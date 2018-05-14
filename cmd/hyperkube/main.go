@@ -27,6 +27,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -43,6 +44,8 @@ import (
 	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
 	kubectl "k8s.io/kubernetes/pkg/kubectl/cmd"
 	_ "k8s.io/kubernetes/pkg/version/prometheus" // for version metric registration
+
+	jaegercfg "github.com/uber/jaeger-client-go/config"
 )
 
 func main() {
@@ -59,8 +62,41 @@ func main() {
 	logs.InitLogs()
 	defer logs.FlushLogs()
 
+	// Determine which command we run.
 	basename := filepath.Base(os.Args[0])
-	if err := commandFor(basename, hyperkubeCommand, allCommandFns).Execute(); err != nil {
+	command := commandFor(basename, hyperkubeCommand, allCommandFns)
+
+	// Usage of Jaeger is configured via the usual environment variables, like
+	// JAEGER_AGENT_HOST (https://github.com/jaegertracing/jaeger-client-go#environment-variables).
+	// But in contrast to the default behavior, tracing with Jaeger must
+	// be enabled explicitly by setting JAEGER_ENABLED to true.
+	envEnabled := "JAEGER_ENABLED"
+	if e := os.Getenv(envEnabled); e != "" {
+		value, err := strconv.ParseBool(e)
+                if err != nil {
+			fmt.Fprintf(os.Stderr, "cannot parse %s=%s: %s\n", envEnabled, e, err)
+			os.Exit(1)
+		}
+		if value {
+			cfg, err := jaegercfg.FromEnv()
+			if err != nil {
+				// parsing errors might happen here, such as when we get a string where we expect a number
+				fmt.Fprintf(os.Stderr, "Could not parse Jaeger env vars: %s\n", err.Error())
+				os.Exit(1)
+			}
+			// Initialize tracer singleton. Because
+			// hypercube acts like some other command, we
+			// use that command's name here.
+			closer, err := cfg.InitGlobalTracer(command.Name())
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Could not initialize jaeger tracer: %s\n", err.Error())
+				os.Exit(1)
+			}
+			defer closer.Close()
+		}
+        }
+
+	if err := command.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}

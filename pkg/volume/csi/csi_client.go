@@ -26,6 +26,9 @@ import (
 	"github.com/golang/glog"
 	"google.golang.org/grpc"
 	api "k8s.io/api/core/v1"
+
+	"github.com/opentracing/opentracing-go"
+	"github.com/grpc-ecosystem/grpc-opentracing/go/otgrpc"
 )
 
 type csiClient interface {
@@ -81,12 +84,19 @@ func newCsiDriverClient(network, addr string) *csiDriverClient {
 // if not, it creates a new connection and associated clients
 func (c *csiDriverClient) assertConnection() error {
 	if c.conn == nil {
-		conn, err := grpc.Dial(
-			c.addr,
+		dialOptions := []grpc.DialOption{
 			grpc.WithInsecure(),
 			grpc.WithDialer(func(target string, timeout time.Duration) (net.Conn, error) {
 				return net.Dial(c.network, target)
 			}),
+		}
+		tracer := opentracing.GlobalTracer()
+		if tracer != nil {
+			dialOptions = append(dialOptions, grpc.WithUnaryInterceptor(otgrpc.OpenTracingClientInterceptor(tracer)))
+		}
+		conn, err := grpc.Dial(
+			c.addr,
+			dialOptions...
 		)
 		if err != nil {
 			return err
