@@ -20,6 +20,7 @@ go_library(
         "//test/e2e/instrumentation/logging/stackdriver:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
+        "//vendor/github.com/spf13/viper:go_default_library",
     ],
 )
 
