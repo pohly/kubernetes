@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/viperconfig"
 
 	// test sources
 	_ "k8s.io/kubernetes/test/e2e/apimachinery"
@@ -41,7 +42,10 @@ import (
 )
 
 func init() {
-	framework.ViperizeFlags()
+	// Register framework flags, then handle flags and Viper config.
+	framework.HandleFlags()
+	viperconfig.ViperizeFlags()
+	framework.AfterReadingAllFlags(&framework.TestContext)
 }
 
 func TestE2E(t *testing.T) {
