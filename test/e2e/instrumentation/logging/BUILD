@@ -21,6 +21,7 @@ go_library(
         "//test/utils/image:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
+        "//vendor/github.com/spf13/viper:go_default_library",
     ],
 )
 

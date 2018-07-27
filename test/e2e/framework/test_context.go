@@ -162,18 +162,6 @@ type TestContextType struct {
 	// Then invoke e2e with '--viper-config e2e' with 'e2e.json'
 	// in the current directory or '--viper-config /tmp/e2e.json'.
 	Viper string
-
-	// Cadvisor contains settings for test/e2e/instrumentation/monitoring.
-	Cadvisor struct {
-		MaxRetries      int
-		SleepDurationMS int
-	}
-
-	// LoggingSoak contains settings for test/e2e/instrumentation/logging.
-	LoggingSoak struct {
-		Scale                    int
-		MilliSecondsBetweenWaves int
-	}
 }
 
 // NodeTestContextType is part of TestContextType, it is shared by all node e2e test.

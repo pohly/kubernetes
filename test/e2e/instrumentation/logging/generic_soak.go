@@ -25,11 +25,23 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/spf13/viper"
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
+
+// For backwards-compatibility reasons these settings are defined at
+// the top level instead of nesting them inside Instrumentation.Logging.
+// They have no command line flags and can only be set via Viper.
+var viperContext struct {
+	LoggingSoak struct {
+		Scale                    int
+		MilliSecondsBetweenWaves int
+	}
+}
+var loggingSoak = &viperContext.LoggingSoak
 
 var _ = instrumentation.SIGDescribe("Logging soak [Performance] [Slow] [Disruptive]", func() {
 
@@ -48,13 +60,15 @@ var _ = instrumentation.SIGDescribe("Logging soak [Performance] [Slow] [Disrupti
 	// Returns wave interval (how many seconds to wait before dumping the next wave of pods).
 	readConfig := func() (int, time.Duration) {
 		// Read in configuration settings, reasonable defaults.
-		scale := framework.TestContext.LoggingSoak.Scale
-		if framework.TestContext.LoggingSoak.Scale == 0 {
+		err := viper.Unmarshal(&viperContext)
+		Expect(err).NotTo(HaveOccurred())
+		scale := loggingSoak.Scale
+		if scale == 0 {
 			scale = 1
 			framework.Logf("Overriding default scale value of zero to %d", scale)
 		}
 
-		milliSecondsBetweenWaves := framework.TestContext.LoggingSoak.MilliSecondsBetweenWaves
+		milliSecondsBetweenWaves := loggingSoak.MilliSecondsBetweenWaves
 		if milliSecondsBetweenWaves == 0 {
 			milliSecondsBetweenWaves = 5000
 			framework.Logf("Overriding default milliseconds value of zero to %d", milliSecondsBetweenWaves)
@@ -63,8 +77,9 @@ var _ = instrumentation.SIGDescribe("Logging soak [Performance] [Slow] [Disrupti
 		return scale, time.Duration(milliSecondsBetweenWaves) * time.Millisecond
 	}
 
-	scale, millisecondsBetweenWaves := readConfig()
-	It(fmt.Sprintf("should survive logging 1KB every %v seconds, for a duration of %v, scaling up to %v pods per node", kbRateInSeconds, totalLogTime, scale), func() {
+	It(fmt.Sprintf("should survive logging 1KB every %v seconds, for a duration of %v", kbRateInSeconds, totalLogTime), func() {
+		scale, timeBetweenWaves := readConfig()
+		By(fmt.Sprintf("scaling up to %v pods per node", scale))
 		defer GinkgoRecover()
 		var wg sync.WaitGroup
 		wg.Add(scale)
@@ -78,7 +93,7 @@ var _ = instrumentation.SIGDescribe("Logging soak [Performance] [Slow] [Disrupti
 				framework.Logf("Completed logging soak, wave %v", i)
 			}()
 			// Niceness.
-			time.Sleep(millisecondsBetweenWaves)
+			time.Sleep(timeBetweenWaves)
 		}
 		framework.Logf("Waiting on all %v logging soak waves to complete", scale)
 		wg.Wait()
