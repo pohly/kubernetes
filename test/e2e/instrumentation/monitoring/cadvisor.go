@@ -20,13 +20,26 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/spf13/viper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
+
+// For backwards-compatibility reasons these settings are defined at
+// the top level instead of nesting them inside Instrumentation.Monitoring.
+// They have no command line flags and can only be set via Viper.
+var viperContext struct {
+	Cadvisor struct {
+		MaxRetries      int
+		SleepDurationMS int
+	}
+}
+var cadvisor = &viperContext.Cadvisor
 
 var _ = instrumentation.SIGDescribe("Cadvisor", func() {
 
@@ -47,13 +60,15 @@ func CheckCadvisorHealthOnAllNodes(c clientset.Interface, timeout time.Duration)
 	// returns maxRetries, sleepDuration
 	readConfig := func() (int, time.Duration) {
 		// Read in configuration settings, reasonable defaults.
-		retry := framework.TestContext.Cadvisor.MaxRetries
-		if framework.TestContext.Cadvisor.MaxRetries == 0 {
+		err := viper.Unmarshal(&viperContext)
+		Expect(err).NotTo(HaveOccurred())
+		retry := cadvisor.MaxRetries
+		if retry == 0 {
 			retry = 6
 			framework.Logf("Overriding default retry value of zero to %d", retry)
 		}
 
-		sleepDurationMS := framework.TestContext.Cadvisor.SleepDurationMS
+		sleepDurationMS := cadvisor.SleepDurationMS
 		if sleepDurationMS == 0 {
 			sleepDurationMS = 10000
 			framework.Logf("Overriding default milliseconds value of zero to %d", sleepDurationMS)
