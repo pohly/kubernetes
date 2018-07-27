@@ -151,6 +151,7 @@ go_library(
         "//vendor/github.com/onsi/gomega/types:go_default_library",
         "//vendor/github.com/prometheus/common/expfmt:go_default_library",
         "//vendor/github.com/prometheus/common/model:go_default_library",
+        "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/github.com/spf13/viper:go_default_library",
         "//vendor/golang.org/x/crypto/ssh:go_default_library",
         "//vendor/golang.org/x/net/websocket:go_default_library",
