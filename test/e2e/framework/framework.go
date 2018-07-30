@@ -14,6 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package framework contains provider-independent helper code for
+// building and running E2E tests with Ginkgo. The actual Ginkgo test
+// suites gets assembled by combining this framework, the optional
+// provider support code and specific tests via a separate .go file
+// like Kubernetes' test/e2e.go.
 package framework
 
 import (

@@ -29,6 +29,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/providers"
 )
 
 const (
@@ -59,10 +60,10 @@ var (
 // IngressScaleFramework defines the framework for ingress scale testing.
 type IngressScaleFramework struct {
 	Clientset     clientset.Interface
-	Jig           *framework.IngressTestJig
-	GCEController *framework.GCEIngressController
+	Jig           *providers.IngressTestJig
+	GCEController *providers.GCEIngressController
 	CloudConfig   framework.CloudConfig
-	Logger        framework.TestLogger
+	Logger        providers.TestLogger
 
 	Namespace        string
 	EnableTLS        bool
@@ -92,7 +93,7 @@ func NewIngressScaleFramework(cs clientset.Interface, ns string, cloudConfig fra
 		Namespace:   ns,
 		Clientset:   cs,
 		CloudConfig: cloudConfig,
-		Logger:      &framework.E2ELogger{},
+		Logger:      &providers.E2ELogger{},
 		EnableTLS:   true,
 		NumIngressesTest: []int{
 			numIngressesSmall,
@@ -106,10 +107,10 @@ func NewIngressScaleFramework(cs clientset.Interface, ns string, cloudConfig fra
 // PrepareScaleTest prepares framework for ingress scale testing.
 func (f *IngressScaleFramework) PrepareScaleTest() error {
 	f.Logger.Infof("Initializing ingress test suite and gce controller...")
-	f.Jig = framework.NewIngressTestJig(f.Clientset)
+	f.Jig = providers.NewIngressTestJig(f.Clientset)
 	f.Jig.Logger = f.Logger
 	f.Jig.PollInterval = scaleTestPollInterval
-	f.GCEController = &framework.GCEIngressController{
+	f.GCEController = &providers.GCEIngressController{
 		Client: f.Clientset,
 		Cloud:  f.CloudConfig,
 	}

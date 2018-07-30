@@ -27,6 +27,7 @@ import (
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/providers"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -70,7 +71,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 
 		By("Creating a LoadBalancer type service with ExternalTrafficPolicy=Global")
 		svc := jig.CreateLoadBalancerService(ns, serviceName, framework.LoadBalancerCreateTimeoutDefault, func(svc *v1.Service) {
-			svc.Spec.Ports = []v1.ServicePort{{Protocol: "TCP", Port: framework.FirewallTestHttpPort}}
+			svc.Spec.Ports = []v1.ServicePort{{Protocol: "TCP", Port: providers.FirewallTestHttpPort}}
 			svc.Spec.LoadBalancerSourceRanges = firewallTestSourceRanges
 		})
 		defer func() {
@@ -80,23 +81,23 @@ var _ = SIGDescribe("Firewall rule", func() {
 			})
 			Expect(cs.CoreV1().Services(svc.Namespace).Delete(svc.Name, nil)).NotTo(HaveOccurred())
 			By("Waiting for the local traffic health check firewall rule to be deleted")
-			localHCFwName := framework.MakeHealthCheckFirewallNameForLBService(clusterID, cloudprovider.GetLoadBalancerName(svc), false)
-			_, err := framework.WaitForFirewallRule(gceCloud, localHCFwName, false, framework.LoadBalancerCleanupTimeout)
+			localHCFwName := providers.MakeHealthCheckFirewallNameForLBService(clusterID, cloudprovider.GetLoadBalancerName(svc), false)
+			_, err := providers.WaitForFirewallRule(gceCloud, localHCFwName, false, framework.LoadBalancerCleanupTimeout)
 			Expect(err).NotTo(HaveOccurred())
 		}()
 		svcExternalIP := svc.Status.LoadBalancer.Ingress[0].IP
 
 		By("Checking if service's firewall rule is correct")
-		lbFw := framework.ConstructFirewallForLBService(svc, cloudConfig.NodeTag)
+		lbFw := providers.ConstructFirewallForLBService(svc, cloudConfig.NodeTag)
 		fw, err := gceCloud.GetFirewall(lbFw.Name)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(framework.VerifyFirewallRule(fw, lbFw, cloudConfig.Network, false)).NotTo(HaveOccurred())
+		Expect(providers.VerifyFirewallRule(fw, lbFw, cloudConfig.Network, false)).NotTo(HaveOccurred())
 
 		By("Checking if service's nodes health check firewall rule is correct")
-		nodesHCFw := framework.ConstructHealthCheckFirewallForLBService(clusterID, svc, cloudConfig.NodeTag, true)
+		nodesHCFw := providers.ConstructHealthCheckFirewallForLBService(clusterID, svc, cloudConfig.NodeTag, true)
 		fw, err = gceCloud.GetFirewall(nodesHCFw.Name)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(framework.VerifyFirewallRule(fw, nodesHCFw, cloudConfig.Network, false)).NotTo(HaveOccurred())
+		Expect(providers.VerifyFirewallRule(fw, nodesHCFw, cloudConfig.Network, false)).NotTo(HaveOccurred())
 
 		// OnlyLocal service is needed to examine which exact nodes the requests are being forwarded to by the Load Balancer on GCE
 		By("Updating LoadBalancer service to ExternalTrafficPolicy=Local")
@@ -105,19 +106,19 @@ var _ = SIGDescribe("Firewall rule", func() {
 		})
 
 		By("Waiting for the nodes health check firewall rule to be deleted")
-		_, err = framework.WaitForFirewallRule(gceCloud, nodesHCFw.Name, false, framework.LoadBalancerCleanupTimeout)
+		_, err = providers.WaitForFirewallRule(gceCloud, nodesHCFw.Name, false, framework.LoadBalancerCleanupTimeout)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Waiting for the correct local traffic health check firewall rule to be created")
-		localHCFw := framework.ConstructHealthCheckFirewallForLBService(clusterID, svc, cloudConfig.NodeTag, false)
-		fw, err = framework.WaitForFirewallRule(gceCloud, localHCFw.Name, true, framework.LoadBalancerCreateTimeoutDefault)
+		localHCFw := providers.ConstructHealthCheckFirewallForLBService(clusterID, svc, cloudConfig.NodeTag, false)
+		fw, err = providers.WaitForFirewallRule(gceCloud, localHCFw.Name, true, framework.LoadBalancerCreateTimeoutDefault)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(framework.VerifyFirewallRule(fw, localHCFw, cloudConfig.Network, false)).NotTo(HaveOccurred())
+		Expect(providers.VerifyFirewallRule(fw, localHCFw, cloudConfig.Network, false)).NotTo(HaveOccurred())
 
 		By(fmt.Sprintf("Creating netexec pods on at most %v nodes", framework.MaxNodesForEndpointsTests))
 		for i, nodeName := range nodesNames {
 			podName := fmt.Sprintf("netexec%v", i)
-			jig.LaunchNetexecPodOnNode(f, nodeName, podName, framework.FirewallTestHttpPort, framework.FirewallTestUdpPort, true)
+			jig.LaunchNetexecPodOnNode(f, nodeName, podName, providers.FirewallTestHttpPort, providers.FirewallTestUdpPort, true)
 			defer func() {
 				framework.Logf("Cleaning up the netexec pod: %v", podName)
 				Expect(cs.CoreV1().Pods(ns).Delete(podName, nil)).NotTo(HaveOccurred())
@@ -126,7 +127,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 
 		// Send requests from outside of the cluster because internal traffic is whitelisted
 		By("Accessing the external service ip from outside, all non-master nodes should be reached")
-		Expect(framework.TestHitNodesFromOutside(svcExternalIP, framework.FirewallTestHttpPort, framework.FirewallTimeoutDefault, nodesSet)).NotTo(HaveOccurred())
+		Expect(framework.TestHitNodesFromOutside(svcExternalIP, providers.FirewallTestHttpPort, providers.FirewallTimeoutDefault, nodesSet)).NotTo(HaveOccurred())
 
 		// Check if there are overlapping tags on the firewall that extend beyond just the vms in our cluster
 		// by removing the tag on one vm and make sure it doesn't get any traffic. This is an imperfect
@@ -140,17 +141,17 @@ var _ = SIGDescribe("Firewall rule", func() {
 		if zoneInLabel, ok := nodeList.Items[0].Labels[kubeletapis.LabelZoneFailureDomain]; ok {
 			zone = zoneInLabel
 		}
-		removedTags := framework.SetInstanceTags(cloudConfig, nodesNames[0], zone, []string{})
+		removedTags := providers.SetInstanceTags(cloudConfig, nodesNames[0], zone, []string{})
 		defer func() {
 			By("Adding tags back to the node and wait till the traffic is recovered")
 			nodesSet.Insert(nodesNames[0])
-			framework.SetInstanceTags(cloudConfig, nodesNames[0], zone, removedTags)
+			providers.SetInstanceTags(cloudConfig, nodesNames[0], zone, removedTags)
 			// Make sure traffic is recovered before exit
-			Expect(framework.TestHitNodesFromOutside(svcExternalIP, framework.FirewallTestHttpPort, framework.FirewallTimeoutDefault, nodesSet)).NotTo(HaveOccurred())
+			Expect(framework.TestHitNodesFromOutside(svcExternalIP, providers.FirewallTestHttpPort, providers.FirewallTimeoutDefault, nodesSet)).NotTo(HaveOccurred())
 		}()
 
 		By("Accessing serivce through the external ip and examine got no response from the node without tags")
-		Expect(framework.TestHitNodesFromOutsideWithCount(svcExternalIP, framework.FirewallTestHttpPort, framework.FirewallTimeoutDefault, nodesSet, 15)).NotTo(HaveOccurred())
+		Expect(framework.TestHitNodesFromOutsideWithCount(svcExternalIP, providers.FirewallTestHttpPort, providers.FirewallTimeoutDefault, nodesSet, 15)).NotTo(HaveOccurred())
 	})
 
 	It("should have correct firewall rules for e2e cluster", func() {
@@ -160,25 +161,25 @@ var _ = SIGDescribe("Firewall rule", func() {
 		}
 
 		By("Checking if e2e firewall rules are correct")
-		for _, expFw := range framework.GetE2eFirewalls(cloudConfig.MasterName, cloudConfig.MasterTag, cloudConfig.NodeTag, cloudConfig.Network, cloudConfig.ClusterIPRange) {
+		for _, expFw := range providers.GetE2eFirewalls(cloudConfig.MasterName, cloudConfig.MasterTag, cloudConfig.NodeTag, cloudConfig.Network, cloudConfig.ClusterIPRange) {
 			fw, err := gceCloud.GetFirewall(expFw.Name)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(framework.VerifyFirewallRule(fw, expFw, cloudConfig.Network, false)).NotTo(HaveOccurred())
+			Expect(providers.VerifyFirewallRule(fw, expFw, cloudConfig.Network, false)).NotTo(HaveOccurred())
 		}
 
 		By("Checking well known ports on master and nodes are not exposed externally")
 		nodeAddrs := framework.NodeAddresses(nodes, v1.NodeExternalIP)
 		Expect(len(nodeAddrs)).NotTo(BeZero())
 		masterAddr := framework.GetMasterAddress(cs)
-		flag, _ := framework.TestNotReachableHTTPTimeout(masterAddr, ports.InsecureKubeControllerManagerPort, framework.FirewallTestTcpTimeout)
+		flag, _ := framework.TestNotReachableHTTPTimeout(masterAddr, ports.InsecureKubeControllerManagerPort, providers.FirewallTestTcpTimeout)
 		Expect(flag).To(BeTrue())
-		flag, _ = framework.TestNotReachableHTTPTimeout(masterAddr, ports.SchedulerPort, framework.FirewallTestTcpTimeout)
+		flag, _ = framework.TestNotReachableHTTPTimeout(masterAddr, ports.SchedulerPort, providers.FirewallTestTcpTimeout)
 		Expect(flag).To(BeTrue())
-		flag, _ = framework.TestNotReachableHTTPTimeout(nodeAddrs[0], ports.KubeletPort, framework.FirewallTestTcpTimeout)
+		flag, _ = framework.TestNotReachableHTTPTimeout(nodeAddrs[0], ports.KubeletPort, providers.FirewallTestTcpTimeout)
 		Expect(flag).To(BeTrue())
-		flag, _ = framework.TestNotReachableHTTPTimeout(nodeAddrs[0], ports.KubeletReadOnlyPort, framework.FirewallTestTcpTimeout)
+		flag, _ = framework.TestNotReachableHTTPTimeout(nodeAddrs[0], ports.KubeletReadOnlyPort, providers.FirewallTestTcpTimeout)
 		Expect(flag).To(BeTrue())
-		flag, _ = framework.TestNotReachableHTTPTimeout(nodeAddrs[0], ports.ProxyStatusPort, framework.FirewallTestTcpTimeout)
+		flag, _ = framework.TestNotReachableHTTPTimeout(nodeAddrs[0], ports.ProxyStatusPort, providers.FirewallTestTcpTimeout)
 		Expect(flag).To(BeTrue())
 	})
 })

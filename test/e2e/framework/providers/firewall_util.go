@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework
+package providers
 
 import (
 	"fmt"
@@ -29,6 +29,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
+	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/gomega"
 	compute "google.golang.org/api/compute/v1"
@@ -51,7 +52,7 @@ func MakeFirewallNameForLBService(name string) string {
 // ConstructFirewallForLBService returns the expected GCE firewall rule for a loadbalancer type service
 func ConstructFirewallForLBService(svc *v1.Service, nodeTag string) *compute.Firewall {
 	if svc.Spec.Type != v1.ServiceTypeLoadBalancer {
-		Failf("can not construct firewall rule for non-loadbalancer type service")
+		framework.Failf("can not construct firewall rule for non-loadbalancer type service")
 	}
 	fw := compute.Firewall{}
 	fw.Name = MakeFirewallNameForLBService(cloudprovider.GetLoadBalancerName(svc))
@@ -77,7 +78,7 @@ func MakeHealthCheckFirewallNameForLBService(clusterID, name string, isNodesHeal
 // ConstructHealthCheckFirewallForLBService returns the expected GCE firewall rule for a loadbalancer type service
 func ConstructHealthCheckFirewallForLBService(clusterID string, svc *v1.Service, nodeTag string, isNodesHealthCheck bool) *compute.Firewall {
 	if svc.Spec.Type != v1.ServiceTypeLoadBalancer {
-		Failf("can not construct firewall rule for non-loadbalancer type service")
+		framework.Failf("can not construct firewall rule for non-loadbalancer type service")
 	}
 	fw := compute.Firewall{}
 	fw.Name = MakeHealthCheckFirewallNameForLBService(clusterID, cloudprovider.GetLoadBalancerName(svc), isNodesHealthCheck)
@@ -97,18 +98,18 @@ func ConstructHealthCheckFirewallForLBService(clusterID string, svc *v1.Service,
 }
 
 // GetInstanceTags gets tags from GCE instance with given name.
-func GetInstanceTags(cloudConfig CloudConfig, instanceName string) *compute.Tags {
+func GetInstanceTags(cloudConfig framework.CloudConfig, instanceName string) *compute.Tags {
 	gceCloud := cloudConfig.Provider.(*gcecloud.GCECloud)
 	res, err := gceCloud.ComputeServices().GA.Instances.Get(cloudConfig.ProjectID, cloudConfig.Zone,
 		instanceName).Do()
 	if err != nil {
-		Failf("Failed to get instance tags for %v: %v", instanceName, err)
+		framework.Failf("Failed to get instance tags for %v: %v", instanceName, err)
 	}
 	return res.Tags
 }
 
 // SetInstanceTags sets tags on GCE instance with given name.
-func SetInstanceTags(cloudConfig CloudConfig, instanceName, zone string, tags []string) []string {
+func SetInstanceTags(cloudConfig framework.CloudConfig, instanceName, zone string, tags []string) []string {
 	gceCloud := cloudConfig.Provider.(*gcecloud.GCECloud)
 	// Re-get instance everytime because we need the latest fingerprint for updating metadata
 	resTags := GetInstanceTags(cloudConfig, instanceName)
@@ -116,17 +117,17 @@ func SetInstanceTags(cloudConfig CloudConfig, instanceName, zone string, tags []
 		cloudConfig.ProjectID, zone, instanceName,
 		&compute.Tags{Fingerprint: resTags.Fingerprint, Items: tags}).Do()
 	if err != nil {
-		Failf("failed to set instance tags: %v", err)
+		framework.Failf("failed to set instance tags: %v", err)
 	}
-	Logf("Sent request to set tags %v on instance: %v", tags, instanceName)
+	framework.Logf("Sent request to set tags %v on instance: %v", tags, instanceName)
 	return resTags.Items
 }
 
 // GetNodeTags gets k8s node tag from one of the nodes
-func GetNodeTags(c clientset.Interface, cloudConfig CloudConfig) []string {
-	nodes := GetReadySchedulableNodesOrDie(c)
+func GetNodeTags(c clientset.Interface, cloudConfig framework.CloudConfig) []string {
+	nodes := framework.GetReadySchedulableNodesOrDie(c)
 	if len(nodes.Items) == 0 {
-		Logf("GetNodeTags: Found 0 node.")
+		framework.Logf("GetNodeTags: Found 0 node.")
 		return []string{}
 	}
 	return GetInstanceTags(cloudConfig, nodes.Items[0].Name).Items
@@ -437,7 +438,7 @@ func VerifyFirewallRule(res, exp *compute.Firewall, network string, portsSubset 
 }
 
 func WaitForFirewallRule(gceCloud *gcecloud.GCECloud, fwName string, exist bool, timeout time.Duration) (*compute.Firewall, error) {
-	Logf("Waiting up to %v for firewall %v exist=%v", timeout, fwName, exist)
+	framework.Logf("Waiting up to %v for firewall %v exist=%v", timeout, fwName, exist)
 	var fw *compute.Firewall
 	var err error
 
@@ -445,7 +446,7 @@ func WaitForFirewallRule(gceCloud *gcecloud.GCECloud, fwName string, exist bool,
 		fw, err = gceCloud.GetFirewall(fwName)
 		if err != nil && exist ||
 			err == nil && !exist ||
-			err != nil && !exist && !IsGoogleAPIHTTPErrorCode(err, http.StatusNotFound) {
+			err != nil && !exist && !framework.IsGoogleAPIHTTPErrorCode(err, http.StatusNotFound) {
 			return false, nil
 		}
 		return true, nil
