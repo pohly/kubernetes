@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -197,7 +198,7 @@ func testZonalFailover(c clientset.Interface, ns string) {
 		waitStatus <- waitForStatefulSetReplicasNotReady(statefulSet.Name, ns, c)
 	}()
 
-	cloud, err := framework.GetGCECloud()
+	cloud, err := gce.GetGCECloud()
 	if err != nil {
 		Expect(err).NotTo(HaveOccurred())
 	}

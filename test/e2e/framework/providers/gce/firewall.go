@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package providers
+package gce
 
 import (
 	"fmt"
@@ -23,16 +23,16 @@ import (
 	"strings"
 	"time"
 
+	compute "google.golang.org/api/compute/v1"
+	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/gomega"
-	compute "google.golang.org/api/compute/v1"
 )
 
 const (
@@ -95,42 +95,6 @@ func ConstructHealthCheckFirewallForLBService(clusterID string, svc *v1.Service,
 		},
 	}
 	return &fw
-}
-
-// GetInstanceTags gets tags from GCE instance with given name.
-func GetInstanceTags(cloudConfig framework.CloudConfig, instanceName string) *compute.Tags {
-	gceCloud := cloudConfig.Provider.(*gcecloud.GCECloud)
-	res, err := gceCloud.ComputeServices().GA.Instances.Get(cloudConfig.ProjectID, cloudConfig.Zone,
-		instanceName).Do()
-	if err != nil {
-		framework.Failf("Failed to get instance tags for %v: %v", instanceName, err)
-	}
-	return res.Tags
-}
-
-// SetInstanceTags sets tags on GCE instance with given name.
-func SetInstanceTags(cloudConfig framework.CloudConfig, instanceName, zone string, tags []string) []string {
-	gceCloud := cloudConfig.Provider.(*gcecloud.GCECloud)
-	// Re-get instance everytime because we need the latest fingerprint for updating metadata
-	resTags := GetInstanceTags(cloudConfig, instanceName)
-	_, err := gceCloud.ComputeServices().GA.Instances.SetTags(
-		cloudConfig.ProjectID, zone, instanceName,
-		&compute.Tags{Fingerprint: resTags.Fingerprint, Items: tags}).Do()
-	if err != nil {
-		framework.Failf("failed to set instance tags: %v", err)
-	}
-	framework.Logf("Sent request to set tags %v on instance: %v", tags, instanceName)
-	return resTags.Items
-}
-
-// GetNodeTags gets k8s node tag from one of the nodes
-func GetNodeTags(c clientset.Interface, cloudConfig framework.CloudConfig) []string {
-	nodes := framework.GetReadySchedulableNodesOrDie(c)
-	if len(nodes.Items) == 0 {
-		framework.Logf("GetNodeTags: Found 0 node.")
-		return []string{}
-	}
-	return GetInstanceTags(cloudConfig, nodes.Items[0].Name).Items
 }
 
 // GetInstancePrefix returns the INSTANCE_PREFIX env we set for e2e cluster.
@@ -446,7 +410,7 @@ func WaitForFirewallRule(gceCloud *gcecloud.GCECloud, fwName string, exist bool,
 		fw, err = gceCloud.GetFirewall(fwName)
 		if err != nil && exist ||
 			err == nil && !exist ||
-			err != nil && !exist && !framework.IsGoogleAPIHTTPErrorCode(err, http.StatusNotFound) {
+			err != nil && !exist && !IsGoogleAPIHTTPErrorCode(err, http.StatusNotFound) {
 			return false, nil
 		}
 		return true, nil

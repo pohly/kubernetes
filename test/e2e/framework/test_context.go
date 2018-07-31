@@ -32,9 +32,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
-	"k8s.io/kubernetes/pkg/kubemark"
 )
 
 const defaultHost = "http://127.0.0.1:8080"
@@ -66,13 +64,12 @@ const defaultHost = "http://127.0.0.1:8080"
 // command line flags. All command line flags will be automatically
 // bound to Viper keys of the same name.
 type TestContextType struct {
-	KubeConfig                 string
-	KubemarkExternalKubeConfig string
-	KubeContext                string
-	KubeAPIContentType         string
-	KubeVolumeDir              string
-	CertDir                    string
-	Host                       string
+	KubeConfig         string
+	KubeContext        string
+	KubeAPIContentType string
+	KubeVolumeDir      string
+	CertDir            string
+	Host               string
 	// TODO: Deprecating this over time... instead just use gobindata_util.go , see #23987.
 	RepoRoot                string
 	DockershimCheckpointDir string
@@ -198,11 +195,15 @@ type CloudConfig struct {
 	NodeTag           string
 	MasterTag         string
 
-	Provider           cloudprovider.Interface
-	KubemarkController *kubemark.KubemarkController
+	Provider ProviderInterface
 }
 
-var TestContext TestContextType
+var TestContext = TestContextType{
+	// May be overwritten later by E2E test suite. Here we just ensure that it is not nil.
+	CloudConfig: CloudConfig{
+		Provider: NullProvider{},
+	},
+}
 
 // Register flags common to all e2e test suites.
 func RegisterCommonFlags() {
@@ -248,7 +249,6 @@ func RegisterCommonFlags() {
 func RegisterClusterFlags() {
 	flag.BoolVar(&TestContext.VerifyServiceAccount, "e2e-verify-service-account", true, "If true tests will verify the service account before running.")
 	flag.StringVar(&TestContext.KubeConfig, clientcmd.RecommendedConfigPathFlag, os.Getenv(clientcmd.RecommendedConfigPathEnvVar), "Path to kubeconfig containing embedded authinfo.")
-	flag.StringVar(&TestContext.KubemarkExternalKubeConfig, fmt.Sprintf("%s-%s", "kubemark-external", clientcmd.RecommendedConfigPathFlag), "", "Path to kubeconfig containing embedded authinfo for external cluster.")
 	flag.StringVar(&TestContext.KubeContext, clientcmd.FlagContext, "", "kubeconfig context to use/override. If unset, will use value from 'current-context'")
 	flag.StringVar(&TestContext.KubeAPIContentType, "kube-api-content-type", "application/vnd.kubernetes.protobuf", "ContentType used to communicate with apiserver")
 
