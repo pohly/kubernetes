@@ -18,6 +18,8 @@ go_test(
         "//test/e2e/autoscaling:go_default_library",
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
+        "//test/e2e/framework/testfiles:go_default_library",
+        "//test/e2e/generated:go_default_library",
         "//test/e2e/instrumentation:go_default_library",
         "//test/e2e/kubectl:go_default_library",
         "//test/e2e/lifecycle:go_default_library",
