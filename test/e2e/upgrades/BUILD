@@ -40,6 +40,7 @@ go_library(
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/ingress:go_default_library",
         "//test/e2e/framework/providers/gce:go_default_library",
+        "//test/e2e/framework/testfiles:go_default_library",
         "//test/e2e/scheduling:go_default_library",
         "//test/utils/image:go_default_library",
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",

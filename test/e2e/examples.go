@@ -18,8 +18,6 @@ package e2e
 
 import (
 	"fmt"
-	"io/ioutil"
-	"os"
 	"path/filepath"
 	"sync"
 	"time"
@@ -31,7 +29,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/generated"
+	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -63,17 +61,13 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 
 	framework.KubeDescribe("Liveness", func() {
 		It("liveness pods should be automatically restarted", func() {
-			mkpath := func(file string) string {
-				path := filepath.Join("test/fixtures/doc-yaml/user-guide/liveness", file)
-				framework.ExpectNoError(createFileForGoBinData(path, path))
-				return path
-			}
-			execYaml := mkpath("exec-liveness.yaml")
-			httpYaml := mkpath("http-liveness.yaml")
+			test := "test/fixtures/doc-yaml/user-guide/liveness"
+			execYaml := readFile(test, "exec-liveness.yaml")
+			httpYaml := readFile(test, "http-liveness.yaml")
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
-			framework.RunKubectlOrDie("create", "-f", filepath.Join(framework.TestContext.OutputDir, execYaml), nsFlag)
-			framework.RunKubectlOrDie("create", "-f", filepath.Join(framework.TestContext.OutputDir, httpYaml), nsFlag)
+			framework.RunKubectlOrDieInput(execYaml, "create", "-f", "-", nsFlag)
+			framework.RunKubectlOrDieInput(httpYaml, "create", "-f", "-", nsFlag)
 
 			// Since both containers start rapidly, we can easily run this test in parallel.
 			var wg sync.WaitGroup
@@ -115,20 +109,16 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 
 	framework.KubeDescribe("Secret", func() {
 		It("should create a pod that reads a secret", func() {
-			mkpath := func(file string) string {
-				path := filepath.Join("test/fixtures/doc-yaml/user-guide/secrets", file)
-				framework.ExpectNoError(createFileForGoBinData(path, path))
-				return path
-			}
-			secretYaml := mkpath("secret.yaml")
-			podYaml := mkpath("secret-pod.yaml")
+			test := "test/fixtures/doc-yaml/user-guide/secrets"
+			secretYaml := readFile(test, "secret.yaml")
+			podYaml := readFile(test, "secret-pod.yaml")
 
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 			podName := "secret-test-pod"
 
 			By("creating secret and pod")
-			framework.RunKubectlOrDie("create", "-f", filepath.Join(framework.TestContext.OutputDir, secretYaml), nsFlag)
-			framework.RunKubectlOrDie("create", "-f", filepath.Join(framework.TestContext.OutputDir, podYaml), nsFlag)
+			framework.RunKubectlOrDieInput(secretYaml, "create", "-f", "-", nsFlag)
+			framework.RunKubectlOrDieInput(podYaml, "create", "-f", "-", nsFlag)
 			err := framework.WaitForPodNoLongerRunningInNamespace(c, podName, ns)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -140,17 +130,13 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 
 	framework.KubeDescribe("Downward API", func() {
 		It("should create a pod that prints his name and namespace", func() {
-			mkpath := func(file string) string {
-				path := filepath.Join("test/fixtures/doc-yaml/user-guide/downward-api", file)
-				framework.ExpectNoError(createFileForGoBinData(path, path))
-				return path
-			}
-			podYaml := mkpath("dapi-pod.yaml")
+			test := "test/fixtures/doc-yaml/user-guide/downward-api"
+			podYaml := readFile(test, "dapi-pod.yaml")
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 			podName := "dapi-test-pod"
 
 			By("creating the pod")
-			framework.RunKubectlOrDie("create", "-f", filepath.Join(framework.TestContext.OutputDir, podYaml), nsFlag)
+			framework.RunKubectlOrDieInput(podYaml, "create", "-f", "-", nsFlag)
 			err := framework.WaitForPodNoLongerRunningInNamespace(c, podName, ns)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -163,19 +149,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 	})
 })
 
-func createFileForGoBinData(gobindataPath, outputFilename string) error {
-	data := generated.ReadOrDie(gobindataPath)
-	if len(data) == 0 {
-		return fmt.Errorf("Failed to read gobindata from %v", gobindataPath)
-	}
-	fullPath := filepath.Join(framework.TestContext.OutputDir, outputFilename)
-	err := os.MkdirAll(filepath.Dir(fullPath), 0777)
-	if err != nil {
-		return fmt.Errorf("Error while creating directory %v: %v", filepath.Dir(fullPath), err)
-	}
-	err = ioutil.WriteFile(fullPath, data, 0644)
-	if err != nil {
-		return fmt.Errorf("Error while trying to write to file %v: %v", fullPath, err)
-	}
-	return nil
+func readFile(test, file string) string {
+	from := filepath.Join(test, file)
+	return string(testfiles.ReadOrDie(from))
 }
