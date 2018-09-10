@@ -84,10 +84,11 @@ import (
 	"unicode/utf8"
 )
 
-// CommandLine is the flag set that AddOptions adds to. Usually this
-// is the same as the default in the flag package, but can also be
-// something else (for example during testing).
-var CommandLine = flag.CommandLine
+// CommandLine is the flag set that AddOptions adds to. This
+// is distinct from the global default in the flag package, so
+// these additional flags can be treated separately from other
+// flags if desired.
+var CommandLine = flag.NewFlagSet("config", flag.ContinueOnError)
 
 // AddOptions analyzes the options value and creates the necessary
 // flags to populate it.
