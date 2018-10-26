@@ -131,7 +131,9 @@ func CopyAllLogs(ctx context.Context, cs clientset.Interface, ns string, to LogO
 							}
 							return
 						}
-						file, err := os.Create(filename)
+						// The test suite might run the same test multiple times,
+						// so we have to append here.
+						file, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 						if err != nil {
 							if to.StatusWriter != nil {
 								fmt.Fprintf(to.StatusWriter, "create file %s: %s\n", filename, err)
@@ -152,11 +154,24 @@ func CopyAllLogs(ctx context.Context, cs clientset.Interface, ns string, to LogO
 							readCloser.Close()
 						}()
 						scanner := bufio.NewScanner(readCloser)
+						first := true
 						for scanner.Scan() {
 							line := scanner.Text()
 							// Filter out the expected "end of stream" error message,
 							// it would just confuse developers who don't know about it.
-							if !strings.HasPrefix(line, "rpc error: code = Unknown desc = Error: No such container:") {
+							// Same for attempts to read logs from a container that
+							// isn't ready (yet?!).
+							if !strings.HasPrefix(line, "rpc error: code = Unknown desc = Error: No such container:") &&
+								!strings.HasPrefix(line, "Unable to retrieve container logs for ") {
+								if first {
+									if to.LogWriter == nil {
+										// Because the same log might be written to multiple times
+										// in different test instances, log an extra line to separate them.
+										// Also provides some useful extra information.
+										fmt.Fprintf(out, "==== start of log for container %s/%s ====\n", pod.ObjectMeta.Name, c.Name)
+									}
+									first = false
+								}
 								fmt.Fprintf(out, "%s%s\n", prefix, scanner.Text())
 							}
 						}
