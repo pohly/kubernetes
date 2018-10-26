@@ -168,7 +168,7 @@ func CopyAllLogs(ctx context.Context, cs clientset.Interface, ns string, to LogO
 										// Because the same log might be written to multiple times
 										// in different test instances, log an extra line to separate them.
 										// Also provides some useful extra information.
-										fmt.Fprintf(out, "==== start of log for container %s/%s ====\n", pod.ObjectMeta.Name, c.Name)
+										fmt.Fprintf(out, "==== start of log for container %s ====\n", name)
 									}
 									first = false
 								}
