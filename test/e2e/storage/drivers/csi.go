@@ -71,6 +71,7 @@ func initHostPathCSIDriver(name string, config testsuites.TestConfig, manifests 
 			),
 			Capabilities: map[testsuites.Capability]bool{
 				testsuites.CapPersistence: true,
+				testsuites.CapMultiPODs:   true,
 			},
 
 			Config: config,

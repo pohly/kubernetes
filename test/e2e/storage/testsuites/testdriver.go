@@ -86,6 +86,13 @@ const (
 	CapBlock       Capability = "block"       // raw block mode
 	CapFsGroup     Capability = "fsGroup"     // volume ownership via fsGroup
 	CapExec        Capability = "exec"        // exec a file in the volume
+
+	// multiple pods on a node can use the same volume concurrently;
+	// for CSI, see:
+	// - https://github.com/container-storage-interface/spec/pull/150
+	// - https://github.com/container-storage-interface/spec/issues/178
+	// - NodeStageVolume in the spec
+	CapMultiPODs Capability = "multipods"
 )
 
 // DriverInfo represents a combination of parameters to be used in implementation of TestDriver
