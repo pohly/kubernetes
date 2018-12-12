@@ -19,6 +19,7 @@ package testsuites
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -50,6 +51,7 @@ type StorageClassTest struct {
 	NodeName           string
 	NodeSelector       map[string]string
 	SkipWriteReadCheck bool
+	MultiWriteCheck    bool
 	VolumeMode         *v1.PersistentVolumeMode
 }
 
@@ -183,6 +185,15 @@ func testProvisioning(driver TestDriver, input *provisioningTestInput) {
 			TestDynamicProvisioning(input.testCase, input.cs, input.pvc, input.sc)
 		})
 	}
+
+	multi, set := driver.GetDriverInfo().Capabilities[CapMultiPODs]
+	if !set || multi {
+		It("should allow concurrent writes on the same node", func() {
+			input.testCase.SkipWriteReadCheck = true
+			input.testCase.MultiWriteCheck = true
+			TestDynamicProvisioning(input.testCase, input.cs, input.pvc, input.sc)
+		})
+	}
 }
 
 // TestDynamicProvisioning tests dynamic provisioning with specified StorageClassTest and storageClass
@@ -253,6 +264,26 @@ func TestDynamicProvisioning(t StorageClassTest, client clientset.Interface, cla
 		Expect(err).NotTo(HaveOccurred())
 	}
 
+	// Determine where to run pods.
+	nodeName := t.NodeName
+	var nodes *v1.NodeList
+	if t.NodeSelector != nil {
+		var parts []string
+		for label, value := range t.NodeSelector {
+			parts = append(parts, label+"="+value)
+		}
+		labelSelector := strings.Join(parts, " ")
+		nodes, err = client.CoreV1().Nodes().List(metav1.ListOptions{
+			LabelSelector: labelSelector,
+		})
+		Expect(err).NotTo(HaveOccurred(), "list nodes with node selector %q", t.NodeSelector)
+	}
+
+	// Fall back to one selected if none was explicitly specified.
+	if nodeName == "" && nodes != nil && len(nodes.Items) > 0 {
+		nodeName = nodes.Items[0].Name
+	}
+
 	if !t.SkipWriteReadCheck {
 		// We start two pods:
 		// - The first writes 'hello word' to the /mnt/test (= the volume).
@@ -277,25 +308,6 @@ func TestDynamicProvisioning(t StorageClassTest, client clientset.Interface, cla
 		// - if TestConfig.ClientNodeSelector matches more than the node from
 		//   the first step, it will run a third pod on a different node
 
-		nodeName := t.NodeName
-		var nodes *v1.NodeList
-		if t.NodeSelector != nil {
-			var parts []string
-			for label, value := range t.NodeSelector {
-				parts = append(parts, label+"="+value)
-			}
-			labelSelector := strings.Join(parts, " ")
-			nodes, err = client.CoreV1().Nodes().List(metav1.ListOptions{
-				LabelSelector: labelSelector,
-			})
-			Expect(err).NotTo(HaveOccurred(), "list nodes with node selector %q", t.NodeSelector)
-		}
-
-		// Fall back to one selected if none was explicitly specified.
-		if nodeName == "" && nodes != nil && len(nodes.Items) > 0 {
-			nodeName = nodes.Items[0].Name
-		}
-
 		By("checking the created volume is writable")
 		runInPodWithVolume(client, claim.Namespace, claim.Name, "-first", nodeName, command)
 
@@ -317,6 +329,23 @@ func TestDynamicProvisioning(t StorageClassTest, client clientset.Interface, cla
 			runInPodWithVolume(client, claim.Namespace, claim.Name, "-third", secondNodeName, "grep 'hello world' /mnt/test/data")
 		}
 	}
+
+	if t.MultiWriteCheck {
+		// We start two pods concurrently on the same node,
+		// using the same PVC. Both wait for other to create a
+		// file before returning.
+		wg := sync.WaitGroup{}
+		wg.Add(2)
+		run := func(suffix, command string) {
+			defer GinkgoRecover()
+			defer wg.Done()
+			runInPodWithVolume(client, claim.Namespace, claim.Name, suffix, nodeName, command)
+		}
+		go run("-first", "touch /mnt/test/first && while ! [ -f /mnt/test/second ]; do sleep 1; done")
+		go run("-second", "touch /mnt/test/second && while ! [ -f /mnt/test/first ]; do sleep 1; done")
+		wg.Wait()
+	}
+
 	By(fmt.Sprintf("deleting claim %q/%q", claim.Namespace, claim.Name))
 	framework.ExpectNoError(client.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, nil))
 

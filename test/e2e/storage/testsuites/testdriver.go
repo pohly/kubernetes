@@ -89,7 +89,9 @@ type DynamicPVTestDriver interface {
 	GetClaimSize() string
 }
 
-// Capability represents a feature that a volume plugin supports
+// Capability represents a feature that a volume plugin supports.
+// Unless noted otherwise, capabilities are assumed to be not
+// supported when not set explicitly.
 type Capability string
 
 const (
@@ -97,6 +99,7 @@ const (
 	CapBlock       Capability = "block"       // raw block mode
 	CapFsGroup     Capability = "fsGroup"     // volume ownership via fsGroup
 	CapExec        Capability = "exec"        // exec a file in the volume
+	CapMultiPODs   Capability = "multipods"   // multiple pods on a node can use the same volume concurrently; enabled by default
 )
 
 // DriverInfo represents a combination of parameters to be used in implementation of TestDriver
