@@ -18,6 +18,7 @@ package testsuites
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -47,6 +48,7 @@ type StorageClassTest struct {
 	ExpectedSize       string
 	PvCheck            func(volume *v1.PersistentVolume) error
 	NodeName           string
+	NodeSelector       map[string]string
 	SkipWriteReadCheck bool
 	VolumeMode         *v1.PersistentVolumeMode
 }
@@ -88,6 +90,7 @@ func createProvisioningTestInput(driver TestDriver, pattern testpatterns.TestPat
 			ClaimSize:    resource.claimSize,
 			ExpectedSize: resource.claimSize,
 			NodeName:     driver.GetDriverInfo().Config.ClientNodeName,
+			NodeSelector: driver.GetDriverInfo().Config.ClientNodeSelector,
 		},
 		cs:  driver.GetDriverInfo().Config.Framework.ClientSet,
 		pvc: resource.pvc,
@@ -265,10 +268,54 @@ func TestDynamicProvisioning(t StorageClassTest, client clientset.Interface, cla
 			command += fmt.Sprintf(" && ( mount | grep 'on /mnt/test' | awk '{print $6}' | sed 's/^(/,/; s/)$/,/' | grep -q ,%s, )", option)
 		}
 		command += " || (mount | grep 'on /mnt/test'; false)"
-		runInPodWithVolume(client, claim.Namespace, claim.Name, "-first", t.NodeName, command)
+
+		// This test uses TestConfig.ClientNodeName and TestConfig.ClientNodeSelector
+		// as follows:
+		// - first it runs two pods on the same node, selected based on
+		//   TestConfig.ClientNodeName (if not empty) or TestConfig.ClientNodeSelector
+		//   (otherwise)
+		// - if TestConfig.ClientNodeSelector matches more than the node from
+		//   the first step, it will run a third pod on a different node
+
+		nodeName := t.NodeName
+		var nodes *v1.NodeList
+		if t.NodeSelector != nil {
+			var parts []string
+			for label, value := range t.NodeSelector {
+				parts = append(parts, label+"="+value)
+			}
+			labelSelector := strings.Join(parts, " ")
+			nodes, err = client.CoreV1().Nodes().List(metav1.ListOptions{
+				LabelSelector: labelSelector,
+			})
+			Expect(err).NotTo(HaveOccurred(), "list nodes with node selector %q", t.NodeSelector)
+		}
+
+		// Fall back to one selected if none was explicitly specified.
+		if nodeName == "" && nodes != nil && len(nodes.Items) > 0 {
+			nodeName = nodes.Items[0].Name
+		}
+
+		By("checking the created volume is writable")
+		runInPodWithVolume(client, claim.Namespace, claim.Name, "-first", nodeName, command)
 
 		By("checking the created volume is readable and retains data")
-		runInPodWithVolume(client, claim.Namespace, claim.Name, "-second", t.NodeName, "grep 'hello world' /mnt/test/data")
+		runInPodWithVolume(client, claim.Namespace, claim.Name, "-second", nodeName, "grep 'hello world' /mnt/test/data")
+
+		// Run on another node, if we have one.
+		var secondNodeName string
+		if nodes != nil {
+			for _, node := range nodes.Items {
+				if node.Name != nodeName {
+					secondNodeName = node.Name
+					break
+				}
+			}
+		}
+		if secondNodeName != "" {
+			By("checking the created volume is readable on another node")
+			runInPodWithVolume(client, claim.Namespace, claim.Name, "-third", secondNodeName, "grep 'hello world' /mnt/test/data")
+		}
 	}
 	By(fmt.Sprintf("deleting claim %q/%q", claim.Namespace, claim.Name))
 	framework.ExpectNoError(client.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, nil))
