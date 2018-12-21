@@ -87,14 +87,11 @@ func createProvisioningTestInput(driver TestDriver, pattern testpatterns.TestPat
 		testCase: StorageClassTest{
 			ClaimSize:    resource.claimSize,
 			ExpectedSize: resource.claimSize,
+			NodeName:     driver.GetDriverInfo().Config.ClientNodeName,
 		},
 		cs:  driver.GetDriverInfo().Config.Framework.ClientSet,
 		pvc: resource.pvc,
 		sc:  resource.sc,
-	}
-
-	if driver.GetDriverInfo().Config.ClientNodeName != "" {
-		input.testCase.NodeName = driver.GetDriverInfo().Config.ClientNodeName
 	}
 
 	return resource, input
@@ -302,6 +299,7 @@ func runInPodWithVolume(c clientset.Interface, ns, claimName, nodeName, command 
 			GenerateName: "pvc-volume-tester-",
 		},
 		Spec: v1.PodSpec{
+			NodeName: nodeName,
 			Containers: []v1.Container{
 				{
 					Name:    "volume-tester",
@@ -331,9 +329,6 @@ func runInPodWithVolume(c clientset.Interface, ns, claimName, nodeName, command 
 		},
 	}
 
-	if len(nodeName) != 0 {
-		pod.Spec.NodeName = nodeName
-	}
 	pod, err := c.CoreV1().Pods(ns).Create(pod)
 	framework.ExpectNoError(err, "Failed to create pod: %v", err)
 	defer func() {
