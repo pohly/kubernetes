@@ -265,10 +265,10 @@ func TestDynamicProvisioning(t StorageClassTest, client clientset.Interface, cla
 			command += fmt.Sprintf(" && ( mount | grep 'on /mnt/test' | awk '{print $6}' | sed 's/^(/,/; s/)$/,/' | grep -q ,%s, )", option)
 		}
 		command += " || (mount | grep 'on /mnt/test'; false)"
-		runInPodWithVolume(client, claim.Namespace, claim.Name, t.NodeName, command)
+		runInPodWithVolume(client, claim.Namespace, claim.Name, "-first", t.NodeName, command)
 
 		By("checking the created volume is readable and retains data")
-		runInPodWithVolume(client, claim.Namespace, claim.Name, t.NodeName, "grep 'hello world' /mnt/test/data")
+		runInPodWithVolume(client, claim.Namespace, claim.Name, "-second", t.NodeName, "grep 'hello world' /mnt/test/data")
 	}
 	By(fmt.Sprintf("deleting claim %q/%q", claim.Namespace, claim.Name))
 	framework.ExpectNoError(client.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, nil))
@@ -289,14 +289,14 @@ func TestDynamicProvisioning(t StorageClassTest, client clientset.Interface, cla
 }
 
 // runInPodWithVolume runs a command in a pod with given claim mounted to /mnt directory.
-func runInPodWithVolume(c clientset.Interface, ns, claimName, nodeName, command string) {
+func runInPodWithVolume(c clientset.Interface, ns, claimName, suffix, nodeName, command string) {
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "pvc-volume-tester-",
+			Name: "pvc-volume-tester" + suffix,
 		},
 		Spec: v1.PodSpec{
 			NodeName: nodeName,
