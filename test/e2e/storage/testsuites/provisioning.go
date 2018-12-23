@@ -121,7 +121,7 @@ func (p *provisioningTestSuite) execTest(driver TestDriver, pattern testpatterns
 		// Ginkgo's "Global Shared Behaviors" require arguments for a shared function
 		// to be a single struct and to be passed as a pointer.
 		// Please see https://onsi.github.io/ginkgo/#global-shared-behaviors for details.
-		testProvisioning(driver, &input)
+		p.testProvisioning(driver, pattern, &input)
 	})
 }
 
@@ -163,28 +163,35 @@ type provisioningTestInput struct {
 	sc       *storage.StorageClass
 }
 
-func testProvisioning(driver TestDriver, input *provisioningTestInput) {
+// TODO (?): inline the code into execTest? The control flow and variable binding would be easier to understand, IMHO.
+func (p *provisioningTestSuite) testProvisioning(driver TestDriver, pattern testpatterns.TestPattern, input *provisioningTestInput) {
 	It("should provision storage with defaults", func() {
 		TestDynamicProvisioning(input.testCase, input.cs, input.pvc, input.sc)
 	})
 
 	supportedMountOptions := driver.GetDriverInfo().SupportedMountOption
+	// Optional test, not using framework utility function.
+	mountText := "should provision storage with mount options"
 	if supportedMountOptions != nil {
-		It("should provision storage with mount options", func() {
+		It(mountText, func() {
 			input.sc.MountOptions = supportedMountOptions.Union(driver.GetDriverInfo().RequiredMountOption).List()
 			TestDynamicProvisioning(input.testCase, input.cs, input.pvc, input.sc)
 		})
+	} else {
+		// This extra prefix wouldn't be necessary if we could retrieve the current components
+		// from ginkgo during test registration, but ginkgo doesn't support that - see spec.go
+		framework.Skipped(getTestNameStr(p, pattern) + " " + mountText)
 	}
 
-	if driver.GetDriverInfo().Capabilities[CapBlock] {
-		It("should create and delete block persistent volumes", func() {
+	// Optional test, using framework utility function.
+	framework.ItCond("should create and delete block persistent volumes", driver.GetDriverInfo().Capabilities[CapBlock],
+		func() {
 			block := v1.PersistentVolumeBlock
 			input.testCase.VolumeMode = &block
 			input.testCase.SkipWriteReadCheck = true
 			input.pvc.Spec.VolumeMode = &block
 			TestDynamicProvisioning(input.testCase, input.cs, input.pvc, input.sc)
 		})
-	}
 
 	multi, set := driver.GetDriverInfo().Capabilities[CapMultiPODs]
 	if !set || multi {

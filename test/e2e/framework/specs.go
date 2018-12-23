@@ -17,6 +17,9 @@ limitations under the License.
 package framework
 
 import (
+	"sort"
+	"strings"
+
 	"github.com/onsi/ginkgo"
 )
 
@@ -26,6 +29,7 @@ type spec struct {
 }
 
 var specs []spec
+var skipped []string
 
 // DescribeWithTestContext is like ginkgo.Describe, but in contrast to
 // ginkgo, the framework implementation will invoke the spec body at a
@@ -44,4 +48,32 @@ func describeSpecs() {
 	for _, spec := range specs {
 		ginkgo.Describe(spec.text, spec.body)
 	}
+}
+
+// Skipped records the fact that some test definition was skipped.
+// It's parameter is the text that would have been given to the
+// ginkgo.Context or ginkgo.It call that is getting skipped.
+// Later the framework will use that recorded information to inform
+// the user about skipped tests.
+//
+// Doing that with logging calls would have the disadvantage that
+// the output is produced for each program startup, even when the
+// user does not want to run any tests.
+func Skipped(text string) {
+	skipped = append(skipped /* ginkgo.CurrentGinkgoTestDescription().FullTestText */, "??? "+text)
+}
+
+// ItCond only registers the test if the condition is true, otherwise it gets
+// recorded as skipped.
+func ItCond(text string, cond bool, body func()) {
+	if !cond {
+		Skipped(text)
+		return
+	}
+	ginkgo.It(text, body)
+}
+
+func GetSkipped() string {
+	sort.Strings(skipped)
+	return strings.Join(skipped, "\n")
 }

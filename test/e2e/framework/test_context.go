@@ -420,4 +420,10 @@ func AfterReadingAllFlags(t *TestContextType) {
 	// Register Ginkgo specs in Gingko that wanted to wait for the
 	// TestContext to be initialized.
 	describeSpecs()
+
+	// Log all tests that weren't registered.
+	skipped := GetSkipped()
+	if skipped != "" {
+		klog.Infof("The following tests were not added to the test suite because they are not supported in the current configuration:\n%s\n", skipped)
+	}
 }
