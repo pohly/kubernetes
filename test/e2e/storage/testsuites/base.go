@@ -74,14 +74,6 @@ func RunTestSuite(f *framework.Framework, driver TestDriver, tsInits []func() Te
 			if !isTestSupported(suite, driver, pattern) {
 				continue
 			}
-
-			if bTestDriver, ok := driver.(BeforeEachTestDriver); ok {
-				p := pattern
-				BeforeEach(func() {
-					bTestDriver.BeforeEach(p)
-				})
-			}
-
 			suite.execTest(driver, pattern)
 		}
 	}

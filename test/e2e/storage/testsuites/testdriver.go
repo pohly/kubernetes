@@ -48,15 +48,6 @@ type FilterTestDriver interface {
 	IsTestSupported(testpatterns.TestPattern) bool
 }
 
-// BeforeEachTestDriver is an optional interface that drivers can
-// implement to hook into test execution. It can be used to initialize
-// additional resources at a time when TestConfig (see below) is fully
-// populated or to skip tests based on some runtime criteria.
-type BeforeEachTestDriver interface {
-	// Called once per test.
-	BeforeEach(testpatterns.TestPattern)
-}
-
 // PreprovisionedVolumeTestDriver represents an interface for a TestDriver that has pre-provisioned volume
 type PreprovisionedVolumeTestDriver interface {
 	TestDriver

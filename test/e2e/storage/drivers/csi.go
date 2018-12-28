@@ -164,7 +164,6 @@ type gcePDCSIDriver struct {
 
 var _ testsuites.TestDriver = &gcePDCSIDriver{}
 var _ testsuites.DynamicPVTestDriver = &gcePDCSIDriver{}
-var _ testsuites.BeforeEachTestDriver = &gcePDCSIDriver{}
 
 // InitGcePDCSIDriver returns gcePDCSIDriver that implements TestDriver interface
 func InitGcePDCSIDriver(config testsuites.TestConfig) testsuites.TestDriver {
@@ -195,12 +194,6 @@ func (g *gcePDCSIDriver) GetDriverInfo() *testsuites.DriverInfo {
 	return &g.driverInfo
 }
 
-func (g *gcePDCSIDriver) BeforeEach(pattern testpatterns.TestPattern) {
-	f := g.driverInfo.Config.Framework
-	framework.SkipUnlessProviderIs("gce", "gke")
-	framework.SkipIfMultizone(f.ClientSet)
-}
-
 func (g *gcePDCSIDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.StorageClass {
 	ns := g.driverInfo.Config.Framework.Namespace.Name
 	provisioner := g.driverInfo.Name
@@ -216,6 +209,9 @@ func (g *gcePDCSIDriver) GetClaimSize() string {
 }
 
 func (g *gcePDCSIDriver) CreateDriver() {
+	framework.SkipUnlessProviderIs("gce", "gke")
+	framework.SkipIfMultizone(g.driverInfo.Config.Framework.ClientSet)
+
 	By("deploying csi gce-pd driver")
 	// It would be safer to rename the gcePD driver, but that
 	// hasn't been done before either and attempts to do so now led to
@@ -259,7 +255,6 @@ type gcePDExternalCSIDriver struct {
 
 var _ testsuites.TestDriver = &gcePDExternalCSIDriver{}
 var _ testsuites.DynamicPVTestDriver = &gcePDExternalCSIDriver{}
-var _ testsuites.BeforeEachTestDriver = &gcePDExternalCSIDriver{}
 
 // InitGcePDExternalCSIDriver returns gcePDExternalCSIDriver that implements TestDriver interface
 func InitGcePDExternalCSIDriver(config testsuites.TestConfig) testsuites.TestDriver {
@@ -292,11 +287,6 @@ func (g *gcePDExternalCSIDriver) GetDriverInfo() *testsuites.DriverInfo {
 	return &g.driverInfo
 }
 
-func (g *gcePDExternalCSIDriver) BeforeEach(pattern testpatterns.TestPattern) {
-	framework.SkipUnlessProviderIs("gce", "gke")
-	framework.SkipIfMultizone(g.driverInfo.Config.Framework.ClientSet)
-}
-
 func (g *gcePDExternalCSIDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.StorageClass {
 	ns := g.driverInfo.Config.Framework.Namespace.Name
 	provisioner := g.driverInfo.Name
@@ -312,6 +302,8 @@ func (g *gcePDExternalCSIDriver) GetClaimSize() string {
 }
 
 func (g *gcePDExternalCSIDriver) CreateDriver() {
+	framework.SkipUnlessProviderIs("gce", "gke")
+	framework.SkipIfMultizone(g.driverInfo.Config.Framework.ClientSet)
 }
 
 func (g *gcePDExternalCSIDriver) CleanupDriver() {
