@@ -139,7 +139,7 @@ type volumeModeTestResource struct {
 	pvc *v1.PersistentVolumeClaim
 	pv  *v1.PersistentVolume
 
-	driverTestResource interface{}
+	volume TestVolume
 }
 
 var _ TestResource = &volumeModeTestResource{}
@@ -160,7 +160,7 @@ func (s *volumeModeTestResource) setupResource(driver TestDriver, pattern testpa
 	)
 
 	// Create volume for pre-provisioned volume tests
-	s.driverTestResource = CreateVolume(driver, volType)
+	s.volume = CreateVolume(driver, volType)
 
 	switch volType {
 	case testpatterns.PreprovisionedPV:
@@ -170,7 +170,7 @@ func (s *volumeModeTestResource) setupResource(driver TestDriver, pattern testpa
 			scName = fmt.Sprintf("%s-%s-sc-for-file", ns.Name, dInfo.Name)
 		}
 		if pDriver, ok := driver.(PreprovisionedPVTestDriver); ok {
-			pvSource = pDriver.GetPersistentVolumeSource(false, fsType, s.driverTestResource)
+			pvSource = pDriver.GetPersistentVolumeSource(false, fsType, s.volume)
 			if pvSource == nil {
 				framework.Skipf("Driver %q does not define PersistentVolumeSource - skipping", dInfo.Name)
 			}
@@ -203,7 +203,6 @@ func (s *volumeModeTestResource) cleanupResource(driver TestDriver, pattern test
 	f := dInfo.Config.Framework
 	cs := f.ClientSet
 	ns := f.Namespace
-	volType := pattern.VolType
 
 	By("Deleting pv and pvc")
 	errs := framework.PVPVCCleanup(cs, ns.Name, s.pv, s.pvc)
@@ -216,7 +215,9 @@ func (s *volumeModeTestResource) cleanupResource(driver TestDriver, pattern test
 	}
 
 	// Cleanup volume for pre-provisioned volume tests
-	DeleteVolume(driver, volType, s.driverTestResource)
+	if s.volume != nil {
+		s.volume.DeleteVolume()
+	}
 }
 
 type volumeModeTestInput struct {
