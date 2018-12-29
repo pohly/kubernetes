@@ -31,7 +31,7 @@ type TestDriver interface {
 	// CreateDriver creates all driver resources that is required for TestDriver method
 	// except CreateVolume. May be called more than once and should only do something on
 	// the first call.
-	CreateDriver()
+	CreateDriver(config *TestConfig)
 	// CreateDriver cleanup all the resources that is created in CreateDriver. There is
 	// no guarantee that CreateDriver succeeded or even was called at all, so the test driver
 	// has to track resources.
@@ -59,7 +59,7 @@ type TestVolume interface {
 type PreprovisionedVolumeTestDriver interface {
 	TestDriver
 	// CreateVolume creates a pre-provisioned volume of the desired volume type.
-	CreateVolume(volumeType testpatterns.TestVolType) TestVolume
+	CreateVolume(config *TestConfig, volumeType testpatterns.TestVolType) TestVolume
 }
 
 // InlineVolumeTestDriver represents an interface for a TestDriver that supports InlineVolume
@@ -69,7 +69,7 @@ type InlineVolumeTestDriver interface {
 	// GetVolumeSource returns a volumeSource for inline volume.
 	// It will set readOnly and fsType to the volumeSource, if TestDriver supports both of them.
 	// It will return nil, if the TestDriver doesn't support either of the parameters.
-	GetVolumeSource(readOnly bool, fsType string, testVolume TestVolume) *v1.VolumeSource
+	GetVolumeSource(config *TestConfig, readOnly bool, fsType string, testVolume TestVolume) *v1.VolumeSource
 }
 
 // PreprovisionedPVTestDriver represents an interface for a TestDriver that supports PreprovisionedPV
@@ -78,7 +78,7 @@ type PreprovisionedPVTestDriver interface {
 	// GetPersistentVolumeSource returns a PersistentVolumeSource for pre-provisioned Persistent Volume.
 	// It will set readOnly and fsType to the PersistentVolumeSource, if TestDriver supports both of them.
 	// It will return nil, if the TestDriver doesn't support either of the parameters.
-	GetPersistentVolumeSource(readOnly bool, fsType string, testVolume TestVolume) *v1.PersistentVolumeSource
+	GetPersistentVolumeSource(config *TestConfig, readOnly bool, fsType string, testVolume TestVolume) *v1.PersistentVolumeSource
 }
 
 // DynamicPVTestDriver represents an interface for a TestDriver that supports DynamicPV
@@ -87,7 +87,7 @@ type DynamicPVTestDriver interface {
 	// GetDynamicProvisionStorageClass returns a StorageClass dynamic provision Persistent Volume.
 	// It will set fsType to the StorageClass, if TestDriver supports it.
 	// It will return nil, if the TestDriver doesn't support it.
-	GetDynamicProvisionStorageClass(fsType string) *storagev1.StorageClass
+	GetDynamicProvisionStorageClass(config *TestConfig, fsType string) *storagev1.StorageClass
 
 	// GetClaimSize returns the size of the volume that is to be provisioned ("5Gi", "1Mi").
 	// The size must be chosen so that the resulting volume is large enough for all
@@ -108,7 +108,7 @@ const (
 	CapMultiPODs   Capability = "multipods"   // multiple pods on a node can use the same volume concurrently; enabled by default
 )
 
-// DriverInfo represents a combination of parameters to be used in implementation of TestDriver
+// DriverInfo represents static information about a TestDriver.
 type DriverInfo struct {
 	Name       string // Name of the driver
 	FeatureTag string // FeatureTag for the driver
@@ -123,8 +123,10 @@ type DriverInfo struct {
 }
 
 // TestConfig represents parameters that control test execution.
-// They can still be modified after defining tests, for example
-// in a BeforeEach or when creating the driver.
+// One instance gets allocated for each test and is then passed
+// via pointer to functions involved in the test. These functions,
+// in particular CreateDriver, can update fields if needed for
+// the remaining test execution.
 type TestConfig struct {
 	// Some short word that gets inserted into dynamically
 	// generated entities (pods, paths) as first part of the name
