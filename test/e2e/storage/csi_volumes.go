@@ -43,7 +43,7 @@ import (
 )
 
 // List of testDrivers to be executed in below loop
-var csiTestDrivers = []func(config testsuites.TestConfig) testsuites.TestDriver{
+var csiTestDrivers = []func() testsuites.TestDriver{
 	drivers.InitHostPathCSIDriver,
 	drivers.InitGcePDCSIDriver,
 	drivers.InitGcePDExternalCSIDriver,
@@ -52,10 +52,11 @@ var csiTestDrivers = []func(config testsuites.TestConfig) testsuites.TestDriver{
 
 // List of testSuites to be executed in below loop
 var csiTestSuites = []func() testsuites.TestSuite{
-	testsuites.InitVolumesTestSuite,
-	testsuites.InitVolumeIOTestSuite,
-	testsuites.InitVolumeModeTestSuite,
-	testsuites.InitSubPathTestSuite,
+	// TODO: also convert these suites
+	// testsuites.InitVolumesTestSuite,
+	// testsuites.InitVolumeIOTestSuite,
+	// testsuites.InitVolumeModeTestSuite,
+	// testsuites.InitSubPathTestSuite,
 	testsuites.InitProvisioningTestSuite,
 }
 
@@ -81,11 +82,6 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 		cancel context.CancelFunc
 		cs     clientset.Interface
 		ns     *v1.Namespace
-		// Common configuration options for each driver.
-		config = testsuites.TestConfig{
-			Framework: f,
-			Prefix:    "csi",
-		}
 	)
 
 	BeforeEach(func() {
@@ -126,16 +122,16 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 	})
 
 	for _, initDriver := range csiTestDrivers {
-		curDriver := initDriver(config)
-		curConfig := curDriver.GetDriverInfo().Config
+		curDriver := initDriver()
+		curConfig := &testsuites.TestConfig{
+			Framework: f,
+			Prefix:    "csi",
+		}
+
 		Context(testsuites.GetDriverNameWithFeatureTags(curDriver), func() {
 			BeforeEach(func() {
-				// Reset config. The driver might have modified its copy
-				// in a previous test.
-				curDriver.GetDriverInfo().Config = curConfig
-
 				// setupDriver
-				curDriver.CreateDriver()
+				curDriver.CreateDriver(curConfig)
 			})
 
 			AfterEach(func() {
@@ -143,7 +139,7 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 				curDriver.CleanupDriver()
 			})
 
-			testsuites.RunTestSuite(f, curDriver, csiTestSuites, csiTunePattern)
+			testsuites.SetupTestSuite(curDriver, curConfig, csiTestSuites, csiTunePattern)
 		})
 	}
 
@@ -153,17 +149,18 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 			cs     clientset.Interface
 			csics  csiclient.Interface
 			driver testsuites.TestDriver
+			config *testsuites.TestConfig
 		)
 
 		BeforeEach(func() {
 			cs = f.ClientSet
 			csics = f.CSIClientSet
-			config := testsuites.TestConfig{
+			config = &testsuites.TestConfig{
 				Framework: f,
 				Prefix:    "csi-attach",
 			}
-			driver = drivers.InitHostPathCSIDriver(config)
-			driver.CreateDriver()
+			driver = drivers.InitHostPathCSIDriver()
+			driver.CreateDriver(config)
 		})
 
 		AfterEach(func() {
@@ -208,7 +205,7 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 				By("Creating pod")
 				var sc *storagev1.StorageClass
 				if dDriver, ok := driver.(testsuites.DynamicPVTestDriver); ok {
-					sc = dDriver.GetDynamicProvisionStorageClass("")
+					sc = dDriver.GetDynamicProvisionStorageClass(config, "")
 				}
 				nodeName := driver.GetDriverInfo().Config.ClientNodeName
 				scTest := testsuites.StorageClassTest{

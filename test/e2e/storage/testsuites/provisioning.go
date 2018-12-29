@@ -37,8 +37,11 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
-// StorageClassTest represents parameters to be used by provisioning tests
+// StorageClassTest represents parameters to be used by TestDynamicProvisioning
 type StorageClassTest struct {
+	Client             clientset.Interface
+	Claim              *v1.PersistentVolumeClaim
+	Class              *storage.StorageClass
 	Name               string
 	CloudProviders     []string
 	Provisioner        string
@@ -82,122 +85,76 @@ func (p *provisioningTestSuite) isTestSupported(pattern testpatterns.TestPattern
 	return ok
 }
 
-func createProvisioningTestInput(driver TestDriver, pattern testpatterns.TestPattern) (provisioningTestResource, provisioningTestInput) {
-	// Setup test resource for driver and testpattern
-	resource := provisioningTestResource{}
-	resource.setupResource(driver, pattern)
-
-	input := provisioningTestInput{
-		testCase: StorageClassTest{
-			ClaimSize:    resource.claimSize,
-			ExpectedSize: resource.claimSize,
-			NodeName:     driver.GetDriverInfo().Config.ClientNodeName,
-			NodeSelector: driver.GetDriverInfo().Config.ClientNodeSelector,
-		},
-		cs:  driver.GetDriverInfo().Config.Framework.ClientSet,
-		pvc: resource.pvc,
-		sc:  resource.sc,
-	}
-
-	return resource, input
-}
-
-func (p *provisioningTestSuite) execTest(driver TestDriver, pattern testpatterns.TestPattern) {
+func (p *provisioningTestSuite) setupTest(driver TestDriver, config *TestConfig, pattern testpatterns.TestPattern) {
 	Context(getTestNameStr(p, pattern), func() {
 		var (
-			resource provisioningTestResource
-			input    provisioningTestInput
+			testCase StorageClassTest
+			pvc      *v1.PersistentVolumeClaim
+			sc       *storage.StorageClass
 		)
 
+		Expect(pattern.VolType).To(Equal(testpatterns.DynamicPV))
+
 		BeforeEach(func() {
-			// Create test input
-			resource, input = createProvisioningTestInput(driver, pattern)
-		})
-
-		AfterEach(func() {
-			resource.cleanupResource(driver, pattern)
-		})
-
-		// Ginkgo's "Global Shared Behaviors" require arguments for a shared function
-		// to be a single struct and to be passed as a pointer.
-		// Please see https://onsi.github.io/ginkgo/#global-shared-behaviors for details.
-		testProvisioning(driver, &input)
-	})
-}
-
-type provisioningTestResource struct {
-	claimSize string
-	sc        *storage.StorageClass
-	pvc       *v1.PersistentVolumeClaim
-}
-
-var _ TestResource = &provisioningTestResource{}
-
-func (p *provisioningTestResource) setupResource(driver TestDriver, pattern testpatterns.TestPattern) {
-	// Setup provisioningTest resource
-	switch pattern.VolType {
-	case testpatterns.DynamicPV:
-		if dDriver, ok := driver.(DynamicPVTestDriver); ok {
-			p.sc = dDriver.GetDynamicProvisionStorageClass("")
-			if p.sc == nil {
+			dDriver := driver.(DynamicPVTestDriver) // Checked in isTestSupported.
+			claimSize := dDriver.GetClaimSize()
+			sc = dDriver.GetDynamicProvisionStorageClass(config, "")
+			if sc == nil {
 				framework.Skipf("Driver %q does not define Dynamic Provision StorageClass - skipping", driver.GetDriverInfo().Name)
 			}
-			p.claimSize = dDriver.GetClaimSize()
-			p.pvc = getClaim(p.claimSize, driver.GetDriverInfo().Config.Framework.Namespace.Name)
-			p.pvc.Spec.StorageClassName = &p.sc.Name
-			framework.Logf("In creating storage class object and pvc object for driver - sc: %v, pvc: %v", p.sc, p.pvc)
+			pvc = getClaim(claimSize, config.Framework.Namespace.Name)
+			pvc.Spec.StorageClassName = &sc.Name
+			framework.Logf("In creating storage class object and pvc object for driver - sc: %v, pvc: %v", sc, pvc)
+			testCase = StorageClassTest{
+				Client:       config.Framework.ClientSet,
+				Claim:        pvc,
+				Class:        sc,
+				ClaimSize:    claimSize,
+				ExpectedSize: claimSize,
+				NodeName:     config.ClientNodeName,
+				NodeSelector: config.ClientNodeSelector,
+			}
+		})
+
+		It("should provision storage with defaults", func() {
+			testCase.TestDynamicProvisioning()
+		})
+
+		supportedMountOptions := driver.GetDriverInfo().SupportedMountOption
+		if supportedMountOptions != nil {
+			It("should provision storage with mount options", func() {
+				testCase.Class.MountOptions = supportedMountOptions.Union(driver.GetDriverInfo().RequiredMountOption).List()
+				testCase.TestDynamicProvisioning()
+			})
 		}
-	default:
-		// Should never get here because of the check in skipUnsupportedTest above.
-		framework.Failf("Dynamic Provision test doesn't support: %s", pattern.VolType)
-	}
-}
 
-func (p *provisioningTestResource) cleanupResource(driver TestDriver, pattern testpatterns.TestPattern) {
-}
+		if driver.GetDriverInfo().Capabilities[CapBlock] {
+			It("should create and delete block persistent volumes", func() {
+				block := v1.PersistentVolumeBlock
+				testCase.VolumeMode = &block
+				testCase.SkipWriteReadCheck = true
+				pvc.Spec.VolumeMode = &block
+				testCase.TestDynamicProvisioning()
+			})
+		}
 
-type provisioningTestInput struct {
-	testCase StorageClassTest
-	cs       clientset.Interface
-	pvc      *v1.PersistentVolumeClaim
-	sc       *storage.StorageClass
-}
-
-func testProvisioning(driver TestDriver, input *provisioningTestInput) {
-	It("should provision storage with defaults", func() {
-		TestDynamicProvisioning(input.testCase, input.cs, input.pvc, input.sc)
+		multi, set := driver.GetDriverInfo().Capabilities[CapMultiPODs]
+		if !set || multi {
+			It("should allow concurrent writes on the same node", func() {
+				testCase.SkipWriteReadCheck = true
+				testCase.MultiWriteCheck = true
+				testCase.TestDynamicProvisioning()
+			})
+		}
 	})
-
-	supportedMountOptions := driver.GetDriverInfo().SupportedMountOption
-	if supportedMountOptions != nil {
-		It("should provision storage with mount options", func() {
-			input.sc.MountOptions = supportedMountOptions.Union(driver.GetDriverInfo().RequiredMountOption).List()
-			TestDynamicProvisioning(input.testCase, input.cs, input.pvc, input.sc)
-		})
-	}
-
-	if driver.GetDriverInfo().Capabilities[CapBlock] {
-		It("should create and delete block persistent volumes", func() {
-			block := v1.PersistentVolumeBlock
-			input.testCase.VolumeMode = &block
-			input.testCase.SkipWriteReadCheck = true
-			input.pvc.Spec.VolumeMode = &block
-			TestDynamicProvisioning(input.testCase, input.cs, input.pvc, input.sc)
-		})
-	}
-
-	multi, set := driver.GetDriverInfo().Capabilities[CapMultiPODs]
-	if !set || multi {
-		It("should allow concurrent writes on the same node", func() {
-			input.testCase.SkipWriteReadCheck = true
-			input.testCase.MultiWriteCheck = true
-			TestDynamicProvisioning(input.testCase, input.cs, input.pvc, input.sc)
-		})
-	}
 }
 
-// TestDynamicProvisioning tests dynamic provisioning with specified StorageClassTest and storageClass
-func TestDynamicProvisioning(t StorageClassTest, client clientset.Interface, claim *v1.PersistentVolumeClaim, class *storage.StorageClass) *v1.PersistentVolume {
+// TestDynamicProvisioning tests dynamic provisioning with specified StorageClassTest
+func (t StorageClassTest) TestDynamicProvisioning() *v1.PersistentVolume {
+	client := t.Client
+	claim := t.Claim
+	class := t.Class
+
 	var err error
 	if class != nil {
 		By("creating a StorageClass " + class.Name)

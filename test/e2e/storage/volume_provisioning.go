@@ -497,10 +497,11 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 
 				By("Testing " + test.Name)
 				suffix := fmt.Sprintf("%d", i)
-				class := newStorageClass(test, ns, suffix)
-				claim := newClaim(test, ns, suffix)
-				claim.Spec.StorageClassName = &class.Name
-				testsuites.TestDynamicProvisioning(test, c, claim, class)
+				test.Client = c
+				test.Class = newStorageClass(test, ns, suffix)
+				test.Claim = newClaim(test, ns, suffix)
+				test.Claim.Spec.StorageClassName = &test.Class.Name
+				test.TestDynamicProvisioning()
 			}
 
 			// Run the last test with storage.k8s.io/v1beta1 on pvc
@@ -512,9 +513,11 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				Expect(err).NotTo(HaveOccurred())
 				defer deleteStorageClass(c, class.Name)
 
-				claim := newClaim(*betaTest, ns, "beta")
-				claim.Spec.StorageClassName = &(class.Name)
-				testsuites.TestDynamicProvisioning(*betaTest, c, claim, nil)
+				betaTest.Client = c
+				betaTest.Class = nil
+				betaTest.Claim = newClaim(*betaTest, ns, "beta")
+				betaTest.Claim.Spec.StorageClassName = &(class.Name)
+				(*betaTest).TestDynamicProvisioning()
 			}
 		})
 
@@ -522,6 +525,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			framework.SkipUnlessProviderIs("gce", "gke")
 
 			test := testsuites.StorageClassTest{
+				Client:         c,
 				Name:           "HDD PD on GCE/GKE",
 				CloudProviders: []string{"gce", "gke"},
 				Provisioner:    "kubernetes.io/gce-pd",
@@ -534,12 +538,12 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 					return checkGCEPD(volume, "pd-standard")
 				},
 			}
-			class := newStorageClass(test, ns, "reclaimpolicy")
+			test.Class = newStorageClass(test, ns, "reclaimpolicy")
 			retain := v1.PersistentVolumeReclaimRetain
-			class.ReclaimPolicy = &retain
-			claim := newClaim(test, ns, "reclaimpolicy")
-			claim.Spec.StorageClassName = &class.Name
-			pv := testsuites.TestDynamicProvisioning(test, c, claim, class)
+			test.Class.ReclaimPolicy = &retain
+			test.Claim = newClaim(test, ns, "reclaimpolicy")
+			test.Claim.Spec.StorageClassName = &test.Class.Name
+			pv := test.TestDynamicProvisioning()
 
 			By(fmt.Sprintf("waiting for the provisioned PV %q to enter phase %s", pv.Name, v1.VolumeReleased))
 			framework.ExpectNoError(framework.WaitForPersistentVolumePhase(v1.VolumeReleased, c, pv.Name, 1*time.Second, 30*time.Second))
@@ -773,17 +777,18 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 
 			By("creating a StorageClass")
 			test := testsuites.StorageClassTest{
+				Client:       c,
 				Name:         "external provisioner test",
 				Provisioner:  externalPluginName,
 				ClaimSize:    "1500Mi",
 				ExpectedSize: "1500Mi",
 			}
-			class := newStorageClass(test, ns, "external")
-			claim := newClaim(test, ns, "external")
-			claim.Spec.StorageClassName = &(class.Name)
+			test.Class = newStorageClass(test, ns, "external")
+			test.Claim = newClaim(test, ns, "external")
+			test.Claim.Spec.StorageClassName = &test.Class.Name
 
 			By("creating a claim with a external provisioning annotation")
-			testsuites.TestDynamicProvisioning(test, c, claim, class)
+			test.TestDynamicProvisioning()
 		})
 	})
 
@@ -793,13 +798,14 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 
 			By("creating a claim with no annotation")
 			test := testsuites.StorageClassTest{
+				Client:       c,
 				Name:         "default",
 				ClaimSize:    "2Gi",
 				ExpectedSize: "2Gi",
 			}
 
-			claim := newClaim(test, ns, "default")
-			testsuites.TestDynamicProvisioning(test, c, claim, nil)
+			test.Claim = newClaim(test, ns, "default")
+			test.TestDynamicProvisioning()
 		})
 
 		// Modifying the default storage class can be disruptive to other tests that depend on it
@@ -872,6 +878,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			serverUrl := "https://" + pod.Status.PodIP + ":8081"
 			By("creating a StorageClass")
 			test := testsuites.StorageClassTest{
+				Client:             c,
 				Name:               "Gluster Dynamic provisioner test",
 				Provisioner:        "kubernetes.io/glusterfs",
 				ClaimSize:          "2Gi",
@@ -880,12 +887,12 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				SkipWriteReadCheck: true,
 			}
 			suffix := fmt.Sprintf("glusterdptest")
-			class := newStorageClass(test, ns, suffix)
+			test.Class = newStorageClass(test, ns, suffix)
 
 			By("creating a claim object with a suffix for gluster dynamic provisioner")
-			claim := newClaim(test, ns, suffix)
+			test.Claim = newClaim(test, ns, suffix)
 
-			testsuites.TestDynamicProvisioning(test, c, claim, class)
+			test.TestDynamicProvisioning()
 		})
 	})
 
@@ -967,12 +974,13 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				}
 				By("creating a claim with class with allowedTopologies set")
 				suffix := "topology"
-				class := newStorageClass(test, ns, suffix)
+				test.Client = c
+				test.Class = newStorageClass(test, ns, suffix)
 				zone := getRandomCloudZone(c)
-				addSingleZoneAllowedTopologyToStorageClass(c, class, zone)
-				claim := newClaim(test, ns, suffix)
-				claim.Spec.StorageClassName = &class.Name
-				pv := testsuites.TestDynamicProvisioning(test, c, claim, class)
+				addSingleZoneAllowedTopologyToStorageClass(c, test.Class, zone)
+				test.Claim = newClaim(test, ns, suffix)
+				test.Claim.Spec.StorageClassName = &test.Class.Name
+				pv := test.TestDynamicProvisioning()
 				checkZoneFromLabelAndAffinity(pv, zone, true)
 			}
 		})

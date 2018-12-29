@@ -55,7 +55,7 @@ type hostpathCSIDriver struct {
 	manifests  []string
 }
 
-func initHostPathCSIDriver(name string, config testsuites.TestConfig, manifests ...string) testsuites.TestDriver {
+func initHostPathCSIDriver(name string, manifests ...string) testsuites.TestDriver {
 	return &hostpathCSIDriver{
 		driverInfo: testsuites.DriverInfo{
 			Name:        name,
@@ -67,8 +67,6 @@ func initHostPathCSIDriver(name string, config testsuites.TestConfig, manifests 
 			Capabilities: map[testsuites.Capability]bool{
 				testsuites.CapPersistence: true,
 			},
-
-			Config: config,
 		},
 		manifests: manifests,
 	}
@@ -78,8 +76,8 @@ var _ testsuites.TestDriver = &hostpathCSIDriver{}
 var _ testsuites.DynamicPVTestDriver = &hostpathCSIDriver{}
 
 // InitHostPathCSIDriver returns hostpathCSIDriver that implements TestDriver interface
-func InitHostPathCSIDriver(config testsuites.TestConfig) testsuites.TestDriver {
-	return initHostPathCSIDriver("csi-hostpath", config,
+func InitHostPathCSIDriver() testsuites.TestDriver {
+	return initHostPathCSIDriver("csi-hostpath",
 		"test/e2e/testing-manifests/storage-csi/driver-registrar/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
@@ -94,10 +92,10 @@ func (h *hostpathCSIDriver) GetDriverInfo() *testsuites.DriverInfo {
 	return &h.driverInfo
 }
 
-func (h *hostpathCSIDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.StorageClass {
+func (h *hostpathCSIDriver) GetDynamicProvisionStorageClass(config *testsuites.TestConfig, fsType string) *storagev1.StorageClass {
 	provisioner := testsuites.GetUniqueDriverName(h)
 	parameters := map[string]string{}
-	ns := h.driverInfo.Config.Framework.Namespace.Name
+	ns := config.Framework.Namespace.Name
 	suffix := fmt.Sprintf("%s-sc", provisioner)
 
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
@@ -107,15 +105,15 @@ func (h *hostpathCSIDriver) GetClaimSize() string {
 	return "5Gi"
 }
 
-func (h *hostpathCSIDriver) CreateDriver() {
+func (h *hostpathCSIDriver) CreateDriver(config *testsuites.TestConfig) {
 	By(fmt.Sprintf("deploying %s driver", h.driverInfo.Name))
-	f := h.driverInfo.Config.Framework
+	f := config.Framework
 	cs := f.ClientSet
 
 	// The hostpath CSI driver only works when everything runs on the same node.
 	nodes := framework.GetReadySchedulableNodesOrDie(cs)
 	nodeName := nodes.Items[rand.Intn(len(nodes.Items))].Name
-	h.driverInfo.Config.ClientNodeName = nodeName
+	config.ClientNodeName = nodeName
 
 	// TODO (?): the storage.csi.image.version and storage.csi.image.registry
 	// settings are ignored for this test. We could patch the image definitions.
@@ -126,8 +124,8 @@ func (h *hostpathCSIDriver) CreateDriver() {
 		ProvisionerContainerName: "csi-provisioner",
 		NodeName:                 nodeName,
 	}
-	cleanup, err := h.driverInfo.Config.Framework.CreateFromManifests(func(item interface{}) error {
-		return utils.PatchCSIDeployment(h.driverInfo.Config.Framework, o, item)
+	cleanup, err := config.Framework.CreateFromManifests(func(item interface{}) error {
+		return utils.PatchCSIDeployment(config.Framework, o, item)
 	},
 		h.manifests...)
 	h.cleanup = cleanup
@@ -144,8 +142,8 @@ func (h *hostpathCSIDriver) CleanupDriver() {
 }
 
 // InitHostPathV0CSIDriver returns a variant of hostpathCSIDriver with different manifests.
-func InitHostPathV0CSIDriver(config testsuites.TestConfig) testsuites.TestDriver {
-	return initHostPathCSIDriver("csi-hostpath-v0", config,
+func InitHostPathV0CSIDriver() testsuites.TestDriver {
+	return initHostPathCSIDriver("csi-hostpath-v0",
 		"test/e2e/testing-manifests/storage-csi/driver-registrar/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
@@ -166,7 +164,7 @@ var _ testsuites.TestDriver = &gcePDCSIDriver{}
 var _ testsuites.DynamicPVTestDriver = &gcePDCSIDriver{}
 
 // InitGcePDCSIDriver returns gcePDCSIDriver that implements TestDriver interface
-func InitGcePDCSIDriver(config testsuites.TestConfig) testsuites.TestDriver {
+func InitGcePDCSIDriver() testsuites.TestDriver {
 	return &gcePDCSIDriver{
 		driverInfo: testsuites.DriverInfo{
 			Name:        "pd.csi.storage.gke.io",
@@ -184,8 +182,6 @@ func InitGcePDCSIDriver(config testsuites.TestConfig) testsuites.TestDriver {
 				testsuites.CapFsGroup:     true,
 				testsuites.CapExec:        true,
 			},
-
-			Config: config,
 		},
 	}
 }
@@ -194,8 +190,8 @@ func (g *gcePDCSIDriver) GetDriverInfo() *testsuites.DriverInfo {
 	return &g.driverInfo
 }
 
-func (g *gcePDCSIDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.StorageClass {
-	ns := g.driverInfo.Config.Framework.Namespace.Name
+func (g *gcePDCSIDriver) GetDynamicProvisionStorageClass(config *testsuites.TestConfig, fsType string) *storagev1.StorageClass {
+	ns := config.Framework.Namespace.Name
 	provisioner := g.driverInfo.Name
 	suffix := fmt.Sprintf("%s-sc", g.driverInfo.Name)
 
@@ -208,9 +204,9 @@ func (g *gcePDCSIDriver) GetClaimSize() string {
 	return "5Gi"
 }
 
-func (g *gcePDCSIDriver) CreateDriver() {
+func (g *gcePDCSIDriver) CreateDriver(config *testsuites.TestConfig) {
 	framework.SkipUnlessProviderIs("gce", "gke")
-	framework.SkipIfMultizone(g.driverInfo.Config.Framework.ClientSet)
+	framework.SkipIfMultizone(config.Framework.ClientSet)
 
 	By("deploying csi gce-pd driver")
 	// It would be safer to rename the gcePD driver, but that
@@ -225,9 +221,9 @@ func (g *gcePDCSIDriver) CreateDriver() {
 	// 	DriverContainerName:      "gce-driver",
 	// 	ProvisionerContainerName: "csi-external-provisioner",
 	// }
-	createGCESecrets(g.driverInfo.Config.Framework.ClientSet, g.driverInfo.Config.Framework.Namespace.Name)
+	createGCESecrets(config.Framework.ClientSet, config.Framework.Namespace.Name)
 
-	cleanup, err := g.driverInfo.Config.Framework.CreateFromManifests(nil,
+	cleanup, err := config.Framework.CreateFromManifests(nil,
 		"test/e2e/testing-manifests/storage-csi/driver-registrar/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
@@ -257,7 +253,7 @@ var _ testsuites.TestDriver = &gcePDExternalCSIDriver{}
 var _ testsuites.DynamicPVTestDriver = &gcePDExternalCSIDriver{}
 
 // InitGcePDExternalCSIDriver returns gcePDExternalCSIDriver that implements TestDriver interface
-func InitGcePDExternalCSIDriver(config testsuites.TestConfig) testsuites.TestDriver {
+func InitGcePDExternalCSIDriver() testsuites.TestDriver {
 	return &gcePDExternalCSIDriver{
 		driverInfo: testsuites.DriverInfo{
 			Name: "pd.csi.storage.gke.io",
@@ -277,8 +273,6 @@ func InitGcePDExternalCSIDriver(config testsuites.TestConfig) testsuites.TestDri
 				testsuites.CapFsGroup:     true,
 				testsuites.CapExec:        true,
 			},
-
-			Config: config,
 		},
 	}
 }
@@ -287,8 +281,8 @@ func (g *gcePDExternalCSIDriver) GetDriverInfo() *testsuites.DriverInfo {
 	return &g.driverInfo
 }
 
-func (g *gcePDExternalCSIDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.StorageClass {
-	ns := g.driverInfo.Config.Framework.Namespace.Name
+func (g *gcePDExternalCSIDriver) GetDynamicProvisionStorageClass(config *testsuites.TestConfig, fsType string) *storagev1.StorageClass {
+	ns := config.Framework.Namespace.Name
 	provisioner := g.driverInfo.Name
 	suffix := fmt.Sprintf("%s-sc", g.driverInfo.Name)
 
@@ -301,9 +295,9 @@ func (g *gcePDExternalCSIDriver) GetClaimSize() string {
 	return "5Gi"
 }
 
-func (g *gcePDExternalCSIDriver) CreateDriver() {
+func (g *gcePDExternalCSIDriver) CreateDriver(config *testsuites.TestConfig) {
 	framework.SkipUnlessProviderIs("gce", "gke")
-	framework.SkipIfMultizone(g.driverInfo.Config.Framework.ClientSet)
+	framework.SkipIfMultizone(config.Framework.ClientSet)
 }
 
 func (g *gcePDExternalCSIDriver) CleanupDriver() {

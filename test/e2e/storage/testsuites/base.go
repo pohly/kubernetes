@@ -39,8 +39,8 @@ type TestSuite interface {
 	getTestSuiteInfo() TestSuiteInfo
 	// isTestSupported returns true if this TestSuite can be tested with the combination of TestPattern and TestDriver
 	isTestSupported(testpatterns.TestPattern, TestDriver) bool
-	// execTest executes test of the testpattern for the driver
-	execTest(TestDriver, testpatterns.TestPattern)
+	// setupTest defines tests of the testpattern for the driver
+	setupTest(TestDriver, *TestConfig, testpatterns.TestPattern)
 }
 
 // TestSuiteInfo represents a set of parameters for TestSuite
@@ -52,11 +52,8 @@ type TestSuiteInfo struct {
 
 // TestResource represents an interface for resources that is used by TestSuite
 type TestResource interface {
-	// setupResource sets up test resources to be used for the tests with the
-	// combination of TestDriver and TestPattern
-	setupResource(TestDriver, testpatterns.TestPattern)
-	// cleanupResource clean up the test resources created in SetupResource
-	cleanupResource(TestDriver, testpatterns.TestPattern)
+	// cleanupResource cleans up the test resources created when setting up the resource
+	cleanupResource()
 }
 
 func getTestNameStr(suite TestSuite, pattern testpatterns.TestPattern) string {
@@ -64,8 +61,8 @@ func getTestNameStr(suite TestSuite, pattern testpatterns.TestPattern) string {
 	return fmt.Sprintf("[Testpattern: %s]%s %s%s", pattern.Name, pattern.FeatureTag, tsInfo.name, tsInfo.featureTag)
 }
 
-// RunTestSuite defines tests for all testpatterns and all testSuites for a driver
-func RunTestSuite(f *framework.Framework, driver TestDriver, tsInits []func() TestSuite, tunePatternFunc func([]testpatterns.TestPattern) []testpatterns.TestPattern) {
+// SetupTestSuite defines tests for all testpatterns and all testSuites for a driver
+func SetupTestSuite(driver TestDriver, config *TestConfig, tsInits []func() TestSuite, tunePatternFunc func([]testpatterns.TestPattern) []testpatterns.TestPattern) {
 	for _, testSuiteInit := range tsInits {
 		suite := testSuiteInit()
 		patterns := tunePatternFunc(suite.getTestSuiteInfo().testPatterns)
@@ -75,7 +72,7 @@ func RunTestSuite(f *framework.Framework, driver TestDriver, tsInits []func() Te
 				continue
 			}
 
-			suite.execTest(driver, pattern)
+			suite.setupTest(driver, config, pattern)
 		}
 	}
 }
@@ -132,6 +129,8 @@ func isTestSupported(suite TestSuite, driver TestDriver, pattern testpatterns.Te
 // Also, see subpath.go in the same directory for how to extend and use it.
 type genericVolumeTestResource struct {
 	driver    TestDriver
+	config    *TestConfig
+	pattern   testpatterns.TestPattern
 	volType   string
 	volSource *v1.VolumeSource
 	pvc       *v1.PersistentVolumeClaim
@@ -143,9 +142,12 @@ type genericVolumeTestResource struct {
 
 var _ TestResource = &genericVolumeTestResource{}
 
-// setupResource sets up genericVolumeTestResource
-func (r *genericVolumeTestResource) setupResource(driver TestDriver, pattern testpatterns.TestPattern) {
-	r.driver = driver
+func setupGenericVolumeTestResource(driver TestDriver, config *TestConfig, pattern testpatterns.TestPattern) TestResource {
+	r := genericVolumeTestResource{
+		driver:  driver,
+		config:  config,
+		pattern: pattern,
+	}
 	dInfo := driver.GetDriverInfo()
 	f := dInfo.Config.Framework
 	cs := f.ClientSet
@@ -153,19 +155,19 @@ func (r *genericVolumeTestResource) setupResource(driver TestDriver, pattern tes
 	volType := pattern.VolType
 
 	// Create volume for pre-provisioned volume tests
-	r.volume = CreateVolume(driver, volType)
+	r.volume = CreateVolume(driver, config, volType)
 
 	switch volType {
 	case testpatterns.InlineVolume:
 		framework.Logf("Creating resource for inline volume")
 		if iDriver, ok := driver.(InlineVolumeTestDriver); ok {
-			r.volSource = iDriver.GetVolumeSource(false, fsType, r.volume)
+			r.volSource = iDriver.GetVolumeSource(config, false, fsType, r.volume)
 			r.volType = dInfo.Name
 		}
 	case testpatterns.PreprovisionedPV:
 		framework.Logf("Creating resource for pre-provisioned PV")
 		if pDriver, ok := driver.(PreprovisionedPVTestDriver); ok {
-			pvSource := pDriver.GetPersistentVolumeSource(false, fsType, r.volume)
+			pvSource := pDriver.GetPersistentVolumeSource(config, false, fsType, r.volume)
 			if pvSource != nil {
 				r.volSource, r.pv, r.pvc = createVolumeSourceWithPVCPV(f, dInfo.Name, pvSource, false)
 			}
@@ -175,7 +177,7 @@ func (r *genericVolumeTestResource) setupResource(driver TestDriver, pattern tes
 		framework.Logf("Creating resource for dynamic PV")
 		if dDriver, ok := driver.(DynamicPVTestDriver); ok {
 			claimSize := dDriver.GetClaimSize()
-			r.sc = dDriver.GetDynamicProvisionStorageClass(fsType)
+			r.sc = dDriver.GetDynamicProvisionStorageClass(r.config, fsType)
 
 			By("creating a StorageClass " + r.sc.Name)
 			var err error
@@ -195,13 +197,15 @@ func (r *genericVolumeTestResource) setupResource(driver TestDriver, pattern tes
 	if r.volSource == nil {
 		framework.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, volType)
 	}
+
+	return &r
 }
 
 // cleanupResource cleans up genericVolumeTestResource
-func (r *genericVolumeTestResource) cleanupResource(driver TestDriver, pattern testpatterns.TestPattern) {
-	dInfo := driver.GetDriverInfo()
+func (r *genericVolumeTestResource) cleanupResource() {
+	dInfo := r.driver.GetDriverInfo()
 	f := dInfo.Config.Framework
-	volType := pattern.VolType
+	volType := r.pattern.VolType
 
 	if r.pvc != nil || r.pv != nil {
 		switch volType {

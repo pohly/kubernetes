@@ -26,7 +26,7 @@ import (
 )
 
 // List of testDrivers to be executed in below loop
-var testDrivers = []func(config testsuites.TestConfig) testsuites.TestDriver{
+var testDrivers = []func() testsuites.TestDriver{
 	drivers.InitNFSDriver,
 	drivers.InitGlusterFSDriver,
 	drivers.InitISCSIDriver,
@@ -44,10 +44,11 @@ var testDrivers = []func(config testsuites.TestConfig) testsuites.TestDriver{
 
 // List of testSuites to be executed in below loop
 var testSuites = []func() testsuites.TestSuite{
-	testsuites.InitVolumesTestSuite,
-	testsuites.InitVolumeIOTestSuite,
-	testsuites.InitVolumeModeTestSuite,
-	testsuites.InitSubPathTestSuite,
+	// TODO: also convert these suites
+	// testsuites.InitVolumesTestSuite,
+	// testsuites.InitVolumeIOTestSuite,
+	// testsuites.InitVolumeModeTestSuite,
+	// testsuites.InitSubPathTestSuite,
 	testsuites.InitProvisioningTestSuite,
 }
 
@@ -59,25 +60,20 @@ func intreeTunePattern(patterns []testpatterns.TestPattern) []testpatterns.TestP
 var _ = utils.SIGDescribe("In-tree Volumes", func() {
 	f := framework.NewDefaultFramework("volumes")
 
-	var (
-		// Common configuration options for all drivers.
-		config = testsuites.TestConfig{
-			Framework: f,
-			Prefix:    "in-tree",
-		}
-	)
-
 	for _, initDriver := range testDrivers {
-		curDriver := initDriver(config)
-		curConfig := curDriver.GetDriverInfo().Config
+		curDriver := initDriver()
 		Context(testsuites.GetDriverNameWithFeatureTags(curDriver), func() {
-			BeforeEach(func() {
-				// Reset config. The driver might have modified its copy
-				// in a previous test.
-				curDriver.GetDriverInfo().Config = curConfig
+			var (
+				config *testsuites.TestConfig
+			)
 
+			BeforeEach(func() {
+				config = &testsuites.TestConfig{
+					Framework: f,
+					Prefix:    "in-tree",
+				}
 				// setupDriver
-				curDriver.CreateDriver()
+				curDriver.CreateDriver(config)
 			})
 
 			AfterEach(func() {
@@ -85,7 +81,7 @@ var _ = utils.SIGDescribe("In-tree Volumes", func() {
 				curDriver.CleanupDriver()
 			})
 
-			testsuites.RunTestSuite(f, curDriver, testSuites, intreeTunePattern)
+			testsuites.SetupTestSuite(curDriver, config, testSuites, intreeTunePattern)
 		})
 	}
 })
