@@ -110,12 +110,14 @@ func testVolumeProvisioning(c clientset.Interface, ns string) {
 			},
 			ClaimSize:    "1.5Gi",
 			ExpectedSize: "2Gi",
-			PvCheck: func(volume *v1.PersistentVolume) error {
-				err := checkGCEPD(volume, "pd-standard")
-				if err != nil {
-					return err
-				}
-				return verifyZonesInPV(volume, sets.NewString(cloudZones...), true /* match */)
+			PvCheck: func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
+				var err error
+				err = checkGCEPD(volume, "pd-standard")
+				Expect(err).NotTo(HaveOccurred(), "checkGCEPD")
+				err = verifyZonesInPV(volume, sets.NewString(cloudZones...), true /* match */)
+				Expect(err).NotTo(HaveOccurred(), "verifyZonesInPV")
+
+				testsuites.PVWriteReadCheck(c, claim, volume, testsuites.NodeSelection{})
 			},
 		},
 		{
@@ -128,16 +130,16 @@ func testVolumeProvisioning(c clientset.Interface, ns string) {
 			},
 			ClaimSize:    "1.5Gi",
 			ExpectedSize: "2Gi",
-			PvCheck: func(volume *v1.PersistentVolume) error {
-				err := checkGCEPD(volume, "pd-standard")
-				if err != nil {
-					return err
-				}
+			PvCheck: func(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) {
+				var err error
+				err = checkGCEPD(volume, "pd-standard")
+				Expect(err).NotTo(HaveOccurred(), "checkGCEPD")
 				zones, err := framework.GetClusterZones(c)
-				if err != nil {
-					return err
-				}
-				return verifyZonesInPV(volume, zones, false /* match */)
+				Expect(err).NotTo(HaveOccurred(), "GetClusterZones")
+				err = verifyZonesInPV(volume, zones, false /* match */)
+				Expect(err).NotTo(HaveOccurred(), "verifyZonesInPV")
+
+				testsuites.PVWriteReadCheck(c, claim, volume, testsuites.NodeSelection{})
 			},
 		},
 	}
@@ -319,7 +321,7 @@ func testRegionalDelayedBinding(c clientset.Interface, ns string, pvcCount int) 
 		claim.Spec.StorageClassName = &class.Name
 		claims = append(claims, claim)
 	}
-	pvs, node := testsuites.TestBindingWaitForFirstConsumerMultiPVC(test, c, claims, class)
+	pvs, node := testsuites.TestBindingWaitForFirstConsumerMultiPVC(test, c, claims, class, nil /* node selector */, false /* expect unschedulable */)
 	if node == nil {
 		framework.Failf("unexpected nil node found")
 	}
@@ -376,7 +378,7 @@ func testRegionalAllowedTopologiesWithDelayedBinding(c clientset.Interface, ns s
 		claim.Spec.StorageClassName = &class.Name
 		claims = append(claims, claim)
 	}
-	pvs, node := testsuites.TestBindingWaitForFirstConsumerMultiPVC(test, c, claims, class)
+	pvs, node := testsuites.TestBindingWaitForFirstConsumerMultiPVC(test, c, claims, class, nil /* node selector */, false /* expect unschedulable */)
 	if node == nil {
 		framework.Failf("unexpected nil node found")
 	}
