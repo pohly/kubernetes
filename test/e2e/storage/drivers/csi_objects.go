@@ -20,7 +20,6 @@ limitations under the License.
 package drivers
 
 import (
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -35,28 +34,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
-
-var (
-	csiImageVersion  = flag.String("storage.csi.image.version", "", "overrides the default tag used for hostpathplugin/csi-attacher/csi-provisioner/driver-registrar images")
-	csiImageRegistry = flag.String("storage.csi.image.registry", "quay.io/k8scsi", "overrides the default repository used for hostpathplugin/csi-attacher/csi-provisioner/driver-registrar images")
-	csiImageVersions = map[string]string{
-		"hostpathplugin":   "v0.4.0",
-		"csi-attacher":     "v0.4.0",
-		"csi-provisioner":  "v0.4.0",
-		"driver-registrar": "v0.4.0",
-	}
-)
-
-func csiContainerImage(image string) string {
-	var fullName string
-	fullName += *csiImageRegistry + "/" + image + ":"
-	if *csiImageVersion != "" {
-		fullName += *csiImageVersion
-	} else {
-		fullName += csiImageVersions[image]
-	}
-	return fullName
-}
 
 func shredFile(filePath string) {
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {

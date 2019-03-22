@@ -26,11 +26,13 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/config"
 )
 
 func init() {
-	framework.RegisterCommonFlags()
-	framework.RegisterClusterFlags()
+	config.CopyFlags(config.Flags, flag.CommandLine)
+	framework.RegisterCommonFlags(flag.CommandLine)
+	framework.RegisterClusterFlags(flag.CommandLine)
 
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 }
