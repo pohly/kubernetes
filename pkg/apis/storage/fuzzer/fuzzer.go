@@ -46,6 +46,10 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				obj.Spec.PodInfoOnMount = new(bool)
 				*(obj.Spec.PodInfoOnMount) = false
 			}
+			if obj.Spec.Mode == nil {
+				obj.Spec.Mode = new(storage.CSIDriverMode)
+				*obj.Spec.Mode = storage.PersistentDriverMode
+			}
 		},
 	}
 }

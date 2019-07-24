@@ -291,9 +291,40 @@ type CSIDriverSpec struct {
 	// "csi.storage.k8s.io/pod.name": pod.Name
 	// "csi.storage.k8s.io/pod.namespace": pod.Namespace
 	// "csi.storage.k8s.io/pod.uid": string(pod.UID)
+	// "csi.storage.k8s.io/ephemeral": "true" iff the volume is an ephemeral inline volumed
+	//                                 defined by a CSIVolumeSource, otherwise "false"
 	// +optional
 	PodInfoOnMount *bool `json:"podInfoOnMount,omitempty" protobuf:"bytes,2,opt,name=podInfoOnMount"`
+
+	// If set, Mode defines how this CSI volume driver can be used.
+	// The default is "persistent", which is the usage defined by
+	// the CSI specification.
+	//
+	// Other modes are:
+	// - "ephemeral": only use this driver for inline ephemeral volumes (CSIVolumeSource)
+	// - "persistent+ephemeral": both modes supported
+	//
+	// More modes may be added in the future.
+	// +optional
+	Mode *CSIDriverMode `json:"mode,omitempty" protobuf:"bytes,3,opt,name=mode"`
 }
+
+// CSIDriverMode is an enumeration of possible usage modes of a CSI driver.
+// More modes may be added in the future.
+type CSIDriverMode string
+
+const (
+	// PersistentDriverMode explicitly confirms that the driver implements
+	// the full CSI spec. It is the default when CSIDriverSpec.Mode is not
+	// set.
+	PersistentDriverMode CSIDriverMode = "persistent"
+	// EphemeralDriverMode indicates that the driver can be used for
+	// ephemeral inline volumes, and only for those.
+	EphemeralDriverMode CSIDriverMode = "ephemeral"
+	// CombinedDriverMode enables the usage of the CSI driver for
+	// persistent and ephemeral inline volumes.
+	CombinedDriverMode CSIDriverMode = "persistent+ephemeral"
+)
 
 // +genclient
 // +genclient:nonNamespaced
