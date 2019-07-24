@@ -84,7 +84,7 @@ func makeTestVol(name string, driverName string) *api.Volume {
 	}
 }
 
-func getTestCSIDriver(name string, podInfoMount *bool, attachable *bool) *storagev1beta1.CSIDriver {
+func getTestCSIDriver(name string, podInfoMount *bool, attachable *bool, mode *storagev1beta1.CSIDriverMode) *storagev1beta1.CSIDriver {
 	return &storagev1beta1.CSIDriver{
 		ObjectMeta: meta.ObjectMeta{
 			Name: name,
@@ -92,6 +92,7 @@ func getTestCSIDriver(name string, podInfoMount *bool, attachable *bool) *storag
 		Spec: storagev1beta1.CSIDriverSpec{
 			PodInfoOnMount: podInfoMount,
 			AttachRequired: attachable,
+			Mode:           mode,
 		},
 	}
 }

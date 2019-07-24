@@ -30,6 +30,7 @@ import (
 	"k8s.io/klog"
 
 	api "k8s.io/api/core/v1"
+	storage "k8s.io/api/storage/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -71,13 +72,6 @@ type csiPlugin struct {
 	blockEnabled    bool
 	csiDriverLister storagelisters.CSIDriverLister
 }
-
-//TODO (vladimirvivien) add this type to storage api
-type driverMode string
-
-const persistentDriverMode driverMode = "persistent"
-const ephemeralDriverMode driverMode = "ephemeral"
-const combinedDriverMode driverMode = "persistent+ephemeral"
 
 type csiVolumeMode string
 
@@ -392,10 +386,11 @@ func (p *csiPlugin) NewMounter(
 		return nil, err
 	}
 
-	// TODO(pohly): check CSIDriver.Spec.Mode to ensure that the CSI driver
+	// Check CSIDriver.Spec.Mode to ensure that the CSI driver
 	// supports the current csiVolumeMode.
-	// In alpha it is assumed that drivers are used correctly without
-	// the additional sanity check.
+	if err := p.supportsVolumeMode(driverName, csiVolumeMode); err != nil {
+		return nil, err
+	}
 
 	k8s := p.host.GetKubeClient()
 	if k8s == nil {
@@ -799,6 +794,61 @@ func (p *csiPlugin) skipAttach(driver string) (bool, error) {
 		return true, nil
 	}
 	return false, nil
+}
+
+// supportsVolumeMode looks up CSIDriver object associated with the
+// driver name to determine if the driver supports the given volume
+// mode. An error indicates that it isn't supported and explains why.
+func (p *csiPlugin) supportsVolumeMode(driver string, volumeMode csiVolumeMode) error {
+	driverMode, err := p.lookupDriverMode(driver)
+	isDefault := false
+	effectiveMode := driverMode
+	if driverMode == "" {
+		isDefault = true
+		effectiveMode = storage.PersistentDriverMode
+	}
+
+	switch {
+	case err != nil:
+		return err
+	case volumeMode == persistentVolumeMode && (effectiveMode == storage.PersistentDriverMode || effectiveMode == storage.CombinedDriverMode) ||
+		volumeMode == ephemeralVolumeMode && (effectiveMode == storage.EphemeralDriverMode || effectiveMode == storage.CombinedDriverMode):
+		return nil
+	case isDefault:
+		// Using the same error message might be confusing because 'which only supports "persistent"' would
+		// be wrong for a driver that merely doesn't specify that it supports ephemeral.
+		return fmt.Errorf("volume mode %q not supported by driver %s (no CSIDriver object or no Mode specified)", volumeMode, driver)
+	default:
+		return fmt.Errorf("volume mode %q not supported by driver %s (only supports %q)", volumeMode, driver, driverMode)
+	}
+}
+
+// lookupDriverMode looks up CSIDriver object associated with the driver name and
+// returns what it finds there or the empty string if nothing was set explicitly.
+func (p *csiPlugin) lookupDriverMode(driver string) (storage.CSIDriverMode, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
+		return "", nil
+	}
+
+	kletHost, ok := p.host.(volume.KubeletVolumeHost)
+	if ok {
+		kletHost.WaitForCacheSync()
+	}
+
+	if p.csiDriverLister == nil {
+		return "", errors.New("CSIDriver lister does not exist")
+	}
+	csiDriver, err := p.csiDriverLister.Get(driver)
+	if err != nil {
+		if apierrs.IsNotFound(err) {
+			return "", nil
+		}
+		return "", err
+	}
+	if csiDriver.Spec.Mode == nil {
+		return "", nil
+	}
+	return *csiDriver.Spec.Mode, nil
 }
 
 // getCSIVolumeMode returns the mode for the specified spec: {persistent|ephemeral}.

@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	api "k8s.io/api/core/v1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -403,8 +404,8 @@ func TestPluginConstructVolumeSpecWithInline(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
 
-	plug, tmpDir := newTestPlugin(t, nil)
-	defer os.RemoveAll(tmpDir)
+	// Need variables for the struct construction below.
+	ephemeralDriverMode := storagev1beta1.EphemeralDriverMode
 
 	testCases := []struct {
 		name       string
@@ -413,6 +414,7 @@ func TestPluginConstructVolumeSpecWithInline(t *testing.T) {
 		volHandle  string
 		podUID     types.UID
 		shouldFail bool
+		mode       *storagev1beta1.CSIDriverMode
 	}{
 		{
 			name:       "construct spec1 from persistent spec",
@@ -433,12 +435,16 @@ func TestPluginConstructVolumeSpecWithInline(t *testing.T) {
 			specVolID:  "volspec",
 			originSpec: volume.NewSpecFromVolume(makeTestVol("volspec", testDriver)),
 			podUID:     types.UID(fmt.Sprintf("%08X", rand.Uint64())),
+			// Required for the driver to be accepted for the inline volume.
+			mode: &ephemeralDriverMode,
 		},
 		{
 			name:       "construct spec from volume spec2",
 			specVolID:  "volspec2",
 			originSpec: volume.NewSpecFromVolume(makeTestVol("volspec2", testDriver)),
 			podUID:     types.UID(fmt.Sprintf("%08X", rand.Uint64())),
+			// Required for the driver to be accepted for the inline volume.
+			mode: &ephemeralDriverMode,
 		},
 		{
 			name:       "missing spec",
@@ -451,6 +457,11 @@ func TestPluginConstructVolumeSpecWithInline(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			driver := getTestCSIDriver(testDriver, nil, nil, tc.mode)
+			client := fakeclient.NewSimpleClientset(driver)
+			plug, tmpDir := newTestPlugin(t, client)
+			defer os.RemoveAll(tmpDir)
+
 			mounter, err := plug.NewMounter(
 				tc.originSpec,
 				&api.Pod{ObjectMeta: meta.ObjectMeta{UID: tc.podUID, Namespace: testns}},
@@ -549,12 +560,12 @@ func TestPluginNewMounter(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		plug, tmpDir := newTestPlugin(t, nil)
-		defer os.RemoveAll(tmpDir)
-
-		registerFakePlugin(testDriver, "endpoint", []string{"1.2.0"}, t)
-
 		t.Run(test.name, func(t *testing.T) {
+			plug, tmpDir := newTestPlugin(t, nil)
+			defer os.RemoveAll(tmpDir)
+
+			registerFakePlugin(testDriver, "endpoint", []string{"1.2.0"}, t)
+
 			mounter, err := plug.NewMounter(
 				test.spec,
 				&api.Pod{ObjectMeta: meta.ObjectMeta{UID: test.podUID, Namespace: test.namespace}},
@@ -668,12 +679,18 @@ func TestPluginNewMounterWithInline(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		plug, tmpDir := newTestPlugin(t, nil)
-		defer os.RemoveAll(tmpDir)
-
-		registerFakePlugin(testDriver, "endpoint", []string{"1.2.0"}, t)
-
 		t.Run(test.name, func(t *testing.T) {
+			driverMode := storagev1beta1.PersistentDriverMode
+			if test.csiVolumeMode == ephemeralVolumeMode {
+				driverMode = storagev1beta1.EphemeralDriverMode
+			}
+			driver := getTestCSIDriver(testDriver, nil, nil, &driverMode)
+			fakeClient := fakeclient.NewSimpleClientset(driver)
+			plug, tmpDir := newTestPlugin(t, fakeClient)
+			defer os.RemoveAll(tmpDir)
+
+			registerFakePlugin(testDriver, "endpoint", []string{"1.2.0"}, t)
+
 			mounter, err := plug.NewMounter(
 				test.spec,
 				&api.Pod{ObjectMeta: meta.ObjectMeta{UID: test.podUID, Namespace: test.namespace}},
@@ -844,6 +861,7 @@ func TestPluginCanAttach(t *testing.T) {
 		spec       *volume.Spec
 		canAttach  bool
 		shouldFail bool
+		mode       *storagev1beta1.CSIDriverMode
 	}{
 		{
 			name:       "non-attachable inline",
@@ -873,8 +891,8 @@ func TestPluginCanAttach(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		csiDriver := getTestCSIDriver(test.driverName, nil, &test.canAttach)
 		t.Run(test.name, func(t *testing.T) {
+			csiDriver := getTestCSIDriver(test.driverName, nil, &test.canAttach, test.mode)
 			fakeCSIClient := fakeclient.NewSimpleClientset(csiDriver)
 			plug, tmpDir := newTestPlugin(t, fakeCSIClient)
 			defer os.RemoveAll(tmpDir)
@@ -898,6 +916,7 @@ func TestPluginFindAttachablePlugin(t *testing.T) {
 		spec       *volume.Spec
 		canAttach  bool
 		shouldFail bool
+		mode       *storagev1beta1.CSIDriverMode
 	}{
 		{
 			name:       "non-attachable inline",
@@ -934,7 +953,7 @@ func TestPluginFindAttachablePlugin(t *testing.T) {
 			}
 			defer os.RemoveAll(tmpDir)
 
-			client := fakeclient.NewSimpleClientset(getTestCSIDriver(test.driverName, nil, &test.canAttach))
+			client := fakeclient.NewSimpleClientset(getTestCSIDriver(test.driverName, nil, &test.canAttach, test.mode))
 			factory := informers.NewSharedInformerFactory(client, CsiResyncPeriod)
 			host := volumetest.NewFakeVolumeHostWithCSINodeName(
 				tmpDir,

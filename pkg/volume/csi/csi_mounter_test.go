@@ -28,6 +28,7 @@ import (
 
 	api "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -155,9 +156,9 @@ func MounterSetUpTests(t *testing.T, podInfoEnabled bool) {
 				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
 			}
 			fakeClient := fakeclient.NewSimpleClientset(
-				getTestCSIDriver("no-info", &noPodMountInfo, nil),
-				getTestCSIDriver("info", &currentPodInfoMount, nil),
-				getTestCSIDriver("nil", nil, nil),
+				getTestCSIDriver("no-info", &noPodMountInfo, nil, nil),
+				getTestCSIDriver("info", &currentPodInfoMount, nil, nil),
+				getTestCSIDriver("nil", nil, nil, nil),
 			)
 			plug, tmpDir := newTestPlugin(t, fakeClient)
 			defer os.RemoveAll(tmpDir)
@@ -397,10 +398,6 @@ func TestMounterSetUpSimple(t *testing.T) {
 func TestMounterSetUpWithInline(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
 
-	fakeClient := fakeclient.NewSimpleClientset()
-	plug, tmpDir := newTestPlugin(t, fakeClient)
-	defer os.RemoveAll(tmpDir)
-
 	testCases := []struct {
 		name       string
 		podUID     types.UID
@@ -449,6 +446,14 @@ func TestMounterSetUpWithInline(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		driverMode := storagev1beta1.PersistentDriverMode
+		if tc.mode == ephemeralVolumeMode {
+			driverMode = storagev1beta1.EphemeralDriverMode
+		}
+		driver := getTestCSIDriver(testDriver, nil, nil, &driverMode)
+		fakeClient := fakeclient.NewSimpleClientset(driver)
+		plug, tmpDir := newTestPlugin(t, fakeClient)
+		defer os.RemoveAll(tmpDir)
 		registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
 		t.Run(tc.name, func(t *testing.T) {
 			mounter, err := plug.NewMounter(

@@ -27,7 +27,10 @@ import (
 
 	api "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
+	storagebeta1 "k8s.io/api/storage/v1beta1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
@@ -45,6 +48,12 @@ import (
 // based on operations from the volume manager/reconciler/operation executor
 func TestCSI_VolumeAll(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
+
+	// Need variables for the struct construction below.
+	ephemeralDriverMode := storagebeta1.EphemeralDriverMode
+	persistentDriverMode := storagebeta1.PersistentDriverMode
+	combinedDriverMode := storagebeta1.CombinedDriverMode
+
 	tests := []struct {
 		name       string
 		specName   string
@@ -54,6 +63,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 		podFunc    func() *api.Pod
 		isInline   bool
 		shouldFail bool
+		driverSpec *storagebeta1.CSIDriverSpec
 	}{
 		{
 			name:     "PersistentVolume",
@@ -69,7 +79,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 			},
 		},
 		{
-			name:    "ephermeral inline",
+			name:    "ephemeral inline supported",
 			driver:  "inline-driver-1",
 			volName: "test.vol2",
 			specFunc: func(specName, driver, volName string) *volume.Spec {
@@ -80,6 +90,75 @@ func TestCSI_VolumeAll(t *testing.T) {
 				return &api.Pod{ObjectMeta: meta.ObjectMeta{UID: podUID, Namespace: testns}}
 			},
 			isInline: true,
+			driverSpec: &storagebeta1.CSIDriverSpec{
+				// Required for the driver to be accepted for the inline volume.
+				Mode: &ephemeralDriverMode,
+			},
+		},
+		{
+			name:    "ephemeral inline also supported",
+			driver:  "inline-driver-1",
+			volName: "test.vol2",
+			specFunc: func(specName, driver, volName string) *volume.Spec {
+				return volume.NewSpecFromVolume(makeTestVol(specName, driver))
+			},
+			podFunc: func() *api.Pod {
+				podUID := types.UID(fmt.Sprintf("%08X", rand.Uint64()))
+				return &api.Pod{ObjectMeta: meta.ObjectMeta{UID: podUID, Namespace: testns}}
+			},
+			isInline: true,
+			driverSpec: &storagebeta1.CSIDriverSpec{
+				// Required for the driver to be accepted for the inline volume.
+				Mode: &combinedDriverMode,
+			},
+		},
+		{
+			name:    "ephemeral inline without CSIDriver info",
+			driver:  "inline-driver-2",
+			volName: "test.vol3",
+			specFunc: func(specName, driver, volName string) *volume.Spec {
+				return volume.NewSpecFromVolume(makeTestVol(specName, driver))
+			},
+			podFunc: func() *api.Pod {
+				podUID := types.UID(fmt.Sprintf("%08X", rand.Uint64()))
+				return &api.Pod{ObjectMeta: meta.ObjectMeta{UID: podUID, Namespace: testns}}
+			},
+			isInline: true,
+		},
+		{
+			name:    "ephemeral inline with driver that has no mode",
+			driver:  "inline-driver-3",
+			volName: "test.vol4",
+			specFunc: func(specName, driver, volName string) *volume.Spec {
+				return volume.NewSpecFromVolume(makeTestVol(specName, driver))
+			},
+			podFunc: func() *api.Pod {
+				podUID := types.UID(fmt.Sprintf("%08X", rand.Uint64()))
+				return &api.Pod{ObjectMeta: meta.ObjectMeta{UID: podUID, Namespace: testns}}
+			},
+			isInline: true,
+			driverSpec: &storagebeta1.CSIDriverSpec{
+				// This means the driver *cannot* handle the inline volume because
+				// the default is "persistent".
+				Mode: nil,
+			},
+		},
+		{
+			name:    "ephemeral inline with driver that has wrong mode",
+			driver:  "inline-driver-3",
+			volName: "test.vol4",
+			specFunc: func(specName, driver, volName string) *volume.Spec {
+				return volume.NewSpecFromVolume(makeTestVol(specName, driver))
+			},
+			podFunc: func() *api.Pod {
+				podUID := types.UID(fmt.Sprintf("%08X", rand.Uint64()))
+				return &api.Pod{ObjectMeta: meta.ObjectMeta{UID: podUID, Namespace: testns}}
+			},
+			isInline: true,
+			driverSpec: &storagebeta1.CSIDriverSpec{
+				// This means the driver *cannot* handle the inline volume.
+				Mode: &persistentDriverMode,
+			},
 		},
 		{
 			name:     "missing spec",
@@ -118,10 +197,27 @@ func TestCSI_VolumeAll(t *testing.T) {
 				t.Fatalf("can't create temp dir: %v", err)
 			}
 			defer os.RemoveAll(tmpDir)
-			client := fakeclient.NewSimpleClientset()
+
+			var driverInfo *storagebeta1.CSIDriver
+			objs := []runtime.Object{}
+			if test.driverSpec != nil {
+				driverInfo = &storagebeta1.CSIDriver{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: test.driver,
+					},
+					Spec: *test.driverSpec,
+				}
+				objs = append(objs, driverInfo)
+			}
+
+			client := fakeclient.NewSimpleClientset(objs...)
 			fakeWatcher := watch.NewRaceFreeFake()
 
-			factory := informers.NewSharedInformerFactory(client, CsiResyncPeriod)
+			factory := informers.NewSharedInformerFactory(client, time.Hour /* disable resync */)
+			csiDriverInformer := factory.Storage().V1beta1().CSIDrivers()
+			if driverInfo != nil {
+				csiDriverInformer.Informer().GetStore().Add(driverInfo)
+			}
 			factory.Start(wait.NeverStop)
 
 			host := volumetest.NewFakeVolumeHostWithCSINodeName(
@@ -129,7 +225,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 				client,
 				nil,
 				"csi-node",
-				factory.Storage().V1beta1().CSIDrivers().Lister(),
+				csiDriverInformer.Lister(),
 			)
 
 			plugMgr := &volume.VolumePluginMgr{}
@@ -253,6 +349,14 @@ func TestCSI_VolumeAll(t *testing.T) {
 			}
 
 			mounter, err := volPlug.NewMounter(volSpec, pod, volume.VolumeOptions{})
+			if test.isInline && (test.driverSpec == nil || test.driverSpec.Mode == nil || *test.driverSpec.Mode == storagebeta1.PersistentDriverMode) {
+				// This *must* fail because a CSIDriver.Spec.Mode == "ephemeral"
+				// is required.
+				if err == nil || mounter != nil {
+					t.Fatalf("csiTest.VolumeAll volPlugin.NewMounter should have failed for inline volume due to lack of support for inline volumes, got: %+v, %s", mounter, err)
+				}
+				return
+			}
 			if err != nil || mounter == nil {
 				t.Fatalf("csiTest.VolumeAll volPlugin.NewMounter is nil or error: %s", err)
 			}
