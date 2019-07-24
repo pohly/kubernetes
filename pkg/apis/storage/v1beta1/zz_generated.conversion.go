@@ -253,6 +253,7 @@ func Convert_storage_CSIDriverList_To_v1beta1_CSIDriverList(in *storage.CSIDrive
 func autoConvert_v1beta1_CSIDriverSpec_To_storage_CSIDriverSpec(in *v1beta1.CSIDriverSpec, out *storage.CSIDriverSpec, s conversion.Scope) error {
 	out.AttachRequired = (*bool)(unsafe.Pointer(in.AttachRequired))
 	out.PodInfoOnMount = (*bool)(unsafe.Pointer(in.PodInfoOnMount))
+	out.Mode = (*storage.CSIDriverMode)(unsafe.Pointer(in.Mode))
 	return nil
 }
 
@@ -264,6 +265,7 @@ func Convert_v1beta1_CSIDriverSpec_To_storage_CSIDriverSpec(in *v1beta1.CSIDrive
 func autoConvert_storage_CSIDriverSpec_To_v1beta1_CSIDriverSpec(in *storage.CSIDriverSpec, out *v1beta1.CSIDriverSpec, s conversion.Scope) error {
 	out.AttachRequired = (*bool)(unsafe.Pointer(in.AttachRequired))
 	out.PodInfoOnMount = (*bool)(unsafe.Pointer(in.PodInfoOnMount))
+	out.Mode = (*v1beta1.CSIDriverMode)(unsafe.Pointer(in.Mode))
 	return nil
 }
 

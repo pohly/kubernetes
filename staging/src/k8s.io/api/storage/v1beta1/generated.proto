@@ -93,8 +93,22 @@ message CSIDriverSpec {
   // "csi.storage.k8s.io/pod.name": pod.Name
   // "csi.storage.k8s.io/pod.namespace": pod.Namespace
   // "csi.storage.k8s.io/pod.uid": string(pod.UID)
+  // "csi.storage.k8s.io/ephemeral": "true" iff the volume is an ephemeral inline volumed
+  //                                 defined by a CSIVolumeSource, otherwise "false"
   // +optional
   optional bool podInfoOnMount = 2;
+
+  // If set, Mode defines how this CSI volume driver can be used.
+  // The default is "persistent", which is the usage defined by
+  // the CSI specification.
+  //
+  // Other modes are:
+  // - "ephemeral": only use this driver for inline ephemeral volumes (CSIVolumeSource)
+  // - "persistent+ephemeral": both modes supported
+  //
+  // More modes may be added in the future.
+  // +optional
+  optional string mode = 3;
 }
 
 // CSINode holds information about all CSI drivers installed on a node.

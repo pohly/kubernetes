@@ -42,6 +42,7 @@
   },
   "spec": {
     "attachRequired": false,
-    "podInfoOnMount": true
+    "podInfoOnMount": true,
+    "mode": "Ă凗蓏Ŋ蛊ĉy"
   }
 }
