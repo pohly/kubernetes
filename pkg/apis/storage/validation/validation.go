@@ -423,6 +423,7 @@ func validateCSIDriverSpec(
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, validateAttachRequired(spec.AttachRequired, fldPath.Child("attachedRequired"))...)
 	allErrs = append(allErrs, validatePodInfoOnMount(spec.PodInfoOnMount, fldPath.Child("podInfoOnMount"))...)
+	allErrs = append(allErrs, validateMode(spec.Mode, fldPath.Child("mode"))...)
 	return allErrs
 }
 
@@ -441,6 +442,27 @@ func validatePodInfoOnMount(podInfoOnMount *bool, fldPath *field.Path) field.Err
 	allErrs := field.ErrorList{}
 	if podInfoOnMount == nil {
 		allErrs = append(allErrs, field.Required(fldPath, ""))
+	}
+
+	return allErrs
+}
+
+// validateMode tests if mode has one of the allowed values.
+func validateMode(mode *storage.CSIDriverMode, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if mode != nil {
+		switch *mode {
+		case storage.PersistentDriverMode:
+		case storage.EphemeralDriverMode:
+		case storage.CombinedDriverMode:
+		default:
+			allErrs = append(allErrs, field.NotSupported(fldPath, *mode,
+				[]string{
+					string(storage.PersistentDriverMode),
+					string(storage.EphemeralDriverMode),
+					string(storage.CombinedDriverMode),
+				}))
+		}
 	}
 
 	return allErrs

@@ -1675,6 +1675,10 @@ func TestCSIDriverValidation(t *testing.T) {
 	attachNotRequired := false
 	podInfoOnMount := true
 	notPodInfoOnMount := false
+	persistentDriverMode := storage.PersistentDriverMode
+	ephemeralDriverMode := storage.EphemeralDriverMode
+	combinedDriverMode := storage.CombinedDriverMode
+	invalidDriverMode := storage.CSIDriverMode("foobar")
 	successCases := []storage.CSIDriver{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: driverName},
@@ -1736,6 +1740,30 @@ func TestCSIDriverValidation(t *testing.T) {
 				PodInfoOnMount: &notPodInfoOnMount,
 			},
 		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: driverName},
+			Spec: storage.CSIDriverSpec{
+				AttachRequired: &attachNotRequired,
+				PodInfoOnMount: &notPodInfoOnMount,
+				Mode:           &persistentDriverMode,
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: driverName},
+			Spec: storage.CSIDriverSpec{
+				AttachRequired: &attachNotRequired,
+				PodInfoOnMount: &notPodInfoOnMount,
+				Mode:           &ephemeralDriverMode,
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: driverName},
+			Spec: storage.CSIDriverSpec{
+				AttachRequired: &attachNotRequired,
+				PodInfoOnMount: &notPodInfoOnMount,
+				Mode:           &combinedDriverMode,
+			},
+		},
 	}
 
 	for _, csiDriver := range successCases {
@@ -1772,6 +1800,15 @@ func TestCSIDriverValidation(t *testing.T) {
 			Spec: storage.CSIDriverSpec{
 				AttachRequired: &attachNotRequired,
 				PodInfoOnMount: nil,
+			},
+		},
+		{
+			// invalid mode
+			ObjectMeta: metav1.ObjectMeta{Name: driverName},
+			Spec: storage.CSIDriverSpec{
+				AttachRequired: &attachNotRequired,
+				PodInfoOnMount: &notPodInfoOnMount,
+				Mode:           &invalidDriverMode,
 			},
 		},
 	}
