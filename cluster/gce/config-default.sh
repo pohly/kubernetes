@@ -49,6 +49,10 @@ NODE_LOCAL_SSDS_EXT=${NODE_LOCAL_SSDS_EXT:-}
 # Accelerators to be attached to each node. Format "type=<accelerator-type>,count=<accelerator-count>"
 # More information on available GPUs here - https://cloud.google.com/compute/docs/gpus/
 NODE_ACCELERATORS=${NODE_ACCELERATORS:-""}
+# One or more local NVDIMM can be attached to each node by this script. Format "size=<number of GB> [size=<number of GB> ...]"
+# Size limits and maximum numbers of local NVDIMMs vary depending on the machine type
+# that was selected with NODE_SIZE.
+NODE_NVDIMM=${NODE_NVDIMM:-""}
 REGISTER_MASTER_KUBELET=${REGISTER_MASTER:-true}
 PREEMPTIBLE_NODE=${PREEMPTIBLE_NODE:-false}
 PREEMPTIBLE_MASTER=${PREEMPTIBLE_MASTER:-false}

@@ -1983,14 +1983,29 @@ function create-node-template() {
     fi
   fi
 
-  local gcloud="gcloud"
-
+  # Any of the following features may add "alpha" or "beta" to the command line.
+  # Alpha features come first. If they set gcloud_alpha_beta, the beta
+  # features won't overwrite that.
+  local gcloud_alpha_beta=""
   local accelerator_args=""
-  # VMs with Accelerators cannot be live migrated.
-  # More details here - https://cloud.google.com/compute/docs/gpus/add-gpus#create-new-gpu-instance
+  local nvdimm_args=""
+  if [[ ! -z "${NODE_NVDIMM}" ]]; then
+    : "${gcloud_alpha_beta:=alpha}"
+    local nvdimm
+    for nvdimm in ${NODE_NVDIMM}; do
+      nvdimm_args=" --local-nvdimm $nvdimm"
+    done
+  fi
   if [[ ! -z "${NODE_ACCELERATORS}" ]]; then
+    # VMs with Accelerators cannot be live migrated.
+    # More details here - https://cloud.google.com/compute/docs/gpus/add-gpus#create-new-gpu-instance
     accelerator_args="--maintenance-policy TERMINATE --restart-on-failure --accelerator ${NODE_ACCELERATORS}"
-    gcloud="gcloud beta"
+    : "${gcloud_alpha_beta:=beta}"
+  fi
+
+  local gcloud="gcloud"
+  if [[ ! -z "$gcloud_alpha_beta" ]]; then
+      gcloud="$gcloud $gcloud_alpha_beta"
   fi
 
   local preemptible_minions=""
@@ -2063,6 +2078,7 @@ function create-node-template() {
       --service-account "${NODE_SERVICE_ACCOUNT}" \
       --tags "${NODE_TAG}" \
       ${accelerator_args} \
+      ${nvdimm_args} \
       ${local_ssds} \
       --region "${REGION}" \
       ${network} \
