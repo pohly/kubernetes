@@ -402,6 +402,12 @@ function detect-node-names() {
         "${group}" --zone "${ZONE}" --project "${PROJECT}" \
         --format='value(instance)'))
     done
+  else
+    # Not using MIGs. Look for nodes directly.
+    NODE_NAMES+=($(gcloud compute instances list \
+    --project "${PROJECT}" \
+    --filter "name ~ '${NODE_INSTANCE_PREFIX}-node-.+' AND zone:(${ZONE})" \
+    --format='value(name)' || true))
   fi
   # Add heapster node name to the list too (if it exists).
   if [[ -n "${HEAPSTER_MACHINE_TYPE:-}" ]]; then
@@ -1964,6 +1970,8 @@ function validate-node-local-ssds-ext(){
 # $3: String of comma-separated metadata-from-file entries.
 # $4: String of comma-separated metadata (key=value) entries.
 # $5: the node OS ("linux" or "windows").
+#
+# Also stores the relevant parameters in NODE_TEMPLATE_ARGS_<template_name>.
 function create-node-template() {
   detect-project
   detect-subnetworks
@@ -2064,28 +2072,30 @@ function create-node-template() {
   fi
 
   local metadata_flag="${metadata_values:+--metadata ${metadata_values}}"
+  local args="--project ${PROJECT} \
+      --machine-type ${NODE_SIZE} \
+      --boot-disk-type ${NODE_DISK_TYPE} \
+      --boot-disk-size ${NODE_DISK_SIZE} \
+      ${node_image_flags} \
+      --service-account ${NODE_SERVICE_ACCOUNT} \
+      --tags ${NODE_TAG} \
+      ${accelerator_args} \
+      ${nvdimm_args} \
+      ${local_ssds} \
+      ${network} \
+      ${preemptible_minions} \
+      $2 \
+      --metadata-from-file $3 \
+      ${metadata_flag}"
+
+  # For NODE_NVDIMM case in create-linux-nodes.
+  eval NODE_TEMPLATE_ARGS_$(echo ${template_name} | tr - _)='$args'
 
   local attempt=1
   while true; do
     echo "Attempt ${attempt} to create ${1}" >&2
     if ! ${gcloud} compute instance-templates create \
-      "${template_name}" \
-      --project "${PROJECT}" \
-      --machine-type "${NODE_SIZE}" \
-      --boot-disk-type "${NODE_DISK_TYPE}" \
-      --boot-disk-size "${NODE_DISK_SIZE}" \
-      ${node_image_flags} \
-      --service-account "${NODE_SERVICE_ACCOUNT}" \
-      --tags "${NODE_TAG}" \
-      ${accelerator_args} \
-      ${nvdimm_args} \
-      ${local_ssds} \
-      --region "${REGION}" \
-      ${network} \
-      ${preemptible_minions} \
-      $2 \
-      --metadata-from-file $3 \
-      ${metadata_flag} >&2; then
+      "${template_name}" $args --region ${REGION} >&2; then
         if (( attempt > 5 )); then
           echo -e "${color_red}Failed to create instance template ${template_name} ${color_norm}" >&2
           exit 2
@@ -2799,8 +2809,24 @@ function create-linux-nodes() {
   fi
 
   local instances_left=${nodes}
+  local migs=${NUM_MIGS}
 
-  for ((i=1; i<=${NUM_MIGS}; i++)); do
+  if [[ "${NODE_NVDIMM}" ]]; then
+    # Don't use any MIGs because the instance-template (although created okay) doesn't
+    # actually work:
+    # gcloud compute instance-groups managed create kubernetes-minion-group ... --base-instance-name kubernetes-minion-group --size 3 --template kubernetes-minion-template
+    # ERROR: (gcloud.compute.instance-groups.managed.create) Could not fetch resource:
+    # - Internal error. Please try again or contact Google Support. (Code: '58EE3BE001DE4.A989D8E.AB0DD3DA')
+    migs=0
+
+    # Instead, create VMs directly.
+    for ((i=0; i<${nodes}; i++)); do
+      local node_name="${NODE_INSTANCE_PREFIX}-node-$i"
+      gcloud alpha compute instances create ${node_name} $(eval echo \${NODE_TEMPLATE_ARGS_$(echo "${template_name}" | tr - _)}) --zone ${ZONE} &
+    done
+  fi
+
+  for ((i=1; i<=${migs}; i++)); do
     local group_name="${NODE_INSTANCE_PREFIX}-group-$i"
     if [[ $i == ${NUM_MIGS} ]]; then
       # TODO: We don't add a suffix for the last group to keep backward compatibility when there's only one MIG.
@@ -2824,7 +2850,9 @@ function create-linux-nodes() {
         --project "${PROJECT}" \
         --timeout "${MIG_WAIT_UNTIL_STABLE_TIMEOUT}" || true &
   done
-  wait
+  kube::util::wait-for-jobs || {
+      echo "WARNING: creation of some nodes may have failed, see errors above." >&2
+  }
 }
 
 # Assumes:
@@ -3110,6 +3138,21 @@ function kube-down() {
           "${group}" &
       fi
     done
+
+    if [[ -z "${INSTANCE_GROUPS[@]:-}" ]]; then
+      # Not using MIGs. Shut down nodes directly.
+      local node
+      for node in $(gcloud compute instances list \
+                           --project "${PROJECT}" \
+                           --filter "name ~ '${NODE_INSTANCE_PREFIX}-node-.+' AND zone:(${ZONE})" \
+                           --format='value(name)' || true); do
+        gcloud compute instances delete \
+               "${node}" \
+               --quiet \
+               --project "${PROJECT}" \
+               --zone "${ZONE}" &
+      done
+    fi
 
     # Wait for last batch of jobs
     kube::util::wait-for-jobs || {
