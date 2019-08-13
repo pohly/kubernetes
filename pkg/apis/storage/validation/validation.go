@@ -445,6 +445,9 @@ func validatePodInfoOnMount(podInfoOnMount *bool, fldPath *field.Path) field.Err
 
 // validateVolumeLifecycleModes tests if mode has one of the allowed values.
 func validateVolumeLifecycleModes(modes []storage.VolumeLifecycleMode, fldPath *field.Path) field.ErrorList {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
+		return nil
+	}
 	allErrs := field.ErrorList{}
 	for _, mode := range modes {
 		switch mode {

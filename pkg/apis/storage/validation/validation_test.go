@@ -1657,7 +1657,9 @@ func TestCSINodeUpdateValidation(t *testing.T) {
 	}
 }
 
-func TestCSIDriverValidation(t *testing.T) {
+func testCSIDriverValidation(t *testing.T, csiInlineVolumeEnabled bool) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, csiInlineVolumeEnabled)()
+
 	driverName := "test-driver"
 	longName := "my-a-b-c-d-c-f-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-y-z-ABCDEFGHIJKLMNOPQRSTUVWXYZ-driver"
 	invalidName := "-invalid-@#$%^&*()-"
@@ -1665,6 +1667,19 @@ func TestCSIDriverValidation(t *testing.T) {
 	attachNotRequired := false
 	podInfoOnMount := true
 	notPodInfoOnMount := false
+
+	invalidVolumeLifecycle := storage.CSIDriver{
+		// invalid mode
+		ObjectMeta: metav1.ObjectMeta{Name: driverName},
+		Spec: storage.CSIDriverSpec{
+			AttachRequired: &attachNotRequired,
+			PodInfoOnMount: &notPodInfoOnMount,
+			VolumeLifecycleModes: []storage.VolumeLifecycleMode{
+				"no-such-mode",
+			},
+		},
+	}
+
 	successCases := []storage.CSIDriver{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: driverName},
@@ -1771,11 +1786,6 @@ func TestCSIDriverValidation(t *testing.T) {
 		},
 	}
 
-	for _, csiDriver := range successCases {
-		if errs := ValidateCSIDriver(&csiDriver); len(errs) != 0 {
-			t.Errorf("expected success: %v", errs)
-		}
-	}
 	errorCases := []storage.CSIDriver{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: invalidName},
@@ -1807,17 +1817,16 @@ func TestCSIDriverValidation(t *testing.T) {
 				PodInfoOnMount: nil,
 			},
 		},
-		{
-			// invalid mode
-			ObjectMeta: metav1.ObjectMeta{Name: driverName},
-			Spec: storage.CSIDriverSpec{
-				AttachRequired: &attachNotRequired,
-				PodInfoOnMount: &notPodInfoOnMount,
-				VolumeLifecycleModes: []storage.VolumeLifecycleMode{
-					"no-such-mode",
-				},
-			},
-		},
+	}
+
+	// The invalid lifecycle mode is only detected if the
+	// CSIInlineVolume feature is enabled. Otherwise the
+	// corresponding validation is a NOP
+	// (https://github.com/kubernetes/kubernetes/pull/80568#discussion_r313505562).
+	if csiInlineVolumeEnabled {
+		errorCases = append(errorCases, invalidVolumeLifecycle)
+	} else {
+		successCases = append(successCases, invalidVolumeLifecycle)
 	}
 
 	for _, csiDriver := range errorCases {
@@ -1825,9 +1834,27 @@ func TestCSIDriverValidation(t *testing.T) {
 			t.Errorf("Expected failure for test: %v", csiDriver)
 		}
 	}
+
+	for _, csiDriver := range successCases {
+		if errs := ValidateCSIDriver(&csiDriver); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+}
+
+func TestCSIDriverValidation(t *testing.T) {
+	t.Run("with inline volume", func(t *testing.T) {
+		testCSIDriverValidation(t, true)
+	})
+	t.Run("without inline volume", func(t *testing.T) {
+		testCSIDriverValidation(t, false)
+	})
 }
 
 func TestCSIDriverValidationUpdate(t *testing.T) {
+	// TODO(pohly): test with and without CSIInlineVolume
+	// TODO(pohly): cleaner test cases (https://github.com/kubernetes/kubernetes/pull/80568#discussion_r312241669)
+
 	driverName := "test-driver"
 	longName := "my-a-b-c-d-c-f-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-y-z-ABCDEFGHIJKLMNOPQRSTUVWXYZ-driver"
 	invalidName := "-invalid-@#$%^&*()-"

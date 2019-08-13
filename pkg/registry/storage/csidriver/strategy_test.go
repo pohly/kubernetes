@@ -241,7 +241,9 @@ func TestCSIDriverPrepareForUpdate(t *testing.T) {
 	})
 }
 
-func TestCSIDriverValidation(t *testing.T) {
+func testCSIDriverValidation(t *testing.T, csiInlineVolumeEnabled bool) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, csiInlineVolumeEnabled)()
+
 	attachRequired := true
 	notAttachRequired := false
 	podInfoOnMount := true
@@ -310,7 +312,10 @@ func TestCSIDriverValidation(t *testing.T) {
 					},
 				},
 			},
-			true,
+			// Validation of VolumeLifecycleModes is only enabled
+			// if the corresponding feature is enabled, otherwise
+			// any value (including invalid ones) are okay.
+			csiInlineVolumeEnabled,
 		},
 		{
 			"persistent volume mode",
@@ -384,4 +389,13 @@ func TestCSIDriverValidation(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCSIDriverValidation(t *testing.T) {
+	t.Run("with inline volume", func(t *testing.T) {
+		testCSIDriverValidation(t, true)
+	})
+	t.Run("without inline volume", func(t *testing.T) {
+		testCSIDriverValidation(t, false)
+	})
 }
