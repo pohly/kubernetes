@@ -325,6 +325,12 @@ const (
 	// Enables CSI Inline volumes support for pods
 	CSIInlineVolume featuregate.Feature = "CSIInlineVolume"
 
+	// owner: @pohly
+	// alpha: v1.18
+	//
+	// Enables tracking of available storage capacity that CSI drivers provide.
+	CSIStorageCapacity featuregate.Feature = "CSIStorageCapacity"
+
 	// owner: @tallclair
 	// alpha: v1.12
 	// beta:  v1.14
@@ -554,6 +560,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ResourceQuotaScopeSelectors:    {Default: true, PreRelease: featuregate.Beta},
 	CSIBlockVolume:                 {Default: true, PreRelease: featuregate.Beta},
 	CSIInlineVolume:                {Default: true, PreRelease: featuregate.Beta},
+	CSIStorageCapacity:             {Default: false, PreRelease: featuregate.Alpha},
 	RuntimeClass:                   {Default: true, PreRelease: featuregate.Beta},
 	NodeLease:                      {Default: true, PreRelease: featuregate.Beta},
 	SCTPSupport:                    {Default: false, PreRelease: featuregate.Alpha},
