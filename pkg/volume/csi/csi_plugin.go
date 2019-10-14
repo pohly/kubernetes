@@ -31,6 +31,7 @@ import (
 	api "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -342,6 +343,7 @@ func (p *csiPlugin) NewMounter(
 		driverName   string
 		volumeHandle string
 		readOnly     bool
+		size         *resource.Quantity
 	)
 
 	switch {
@@ -351,6 +353,7 @@ func (p *csiPlugin) NewMounter(
 		if volSrc.ReadOnly != nil {
 			readOnly = *volSrc.ReadOnly
 		}
+		size = volSrc.FSSize
 	case pvSrc != nil:
 		driverName = pvSrc.Driver
 		volumeHandle = pvSrc.VolumeHandle
@@ -391,6 +394,7 @@ func (p *csiPlugin) NewMounter(
 		volumeID:            volumeHandle,
 		specVolumeID:        spec.Name(),
 		readOnly:            readOnly,
+		size:                size,
 		kubeVolHost:         kvh,
 	}
 	mounter.csiClientGetter.driverName = csiDriverName(driverName)
