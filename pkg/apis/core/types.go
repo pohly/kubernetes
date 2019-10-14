@@ -1656,6 +1656,14 @@ type CSIVolumeSource struct {
 	// +optional
 	FSType *string
 
+	// Desired size of the volume, specified as a quantity string (ex. "1Gi").
+	// Introduced as alpha field in Kubernetes 1.18. Prior to that, CSI
+	// drivers had to rely on a custom parameter in VolumeAttributes.
+	// Whether they continue to do that or use this field depends
+	// on the driver.
+	// +optional
+	FSSize *resource.Quantity
+
 	// VolumeAttributes stores driver-specific properties that are passed to the CSI
 	// driver. Consult your driver's documentation for supported values.
 	// +optional

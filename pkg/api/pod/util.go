@@ -530,11 +530,20 @@ func dropDisabledVolumeDevicesFields(podSpec, oldPodSpec *api.PodSpec) {
 }
 
 // dropDisabledCSIVolumeSourceAlphaFields removes disabled alpha fields from []CSIVolumeSource.
-// This should be called from PrepareForCreate/PrepareForUpdate for all pod specs resources containing a CSIVolumeSource
+// This should be called from PrepareForCreate/PrepareForUpdate for all pod specs resources containing a CSIVolumeSource.
+// Because alpha fields get dropped silently before validateCSIVolumeSource is called, specifying
+// them does not (and cannot) trigger validation errors.
 func dropDisabledCSIVolumeSourceAlphaFields(podSpec, oldPodSpec *api.PodSpec) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) && !csiInUse(oldPodSpec) {
 		for i := range podSpec.Volumes {
 			podSpec.Volumes[i].CSI = nil
+		}
+	} else if !utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolumeSize) && !csiFSSizeInUse(oldPodSpec) {
+		for _, volume := range podSpec.Volumes {
+			csi := volume.CSI
+			if csi != nil {
+				csi.FSSize = nil
+			}
 		}
 	}
 }
@@ -836,6 +845,19 @@ func csiInUse(podSpec *api.PodSpec) bool {
 	}
 	for i := range podSpec.Volumes {
 		if podSpec.Volumes[i].CSI != nil {
+			return true
+		}
+	}
+	return false
+}
+
+// csiInUse returns true if any pod's spec include inline CSI volumes with FSSize set.
+func csiFSSizeInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	for i := range podSpec.Volumes {
+		if podSpec.Volumes[i].CSI != nil && podSpec.Volumes[i].CSI.FSSize != nil {
 			return true
 		}
 	}
