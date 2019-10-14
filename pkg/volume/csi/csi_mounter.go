@@ -31,6 +31,7 @@ import (
 	api "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
@@ -69,6 +70,7 @@ type csiMountMgr struct {
 	specVolumeID        string
 	readOnly            bool
 	supportsSELinux     bool
+	size                *resource.Quantity
 	spec                *volume.Spec
 	pod                 *api.Pod
 	podUID              types.UID
@@ -325,6 +327,13 @@ func (c *csiMountMgr) podAttributes() (map[string]string, error) {
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
 		attrs["csi.storage.k8s.io/ephemeral"] = strconv.FormatBool(c.volumeLifecycleMode == storage.VolumeLifecycleEphemeral)
+		if utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolumeSize) {
+			size := ""
+			if c.size != nil {
+				size = c.size.String()
+			}
+			attrs["csi.storage.k8s.io/size"] = size
+		}
 	}
 
 	klog.V(4).Infof(log("CSIDriver %q requires pod information", c.driverName))

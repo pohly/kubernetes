@@ -29,6 +29,7 @@ import (
 	api "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -96,12 +97,15 @@ func TestMounterGetPath(t *testing.T) {
 
 func MounterSetUpTests(t *testing.T, podInfoEnabled bool) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIDriverRegistry, podInfoEnabled)()
+	size1GB := resource.MustParse("1Gi")
 	tests := []struct {
 		name                  string
 		driver                string
 		volumeContext         map[string]string
+		size                  *resource.Quantity
 		expectedVolumeContext map[string]string
 		csiInlineVolume       bool
+		csiStorageCapacity    bool
 	}{
 		{
 			name:                  "no pod info",
@@ -146,6 +150,23 @@ func MounterSetUpTests(t *testing.T, podInfoEnabled bool) {
 			expectedVolumeContext: map[string]string{"csi.storage.k8s.io/pod.uid": "test-pod", "csi.storage.k8s.io/serviceAccount.name": "test-service-account", "csi.storage.k8s.io/pod.name": "test-pod", "csi.storage.k8s.io/pod.namespace": "test-ns", "csi.storage.k8s.io/ephemeral": "false"},
 			csiInlineVolume:       true,
 		},
+		{
+			name:                  "CSIInlineVolume no size",
+			driver:                "info",
+			volumeContext:         nil,
+			expectedVolumeContext: map[string]string{"csi.storage.k8s.io/pod.uid": "test-pod", "csi.storage.k8s.io/serviceAccount.name": "test-service-account", "csi.storage.k8s.io/pod.name": "test-pod", "csi.storage.k8s.io/pod.namespace": "test-ns", "csi.storage.k8s.io/ephemeral": "false", "csi.storage.k8s.io/size": ""},
+			csiInlineVolume:       true,
+			csiStorageCapacity:    true,
+		},
+		{
+			name:                  "CSIInlineVolume 1Gi size",
+			driver:                "info",
+			volumeContext:         nil,
+			size:                  &size1GB,
+			expectedVolumeContext: map[string]string{"csi.storage.k8s.io/pod.uid": "test-pod", "csi.storage.k8s.io/serviceAccount.name": "test-service-account", "csi.storage.k8s.io/pod.name": "test-pod", "csi.storage.k8s.io/pod.namespace": "test-ns", "csi.storage.k8s.io/ephemeral": "false", "csi.storage.k8s.io/size": "1Gi"},
+			csiInlineVolume:       true,
+			csiStorageCapacity:    true,
+		},
 	}
 
 	noPodMountInfo := false
@@ -155,6 +176,7 @@ func MounterSetUpTests(t *testing.T, podInfoEnabled bool) {
 			// Modes must be set if (and only if) CSIInlineVolume is enabled.
 			var modes []storagev1beta1.VolumeLifecycleMode
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, test.csiInlineVolume)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolumeSize, test.csiStorageCapacity)()
 			if test.csiInlineVolume {
 				modes = append(modes, storagev1beta1.VolumeLifecyclePersistent)
 			}
@@ -192,6 +214,7 @@ func MounterSetUpTests(t *testing.T, podInfoEnabled bool) {
 
 			csiMounter := mounter.(*csiMountMgr)
 			csiMounter.csiClient = setupClient(t, true)
+			csiMounter.size = test.size
 
 			attachID := getAttachmentName(csiMounter.volumeID, string(csiMounter.driverName), string(plug.host.GetNodeName()))
 
