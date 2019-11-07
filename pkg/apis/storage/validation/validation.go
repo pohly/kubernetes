@@ -460,3 +460,17 @@ func validateVolumeLifecycleModes(modes []storage.VolumeLifecycleMode, fldPath *
 
 	return allErrs
 }
+
+// ValidateCSIStorage validates a CSIStorage.
+func ValidateCSIStorage(storageClass *storage.CSIStorage) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMeta(&storageClass.ObjectMeta, false, apivalidation.ValidateClassName, field.NewPath("metadata"))
+	// TODO: validate fields
+	return allErrs
+}
+
+// ValidateCSIStorageUpdate tests if an update to CSIStorage is valid.
+func ValidateCSIStorageUpdate(storageClass, oldCSIStorage *storage.CSIStorage) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&storageClass.ObjectMeta, &oldCSIStorage.ObjectMeta, field.NewPath("metadata"))
+	// TODO: validate field updates
+	return allErrs
+}

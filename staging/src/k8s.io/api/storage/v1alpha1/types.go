@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -133,4 +134,81 @@ type VolumeError struct {
 	// information.
 	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,2,opt,name=message"`
+}
+
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// CSIStorage represents information about storage provided by a certain CSI driver,
+// like for example current capacity. As in CSIDriver, the name of the CSIStorage
+// objects is the same as the driver name. Unlike CSIDriver, these objects are
+// created dynamically and get updated regularly when there are changes.
+type CSIStorage struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// The actual information may depend on the storage class and therefore
+	// is provided separately for each storage class that uses the driver.
+	//
+	// +patchMergeKey=storageClassName
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=storageClassName
+	Info []CSIStorageByClass `patchStrategy:"merge" patchMergeKey:"storageClassName" json:"info,omitempty" protobuf:"bytes,2,opt,name=info"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// CSIStorageList is a collection of CSIStorage objects.
+type CSIStorageList struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Items is the list of CSIStorage objects.
+	// +listType=set
+	Items []CSIStorage `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
+
+// CSIStorageByClass contains information for one particular storage class
+// of a CSI driver.
+type CSIStorageByClass struct {
+	// Storage class name, <all>, <ephemeral>.
+	StorageClassName string `json:"storageClassName" protobuf:"bytes,1,name=storageClassName"`
+
+	// A CSI driver may allocate storage from one or more pools with different
+	// attributes. Entries must have unique names inside this list.
+	//
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=name
+	Pools []CSIStoragePool `patchStrategy:"merge" patchMergeKey:"name" json:"pools,omitempty" protobuf:"bytes,2,opt,name=pools"`
+}
+
+// CSIStoragePool identifies one particular storage pool and stores
+// the corresponding attributes.
+type CSIStoragePool struct {
+	// The name is some user-friendly identifier for this entry.
+	Name string `json:"name" protobuf:"bytes,1,name=name"`
+
+	// NodeTopology can be used to describe a storage pool that is available
+	// only for certain nodes in the cluster. If not set, the pool is consider
+	// to be available from all nodes.
+	// +optional
+	NodeTopology *v1.NodeSelector `json:"nodeTopology,omitempty" protobuf:"bytes,2,opt,name=nodeTopology"`
+
+	// Capacity is the size of the largest volume that currently can
+	// be created. This is a best-effort guess and even volumes
+	// of that size might not get created successfully.
+	// +optional
+	Capacity *resource.Quantity `json:"capacity,omitempty" protobuf:"bytes,3,opt,name=capacity"`
+
+	// ExpiryTime is the absolute time at which this entry becomes obsolete.
+	// When not set, the entry is valid forever.
+	// +optional
+	ExpiryTime *metav1.Time `json:"expiryTime,omitempty" protobuf:"bytes,4,opt,name=expiryTime"`
 }

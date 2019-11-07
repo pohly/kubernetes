@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	csidriverstore "k8s.io/kubernetes/pkg/registry/storage/csidriver/storage"
 	csinodestore "k8s.io/kubernetes/pkg/registry/storage/csinode/storage"
+	csistoragestore "k8s.io/kubernetes/pkg/registry/storage/csistorage/storage"
 	storageclassstore "k8s.io/kubernetes/pkg/registry/storage/storageclass/storage"
 	volumeattachmentstore "k8s.io/kubernetes/pkg/registry/storage/volumeattachment/storage"
 )
@@ -75,6 +76,15 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstora
 		return storage, err
 	}
 	storage["volumeattachments"] = volumeAttachmentStorage.VolumeAttachment
+
+	// register csistorages if CSIStorageCapacity feature gate is enabled
+	if true || utilfeature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity) {
+		csiStorageStorage, err := csistoragestore.NewStorage(restOptionsGetter)
+		if err != nil {
+			return storage, err
+		}
+		storage["csistorages"] = csiStorageStorage.CSIStorage
+	}
 
 	return storage, nil
 }

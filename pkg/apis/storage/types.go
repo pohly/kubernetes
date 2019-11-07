@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
@@ -423,4 +424,65 @@ type CSINodeList struct {
 
 	// items is the list of CSINode
 	Items []CSINode
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// CSIStorage represents information about storage provided by a certain CSI driver,
+// like for example current capacity. As in CSIDriver, the name of the CSIStorage
+// objects is the same as the driver name. Unlike CSIDriver, these objects are
+// created dynamically and get updated regularly when there are changes.
+type CSIStorage struct {
+	metav1.TypeMeta
+	metav1.ObjectMeta
+
+	// The actual information may depend on the storage class and therefore
+	// is provided separately for each storage class that uses the driver.
+	Info []CSIStorageByClass
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// CSIStorageList is a collection of CSIStorage objects.
+type CSIStorageList struct {
+	metav1.TypeMeta
+	// Standard list metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// +optional
+	metav1.ListMeta
+
+	// Items is the list of CSIStorage objects
+	Items []CSIStorage
+}
+
+// CSIStorageByClass contains information for one particular storage class
+// of a CSI driver.
+type CSIStorageByClass struct {
+	// Storage class name, <all>, <ephemeral>.
+	StorageClassName string
+
+	// A CSI driver may allocate storage from one or more pools with different
+	// attributes. Entries must have unique names inside this list.
+	Pools []CSIStoragePool
+}
+
+// CSIStoragePoolInfo identifies one particular storage pool and
+// stores the corresponding attributes.
+type CSIStoragePool struct {
+	// The name is some user-friendly identifier for this entry.
+	Name string
+
+	// NodeTopology can be used to describe a storage pool that is available
+	// only for certain nodes in the cluster. If not set, the pool is consider
+	// to be available from all nodes.
+	NodeTopology *api.NodeSelector
+
+	// Capacity is the size of the largest volume that currently can
+	// be created. This is a best-effort guess and even volumes
+	// of that size might not get created successfully.
+	Capacity *resource.Quantity
+
+	// ExpiryTime is the absolute time at which this entry becomes obsolete.
+	// When not set, the entry is valid forever.
+	ExpiryTime *metav1.Time
 }

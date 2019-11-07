@@ -58,6 +58,7 @@ func NewStorageFactoryConfig() *StorageFactoryConfig {
 		// TODO #83513 csinodes override can be removed in 1.18
 		apisstorage.Resource("csinodes").WithVersion("v1beta1"),
 		apisstorage.Resource("csidrivers").WithVersion("v1beta1"),
+		apisstorage.Resource("csistorages").WithVersion("v1alpha1"),
 	}
 
 	return &StorageFactoryConfig{
