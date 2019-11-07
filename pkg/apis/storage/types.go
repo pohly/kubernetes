@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
@@ -423,4 +424,107 @@ type CSINodeList struct {
 
 	// items is the list of CSINode
 	Items []CSINode
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// CSIStoragePool identifies one particular storage pool and
+// stores the corresponding attributes. The spec is read-only.
+type CSIStoragePool struct {
+	metav1.TypeMeta
+	// Standard object's metadata. The name has no particular meaning and just has to
+	// meet the usual requirements (length, characters, unique). To ensure that
+	// there are no conflicts with other CSI drivers on the cluster, the recommendation
+	// is to use sp-<uuid>.
+	//
+	// Objects are not namespaced.
+	//
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// +optional
+	metav1.ObjectMeta
+
+	Spec   CSIStoragePoolSpec
+	Status CSIStoragePoolStatus
+}
+
+// CSIStoragePoolSpec contains the constant attributes of a CSIStoragePool.
+type CSIStoragePoolSpec struct {
+	// The CSI driver that provides access to the storage pool.
+	// This must be the string returned by the CSI GetPluginName() call.
+	DriverName string
+}
+
+// CSIStoragePoolStatus contains runtime information about a CSIStoragePool.
+//
+// A pool might only be accessible from a subset of the nodes in the
+// cluster. That subset can be identified either via NodeTopology or
+// Nodes, but not both. If neither is set, the pool is assumed
+// to be available in the entire cluster.
+//
+// It is expected to be extended with other
+// attributes which do not depend on the storage class, like health of
+// the pool. Therefore it has the list of
+// `CSIStoragePoolByClass` instances instead of just the capacity
+// and the storage class being in the spec.
+type CSIStoragePoolStatus struct {
+	// NodeTopology can be used to describe a storage pool that is available
+	// only for nodes matching certain criteria.
+	// +optional
+	NodeTopology *api.NodeSelector
+
+	// Nodes can be used to describe a storage pool that is available
+	// only for certain nodes in the cluster.
+	//
+	// +optional
+	Nodes []string
+
+	// Some information, like the actual usable capacity, may
+	// depend on the storage class used for volumes.
+	// +optional
+	Classes []CSIStoragePoolByClass
+}
+
+// CSIStoragePoolByClass contains information that applies to one storage
+// pool of a CSI driver when using a certain storage class.
+type CSIStoragePoolByClass struct {
+	// The storage class name matches the name of some actual
+	// `StorageClass`, in which case the information applies when
+	// using that storage class for a volume. There are also two
+	// special names:
+	// - <ephemeral> for storage used by ephemeral inline volumes (which
+	//   don't use a storage class)
+	// - <fallback> for storage that is the same regardless of the storage class;
+	//   it is applicable if there is no other, more specific entry
+	StorageClassName string
+
+	// Capacity is the size of the largest volume that currently can
+	// be created. This is a best-effort guess and even volumes
+	// of that size might not get created successfully.
+	// +optional
+	Capacity *resource.Quantity
+}
+
+const (
+	// FallbackStorageClassName is used for a CSIStoragePool element which
+	// applies when there isn't a more specific element for the
+	// current storage class or ephemeral volume.
+	FallbackStorageClassName = "<fallback>"
+
+	// EphemeralStorageClassName is used for storage from which
+	// ephemeral volumes are allocated.
+	EphemeralStorageClassName = "<ephemeral>"
+)
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// CSIStoragePoolList is a collection of CSIStoragePool objects.
+type CSIStoragePoolList struct {
+	metav1.TypeMeta
+	// Standard list metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// +optional
+	metav1.ListMeta
+
+	// Items is the list of CSIStoragePool objects.
+	Items []CSIStoragePool
 }
