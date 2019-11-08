@@ -22,12 +22,82 @@ syntax = 'proto2';
 package k8s.io.api.storage.v1alpha1;
 
 import "k8s.io/api/core/v1/generated.proto";
+import "k8s.io/apimachinery/pkg/api/resource/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 
 // Package-wide variables from generator "generated".
 option go_package = "v1alpha1";
+
+// CSIStorage represents information about storage provided by a certain CSI driver,
+// like for example current capacity. As in CSIDriver, the name of the CSIStorage
+// objects is the same as the driver name. Unlike CSIDriver, these objects are
+// created dynamically and get updated regularly when there are changes.
+message CSIStorage {
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+
+  // The actual information may depend on the storage class and therefore
+  // is provided separately for each storage class that uses the driver.
+  //
+  // +patchMergeKey=storageClassName
+  // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=storageClassName
+  repeated CSIStorageByClass info = 2;
+}
+
+// CSIStorageByClass contains information for one particular storage class
+// of a CSI driver.
+message CSIStorageByClass {
+  // Storage class name, <all>, <ephemeral>.
+  optional string storageClassName = 1;
+
+  // A CSI driver may allocate storage from one or more pools with different
+  // attributes. Entries must have unique names inside this list.
+  //
+  // +patchMergeKey=name
+  // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=name
+  repeated CSIStoragePool pools = 2;
+}
+
+// CSIStorageList is a collection of CSIStorage objects.
+message CSIStorageList {
+  // Standard list metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+
+  // Items is the list of CSIStorage objects.
+  // +listType=set
+  repeated CSIStorage items = 2;
+}
+
+// CSIStoragePool identifies one particular storage pool and stores
+// the corresponding attributes.
+message CSIStoragePool {
+  // The name is some user-friendly identifier for this entry.
+  optional string name = 1;
+
+  // NodeTopology can be used to describe a storage pool that is available
+  // only for certain nodes in the cluster. If not set, the pool is consider
+  // to be available from all nodes.
+  // +optional
+  optional k8s.io.api.core.v1.NodeSelector nodeTopology = 2;
+
+  // Capacity is the size of the largest volume that currently can
+  // be created. This is a best-effort guess and even volumes
+  // of that size might not get created successfully.
+  // +optional
+  optional k8s.io.apimachinery.pkg.api.resource.Quantity capacity = 3;
+
+  // ExpiryTime is the absolute time at which this entry becomes obsolete.
+  // When not set, the entry is valid forever.
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time expiryTime = 4;
+}
 
 // VolumeAttachment captures the intent to attach or detach the specified volume
 // to/from the specified node.

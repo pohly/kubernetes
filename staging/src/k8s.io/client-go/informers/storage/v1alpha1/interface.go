@@ -24,6 +24,8 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
+	// CSIStorages returns a CSIStorageInformer.
+	CSIStorages() CSIStorageInformer
 	// VolumeAttachments returns a VolumeAttachmentInformer.
 	VolumeAttachments() VolumeAttachmentInformer
 }
@@ -37,6 +39,11 @@ type version struct {
 // New returns a new Interface.
 func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
+}
+
+// CSIStorages returns a CSIStorageInformer.
+func (v *version) CSIStorages() CSIStorageInformer {
+	return &cSIStorageInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // VolumeAttachments returns a VolumeAttachmentInformer.
