@@ -31,6 +31,27 @@ metadata:
   uid: "7"
 spec:
   attachRequired: false
+  capacityTracking: true
   podInfoOnMount: false
   volumeLifecycleModes:
   - r鯹)晿<o,c鮽ort昍řČ扷5ƗǸ
+status:
+  storage:
+  - pools:
+    - capacity: "2"
+      name: "20"
+      nodeList:
+      - "25"
+      nodeTopology:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: "21"
+            operator: VŚ(ĿȊ甞谐颋
+            values:
+            - "22"
+          matchFields:
+          - key: "23"
+            operator: 峕?狱³-Ǐ忄*齧獚敆Ȏ
+            values:
+            - "24"
+    storageClassName: "19"

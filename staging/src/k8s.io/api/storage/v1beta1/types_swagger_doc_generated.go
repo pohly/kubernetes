@@ -31,6 +31,7 @@ var map_CSIDriver = map[string]string{
 	"":         "CSIDriver captures information about a Container Storage Interface (CSI) volume driver deployed on the cluster. CSI drivers do not need to create the CSIDriver object directly. Instead they may use the cluster-driver-registrar sidecar container. When deployed with a CSI driver it automatically creates a CSIDriver object representing the driver. Kubernetes attach detach controller uses this object to determine whether attach is required. Kubelet uses this object to determine whether pod information needs to be passed on mount. CSIDriver objects are non-namespaced.",
 	"metadata": "Standard object metadata. metadata.Name indicates the name of the CSI driver that this object refers to; it MUST be the same name returned by the CSI GetPluginName() call for that driver. The driver name must be 63 characters or less, beginning and ending with an alphanumeric character ([a-z0-9A-Z]) with dashes (-), dots (.), and alphanumerics between. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"spec":     "Specification of the CSI Driver.",
+	"status":   "Status of the CSI Driver.",
 }
 
 func (CSIDriver) SwaggerDoc() map[string]string {
@@ -52,10 +53,20 @@ var map_CSIDriverSpec = map[string]string{
 	"attachRequired":       "attachRequired indicates this CSI volume driver requires an attach operation (because it implements the CSI ControllerPublishVolume() method), and that the Kubernetes attach detach controller should call the attach volume interface which checks the volumeattachment status and waits until the volume is attached before proceeding to mounting. The CSI external-attacher coordinates with CSI volume driver and updates the volumeattachment status when the attach operation is complete. If the CSIDriverRegistry feature gate is enabled and the value is specified to false, the attach operation will be skipped. Otherwise the attach operation will be called.",
 	"podInfoOnMount":       "If set to true, podInfoOnMount indicates this CSI volume driver requires additional pod information (like podName, podUID, etc.) during mount operations. If set to false, pod information will not be passed on mount. Default is false. The CSI driver specifies podInfoOnMount as part of driver deployment. If true, Kubelet will pass pod information as VolumeContext in the CSI NodePublishVolume() calls. The CSI driver is responsible for parsing and validating the information passed in as VolumeContext. The following VolumeConext will be passed if podInfoOnMount is set to true. This list might grow, but the prefix will be used. \"csi.storage.k8s.io/pod.name\": pod.Name \"csi.storage.k8s.io/pod.namespace\": pod.Namespace \"csi.storage.k8s.io/pod.uid\": string(pod.UID) \"csi.storage.k8s.io/ephemeral\": \"true\" iff the volume is an ephemeral inline volume\n                                defined by a CSIVolumeSource, otherwise \"false\"\n\n\"csi.storage.k8s.io/ephemeral\" is a new feature in Kubernetes 1.16. It is only required for drivers which support both the \"Persistent\" and \"Ephemeral\" VolumeLifecycleMode. Other drivers can leave pod info disabled and/or ignore this field. As Kubernetes 1.15 doesn't support this field, drivers can only support one mode when deployed on such a cluster and the deployment determines which mode that is, for example via a command line parameter of the driver.",
 	"volumeLifecycleModes": "VolumeLifecycleModes defines what kind of volumes this CSI volume driver supports. The default if the list is empty is \"Persistent\", which is the usage defined by the CSI specification and implemented in Kubernetes via the usual PV/PVC mechanism. The other mode is \"Ephemeral\". In this mode, volumes are defined inline inside the pod spec with CSIVolumeSource and their lifecycle is tied to the lifecycle of that pod. A driver has to be aware of this because it is only going to get a NodePublishVolume call for such a volume. For more information about implementing this mode, see https://kubernetes-csi.github.io/docs/ephemeral-local-volumes.html A driver can support one or more of these modes and more modes may be added in the future.",
+	"capacityTracking":     "CapacityTracking defines whether the driver deployment will provide capacity information as part of the driver status.",
 }
 
 func (CSIDriverSpec) SwaggerDoc() map[string]string {
 	return map_CSIDriverSpec
+}
+
+var map_CSIDriverStatus = map[string]string{
+	"":        "CSIDriverStatus represents dynamic information about the driver and the storage provided by it, like for example current capacity.",
+	"storage": "Each driver can provide different kinds of storage.",
+}
+
+func (CSIDriverStatus) SwaggerDoc() map[string]string {
+	return map_CSIDriverStatus
 }
 
 var map_CSINode = map[string]string{
@@ -97,6 +108,29 @@ var map_CSINodeSpec = map[string]string{
 
 func (CSINodeSpec) SwaggerDoc() map[string]string {
 	return map_CSINodeSpec
+}
+
+var map_CSIStorage = map[string]string{
+	"":                 "CSIStorage contains information for one particular kind of storage provided by a CSI driver.",
+	"storageClassName": "The storage class name matches the name of some actual `StorageClass`, in which case the information applies when using that storage class for a volume. There are also two special names: - <ephemeral> for storage used by ephemeral inline volumes (which\n  don't use a storage class)\n- <fallback> for storage that is the same regardless of the storage class;\n  it is applicable if there is no other, more specific entry",
+	"pools":            "A CSI driver may allocate storage from one or more pools with different attributes. The entries must have names that are unique inside this list.",
+}
+
+func (CSIStorage) SwaggerDoc() map[string]string {
+	return map_CSIStorage
+}
+
+var map_CSIStoragePool = map[string]string{
+	"":             "CSIStoragePoolInfo identifies one particular storage pool and stores the corresponding attributes.\n\nA pool might only be accessible from a subset of the nodes in the cluster. That subset can be identified either via NodeTopology or NodeList, but not both. If neither is set, the pool is assumed to be available in the entire cluster.",
+	"name":         "The name is some user-friendly identifier for this entry.",
+	"nodeTopology": "NodeTopology can be used to describe a storage pool that is available only for nodes matching certain criteria.",
+	"nodeList":     "NodeList can be used to describe a storage pool that is available only for certain nodes in the cluster.",
+	"capacity":     "Capacity is the size of the largest volume that currently can be created. This is a best-effort guess and even volumes of that size might not get created successfully.",
+	"expiryTime":   "ExpiryTime is the absolute time at which this entry becomes obsolete. When not set, the entry is valid forever.",
+}
+
+func (CSIStoragePool) SwaggerDoc() map[string]string {
+	return map_CSIStoragePool
 }
 
 var map_StorageClass = map[string]string{

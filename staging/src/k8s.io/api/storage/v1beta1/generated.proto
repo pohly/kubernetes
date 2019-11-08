@@ -22,6 +22,7 @@ syntax = 'proto2';
 package k8s.io.api.storage.v1beta1;
 
 import "k8s.io/api/core/v1/generated.proto";
+import "k8s.io/apimachinery/pkg/api/resource/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
@@ -50,6 +51,10 @@ message CSIDriver {
 
   // Specification of the CSI Driver.
   optional CSIDriverSpec spec = 2;
+
+  // Status of the CSI Driver.
+  // +optional
+  optional CSIDriverStatus status = 3;
 }
 
 // CSIDriverList is a collection of CSIDriver objects.
@@ -119,6 +124,23 @@ message CSIDriverSpec {
   // more modes may be added in the future.
   // +optional
   repeated string volumeLifecycleModes = 3;
+
+  // CapacityTracking defines whether the driver deployment will provide
+  // capacity information as part of the driver status.
+  // +optional
+  optional bool capacityTracking = 4;
+}
+
+// CSIDriverStatus represents dynamic information about the driver and
+// the storage provided by it, like for example current capacity.
+message CSIDriverStatus {
+  // Each driver can provide different kinds of storage.
+  // +patchMergeKey=storageClassName
+  // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=storageClassName
+  // +optional
+  repeated CSIStorage storage = 1;
 }
 
 // DEPRECATED - This group version of CSINode is deprecated by storage/v1/CSINode.
@@ -194,6 +216,65 @@ message CSINodeSpec {
   // +patchMergeKey=name
   // +patchStrategy=merge
   repeated CSINodeDriver drivers = 1;
+}
+
+// CSIStorage contains information for one particular kind of storage
+// provided by a CSI driver.
+message CSIStorage {
+  // The storage class name matches the name of some actual
+  // `StorageClass`, in which case the information applies when
+  // using that storage class for a volume. There are also two
+  // special names:
+  // - <ephemeral> for storage used by ephemeral inline volumes (which
+  //   don't use a storage class)
+  // - <fallback> for storage that is the same regardless of the storage class;
+  //   it is applicable if there is no other, more specific entry
+  optional string storageClassName = 1;
+
+  // A CSI driver may allocate storage from one or more pools
+  // with different attributes. The entries must have names that
+  // are unique inside this list.
+  //
+  // +patchMergeKey=name
+  // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=name
+  // +optional
+  repeated CSIStoragePool pools = 2;
+}
+
+// CSIStoragePoolInfo identifies one particular storage pool and
+// stores the corresponding attributes.
+//
+// A pool might only be accessible from a subset of the nodes in the
+// cluster. That subset can be identified either via NodeTopology or
+// NodeList, but not both. If neither is set, the pool is assumed
+// to be available in the entire cluster.
+message CSIStoragePool {
+  // The name is some user-friendly identifier for this entry.
+  optional string name = 1;
+
+  // NodeTopology can be used to describe a storage pool that is available
+  // only for nodes matching certain criteria.
+  // +optional
+  optional k8s.io.api.core.v1.NodeSelector nodeTopology = 2;
+
+  // NodeList can be used to describe a storage pool that is available
+  // only for certain nodes in the cluster.
+  //
+  // +listType=set
+  // +optional
+  repeated string nodeList = 3;
+
+  // Capacity is the size of the largest volume that currently can
+  // be created. This is a best-effort guess and even volumes
+  // of that size might not get created successfully.
+  // +optional
+  optional k8s.io.apimachinery.pkg.api.resource.Quantity capacity = 4;
+
+  // ExpiryTime is the absolute time at which this entry becomes obsolete.
+  // When not set, the entry is valid forever.
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time expiryTime = 5;
 }
 
 // StorageClass describes the parameters for a class of storage for

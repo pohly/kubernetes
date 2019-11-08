@@ -39,6 +39,7 @@ type CSIDriversGetter interface {
 type CSIDriverInterface interface {
 	Create(*v1beta1.CSIDriver) (*v1beta1.CSIDriver, error)
 	Update(*v1beta1.CSIDriver) (*v1beta1.CSIDriver, error)
+	UpdateStatus(*v1beta1.CSIDriver) (*v1beta1.CSIDriver, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
 	Get(name string, options v1.GetOptions) (*v1beta1.CSIDriver, error)
@@ -119,6 +120,21 @@ func (c *cSIDrivers) Update(cSIDriver *v1beta1.CSIDriver) (result *v1beta1.CSIDr
 	err = c.client.Put().
 		Resource("csidrivers").
 		Name(cSIDriver.Name).
+		Body(cSIDriver).
+		Do().
+		Into(result)
+	return
+}
+
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+
+func (c *cSIDrivers) UpdateStatus(cSIDriver *v1beta1.CSIDriver) (result *v1beta1.CSIDriver, err error) {
+	result = &v1beta1.CSIDriver{}
+	err = c.client.Put().
+		Resource("csidrivers").
+		Name(cSIDriver.Name).
+		SubResource("status").
 		Body(cSIDriver).
 		Do().
 		Into(result)

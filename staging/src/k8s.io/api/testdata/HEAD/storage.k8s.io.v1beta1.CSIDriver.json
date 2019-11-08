@@ -45,6 +45,47 @@
     "podInfoOnMount": false,
     "volumeLifecycleModes": [
       "r鯹)晿\u003co,c鮽ort昍řČ扷5ƗǸ"
+    ],
+    "capacityTracking": true
+  },
+  "status": {
+    "storage": [
+      {
+        "storageClassName": "19",
+        "pools": [
+          {
+            "name": "20",
+            "nodeTopology": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "21",
+                      "operator": "VŚ(ĿȊ甞谐颋",
+                      "values": [
+                        "22"
+                      ]
+                    }
+                  ],
+                  "matchFields": [
+                    {
+                      "key": "23",
+                      "operator": "峕?狱³-Ǐ忄*齧獚敆Ȏ",
+                      "values": [
+                        "24"
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            "nodeList": [
+              "25"
+            ],
+            "capacity": "2"
+          }
+        ]
+      }
     ]
   }
 }
