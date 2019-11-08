@@ -18,6 +18,7 @@ package v1beta1
 
 import (
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -244,6 +245,10 @@ type CSIDriver struct {
 
 	// Specification of the CSI Driver.
 	Spec CSIDriverSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
+
+	// Status of the CSI Driver.
+	// +optional
+	Status CSIDriverStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -317,6 +322,11 @@ type CSIDriverSpec struct {
 	// more modes may be added in the future.
 	// +optional
 	VolumeLifecycleModes []VolumeLifecycleMode `json:"volumeLifecycleModes,omitempty" protobuf:"bytes,3,opt,name=volumeLifecycleModes"`
+
+	// CapacityTracking defines whether the driver deployment will provide
+	// capacity information as part of the driver status.
+	// +optional
+	CapacityTracking *bool `json:"capacityTracking,omitempty" protobuf:"bytes,4,opt,name=capacityTracking"`
 }
 
 // VolumeLifecycleMode is an enumeration of possible usage modes for a volume
@@ -343,6 +353,88 @@ const (
 	// identical.
 	VolumeLifecycleEphemeral VolumeLifecycleMode = "Ephemeral"
 )
+
+// CSIDriverStatus represents dynamic information about the driver and
+// the storage provided by it, like for example current capacity.
+type CSIDriverStatus struct {
+	// Each driver can provide different kinds of storage.
+	// +patchMergeKey=storageClassName
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=storageClassName
+	// +optional
+	Storage []CSIStorage `patchStrategy:"merge" patchMergeKey:"storageClassName" json:"storage,omitempty" protobuf:"bytes,1,opt,name=storage"`
+}
+
+// CSIStorage contains information for one particular kind of storage
+// provided by a CSI driver.
+type CSIStorage struct {
+	// The storage class name matches the name of some actual
+	// `StorageClass`, in which case the information applies when
+	// using that storage class for a volume. There are also two
+	// special names:
+	// - <ephemeral> for storage used by ephemeral inline volumes (which
+	//   don't use a storage class)
+	// - <fallback> for storage that is the same regardless of the storage class;
+	//   it is applicable if there is no other, more specific entry
+	StorageClassName string `json:"storageClassName" protobuf:"bytes,1,name=storageClassName"`
+
+	// A CSI driver may allocate storage from one or more pools
+	// with different attributes. The entries must have names that
+	// are unique inside this list.
+	//
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	Pools []CSIStoragePool `patchStrategy:"merge" patchMergeKey:"name" json:"pools,omitempty" protobuf:"bytes,2,opt,name=pools"`
+}
+
+const (
+	// FallbackStorageClassName is used for a CSIStorage element which
+	// applies when there isn't a more specific element for the
+	// current storage class or ephemeral volume.
+	FallbackStorageClassName = "<fallback>"
+
+	// EphemeralStorageClassName is used for storage from which
+	// ephemeral volumes are allocated.
+	EphemeralStorageClassName = "<ephemeral>"
+)
+
+// CSIStoragePoolInfo identifies one particular storage pool and
+// stores the corresponding attributes.
+//
+// A pool might only be accessible from a subset of the nodes in the
+// cluster. That subset can be identified either via NodeTopology or
+// NodeList, but not both. If neither is set, the pool is assumed
+// to be available in the entire cluster.
+type CSIStoragePool struct {
+	// The name is some user-friendly identifier for this entry.
+	Name string `json:"name" protobuf:"bytes,1,name=name"`
+
+	// NodeTopology can be used to describe a storage pool that is available
+	// only for nodes matching certain criteria.
+	// +optional
+	NodeTopology *v1.NodeSelector `json:"nodeTopology,omitempty" protobuf:"bytes,2,opt,name=nodeTopology"`
+
+	// NodeList can be used to describe a storage pool that is available
+	// only for certain nodes in the cluster.
+	//
+	// +listType=set
+	// +optional
+	NodeList []string `json:"nodeList,omitempty" protobuf:"bytes,3,opt,name=nodeList"`
+
+	// Capacity is the size of the largest volume that currently can
+	// be created. This is a best-effort guess and even volumes
+	// of that size might not get created successfully.
+	// +optional
+	Capacity *resource.Quantity `json:"capacity,omitempty" protobuf:"bytes,4,opt,name=capacity"`
+
+	// ExpiryTime is the absolute time at which this entry becomes obsolete.
+	// When not set, the entry is valid forever.
+	ExpiryTime *metav1.Time `json:"expiryTime,omitempty" protobuf:"bytes,5,opt,name=expiryTime"`
+}
 
 // +genclient
 // +genclient:nonNamespaced

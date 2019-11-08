@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
@@ -244,6 +245,9 @@ type CSIDriver struct {
 
 	// Specification of the CSI Driver.
 	Spec CSIDriverSpec
+
+	// Status of the CSI Driver.
+	Status CSIDriverStatus
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -273,7 +277,6 @@ type CSIDriverSpec struct {
 	// If the CSIDriverRegistry feature gate is enabled and the value is
 	// specified to false, the attach operation will be skipped.
 	// Otherwise the attach operation will be called.
-	// +optional
 	AttachRequired *bool
 
 	// If set to true, podInfoOnMount indicates this CSI volume driver
@@ -291,7 +294,6 @@ type CSIDriverSpec struct {
 	// "csi.storage.k8s.io/pod.name": pod.Name
 	// "csi.storage.k8s.io/pod.namespace": pod.Namespace
 	// "csi.storage.k8s.io/pod.uid": string(pod.UID)
-	// +optional
 	PodInfoOnMount *bool
 
 	// VolumeLifecycleModes defines what kind of volumes this CSI volume driver supports.
@@ -306,8 +308,68 @@ type CSIDriverSpec struct {
 	// https://kubernetes-csi.github.io/docs/ephemeral-local-volumes.html
 	// A driver can support one or more of these mode and
 	// more modes may be added in the future.
-	// +optional
 	VolumeLifecycleModes []VolumeLifecycleMode
+
+	// CapacityTracking defines whether the driver deployment will provide
+	// capacity information as part of the driver status.
+	CapacityTracking *bool
+}
+
+// CSIDriverStatus represents dynamic information about the driver and
+// the storage provided by it, like for example current capacity.
+type CSIDriverStatus struct {
+	// Each driver can provide different kinds of storage.
+	Storage []CSIStorage
+}
+
+// CSIStorage contains information for one particular kind of storage
+// provided by a CSI driver.
+type CSIStorage struct {
+	// The storage class name matches the name of some actual
+	// `StorageClass`, in which case the information applies when
+	// using that storage class for a volume. There are also two
+	// special names:
+	// - <ephemeral> for storage used by ephemeral inline volumes (which
+	//   don't use a storage class)
+	// - <fallback> for storage that is the same regardless of the storage class;
+	//   it is applicable if there is no other, more specific entry
+	StorageClassName string
+
+	// A CSI driver may allocate storage from one or more pools
+	// with different attributes. The entries must have names that
+	// are unique inside this list.
+	Pools []CSIStoragePool
+}
+
+// CSIStoragePoolInfo identifies one particular storage pool and
+// stores the corresponding attributes.
+//
+// A pool might only be accessible from a subset of the nodes in the
+// cluster. That subset can be identified either via NodeTopology or
+// NodeList, but not both. If neither is set, the pool is assumed
+// to be available in the entire cluster.
+type CSIStoragePool struct {
+	// The name is some user-friendly identifier for this entry.
+	Name string
+
+	// NodeTopology can be used to describe a storage pool that is available
+	// only for nodes matching certain criteria.
+	// +optional
+	NodeTopology *api.NodeSelector
+
+	// NodeList can be used to describe a storage pool that is available
+	// only for certain nodes in the cluster.
+	// +optional
+	NodeList []string
+
+	// Capacity is the size of the largest volume that currently can
+	// be created. This is a best-effort guess and even volumes
+	// of that size might not get created successfully.
+	Capacity *resource.Quantity
+
+	// ExpiryTime is the absolute time at which this entry becomes obsolete.
+	// When not set, the entry is valid forever.
+	ExpiryTime *metav1.Time
 }
 
 // VolumeLifecycleMode specifies how a CSI volume is used in Kubernetes.
