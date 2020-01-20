@@ -268,6 +268,11 @@ func (in *CSIVolumeSource) DeepCopyInto(out *CSIVolumeSource) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.FSSize != nil {
+		in, out := &in.FSSize, &out.FSSize
+		x := (*in).DeepCopy()
+		*out = &x
+	}
 	if in.VolumeAttributes != nil {
 		in, out := &in.VolumeAttributes, &out.VolumeAttributes
 		*out = make(map[string]string, len(*in))

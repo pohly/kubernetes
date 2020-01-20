@@ -2392,6 +2392,7 @@ func autoConvert_v1_CSIVolumeSource_To_core_CSIVolumeSource(in *v1.CSIVolumeSour
 	out.Driver = in.Driver
 	out.ReadOnly = (*bool)(unsafe.Pointer(in.ReadOnly))
 	out.FSType = (*string)(unsafe.Pointer(in.FSType))
+	out.FSSize = (*resource.Quantity)(unsafe.Pointer(in.FSSize))
 	out.VolumeAttributes = *(*map[string]string)(unsafe.Pointer(&in.VolumeAttributes))
 	out.NodePublishSecretRef = (*core.LocalObjectReference)(unsafe.Pointer(in.NodePublishSecretRef))
 	return nil
@@ -2406,6 +2407,7 @@ func autoConvert_core_CSIVolumeSource_To_v1_CSIVolumeSource(in *core.CSIVolumeSo
 	out.Driver = in.Driver
 	out.ReadOnly = (*bool)(unsafe.Pointer(in.ReadOnly))
 	out.FSType = (*string)(unsafe.Pointer(in.FSType))
+	out.FSSize = (*resource.Quantity)(unsafe.Pointer(in.FSSize))
 	out.VolumeAttributes = *(*map[string]string)(unsafe.Pointer(&in.VolumeAttributes))
 	out.NodePublishSecretRef = (*v1.LocalObjectReference)(unsafe.Pointer(in.NodePublishSecretRef))
 	return nil

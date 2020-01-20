@@ -246,6 +246,14 @@ message CSIVolumeSource {
   // +optional
   optional string fsType = 3;
 
+  // Desired size of the volume, specified as a quantity string (ex. "1Gi").
+  // Introduced as alpha field in Kubernetes 1.18. Prior to that, CSI
+  // drivers had to rely on a custom parameter in VolumeAttributes.
+  // Whether they continue to do that or use this field depends
+  // on the driver.
+  // +optional
+  optional k8s.io.apimachinery.pkg.api.resource.Quantity fsSize = 6;
+
   // VolumeAttributes stores driver-specific properties that are passed to the CSI
   // driver. Consult your driver's documentation for supported values.
   // +optional

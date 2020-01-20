@@ -359,6 +359,7 @@
           "driver": "138",
           "readOnly": true,
           "fsType": "139",
+          "fsSize": "880",
           "volumeAttributes": {
             "140": "141"
           },
@@ -371,10 +372,9 @@
     "volumeMounts": [
       {
         "name": "143",
-        "readOnly": true,
         "mountPath": "144",
         "subPath": "145",
-        "mountPropagation": "腿ħ缶.蒅!a",
+        "mountPropagation": "媹Hǝ呮}臷Ľð»ųKĵ\u00264ʑ%",
         "subPathExpr": "146"
       }
     ]
