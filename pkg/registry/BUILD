@@ -93,6 +93,7 @@ filegroup(
         "//pkg/registry/settings/rest:all-srcs",
         "//pkg/registry/storage/csidriver:all-srcs",
         "//pkg/registry/storage/csinode:all-srcs",
+        "//pkg/registry/storage/csistoragepool:all-srcs",
         "//pkg/registry/storage/rest:all-srcs",
         "//pkg/registry/storage/storageclass:all-srcs",
         "//pkg/registry/storage/volumeattachment:all-srcs",

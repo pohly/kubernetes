@@ -18,6 +18,10 @@ limitations under the License.
 
 package v1alpha1
 
+// CSIStoragePoolListerExpansion allows custom methods to be added to
+// CSIStoragePoolLister.
+type CSIStoragePoolListerExpansion interface{}
+
 // VolumeAttachmentListerExpansion allows custom methods to be added to
 // VolumeAttachmentLister.
 type VolumeAttachmentListerExpansion interface{}

@@ -23,12 +23,13 @@ package v1alpha1
 import (
 	unsafe "unsafe"
 
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	v1alpha1 "k8s.io/api/storage/v1alpha1"
+	resource "k8s.io/apimachinery/pkg/api/resource"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	core "k8s.io/kubernetes/pkg/apis/core"
-	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	storage "k8s.io/kubernetes/pkg/apis/storage"
 )
 
@@ -39,6 +40,56 @@ func init() {
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*v1alpha1.CSIStoragePool)(nil), (*storage.CSIStoragePool)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_CSIStoragePool_To_storage_CSIStoragePool(a.(*v1alpha1.CSIStoragePool), b.(*storage.CSIStoragePool), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*storage.CSIStoragePool)(nil), (*v1alpha1.CSIStoragePool)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_storage_CSIStoragePool_To_v1alpha1_CSIStoragePool(a.(*storage.CSIStoragePool), b.(*v1alpha1.CSIStoragePool), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha1.CSIStoragePoolByClass)(nil), (*storage.CSIStoragePoolByClass)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_CSIStoragePoolByClass_To_storage_CSIStoragePoolByClass(a.(*v1alpha1.CSIStoragePoolByClass), b.(*storage.CSIStoragePoolByClass), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*storage.CSIStoragePoolByClass)(nil), (*v1alpha1.CSIStoragePoolByClass)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_storage_CSIStoragePoolByClass_To_v1alpha1_CSIStoragePoolByClass(a.(*storage.CSIStoragePoolByClass), b.(*v1alpha1.CSIStoragePoolByClass), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha1.CSIStoragePoolList)(nil), (*storage.CSIStoragePoolList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_CSIStoragePoolList_To_storage_CSIStoragePoolList(a.(*v1alpha1.CSIStoragePoolList), b.(*storage.CSIStoragePoolList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*storage.CSIStoragePoolList)(nil), (*v1alpha1.CSIStoragePoolList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_storage_CSIStoragePoolList_To_v1alpha1_CSIStoragePoolList(a.(*storage.CSIStoragePoolList), b.(*v1alpha1.CSIStoragePoolList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha1.CSIStoragePoolSpec)(nil), (*storage.CSIStoragePoolSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_CSIStoragePoolSpec_To_storage_CSIStoragePoolSpec(a.(*v1alpha1.CSIStoragePoolSpec), b.(*storage.CSIStoragePoolSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*storage.CSIStoragePoolSpec)(nil), (*v1alpha1.CSIStoragePoolSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_storage_CSIStoragePoolSpec_To_v1alpha1_CSIStoragePoolSpec(a.(*storage.CSIStoragePoolSpec), b.(*v1alpha1.CSIStoragePoolSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha1.CSIStoragePoolStatus)(nil), (*storage.CSIStoragePoolStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_CSIStoragePoolStatus_To_storage_CSIStoragePoolStatus(a.(*v1alpha1.CSIStoragePoolStatus), b.(*storage.CSIStoragePoolStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*storage.CSIStoragePoolStatus)(nil), (*v1alpha1.CSIStoragePoolStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_storage_CSIStoragePoolStatus_To_v1alpha1_CSIStoragePoolStatus(a.(*storage.CSIStoragePoolStatus), b.(*v1alpha1.CSIStoragePoolStatus), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*v1alpha1.VolumeAttachment)(nil), (*storage.VolumeAttachment)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1alpha1_VolumeAttachment_To_storage_VolumeAttachment(a.(*v1alpha1.VolumeAttachment), b.(*storage.VolumeAttachment), scope)
 	}); err != nil {
@@ -100,6 +151,126 @@ func RegisterConversions(s *runtime.Scheme) error {
 		return err
 	}
 	return nil
+}
+
+func autoConvert_v1alpha1_CSIStoragePool_To_storage_CSIStoragePool(in *v1alpha1.CSIStoragePool, out *storage.CSIStoragePool, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_v1alpha1_CSIStoragePoolSpec_To_storage_CSIStoragePoolSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := Convert_v1alpha1_CSIStoragePoolStatus_To_storage_CSIStoragePoolStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_v1alpha1_CSIStoragePool_To_storage_CSIStoragePool is an autogenerated conversion function.
+func Convert_v1alpha1_CSIStoragePool_To_storage_CSIStoragePool(in *v1alpha1.CSIStoragePool, out *storage.CSIStoragePool, s conversion.Scope) error {
+	return autoConvert_v1alpha1_CSIStoragePool_To_storage_CSIStoragePool(in, out, s)
+}
+
+func autoConvert_storage_CSIStoragePool_To_v1alpha1_CSIStoragePool(in *storage.CSIStoragePool, out *v1alpha1.CSIStoragePool, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_storage_CSIStoragePoolSpec_To_v1alpha1_CSIStoragePoolSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := Convert_storage_CSIStoragePoolStatus_To_v1alpha1_CSIStoragePoolStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_storage_CSIStoragePool_To_v1alpha1_CSIStoragePool is an autogenerated conversion function.
+func Convert_storage_CSIStoragePool_To_v1alpha1_CSIStoragePool(in *storage.CSIStoragePool, out *v1alpha1.CSIStoragePool, s conversion.Scope) error {
+	return autoConvert_storage_CSIStoragePool_To_v1alpha1_CSIStoragePool(in, out, s)
+}
+
+func autoConvert_v1alpha1_CSIStoragePoolByClass_To_storage_CSIStoragePoolByClass(in *v1alpha1.CSIStoragePoolByClass, out *storage.CSIStoragePoolByClass, s conversion.Scope) error {
+	out.StorageClassName = in.StorageClassName
+	out.Capacity = (*resource.Quantity)(unsafe.Pointer(in.Capacity))
+	return nil
+}
+
+// Convert_v1alpha1_CSIStoragePoolByClass_To_storage_CSIStoragePoolByClass is an autogenerated conversion function.
+func Convert_v1alpha1_CSIStoragePoolByClass_To_storage_CSIStoragePoolByClass(in *v1alpha1.CSIStoragePoolByClass, out *storage.CSIStoragePoolByClass, s conversion.Scope) error {
+	return autoConvert_v1alpha1_CSIStoragePoolByClass_To_storage_CSIStoragePoolByClass(in, out, s)
+}
+
+func autoConvert_storage_CSIStoragePoolByClass_To_v1alpha1_CSIStoragePoolByClass(in *storage.CSIStoragePoolByClass, out *v1alpha1.CSIStoragePoolByClass, s conversion.Scope) error {
+	out.StorageClassName = in.StorageClassName
+	out.Capacity = (*resource.Quantity)(unsafe.Pointer(in.Capacity))
+	return nil
+}
+
+// Convert_storage_CSIStoragePoolByClass_To_v1alpha1_CSIStoragePoolByClass is an autogenerated conversion function.
+func Convert_storage_CSIStoragePoolByClass_To_v1alpha1_CSIStoragePoolByClass(in *storage.CSIStoragePoolByClass, out *v1alpha1.CSIStoragePoolByClass, s conversion.Scope) error {
+	return autoConvert_storage_CSIStoragePoolByClass_To_v1alpha1_CSIStoragePoolByClass(in, out, s)
+}
+
+func autoConvert_v1alpha1_CSIStoragePoolList_To_storage_CSIStoragePoolList(in *v1alpha1.CSIStoragePoolList, out *storage.CSIStoragePoolList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	out.Items = *(*[]storage.CSIStoragePool)(unsafe.Pointer(&in.Items))
+	return nil
+}
+
+// Convert_v1alpha1_CSIStoragePoolList_To_storage_CSIStoragePoolList is an autogenerated conversion function.
+func Convert_v1alpha1_CSIStoragePoolList_To_storage_CSIStoragePoolList(in *v1alpha1.CSIStoragePoolList, out *storage.CSIStoragePoolList, s conversion.Scope) error {
+	return autoConvert_v1alpha1_CSIStoragePoolList_To_storage_CSIStoragePoolList(in, out, s)
+}
+
+func autoConvert_storage_CSIStoragePoolList_To_v1alpha1_CSIStoragePoolList(in *storage.CSIStoragePoolList, out *v1alpha1.CSIStoragePoolList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	out.Items = *(*[]v1alpha1.CSIStoragePool)(unsafe.Pointer(&in.Items))
+	return nil
+}
+
+// Convert_storage_CSIStoragePoolList_To_v1alpha1_CSIStoragePoolList is an autogenerated conversion function.
+func Convert_storage_CSIStoragePoolList_To_v1alpha1_CSIStoragePoolList(in *storage.CSIStoragePoolList, out *v1alpha1.CSIStoragePoolList, s conversion.Scope) error {
+	return autoConvert_storage_CSIStoragePoolList_To_v1alpha1_CSIStoragePoolList(in, out, s)
+}
+
+func autoConvert_v1alpha1_CSIStoragePoolSpec_To_storage_CSIStoragePoolSpec(in *v1alpha1.CSIStoragePoolSpec, out *storage.CSIStoragePoolSpec, s conversion.Scope) error {
+	out.DriverName = in.DriverName
+	return nil
+}
+
+// Convert_v1alpha1_CSIStoragePoolSpec_To_storage_CSIStoragePoolSpec is an autogenerated conversion function.
+func Convert_v1alpha1_CSIStoragePoolSpec_To_storage_CSIStoragePoolSpec(in *v1alpha1.CSIStoragePoolSpec, out *storage.CSIStoragePoolSpec, s conversion.Scope) error {
+	return autoConvert_v1alpha1_CSIStoragePoolSpec_To_storage_CSIStoragePoolSpec(in, out, s)
+}
+
+func autoConvert_storage_CSIStoragePoolSpec_To_v1alpha1_CSIStoragePoolSpec(in *storage.CSIStoragePoolSpec, out *v1alpha1.CSIStoragePoolSpec, s conversion.Scope) error {
+	out.DriverName = in.DriverName
+	return nil
+}
+
+// Convert_storage_CSIStoragePoolSpec_To_v1alpha1_CSIStoragePoolSpec is an autogenerated conversion function.
+func Convert_storage_CSIStoragePoolSpec_To_v1alpha1_CSIStoragePoolSpec(in *storage.CSIStoragePoolSpec, out *v1alpha1.CSIStoragePoolSpec, s conversion.Scope) error {
+	return autoConvert_storage_CSIStoragePoolSpec_To_v1alpha1_CSIStoragePoolSpec(in, out, s)
+}
+
+func autoConvert_v1alpha1_CSIStoragePoolStatus_To_storage_CSIStoragePoolStatus(in *v1alpha1.CSIStoragePoolStatus, out *storage.CSIStoragePoolStatus, s conversion.Scope) error {
+	out.NodeTopology = (*core.NodeSelector)(unsafe.Pointer(in.NodeTopology))
+	out.Nodes = *(*[]string)(unsafe.Pointer(&in.Nodes))
+	out.Classes = *(*[]storage.CSIStoragePoolByClass)(unsafe.Pointer(&in.Classes))
+	return nil
+}
+
+// Convert_v1alpha1_CSIStoragePoolStatus_To_storage_CSIStoragePoolStatus is an autogenerated conversion function.
+func Convert_v1alpha1_CSIStoragePoolStatus_To_storage_CSIStoragePoolStatus(in *v1alpha1.CSIStoragePoolStatus, out *storage.CSIStoragePoolStatus, s conversion.Scope) error {
+	return autoConvert_v1alpha1_CSIStoragePoolStatus_To_storage_CSIStoragePoolStatus(in, out, s)
+}
+
+func autoConvert_storage_CSIStoragePoolStatus_To_v1alpha1_CSIStoragePoolStatus(in *storage.CSIStoragePoolStatus, out *v1alpha1.CSIStoragePoolStatus, s conversion.Scope) error {
+	out.NodeTopology = (*v1.NodeSelector)(unsafe.Pointer(in.NodeTopology))
+	out.Nodes = *(*[]string)(unsafe.Pointer(&in.Nodes))
+	out.Classes = *(*[]v1alpha1.CSIStoragePoolByClass)(unsafe.Pointer(&in.Classes))
+	return nil
+}
+
+// Convert_storage_CSIStoragePoolStatus_To_v1alpha1_CSIStoragePoolStatus is an autogenerated conversion function.
+func Convert_storage_CSIStoragePoolStatus_To_v1alpha1_CSIStoragePoolStatus(in *storage.CSIStoragePoolStatus, out *v1alpha1.CSIStoragePoolStatus, s conversion.Scope) error {
+	return autoConvert_storage_CSIStoragePoolStatus_To_v1alpha1_CSIStoragePoolStatus(in, out, s)
 }
 
 func autoConvert_v1alpha1_VolumeAttachment_To_storage_VolumeAttachment(in *v1alpha1.VolumeAttachment, out *storage.VolumeAttachment, s conversion.Scope) error {
@@ -181,7 +352,7 @@ func autoConvert_v1alpha1_VolumeAttachmentSource_To_storage_VolumeAttachmentSour
 	if in.InlineVolumeSpec != nil {
 		in, out := &in.InlineVolumeSpec, &out.InlineVolumeSpec
 		*out = new(core.PersistentVolumeSpec)
-		if err := v1.Convert_v1_PersistentVolumeSpec_To_core_PersistentVolumeSpec(*in, *out, s); err != nil {
+		if err := corev1.Convert_v1_PersistentVolumeSpec_To_core_PersistentVolumeSpec(*in, *out, s); err != nil {
 			return err
 		}
 	} else {
@@ -199,8 +370,8 @@ func autoConvert_storage_VolumeAttachmentSource_To_v1alpha1_VolumeAttachmentSour
 	out.PersistentVolumeName = (*string)(unsafe.Pointer(in.PersistentVolumeName))
 	if in.InlineVolumeSpec != nil {
 		in, out := &in.InlineVolumeSpec, &out.InlineVolumeSpec
-		*out = new(corev1.PersistentVolumeSpec)
-		if err := v1.Convert_core_PersistentVolumeSpec_To_v1_PersistentVolumeSpec(*in, *out, s); err != nil {
+		*out = new(v1.PersistentVolumeSpec)
+		if err := corev1.Convert_core_PersistentVolumeSpec_To_v1_PersistentVolumeSpec(*in, *out, s); err != nil {
 			return err
 		}
 	} else {

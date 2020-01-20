@@ -22,12 +22,107 @@ syntax = 'proto2';
 package k8s.io.api.storage.v1alpha1;
 
 import "k8s.io/api/core/v1/generated.proto";
+import "k8s.io/apimachinery/pkg/api/resource/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 
 // Package-wide variables from generator "generated".
 option go_package = "v1alpha1";
+
+// CSIStoragePool identifies one particular storage pool and
+// stores the corresponding attributes. The spec is read-only.
+message CSIStoragePool {
+  // Standard object's metadata. The name has no particular meaning and just has to
+  // meet the usual requirements (length, characters, unique). To ensure that
+  // there are no conflicts with other CSI drivers on the cluster, the recommendation
+  // is to use sp-<uuid>.
+  //
+  // Objects are not namespaced.
+  //
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+
+  optional CSIStoragePoolSpec spec = 2;
+
+  optional CSIStoragePoolStatus status = 3;
+}
+
+// CSIStoragePoolByClass contains information that applies to one storage
+// pool of a CSI driver when using a certain storage class.
+message CSIStoragePoolByClass {
+  // The storage class name matches the name of some actual
+  // `StorageClass`, in which case the information applies when
+  // using that storage class for a volume. There are also two
+  // special names:
+  // - <ephemeral> for storage used by ephemeral inline volumes (which
+  //   don't use a storage class)
+  // - <fallback> for storage that is the same regardless of the storage class;
+  //   it is applicable if there is no other, more specific entry
+  optional string storageClassName = 1;
+
+  // Capacity is the size of the largest volume that currently can
+  // be created. This is a best-effort guess and even volumes
+  // of that size might not get created successfully.
+  // +optional
+  optional k8s.io.apimachinery.pkg.api.resource.Quantity capacity = 2;
+}
+
+// CSIStoragePoolList is a collection of CSIStoragePool objects.
+message CSIStoragePoolList {
+  // Standard list metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+
+  // Items is the list of CSIStoragePool objects.
+  // +listType=set
+  repeated CSIStoragePool items = 2;
+}
+
+// CSIStoragePoolSpec contains the constant attributes of a CSIStoragePool.
+message CSIStoragePoolSpec {
+  // The CSI driver that provides access to the storage pool.
+  // This must be the string returned by the CSI GetPluginName() call.
+  optional string driverName = 1;
+}
+
+// CSIStoragePoolStatus contains runtime information about a CSIStoragePool.
+//
+// A pool might only be accessible from a subset of the nodes in the
+// cluster. That subset can be identified either via NodeTopology or
+// Nodes, but not both. If neither is set, the pool is assumed
+// to be available in the entire cluster.
+//
+// It is expected to be extended with other
+// attributes which do not depend on the storage class, like health of
+// the pool. Therefore it has the list of
+// `CSIStoragePoolByClass` instances instead of just the capacity
+// and the storage class being in the spec.
+message CSIStoragePoolStatus {
+  // NodeTopology can be used to describe a storage pool that is available
+  // only for nodes matching certain criteria.
+  // +optional
+  optional k8s.io.api.core.v1.NodeSelector nodeTopology = 1;
+
+  // Nodes can be used to describe a storage pool that is available
+  // only for certain nodes in the cluster.
+  //
+  // +listType=set
+  // +optional
+  repeated string nodes = 2;
+
+  // Some information, like the actual usable capacity, may
+  // depend on the storage class used for volumes.
+  //
+  // +patchMergeKey=storageClassName
+  // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=storageClassName
+  // +optional
+  repeated CSIStoragePoolByClass classes = 3;
+}
 
 // VolumeAttachment captures the intent to attach or detach the specified volume
 // to/from the specified node.
