@@ -330,7 +330,7 @@ func (c *csiMountMgr) podAttributes() (map[string]string, error) {
 		if utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolumeSize) {
 			size := ""
 			if c.size != nil {
-				size = c.size.String()
+				size = fmt.Sprintf("%d", c.size.Value())
 			}
 			attrs["csi.storage.k8s.io/size"] = size
 		}

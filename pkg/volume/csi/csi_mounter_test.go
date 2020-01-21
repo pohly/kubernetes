@@ -163,7 +163,7 @@ func MounterSetUpTests(t *testing.T, podInfoEnabled bool) {
 			driver:                "info",
 			volumeContext:         nil,
 			size:                  &size1GB,
-			expectedVolumeContext: map[string]string{"csi.storage.k8s.io/pod.uid": "test-pod", "csi.storage.k8s.io/serviceAccount.name": "test-service-account", "csi.storage.k8s.io/pod.name": "test-pod", "csi.storage.k8s.io/pod.namespace": "test-ns", "csi.storage.k8s.io/ephemeral": "false", "csi.storage.k8s.io/size": "1Gi"},
+			expectedVolumeContext: map[string]string{"csi.storage.k8s.io/pod.uid": "test-pod", "csi.storage.k8s.io/serviceAccount.name": "test-service-account", "csi.storage.k8s.io/pod.name": "test-pod", "csi.storage.k8s.io/pod.namespace": "test-ns", "csi.storage.k8s.io/ephemeral": "false", "csi.storage.k8s.io/size": "1073741824"},
 			csiInlineVolume:       true,
 			csiStorageCapacity:    true,
 		},
