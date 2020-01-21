@@ -311,6 +311,12 @@ type CSIDriverSpec struct {
 	// +optional
 	PodInfoOnMount *bool
 
+	// If set to true, storageCapacity indicates that the CSI
+	// volume driver wants pod scheduling to consider the storage
+	// capacity that the driver deployment will report by creating
+	// csistoragepool objects with capacity information.
+	StorageCapacity *bool
+
 	// VolumeLifecycleModes defines what kind of volumes this CSI volume driver supports.
 	// The default if the list is empty is "Persistent", which is the usage
 	// defined by the CSI specification and implemented in Kubernetes via the usual

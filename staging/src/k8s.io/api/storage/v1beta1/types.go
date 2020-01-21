@@ -305,10 +305,16 @@ type CSIDriverSpec struct {
 	// via a command line parameter of the driver.
 	//
 	// "csi.storage.k8s.io/size" is a new alpha feature in Kubernetes 1.18. It must be enabled
-	// explicitly with the CSIInlineVolumeSize feature flag. If not supported or enabled, CSI
+	// explicitly with the CSIInlineVolumeSize feature flag. If not supported or disabled, CSI
 	// drivers must use a custom parameter if they need a size for their volumes.
 	// +optional
 	PodInfoOnMount *bool `json:"podInfoOnMount,omitempty" protobuf:"bytes,2,opt,name=podInfoOnMount"`
+
+	// If set to true, storageCapacity indicates that the CSI
+	// volume driver wants pod scheduling to consider the storage
+	// capacity that the driver deployment will report by creating
+	// csistoragepool objects with capacity information.
+	StorageCapacity *bool `json:"storageCapacity,omitempty" protobuf:"bytes,4,opt,name=storageCapacity"`
 
 	// VolumeLifecycleModes defines what kind of volumes this CSI volume driver supports.
 	// The default if the list is empty is "Persistent", which is the usage
