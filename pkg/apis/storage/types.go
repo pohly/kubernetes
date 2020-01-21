@@ -315,6 +315,7 @@ type CSIDriverSpec struct {
 	// volume driver wants pod scheduling to consider the storage
 	// capacity that the driver deployment will report by creating
 	// csistoragepool objects with capacity information.
+	// +optional
 	StorageCapacity *bool
 
 	// VolumeLifecycleModes defines what kind of volumes this CSI volume driver supports.
