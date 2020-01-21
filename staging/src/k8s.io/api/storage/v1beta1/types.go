@@ -293,6 +293,9 @@ type CSIDriverSpec struct {
 	// "csi.storage.k8s.io/pod.uid": string(pod.UID)
 	// "csi.storage.k8s.io/ephemeral": "true" iff the volume is an ephemeral inline volume
 	//                                 defined by a CSIVolumeSource, otherwise "false"
+	// "csi.storage.k8s.io/size": the intended size in bytes of an ephemeral inline volume
+	//                            as decimal number if `fsSize` was set for it, empty if not,
+	//                            and not passed for other volumes
 	//
 	// "csi.storage.k8s.io/ephemeral" is a new feature in Kubernetes 1.16. It is only
 	// required for drivers which support both the "Persistent" and "Ephemeral" VolumeLifecycleMode.
@@ -300,6 +303,10 @@ type CSIDriverSpec struct {
 	// As Kubernetes 1.15 doesn't support this field, drivers can only support one mode when
 	// deployed on such a cluster and the deployment determines which mode that is, for example
 	// via a command line parameter of the driver.
+	//
+	// "csi.storage.k8s.io/size" is a new alpha feature in Kubernetes 1.18. It must be enabled
+	// explicitly with the CSIInlineVolumeSize feature flag. If not supported or enabled, CSI
+	// drivers must use a custom parameter if they need a size for their volumes.
 	// +optional
 	PodInfoOnMount *bool `json:"podInfoOnMount,omitempty" protobuf:"bytes,2,opt,name=podInfoOnMount"`
 
