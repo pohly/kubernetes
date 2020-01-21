@@ -40,6 +40,8 @@ const (
 	ErrReasonBindConflict = "node(s) didn't find available persistent volumes to bind"
 	// ErrReasonNodeConflict is used for VolumeNodeAffinityConflict predicate error.
 	ErrReasonNodeConflict = "node(s) had volume node affinity conflict"
+	// ErrReasonNotEnoughSpace is used when a pod cannot start on a node because not enough storage space is available.
+	ErrReasonNotEnoughSpace = "node(s) did not have enough free storage"
 )
 
 // Name returns name of the plugin. It is used in logs, etc.
@@ -47,24 +49,18 @@ func (pl *VolumeBinding) Name() string {
 	return Name
 }
 
-func podHasPVCs(pod *v1.Pod) bool {
-	for _, vol := range pod.Spec.Volumes {
-		if vol.PersistentVolumeClaim != nil {
-			return true
-		}
-	}
-	return false
-}
-
 // Filter invoked at the filter extension point.
 // It evaluates if a pod can fit due to the volumes it requests,
-// for both bound and unbound PVCs.
+// for both bound and unbound PVCs and ephemeral volumes.
 //
 // For PVCs that are bound, then it checks that the corresponding PV's node affinity is
 // satisfied by the given node.
 //
 // For PVCs that are unbound, it tries to find available PVs that can satisfy the PVC requirements
 // and that the PV node affinity is satisfied by the given node.
+//
+// If storage capacity tracking is enabled, then enough space has to be available
+// for the node and volumes that still need to be created.
 //
 // The predicate returns true if all bound PVCs have compatible PVs with the node, and if all unbound
 // PVCs can be matched with an available and node-compatible PV.
@@ -73,24 +69,23 @@ func (pl *VolumeBinding) Filter(ctx context.Context, cs *framework.CycleState, p
 	if node == nil {
 		return framework.NewStatus(framework.Error, "node not found")
 	}
-	// If pod does not request any PVC, we don't need to do anything.
-	if !podHasPVCs(pod) {
-		return nil
-	}
 
-	unboundSatisfied, boundSatisfied, err := pl.binder.Binder.FindPodVolumes(pod, node)
+	unboundSatisfied, boundSatisfied, sufficientStorage, err := pl.binder.Binder.FindPodVolumes(pod, node)
 
 	if err != nil {
 		return framework.NewStatus(framework.Error, err.Error())
 	}
 
-	if !boundSatisfied || !unboundSatisfied {
+	if !boundSatisfied || !unboundSatisfied || !sufficientStorage {
 		status := framework.NewStatus(framework.UnschedulableAndUnresolvable)
 		if !boundSatisfied {
 			status.AppendReason(ErrReasonNodeConflict)
 		}
 		if !unboundSatisfied {
 			status.AppendReason(ErrReasonBindConflict)
+		}
+		if !sufficientStorage {
+			status.AppendReason(ErrReasonNotEnoughSpace)
 		}
 		return status
 	}

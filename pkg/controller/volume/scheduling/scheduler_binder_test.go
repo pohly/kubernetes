@@ -150,7 +150,8 @@ func newTestBinder(t *testing.T, stopCh <-chan struct{}) *testEnv {
 		pvcInformer,
 		informerFactory.Core().V1().PersistentVolumes(),
 		classInformer,
-		10*time.Second)
+		10*time.Second,
+		nil, false)
 
 	// Wait for informers cache sync
 	informerFactory.Start(stopCh)
@@ -749,36 +750,36 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 		// Expected return values
 		expectedUnbound bool
 		expectedBound   bool
+		expectedStorage bool
 		shouldFail      bool
 	}{
 		"no-volumes": {
 			pod:             makePod(nil),
 			expectedUnbound: true,
 			expectedBound:   true,
+			expectedStorage: true,
 		},
 		"no-pvcs": {
 			pod:             makePodWithoutPVC(),
 			expectedUnbound: true,
 			expectedBound:   true,
+			expectedStorage: true,
 		},
 		"pvc-not-found": {
-			cachePVCs:       []*v1.PersistentVolumeClaim{},
-			podPVCs:         []*v1.PersistentVolumeClaim{boundPVC},
-			expectedUnbound: false,
-			expectedBound:   false,
-			shouldFail:      true,
+			cachePVCs:  []*v1.PersistentVolumeClaim{},
+			podPVCs:    []*v1.PersistentVolumeClaim{boundPVC},
+			shouldFail: true,
 		},
 		"bound-pvc": {
 			podPVCs:         []*v1.PersistentVolumeClaim{boundPVC},
 			pvs:             []*v1.PersistentVolume{pvBound},
 			expectedUnbound: true,
 			expectedBound:   true,
+			expectedStorage: true,
 		},
 		"bound-pvc,pv-not-exists": {
-			podPVCs:         []*v1.PersistentVolumeClaim{boundPVC},
-			expectedUnbound: false,
-			expectedBound:   false,
-			shouldFail:      true,
+			podPVCs:    []*v1.PersistentVolumeClaim{boundPVC},
+			shouldFail: true,
 		},
 		"prebound-pvc": {
 			podPVCs:    []*v1.PersistentVolumeClaim{preboundPVC},
@@ -791,12 +792,14 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 			expectedBindings: []*bindingInfo{makeBinding(unboundPVC, pvNode1a)},
 			expectedUnbound:  true,
 			expectedBound:    true,
+			expectedStorage:  true,
 		},
 		"unbound-pvc,pv-different-node": {
 			podPVCs:         []*v1.PersistentVolumeClaim{unboundPVC},
 			pvs:             []*v1.PersistentVolume{pvNode2},
 			expectedUnbound: false,
 			expectedBound:   true,
+			expectedStorage: true,
 		},
 		"two-unbound-pvcs": {
 			podPVCs:          []*v1.PersistentVolumeClaim{unboundPVC, unboundPVC2},
@@ -804,6 +807,7 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 			expectedBindings: []*bindingInfo{makeBinding(unboundPVC, pvNode1a), makeBinding(unboundPVC2, pvNode1b)},
 			expectedUnbound:  true,
 			expectedBound:    true,
+			expectedStorage:  true,
 		},
 		"two-unbound-pvcs,order-by-size": {
 			podPVCs:          []*v1.PersistentVolumeClaim{unboundPVC2, unboundPVC},
@@ -811,6 +815,7 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 			expectedBindings: []*bindingInfo{makeBinding(unboundPVC, pvNode1a), makeBinding(unboundPVC2, pvNode1b)},
 			expectedUnbound:  true,
 			expectedBound:    true,
+			expectedStorage:  true,
 		},
 		"two-unbound-pvcs,partial-match": {
 			podPVCs:          []*v1.PersistentVolumeClaim{unboundPVC, unboundPVC2},
@@ -818,6 +823,7 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 			expectedBindings: []*bindingInfo{makeBinding(unboundPVC, pvNode1a)},
 			expectedUnbound:  false,
 			expectedBound:    true,
+			expectedStorage:  true,
 		},
 		"one-bound,one-unbound": {
 			podPVCs:          []*v1.PersistentVolumeClaim{unboundPVC, boundPVC},
@@ -825,12 +831,14 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 			expectedBindings: []*bindingInfo{makeBinding(unboundPVC, pvNode1a)},
 			expectedUnbound:  true,
 			expectedBound:    true,
+			expectedStorage:  true,
 		},
 		"one-bound,one-unbound,no-match": {
 			podPVCs:         []*v1.PersistentVolumeClaim{unboundPVC, boundPVC},
 			pvs:             []*v1.PersistentVolume{pvBound, pvNode2},
 			expectedUnbound: false,
 			expectedBound:   true,
+			expectedStorage: true,
 		},
 		"one-prebound,one-unbound": {
 			podPVCs:    []*v1.PersistentVolumeClaim{unboundPVC, preboundPVC},
@@ -842,31 +850,27 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 			pvs:             []*v1.PersistentVolume{pvBoundImmediate},
 			expectedUnbound: true,
 			expectedBound:   true,
+			expectedStorage: true,
 		},
 		"immediate-bound-pvc-wrong-node": {
 			podPVCs:         []*v1.PersistentVolumeClaim{immediateBoundPVC},
 			pvs:             []*v1.PersistentVolume{pvBoundImmediateNode2},
 			expectedUnbound: true,
 			expectedBound:   false,
+			expectedStorage: true,
 		},
 		"immediate-unbound-pvc": {
-			podPVCs:         []*v1.PersistentVolumeClaim{immediateUnboundPVC},
-			expectedUnbound: false,
-			expectedBound:   false,
-			shouldFail:      true,
+			podPVCs:    []*v1.PersistentVolumeClaim{immediateUnboundPVC},
+			shouldFail: true,
 		},
 		"immediate-unbound-pvc,delayed-mode-bound": {
-			podPVCs:         []*v1.PersistentVolumeClaim{immediateUnboundPVC, boundPVC},
-			pvs:             []*v1.PersistentVolume{pvBound},
-			expectedUnbound: false,
-			expectedBound:   false,
-			shouldFail:      true,
+			podPVCs:    []*v1.PersistentVolumeClaim{immediateUnboundPVC, boundPVC},
+			pvs:        []*v1.PersistentVolume{pvBound},
+			shouldFail: true,
 		},
 		"immediate-unbound-pvc,delayed-mode-unbound": {
-			podPVCs:         []*v1.PersistentVolumeClaim{immediateUnboundPVC, unboundPVC},
-			expectedUnbound: false,
-			expectedBound:   false,
-			shouldFail:      true,
+			podPVCs:    []*v1.PersistentVolumeClaim{immediateUnboundPVC, unboundPVC},
+			shouldFail: true,
 		},
 	}
 
@@ -901,7 +905,7 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 		}
 
 		// Execute
-		unboundSatisfied, boundSatisfied, err := testEnv.binder.FindPodVolumes(scenario.pod, testNode)
+		unboundSatisfied, boundSatisfied, sufficientStorage, err := testEnv.binder.FindPodVolumes(scenario.pod, testNode)
 
 		// Validate
 		if !scenario.shouldFail && err != nil {
@@ -915,6 +919,9 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 		}
 		if unboundSatisfied != scenario.expectedUnbound {
 			t.Errorf("Test %q failed: expected unboundSatsified %v, got %v", name, scenario.expectedUnbound, unboundSatisfied)
+		}
+		if sufficientStorage != scenario.expectedStorage {
+			t.Errorf("Test %q failed: expected sufficientStorage %v, got %v", name, scenario.expectedStorage, sufficientStorage)
 		}
 		testEnv.validatePodCache(t, name, testNode.Name, scenario.pod, scenario.expectedBindings, nil)
 	}
@@ -937,6 +944,7 @@ func TestFindPodVolumesWithProvisioning(t *testing.T) {
 		// Expected return values
 		expectedUnbound bool
 		expectedBound   bool
+		expectedStorage bool
 		shouldFail      bool
 	}{
 		"one-provisioned": {
@@ -944,6 +952,7 @@ func TestFindPodVolumesWithProvisioning(t *testing.T) {
 			expectedProvisions: []*v1.PersistentVolumeClaim{provisionedPVC},
 			expectedUnbound:    true,
 			expectedBound:      true,
+			expectedStorage:    true,
 		},
 		"two-unbound-pvcs,one-matched,one-provisioned": {
 			podPVCs:            []*v1.PersistentVolumeClaim{unboundPVC, provisionedPVC},
@@ -952,6 +961,7 @@ func TestFindPodVolumesWithProvisioning(t *testing.T) {
 			expectedProvisions: []*v1.PersistentVolumeClaim{provisionedPVC},
 			expectedUnbound:    true,
 			expectedBound:      true,
+			expectedStorage:    true,
 		},
 		"one-bound,one-provisioned": {
 			podPVCs:            []*v1.PersistentVolumeClaim{boundPVC, provisionedPVC},
@@ -959,6 +969,7 @@ func TestFindPodVolumesWithProvisioning(t *testing.T) {
 			expectedProvisions: []*v1.PersistentVolumeClaim{provisionedPVC},
 			expectedUnbound:    true,
 			expectedBound:      true,
+			expectedStorage:    true,
 		},
 		"one-binding,one-selected-node": {
 			podPVCs:            []*v1.PersistentVolumeClaim{boundPVC, selectedNodePVC},
@@ -966,12 +977,11 @@ func TestFindPodVolumesWithProvisioning(t *testing.T) {
 			expectedProvisions: []*v1.PersistentVolumeClaim{selectedNodePVC},
 			expectedUnbound:    true,
 			expectedBound:      true,
+			expectedStorage:    true,
 		},
 		"immediate-unbound-pvc": {
-			podPVCs:         []*v1.PersistentVolumeClaim{immediateUnboundPVC},
-			expectedUnbound: false,
-			expectedBound:   false,
-			shouldFail:      true,
+			podPVCs:    []*v1.PersistentVolumeClaim{immediateUnboundPVC},
+			shouldFail: true,
 		},
 		"one-immediate-bound,one-provisioned": {
 			podPVCs:            []*v1.PersistentVolumeClaim{immediateBoundPVC, provisionedPVC},
@@ -979,16 +989,19 @@ func TestFindPodVolumesWithProvisioning(t *testing.T) {
 			expectedProvisions: []*v1.PersistentVolumeClaim{provisionedPVC},
 			expectedUnbound:    true,
 			expectedBound:      true,
+			expectedStorage:    true,
 		},
 		"invalid-provisioner": {
 			podPVCs:         []*v1.PersistentVolumeClaim{noProvisionerPVC},
 			expectedUnbound: false,
 			expectedBound:   true,
+			expectedStorage: true,
 		},
 		"volume-topology-unsatisfied": {
 			podPVCs:         []*v1.PersistentVolumeClaim{topoMismatchPVC},
 			expectedUnbound: false,
 			expectedBound:   true,
+			expectedStorage: true,
 		},
 	}
 
@@ -1021,7 +1034,7 @@ func TestFindPodVolumesWithProvisioning(t *testing.T) {
 		}
 
 		// Execute
-		unboundSatisfied, boundSatisfied, err := testEnv.binder.FindPodVolumes(scenario.pod, testNode)
+		unboundSatisfied, boundSatisfied, sufficientStorage, err := testEnv.binder.FindPodVolumes(scenario.pod, testNode)
 
 		// Validate
 		if !scenario.shouldFail && err != nil {
@@ -1035,6 +1048,9 @@ func TestFindPodVolumesWithProvisioning(t *testing.T) {
 		}
 		if unboundSatisfied != scenario.expectedUnbound {
 			t.Errorf("Test %q failed: expected unboundSatsified %v, got %v", name, scenario.expectedUnbound, unboundSatisfied)
+		}
+		if sufficientStorage != scenario.expectedStorage {
+			t.Errorf("Test %q failed: expected sufficientStorage %v, got %v", name, scenario.expectedStorage, sufficientStorage)
 		}
 		testEnv.validatePodCache(t, name, testNode.Name, scenario.pod, scenario.expectedBindings, scenario.expectedProvisions)
 	}
@@ -1059,6 +1075,7 @@ func TestFindPodVolumesWithCSIMigration(t *testing.T) {
 		// Expected return values
 		expectedUnbound bool
 		expectedBound   bool
+		expectedStorage bool
 		shouldFail      bool
 	}{
 		"pvc-bound": {
@@ -1068,6 +1085,7 @@ func TestFindPodVolumesWithCSIMigration(t *testing.T) {
 			initCSINodes:    []*storagev1.CSINode{csiNode1Migrated},
 			expectedBound:   true,
 			expectedUnbound: true,
+			expectedStorage: true,
 		},
 		"pvc-bound,csinode-not-migrated": {
 			podPVCs:         []*v1.PersistentVolumeClaim{boundMigrationPVC},
@@ -1076,6 +1094,7 @@ func TestFindPodVolumesWithCSIMigration(t *testing.T) {
 			initCSINodes:    []*storagev1.CSINode{csiNode1NotMigrated},
 			expectedBound:   true,
 			expectedUnbound: true,
+			expectedStorage: true,
 		},
 		"pvc-bound,missing-csinode": {
 			podPVCs:         []*v1.PersistentVolumeClaim{boundMigrationPVC},
@@ -1083,6 +1102,7 @@ func TestFindPodVolumesWithCSIMigration(t *testing.T) {
 			initNodes:       []*v1.Node{node1Zone1},
 			expectedBound:   true,
 			expectedUnbound: true,
+			expectedStorage: true,
 		},
 		"pvc-bound,node-different-zone": {
 			podPVCs:         []*v1.PersistentVolumeClaim{boundMigrationPVC},
@@ -1091,6 +1111,7 @@ func TestFindPodVolumesWithCSIMigration(t *testing.T) {
 			initCSINodes:    []*storagev1.CSINode{csiNode1Migrated},
 			expectedBound:   false,
 			expectedUnbound: true,
+			expectedStorage: true,
 		},
 	}
 
@@ -1131,7 +1152,7 @@ func TestFindPodVolumesWithCSIMigration(t *testing.T) {
 		}
 
 		// Execute
-		unboundSatisfied, boundSatisfied, err := testEnv.binder.FindPodVolumes(scenario.pod, node)
+		unboundSatisfied, boundSatisfied, sufficientStorage, err := testEnv.binder.FindPodVolumes(scenario.pod, node)
 
 		// Validate
 		if !scenario.shouldFail && err != nil {
@@ -1145,6 +1166,9 @@ func TestFindPodVolumesWithCSIMigration(t *testing.T) {
 		}
 		if unboundSatisfied != scenario.expectedUnbound {
 			t.Errorf("Test %q failed: expected unboundSatsified %v, got %v", name, scenario.expectedUnbound, unboundSatisfied)
+		}
+		if sufficientStorage != scenario.expectedStorage {
+			t.Errorf("Test %q failed: expected sufficientStorage %v, got %v", name, scenario.expectedStorage, sufficientStorage)
 		}
 	}
 }
@@ -1940,7 +1964,7 @@ func TestFindAssumeVolumes(t *testing.T) {
 
 	// Execute
 	// 1. Find matching PVs
-	unboundSatisfied, _, err := testEnv.binder.FindPodVolumes(pod, testNode)
+	unboundSatisfied, _, _, err := testEnv.binder.FindPodVolumes(pod, testNode)
 	if err != nil {
 		t.Errorf("Test failed: FindPodVolumes returned error: %v", err)
 	}
@@ -1967,7 +1991,7 @@ func TestFindAssumeVolumes(t *testing.T) {
 	// Run this many times in case sorting returns different orders for the two PVs.
 	t.Logf("Testing FindPodVolumes after Assume")
 	for i := 0; i < 50; i++ {
-		unboundSatisfied, _, err := testEnv.binder.FindPodVolumes(pod, testNode)
+		unboundSatisfied, _, _, err := testEnv.binder.FindPodVolumes(pod, testNode)
 		if err != nil {
 			t.Errorf("Test failed: FindPodVolumes returned error: %v", err)
 		}
