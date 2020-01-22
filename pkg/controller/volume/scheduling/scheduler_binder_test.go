@@ -128,7 +128,7 @@ type testEnv struct {
 	internalPVCCache        *assumeCache
 }
 
-func newTestBinder(t *testing.T, stopCh <-chan struct{}) *testEnv {
+func newTestBinder(t *testing.T, stopCh <-chan struct{}, withCapacity bool) *testEnv {
 	client := &fake.Clientset{}
 	reactor := pvtesting.NewVolumeReactor(client, nil, nil, nil)
 	// TODO refactor all tests to use real watch mechanism, see #72327
@@ -147,6 +147,13 @@ func newTestBinder(t *testing.T, stopCh <-chan struct{}) *testEnv {
 	csiNodeInformer := informerFactory.Storage().V1().CSINodes()
 	pvcInformer := informerFactory.Core().V1().PersistentVolumeClaims()
 	classInformer := informerFactory.Storage().V1().StorageClasses()
+	var capacityCheck *CapacityCheck
+	if withCapacity {
+		capacityCheck = &CapacityCheck{
+			csiDriverInformer:      informerFactory.Storage().V1beta1().CSIDrivers(),
+			csiStoragePoolInformer: informerFactory.Storage().V1alpha1().CSIStoragePools(),
+		}
+	}
 	binder := NewVolumeBinder(
 		client,
 		nodeInformer,
@@ -155,7 +162,7 @@ func newTestBinder(t *testing.T, stopCh <-chan struct{}) *testEnv {
 		informerFactory.Core().V1().PersistentVolumes(),
 		classInformer,
 		10*time.Second,
-		nil, false)
+		capacityCheck)
 
 	// Wait for informers cache sync
 	informerFactory.Start(stopCh)
@@ -736,7 +743,16 @@ func addProvisionAnn(pvc *v1.PersistentVolumeClaim) *v1.PersistentVolumeClaim {
 	return res
 }
 
+func runAll(t *testing.T, test func(t *testing.T, withCapacity bool)) {
+	t.Run("without capacity", func(t *testing.T) { test(t, false) })
+	t.Run("with capacity", func(t *testing.T) { test(t, true) })
+}
+
 func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
+	runAll(t, testFindPodVolumesWithoutProvisioning)
+}
+
+func testFindPodVolumesWithoutProvisioning(t *testing.T, withCapacity bool) {
 	type scenarioType struct {
 		// Inputs
 		pvs     []*v1.PersistentVolume
@@ -891,7 +907,7 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 		defer cancel()
 
 		// Setup
-		testEnv := newTestBinder(t, ctx.Done())
+		testEnv := newTestBinder(t, ctx.Done(), withCapacity)
 		testEnv.initVolumes(scenario.pvs, scenario.pvs)
 
 		// a. Init pvc cache
@@ -933,6 +949,10 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 }
 
 func TestFindPodVolumesWithProvisioning(t *testing.T) {
+	runAll(t, testFindPodVolumesWithProvisioning)
+}
+
+func testFindPodVolumesWithProvisioning(t *testing.T, withCapacity bool) {
 	type scenarioType struct {
 		// Inputs
 		pvs     []*v1.PersistentVolume
@@ -1025,7 +1045,7 @@ func TestFindPodVolumesWithProvisioning(t *testing.T) {
 		defer cancel()
 
 		// Setup
-		testEnv := newTestBinder(t, ctx.Done())
+		testEnv := newTestBinder(t, ctx.Done(), withCapacity)
 		testEnv.initVolumes(scenario.pvs, scenario.pvs)
 
 		// a. Init pvc cache
@@ -1069,6 +1089,10 @@ func TestFindPodVolumesWithProvisioning(t *testing.T) {
 // TestFindPodVolumesWithCSIMigration aims to test the node affinity check procedure that's
 // done in FindPodVolumes. In order to reach this code path, the given PVCs must be bound to a PV.
 func TestFindPodVolumesWithCSIMigration(t *testing.T) {
+	runAll(t, testFindPodVolumesWithCSIMigration)
+}
+
+func testFindPodVolumesWithCSIMigration(t *testing.T, withCapacity bool) {
 	type scenarioType struct {
 		// Inputs
 		pvs     []*v1.PersistentVolume
@@ -1134,7 +1158,7 @@ func TestFindPodVolumesWithCSIMigration(t *testing.T) {
 		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationGCE, true)()
 
 		// Setup
-		testEnv := newTestBinder(t, ctx.Done())
+		testEnv := newTestBinder(t, ctx.Done(), withCapacity)
 		testEnv.initVolumes(scenario.pvs, scenario.pvs)
 
 		var node *v1.Node
@@ -1187,6 +1211,10 @@ func TestFindPodVolumesWithCSIMigration(t *testing.T) {
 }
 
 func TestAssumePodVolumes(t *testing.T) {
+	runAll(t, testAssumePodVolumes)
+}
+
+func testAssumePodVolumes(t *testing.T, withCapacity bool) {
 	type scenarioType struct {
 		// Inputs
 		podPVCs         []*v1.PersistentVolumeClaim
@@ -1256,7 +1284,7 @@ func TestAssumePodVolumes(t *testing.T) {
 		defer cancel()
 
 		// Setup
-		testEnv := newTestBinder(t, ctx.Done())
+		testEnv := newTestBinder(t, ctx.Done(), withCapacity)
 		testEnv.initClaims(scenario.podPVCs, scenario.podPVCs)
 		pod := makePod(scenario.podPVCs)
 		testEnv.initPodCache(pod, "node1", scenario.bindings, scenario.provisionedPVCs)
@@ -1295,6 +1323,10 @@ func TestAssumePodVolumes(t *testing.T) {
 }
 
 func TestBindAPIUpdate(t *testing.T) {
+	runAll(t, testBindAPIUpdate)
+}
+
+func testBindAPIUpdate(t *testing.T, withCapacity bool) {
 	type scenarioType struct {
 		// Inputs
 		bindings  []*bindingInfo
@@ -1393,7 +1425,7 @@ func TestBindAPIUpdate(t *testing.T) {
 		defer cancel()
 
 		// Setup
-		testEnv := newTestBinder(t, ctx.Done())
+		testEnv := newTestBinder(t, ctx.Done(), withCapacity)
 		pod := makePod(nil)
 		if scenario.apiPVs == nil {
 			scenario.apiPVs = scenario.cachedPVs
@@ -1431,6 +1463,10 @@ func TestBindAPIUpdate(t *testing.T) {
 }
 
 func TestCheckBindings(t *testing.T) {
+	runAll(t, testCheckBindings)
+}
+
+func testCheckBindings(t *testing.T, withCapacity bool) {
 	type scenarioType struct {
 		// Inputs
 		initPVs  []*v1.PersistentVolume
@@ -1588,7 +1624,7 @@ func TestCheckBindings(t *testing.T) {
 
 		// Setup
 		pod := makePod(nil)
-		testEnv := newTestBinder(t, ctx.Done())
+		testEnv := newTestBinder(t, ctx.Done(), withCapacity)
 		testEnv.initNodes([]*v1.Node{node1})
 		testEnv.initVolumes(scenario.initPVs, nil)
 		testEnv.initClaims(scenario.initPVCs, nil)
@@ -1627,6 +1663,10 @@ func TestCheckBindings(t *testing.T) {
 }
 
 func TestCheckBindingsWithCSIMigration(t *testing.T) {
+	runAll(t, testCheckBindingsWithCSIMigration)
+}
+
+func testCheckBindingsWithCSIMigration(t *testing.T, withCapacity bool) {
 	type scenarioType struct {
 		// Inputs
 		initPVs      []*v1.PersistentVolume
@@ -1714,7 +1754,7 @@ func TestCheckBindingsWithCSIMigration(t *testing.T) {
 
 		// Setup
 		pod := makePod(nil)
-		testEnv := newTestBinder(t, ctx.Done())
+		testEnv := newTestBinder(t, ctx.Done(), withCapacity)
 		testEnv.initNodes(scenario.initNodes)
 		testEnv.initCSINodes(scenario.initCSINodes)
 		testEnv.initVolumes(scenario.initPVs, nil)
@@ -1746,6 +1786,10 @@ func TestCheckBindingsWithCSIMigration(t *testing.T) {
 }
 
 func TestBindPodVolumes(t *testing.T) {
+	runAll(t, testBindPodVolumes)
+}
+
+func testBindPodVolumes(t *testing.T, withCapacity bool) {
 	type scenarioType struct {
 		// Inputs
 		bindingsNil bool // Pass in nil bindings slice
@@ -1907,7 +1951,7 @@ func TestBindPodVolumes(t *testing.T) {
 
 		// Setup
 		pod := makePod(nil)
-		testEnv := newTestBinder(t, ctx.Done())
+		testEnv := newTestBinder(t, ctx.Done(), withCapacity)
 		if scenario.nodes == nil {
 			scenario.nodes = []*v1.Node{node1}
 		}
@@ -1967,6 +2011,10 @@ func TestBindPodVolumes(t *testing.T) {
 }
 
 func TestFindAssumeVolumes(t *testing.T) {
+	runAll(t, testFindAssumeVolumes)
+}
+
+func testFindAssumeVolumes(t *testing.T, withCapacity bool) {
 	// Test case
 	podPVCs := []*v1.PersistentVolumeClaim{unboundPVC}
 	pvs := []*v1.PersistentVolume{pvNode2, pvNode1a, pvNode1c}
@@ -1974,7 +2022,7 @@ func TestFindAssumeVolumes(t *testing.T) {
 	// Setup
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	testEnv := newTestBinder(t, ctx.Done())
+	testEnv := newTestBinder(t, ctx.Done(), withCapacity)
 	testEnv.initVolumes(pvs, pvs)
 	testEnv.initClaims(podPVCs, podPVCs)
 	pod := makePod(podPVCs)

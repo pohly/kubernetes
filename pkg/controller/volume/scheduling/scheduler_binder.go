@@ -24,7 +24,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
+	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -34,6 +34,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
+	storageinformersv1alpha1 "k8s.io/client-go/informers/storage/v1alpha1"
 	storageinformersv1beta1 "k8s.io/client-go/informers/storage/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
@@ -138,17 +139,21 @@ type volumeBinder struct {
 
 	translator InTreeToCSITranslator
 
-	// CSIStorageCapacity feature enabled.
-	withCapacity bool
+	capacityCheck *CapacityCheck
+}
 
-	// csiDriverInformer is only set and used when withCapacity is true!
-	csiDriverInformer storageinformersv1beta1.CSIDriverInformer
+// CapacityCheck contains additional parameters for NewVolumeBinder that
+// are only needed when checking volume sizes against available storage
+// capacity is desired.
+type CapacityCheck struct {
+	csiDriverInformer      storageinformersv1beta1.CSIDriverInformer
+	csiStoragePoolInformer storageinformersv1alpha1.CSIStoragePoolInformer
 }
 
 // NewVolumeBinder sets up all the caches needed for the scheduler to make volume binding decisions.
 //
 // withCapacity determines whether storage capacity is checked (CSIStorageCapacity feature).
-// If true, then (and only then) is csiDriverInformer required. It can be nil otherwise.
+// If true, then (and only then) are csiDriverInformer and csiStoragePoolInformer required.
 func NewVolumeBinder(
 	kubeClient clientset.Interface,
 	nodeInformer coreinformers.NodeInformer,
@@ -157,8 +162,7 @@ func NewVolumeBinder(
 	pvInformer coreinformers.PersistentVolumeInformer,
 	storageClassInformer storageinformers.StorageClassInformer,
 	bindTimeout time.Duration,
-	csiDriverInformer storageinformersv1beta1.CSIDriverInformer,
-	withCapacity bool,
+	capacityCheck *CapacityCheck,
 ) SchedulerVolumeBinder {
 
 	b := &volumeBinder{
@@ -171,9 +175,7 @@ func NewVolumeBinder(
 		podBindingCache: NewPodBindingCache(),
 		bindTimeout:     bindTimeout,
 		translator:      csitrans.New(),
-
-		withCapacity:      withCapacity,
-		csiDriverInformer: csiDriverInformer,
+		capacityCheck:   capacityCheck,
 	}
 
 	return b
@@ -202,7 +204,7 @@ func podHasVolumesToCheck(pod *v1.Pod, withCapacity bool) bool {
 // This method intentionally takes in a *v1.Node object instead of using volumebinder.nodeInformer.
 // That's necessary because some operations will need to pass in to the predicate fake node objects.
 func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, node *v1.Node) (unboundVolumesSatisfied, boundVolumesSatisfied, sufficientStorage bool, err error) {
-	if !podHasVolumesToCheck(pod, b.withCapacity) {
+	if !podHasVolumesToCheck(pod, b.capacityCheck != nil) {
 		return true, true, true, nil
 	}
 
@@ -248,7 +250,7 @@ func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, node *v1.Node) (unboundVolume
 
 	// The pod's volumes need to be processed in one call to avoid the race condition where
 	// volumes can get bound/provisioned in between calls.
-	boundClaims, claimsToBind, unboundClaimsImmediate, err := b.getPodVolumes(pod)
+	boundClaims, claimsToBind, unboundClaimsImmediate, inlineVolumes, err := b.getPodVolumes(pod)
 	if err != nil {
 		return false, false, false, err
 	}
@@ -299,15 +301,33 @@ func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, node *v1.Node) (unboundVolume
 		// Check for claims to provision. This is the first time where we potentially
 		// find out that storage is not sufficient for the node.
 		if len(claimsToProvision) > 0 {
-			// TODO: should this really overwrite unboundVolumesSatisfied?
-			unboundVolumesSatisfied, sufficientStorage, provisionedClaims, err = b.checkVolumeProvisions(pod, claimsToProvision, node)
+			var sufficient bool
+			unboundVolumesSatisfied, sufficient, provisionedClaims, err = b.checkVolumeProvisions(pod, claimsToProvision, node)
 			if err != nil {
 				return false, false, false, err
+			}
+			if !sufficient {
+				sufficientStorage = false
 			}
 		}
 	}
 
-	// TODO: check size of ephemeral inline volumes against available storage.
+	// Check size of ephemeral inline volumes against available storage.
+	if b.capacityCheck != nil {
+		for _, csi := range inlineVolumes {
+			if csi.FSSize == nil {
+				continue
+			}
+			sufficient, err := b.hasEnoughCapacity(csi.Driver, csi.FSSize.Value(), nil /*storage class */, node)
+			if err != nil {
+				return false, false, false, err
+			}
+			if !sufficient {
+				// TODO: bail out early here?
+				sufficientStorage = false
+			}
+		}
+	}
 
 	return unboundVolumesSatisfied, boundVolumesSatisfied, sufficientStorage, nil
 }
@@ -687,17 +707,22 @@ func (b *volumeBinder) arePodVolumesBound(pod *v1.Pod) bool {
 	return true
 }
 
-// getPodVolumes returns a pod's PVCs separated into bound, unbound with delayed binding (including provisioning)
-// and unbound with immediate binding (including prebound)
-func (b *volumeBinder) getPodVolumes(pod *v1.Pod) (boundClaims []*v1.PersistentVolumeClaim, unboundClaimsDelayBinding []*v1.PersistentVolumeClaim, unboundClaimsImmediate []*v1.PersistentVolumeClaim, err error) {
+// getPodVolumes returns a pod's PVCs separated into bound, unbound with delayed binding (including provisioning),
+// unbound with immediate binding (including prebound), and CSI ephemeral inline volumes.
+func (b *volumeBinder) getPodVolumes(pod *v1.Pod) (boundClaims []*v1.PersistentVolumeClaim, unboundClaimsDelayBinding []*v1.PersistentVolumeClaim, unboundClaimsImmediate []*v1.PersistentVolumeClaim, inlineVolumes []*v1.CSIVolumeSource, err error) {
 	boundClaims = []*v1.PersistentVolumeClaim{}
 	unboundClaimsImmediate = []*v1.PersistentVolumeClaim{}
 	unboundClaimsDelayBinding = []*v1.PersistentVolumeClaim{}
+	inlineVolumes = []*v1.CSIVolumeSource{}
 
 	for _, vol := range pod.Spec.Volumes {
+		if vol.CSI != nil {
+			inlineVolumes = append(inlineVolumes, vol.CSI)
+			continue
+		}
 		volumeBound, pvc, err := b.isVolumeBound(pod.Namespace, &vol)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, nil, nil, err
 		}
 		if pvc == nil {
 			continue
@@ -707,7 +732,7 @@ func (b *volumeBinder) getPodVolumes(pod *v1.Pod) (boundClaims []*v1.PersistentV
 		} else {
 			delayBindingMode, err := pvutil.IsDelayBindingMode(pvc, b.classLister)
 			if err != nil {
-				return nil, nil, nil, err
+				return nil, nil, nil, nil, err
 			}
 			// Prebound PVCs are treated as unbound immediate binding
 			if delayBindingMode && pvc.Spec.VolumeName == "" {
@@ -720,7 +745,7 @@ func (b *volumeBinder) getPodVolumes(pod *v1.Pod) (boundClaims []*v1.PersistentV
 			}
 		}
 	}
-	return boundClaims, unboundClaimsDelayBinding, unboundClaimsImmediate, nil
+	return boundClaims, unboundClaimsDelayBinding, unboundClaimsImmediate, inlineVolumes, nil
 }
 
 func (b *volumeBinder) checkBoundClaims(claims []*v1.PersistentVolumeClaim, node *v1.Node, podName string) (bool, error) {
@@ -828,23 +853,16 @@ func (b *volumeBinder) checkVolumeProvisions(pod *v1.Pod, claimsToProvision []*v
 			return false, true, nil, nil
 		}
 
-		// Check if storage capacity is sufficient. This is an optional feature and
-		// only works for CSI drivers which opt into it.
-		supported, err := b.storageCapacitySupported(provisioner)
-		if err != nil {
-			return false, false, nil, err
-		}
-		if supported {
-			// Do we have a size to check for?
-			quantity, ok := claim.Spec.Resources.Requests[v1.ResourceStorage]
-			if ok {
-				sufficient, err := b.haveStorageCapacity(provisioner, quantity.Value(), storagev1beta1.VolumeLifecyclePersistent, node)
-				if err != nil {
-					return false, false, nil, err
-				}
-				if !sufficient {
-					return true, false, nil, nil
-				}
+		// Check if storage capacity is sufficient if we have a size to check against.
+		quantity, ok := claim.Spec.Resources.Requests[v1.ResourceStorage]
+		if ok {
+			sufficient, err := b.hasEnoughCapacity(provisioner, quantity.Value(), class, node)
+			if err != nil {
+				return false, false, nil, err
+			}
+			if !sufficient {
+				// hasEnoughCapacity logs an explanation.
+				return true, false, nil, nil
 			}
 		}
 
@@ -869,28 +887,117 @@ func (b *volumeBinder) revertAssumedPVCs(claims []*v1.PersistentVolumeClaim) {
 	}
 }
 
-func (b *volumeBinder) storageCapacitySupported(provisioner string) (bool, error) {
-	if !b.withCapacity {
-		// Feature disabled.
-		return false, nil
+// hasEnoughCapacity checks whether the provisioner has enough capacity left for a new volume of the given size
+// that is available from the node. Only persistent volume claims have a storage class, ephemeral inline volumes don't.
+func (b *volumeBinder) hasEnoughCapacity(provisioner string, sizeInBytes int64, storageClass *storagev1.StorageClass, node *v1.Node) (bool, error) {
+	// This is an optional feature. If disabled, we assume that
+	// there is enough storage.
+	if b.capacityCheck == nil {
+		return true, nil
 	}
 
-	driver, err := b.csiDriverInformer.Lister().Get(provisioner)
+	// Only works for CSI drivers which opt into it.
+	driver, err := b.capacityCheck.csiDriverInformer.Lister().Get(provisioner)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Either the provisioner is no CSI driver or the driver does not
 			// opt into storage capacity scheduling. Either way, skip
 			// capacity checking.
-			return false, nil
+			return true, nil
 		}
 		return false, err
 	}
-	return *driver.Spec.StorageCapacity, nil
+	if driver.Spec.StorageCapacity == nil || !*driver.Spec.StorageCapacity {
+		return true, nil
+	}
+
+	// Look for a matching storage pool.
+	// TODO (for beta): benchmark this and potentially introduce some kind of lookup structure.
+	// TODO: is this lookup and the returned pool thread-safe? Probably yes, but need to verify.
+	pools, err := b.capacityCheck.csiStoragePoolInformer.Lister().List(nil)
+	if err != nil {
+		return false, err
+	}
+
+	// The name to match against. Ephemeral inline volumes may have a separate
+	// CSIStoragePoolByClass entry with a special name.
+	var className string
+	if storageClass != nil {
+		className = storageClass.Name
+	} else {
+		className = storagev1alpha1.EphemeralStorageClassName
+	}
+	for _, pool := range pools {
+		if pool.Spec.DriverName != provisioner {
+			continue
+		}
+
+		// We either need to check the entry which matches
+		// the class name (if one exists) or the fallback (which
+		// again may be missing).
+		var finalByClass storagev1alpha1.CSIStoragePoolByClass
+		for _, byClass := range pool.Status.Classes {
+			switch byClass.StorageClassName {
+			case className:
+				finalByClass = byClass
+				// Done, this is what we are meant to check.
+				break
+			case storagev1alpha1.FallbackStorageClassName:
+				finalByClass = byClass
+				// Keep searching, there might be a more
+				// specific entry.
+			}
+		}
+		if finalByClass.StorageClassName != "" &&
+			finalByClass.Capacity != nil &&
+			finalByClass.Capacity.Value() >= sizeInBytes {
+
+			// We could have checked earlier, but this
+			// check might be more expensive than walking
+			// through the CSIStoragePoolByClass entries.
+			if !b.nodeHasAccess(node, pool) {
+				continue
+			}
+
+			// We are done: there is one CSIStoragePool
+			// with a CSIStoragePoolByClass that matches
+			// the volume, is accessible and has enough
+			// capacity.
+			return true, nil
+		}
+	}
+
+	// TODO (?): this doesn't give any information about which pools where considered and why
+	// they had to be rejected. Log that above? But that might be a lot of log output...
+	klog.V(4).Infof("Node %q has no accessible CSIStoragePool with enough capacity for a volume of size %d and storage class %q", node.Name, sizeInBytes, className)
+	return false, nil
 }
 
-func (b *volumeBinder) haveStorageCapacity(provisioner string, sizeInBytes int64, volumeLifecycleMode storagev1beta1.VolumeLifecycleMode, node *v1.Node) (bool, error) {
-	// TODO
-	return true, nil
+func (b *volumeBinder) nodeHasAccess(node *v1.Node, pool *storagev1alpha1.CSIStoragePool) bool {
+	if pool.Status.NodeTopology != nil {
+		// TODO: what should be given as fields?  Existing
+		// code either passes nil
+		// (https://github.com/kubernetes/kubernetes/blob/dcd0755f84bf8c15fd21e8d697b924991f641ae4/pkg/volume/util/util.go#L179)
+		// or metadata.name as only field
+		// (https://github.com/kubernetes/kubernetes/blob/dcd0755f84bf8c15fd21e8d697b924991f641ae4/pkg/scheduler/framework/plugins/helper/node_affinity.go#L75or).
+		//
+		matches := v1helper.MatchNodeSelectorTerms(pool.Status.NodeTopology.NodeSelectorTerms,
+			node.Labels, nil /* fields */)
+		return matches
+	}
+	if pool.Status.Nodes != nil {
+		for _, nodeName := range pool.Status.Nodes {
+			if node.Name == nodeName {
+				// Gotcha!
+				return true
+			}
+		}
+		// Not listed -> no access.
+		return false
+	}
+
+	// Neither topology nor node list given, assume it has access.
+	return true
 }
 
 type bindingInfo struct {
