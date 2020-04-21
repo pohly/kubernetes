@@ -294,14 +294,16 @@ func (r *VolumeResource) CleanupResource() error {
 					pvc, err := cs.CoreV1().PersistentVolumeClaims(r.Pvc.Namespace).Get(context.TODO(), r.Pvc.Name, metav1.GetOptions{})
 					switch {
 					case err == nil:
-						pv2, err := cs.CoreV1().PersistentVolumes().Get(context.TODO(), pvc.Spec.VolumeName, metav1.GetOptions{})
-						switch {
-						case err == nil:
-							pv = pv2
-						case apierrors.IsNotFound(err):
-							// This should be fine, no PV to wait for.
-						default:
-							cleanUpErrs = append(cleanUpErrs, errors.Wrapf(err, "Failed to find PV %v", pvc.Spec.VolumeName))
+						if pvc.Spec.VolumeName != "" {
+							pv2, err := cs.CoreV1().PersistentVolumes().Get(context.TODO(), pvc.Spec.VolumeName, metav1.GetOptions{})
+							switch {
+							case err == nil:
+								pv = pv2
+							case apierrors.IsNotFound(err):
+								// This should be fine, no PV to wait for.
+							default:
+								cleanUpErrs = append(cleanUpErrs, errors.Wrapf(err, "Failed to find PV %v", pvc.Spec.VolumeName))
+							}
 						}
 					case apierrors.IsNotFound(err):
 						// Without the PVC, we cannot locate the corresponding PV. Let's
