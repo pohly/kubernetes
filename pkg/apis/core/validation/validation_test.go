@@ -937,6 +937,7 @@ func TestValidatePersistentVolumeClaim(t *testing.T) {
 	validMode := core.PersistentVolumeFilesystem
 	scenarios := map[string]struct {
 		isExpectedFailure bool
+		isBadMeta         bool
 		claim             *core.PersistentVolumeClaim
 	}{
 		"good-claim": {
@@ -1022,6 +1023,7 @@ func TestValidatePersistentVolumeClaim(t *testing.T) {
 		},
 		"missing-namespace": {
 			isExpectedFailure: true,
+			isBadMeta:         true,
 			claim: testVolumeClaim("foo", "", core.PersistentVolumeClaimSpec{
 				AccessModes: []core.PersistentVolumeAccessMode{
 					core.ReadWriteOnce,
@@ -1149,17 +1151,39 @@ func TestValidatePersistentVolumeClaim(t *testing.T) {
 		},
 	}
 
-	for name, scenario := range scenarios {
-		t.Run(name, func(t *testing.T) {
-			errs := ValidatePersistentVolumeClaim(scenario.claim)
-			if len(errs) == 0 && scenario.isExpectedFailure {
-				t.Errorf("Unexpected success for scenario: %s", name)
-			}
-			if len(errs) > 0 && !scenario.isExpectedFailure {
-				t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
-			}
-		})
+	test := func(t *testing.T, ephemeral bool) {
+		for name, scenario := range scenarios {
+			t.Run(name, func(t *testing.T) {
+				var errs field.ErrorList
+				if ephemeral {
+					volumes := []core.Volume{
+						{
+							Name: "foo",
+							VolumeSource: core.VolumeSource{
+								Ephemeral: &core.EphemeralVolumeSource{
+									VolumeClaim: &scenario.claim.Spec,
+								},
+							},
+						},
+					}
+					_, errs = ValidateVolumes(volumes, field.NewPath(""))
+				} else {
+					errs = ValidatePersistentVolumeClaim(scenario.claim)
+				}
+				// Some tests don'ts fail for ephemeral volumes because those do not
+				// have ObjectMeta.
+				expectedFailure := scenario.isExpectedFailure && !(scenario.isBadMeta && ephemeral)
+				if len(errs) == 0 && expectedFailure {
+					t.Error("Unexpected success for scenario")
+				}
+				if len(errs) > 0 && !expectedFailure {
+					t.Errorf("Unexpected failure: %+v", errs)
+				}
+			})
+		}
 	}
+	t.Run("persistent", func(t *testing.T) { test(t, false) })
+	t.Run("ephemeral", func(t *testing.T) { test(t, true) })
 }
 
 func TestAlphaPVVolumeModeUpdate(t *testing.T) {

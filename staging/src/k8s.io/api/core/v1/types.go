@@ -153,9 +153,12 @@ type VolumeSource struct {
 	// StorageOS represents a StorageOS volume attached and mounted on Kubernetes nodes.
 	// +optional
 	StorageOS *StorageOSVolumeSource `json:"storageos,omitempty" protobuf:"bytes,27,opt,name=storageos"`
-	// CSI (Container Storage Interface) represents storage that is handled by an external CSI driver (Alpha feature).
+	// CSI (Container Storage Interface) represents ephemeral storage that is handled by an external CSI driver (Beta feature).
 	// +optional
 	CSI *CSIVolumeSource `json:"csi,omitempty" protobuf:"bytes,28,opt,name=csi"`
+	// Ephemeral represents ephemeral storage that is handled by a normal storage driver (Alpha feature).
+	// +optional
+	Ephemeral *EphemeralVolumeSource `json:"ephemeral,omitempty" protobuf:"bytes,29,opt,name=ephemeral"`
 }
 
 // PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace.
@@ -1744,6 +1747,29 @@ type CSIVolumeSource struct {
 	// secret object contains more than one secret, all secret references are passed.
 	// +optional
 	NodePublishSecretRef *LocalObjectReference `json:"nodePublishSecretRef,omitempty" protobuf:"bytes,5,opt,name=nodePublishSecretRef"`
+}
+
+// Represents ephemeral storage that is handled by a normal storage driver.
+type EphemeralVolumeSource struct {
+	// Will be created as a stand-alone PVC to provision the volume.
+	//
+	// The pod in which this EphemeralVolumeSource is embedded will be the
+	// owner, i.e. the PVC will be deleted together with the pod.
+	// The name of the PVC will be `<pod name>-<volume name>` where `<volume name>`
+	// is the name from the `PodSpec.Volumes` array entry. Care must
+	// be taken to keep this concatendated name shorter enough that it
+	// can be used as object name. Labels will be copied from the pod.
+	//
+	// This field is read-only and no changes will be made by Kubernetes
+	// to the PVC after it has been created.
+	//
+	// Required, must not be nil.
+	VolumeClaim *PersistentVolumeClaimSpec `json:"volumeClaim,omitempty" protobuf:"bytes,1,opt,name=volumeClaim"`
+
+	// Specifies a read-only configuration for the volume.
+	// Defaults to false (read/write).
+	// +optional
+	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,2,opt,name=readOnly"`
 }
 
 // ContainerPort represents a network port in a single container.

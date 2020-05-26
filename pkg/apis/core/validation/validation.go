@@ -659,6 +659,14 @@ func validateVolumeSource(source *core.VolumeSource, fldPath *field.Path, volNam
 			allErrs = append(allErrs, validateCSIVolumeSource(source.CSI, fldPath.Child("csi"))...)
 		}
 	}
+	if source.Ephemeral != nil {
+		if numVolumes > 0 {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("ephemeral"), "may not specify more than 1 volume type"))
+		} else {
+			numVolumes++
+			allErrs = append(allErrs, validateEphemeralVolumeSource(source.Ephemeral, fldPath.Child("ephemeral"))...)
+		}
+	}
 
 	if numVolumes == 0 {
 		allErrs = append(allErrs, field.Required(fldPath, "must specify a volume type"))
@@ -1549,6 +1557,16 @@ func validateCSIVolumeSource(csi *core.CSIVolumeSource, fldPath *field.Path) fie
 		}
 	}
 
+	return allErrs
+}
+
+func validateEphemeralVolumeSource(ephemeral *core.EphemeralVolumeSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if ephemeral.VolumeClaim == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("volumeClaim"), ""))
+	} else {
+		allErrs = append(allErrs, ValidatePersistentVolumeClaimSpec(ephemeral.VolumeClaim, fldPath.Child("volumeClaim"))...)
+	}
 	return allErrs
 }
 

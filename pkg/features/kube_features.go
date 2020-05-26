@@ -291,12 +291,18 @@ const (
 	// Enables CSI to use raw block storage volumes
 	CSIBlockVolume featuregate.Feature = "CSIBlockVolume"
 
-	// owner: @vladimirvivien
+	// owner: @pohly
 	// alpha: v1.14
 	// beta: v1.16
 	//
 	// Enables CSI Inline volumes support for pods
 	CSIInlineVolume featuregate.Feature = "CSIInlineVolume"
+
+	// owner: @pohly
+	// alpha: v1.19
+	//
+	// Enables generic ephemeral inline volume support for pods
+	GenericEphemeralVolume featuregate.Feature = "GenericEphemeralVolume"
 
 	// owner: @tallclair
 	// alpha: v1.12
@@ -636,6 +642,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	BalanceAttachedNodeVolumes:     {Default: false, PreRelease: featuregate.Alpha},
 	CSIBlockVolume:                 {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.20
 	CSIInlineVolume:                {Default: true, PreRelease: featuregate.Beta},
+	GenericEphemeralVolume:         {Default: false, PreRelease: featuregate.Alpha},
 	RuntimeClass:                   {Default: true, PreRelease: featuregate.Beta},
 	NodeLease:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	SCTPSupport:                    {Default: false, PreRelease: featuregate.Alpha},
