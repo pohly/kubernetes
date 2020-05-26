@@ -66,12 +66,12 @@ spec:
     matchLabels:
       8---jop9641lg.p-g8c2-k-912e5-c-e63-n-3n/E9.8ThjT9s-j41-0-6p-JFHn7y-74.-0MUORQQ.N2.3: 68._bQw.-dG6c-.6--_x.--0wmZk1_8._3s_-_Bq.m_4
   volumeMounts:
-  - mountPath: "144"
-    mountPropagation: 腿ħ缶.蒅!a
-    name: "143"
+  - mountPath: "155"
+    mountPropagation: ż丩ŽoǠŻʘY賃ɪ鐊瀑Ź9
+    name: "154"
     readOnly: true
-    subPath: "145"
-    subPathExpr: "146"
+    subPath: "156"
+    subPathExpr: "157"
   volumes:
   - awsElasticBlockStore:
       fsType: "43"
@@ -133,6 +133,29 @@ spec:
           resource: "88"
     emptyDir:
       sizeLimit: "700"
+    ephemeral:
+      readOnly: true
+      volumeClaim:
+        accessModes:
+        - 腿ħ缶.蒅!a
+        dataSource:
+          apiGroup: "151"
+          kind: "152"
+          name: "153"
+        resources:
+          limits:
+            jƯĖ漘Z剚敍0): "908"
+          requests:
+            ʭ嵔棂p儼Ƿ裚瓶釆Ɗ+j忊Ŗ: "976"
+        selector:
+          matchExpressions:
+          - key: 1-1-x1z-j4kh6oqu-or---40--87-1wp6.759s-3------6tv27r-m8w-6-9-35d383-iq-ay1z25-3-vj73d/Y.t--_0..--_6yV07-_.___gO-d.iUaCw
+            operator: DoesNotExist
+          matchLabels:
+            TO.d-._NwcGnP-w-Sf5_O1: "1_70"
+        storageClassName: "150"
+        volumeMode: 塓烀罁胾^拜Ȍzɟ踡肒Ao/樝f
+        volumeName: "149"
     fc:
       fsType: "90"
       lun: -460478410

@@ -94,6 +94,13 @@ func SetObjectDefaults_PodPreset(in *v1alpha1.PodPreset) {
 		if a.VolumeSource.ScaleIO != nil {
 			v1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
 		}
+		if a.VolumeSource.Ephemeral != nil {
+			if a.VolumeSource.Ephemeral.VolumeClaim != nil {
+				v1.SetDefaults_PersistentVolumeClaimSpec(a.VolumeSource.Ephemeral.VolumeClaim)
+				v1.SetDefaults_ResourceList(&a.VolumeSource.Ephemeral.VolumeClaim.Resources.Limits)
+				v1.SetDefaults_ResourceList(&a.VolumeSource.Ephemeral.VolumeClaim.Resources.Requests)
+			}
+		}
 	}
 }
 

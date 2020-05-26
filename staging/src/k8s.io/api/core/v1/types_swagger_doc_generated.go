@@ -626,6 +626,16 @@ func (EphemeralContainers) SwaggerDoc() map[string]string {
 	return map_EphemeralContainers
 }
 
+var map_EphemeralVolumeSource = map[string]string{
+	"":            "Represents ephemeral storage that is handled by a normal storage driver.",
+	"volumeClaim": "Will be created as a stand-alone PVC to provision the volume.\n\nThe pod in which this EphemeralVolumeSource is embedded will be the owner, i.e. the PVC will be deleted together with the pod. The name of the PVC will be `<pod name>-<volume name>` where `<volume name>` is the name from the `PodSpec.Volumes` array entry. Care must be taken to keep this concatendated name shorter enough that it can be used as object name. Labels will be copied from the pod.\n\nThis field is read-only and no changes will be made by Kubernetes to the PVC after it has been created.\n\nRequired, must not be nil.",
+	"readOnly":    "Specifies a read-only configuration for the volume. Defaults to false (read/write).",
+}
+
+func (EphemeralVolumeSource) SwaggerDoc() map[string]string {
+	return map_EphemeralVolumeSource
+}
+
 var map_Event = map[string]string{
 	"":                   "Event is a report of an event somewhere in the cluster.",
 	"metadata":           "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
@@ -2429,7 +2439,8 @@ var map_VolumeSource = map[string]string{
 	"portworxVolume":        "PortworxVolume represents a portworx volume attached and mounted on kubelets host machine",
 	"scaleIO":               "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.",
 	"storageos":             "StorageOS represents a StorageOS volume attached and mounted on Kubernetes nodes.",
-	"csi":                   "CSI (Container Storage Interface) represents storage that is handled by an external CSI driver (Alpha feature).",
+	"csi":                   "CSI (Container Storage Interface) represents ephemeral storage that is handled by an external CSI driver (Beta feature).",
+	"ephemeral":             "Ephemeral represents ephemeral storage that is handled by a normal storage driver (Alpha feature).",
 }
 
 func (VolumeSource) SwaggerDoc() map[string]string {

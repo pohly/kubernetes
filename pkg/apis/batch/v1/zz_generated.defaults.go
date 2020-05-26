@@ -88,6 +88,13 @@ func SetObjectDefaults_Job(in *v1.Job) {
 		if a.VolumeSource.ScaleIO != nil {
 			corev1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
 		}
+		if a.VolumeSource.Ephemeral != nil {
+			if a.VolumeSource.Ephemeral.VolumeClaim != nil {
+				corev1.SetDefaults_PersistentVolumeClaimSpec(a.VolumeSource.Ephemeral.VolumeClaim)
+				corev1.SetDefaults_ResourceList(&a.VolumeSource.Ephemeral.VolumeClaim.Resources.Limits)
+				corev1.SetDefaults_ResourceList(&a.VolumeSource.Ephemeral.VolumeClaim.Resources.Requests)
+			}
+		}
 	}
 	for i := range in.Spec.Template.Spec.InitContainers {
 		a := &in.Spec.Template.Spec.InitContainers[i]
