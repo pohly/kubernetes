@@ -240,8 +240,15 @@ func indexByPVCKey(obj interface{}) ([]string, error) {
 	}
 	keys := []string{}
 	for _, podVolume := range pod.Spec.Volumes {
+		claimName := ""
 		if pvcSource := podVolume.VolumeSource.PersistentVolumeClaim; pvcSource != nil {
-			keys = append(keys, fmt.Sprintf("%s/%s", pod.Namespace, pvcSource.ClaimName))
+			claimName = pvcSource.ClaimName
+		}
+		if ephemeralSource := podVolume.VolumeSource.Ephemeral; ephemeralSource != nil && utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume) {
+			claimName = pod.Name + "-" + podVolume.Name
+		}
+		if claimName != "" {
+			keys = append(keys, fmt.Sprintf("%s/%s", pod.Namespace, claimName))
 		}
 	}
 	return keys, nil
@@ -438,7 +445,7 @@ func (adc *attachDetachController) populateDesiredStateOfWorld() error {
 			// The volume specs present in the ActualStateOfWorld are nil, let's replace those
 			// with the correct ones found on pods. The present in the ASW with no corresponding
 			// pod will be detached and the spec is irrelevant.
-			volumeSpec, err := util.CreateVolumeSpec(podVolume, podToAdd.Namespace, nodeName, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister, adc.csiMigratedPluginManager, adc.intreeToCSITranslator)
+			volumeSpec, err := util.CreateVolumeSpec(podVolume, podToAdd, nodeName, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister, adc.csiMigratedPluginManager, adc.intreeToCSITranslator)
 			if err != nil {
 				klog.Errorf(
 					"Error creating spec for volume %q, pod %q/%q: %v",

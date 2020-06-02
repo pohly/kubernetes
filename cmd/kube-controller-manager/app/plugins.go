@@ -153,6 +153,10 @@ func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config persiste
 		allPlugins = append(allPlugins, csi.ProbeVolumePlugins()...)
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume) {
+		// TODO: allPlugins = append(allPlugins, csi.ProbeVolumePlugins()...)
+	}
+
 	return allPlugins, nil
 }
 

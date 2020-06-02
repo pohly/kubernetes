@@ -33,10 +33,12 @@ import (
 	policy "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	policylisters "k8s.io/client-go/listers/policy/v1beta1"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
@@ -1081,11 +1083,19 @@ func podPassesBasicChecks(pod *v1.Pod, pvcLister corelisters.PersistentVolumeCla
 	manifest := &(pod.Spec)
 	for i := range manifest.Volumes {
 		volume := &manifest.Volumes[i]
-		if volume.PersistentVolumeClaim == nil {
-			// Volume is not a PVC, ignore
+		var pvcName string
+		ephemeral := false
+		switch {
+		case volume.PersistentVolumeClaim != nil:
+			pvcName = volume.PersistentVolumeClaim.ClaimName
+		case volume.Ephemeral != nil &&
+			utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume):
+			pvcName = pod.Name + "-" + volume.Name
+			ephemeral = true
+		default:
+			// Volume is not using a PVC, ignore
 			continue
 		}
-		pvcName := volume.PersistentVolumeClaim.ClaimName
 		pvc, err := pvcLister.PersistentVolumeClaims(namespace).Get(pvcName)
 		if err != nil {
 			// The error has already enough context ("persistentvolumeclaim "myclaim" not found")
@@ -1094,6 +1104,11 @@ func podPassesBasicChecks(pod *v1.Pod, pvcLister corelisters.PersistentVolumeCla
 
 		if pvc.DeletionTimestamp != nil {
 			return fmt.Errorf("persistentvolumeclaim %q is being deleted", pvc.Name)
+		}
+
+		if ephemeral &&
+			!metav1.IsControlledBy(pvc, pod) {
+			return fmt.Errorf("persistentvolumeclaim %q was not created for the pod", pvc.Name)
 		}
 	}
 
