@@ -46,6 +46,8 @@ var (
 	DynamicPV TestVolType = "DynamicPV"
 	// CSIInlineVolume represents a volume type that is defined inline and provided by a CSI driver.
 	CSIInlineVolume TestVolType = "CSIInlineVolume"
+	// GenericEphemeralVolume represents a volume type that is defined inline and provisioned through a PVC.
+	GenericEphemeralVolume TestVolType = "GenericEphemeralVolume"
 )
 
 // TestSnapshotType represents a snapshot type to be tested in a TestSuite
@@ -76,10 +78,15 @@ var (
 		Name:    "Inline-volume (default fs)",
 		VolType: InlineVolume,
 	}
-	// DefaultFsEphemeralVolume is TestPattern for "Ephemeral-volume (default fs)"
-	DefaultFsEphemeralVolume = TestPattern{
-		Name:    "Ephemeral-volume (default fs)",
+	// DefaultFsEphemeralVolume is TestPattern for "CSI Ephemeral-volume (default fs)"
+	DefaultFsCSIEphemeralVolume = TestPattern{
+		Name:    "CSI Ephemeral-volume (default fs)",
 		VolType: CSIInlineVolume,
+	}
+	// DefaultFsEphemeralVolume is TestPattern for "Generic Ephemeral-volume (default fs)"
+	DefaultFsGenericEphemeralVolume = TestPattern{
+		Name:    "Generic Ephemeral-volume (default fs)",
+		VolType: GenericEphemeralVolume,
 	}
 	// DefaultFsPreprovisionedPV is TestPattern for "Pre-provisioned PV (default fs)"
 	DefaultFsPreprovisionedPV = TestPattern{
@@ -100,10 +107,16 @@ var (
 		VolType: InlineVolume,
 		FsType:  "ext3",
 	}
-	// Ext3EphemeralVolume is TestPattern for "Ephemeral-volume (ext3)"
-	Ext3EphemeralVolume = TestPattern{
-		Name:    "Ephemeral-volume (ext3)",
-		VolType: InlineVolume,
+	// Ext3EphemeralVolume is TestPattern for "CSI Ephemeral-volume (ext3)"
+	Ext3CSIEphemeralVolume = TestPattern{
+		Name:    "CSI Ephemeral-volume (ext3)",
+		VolType: CSIInlineVolume,
+		FsType:  "ext3",
+	}
+	// Ext3GenericEphemeralVolume is TestPattern for "Generic Ephemeral-volume (ext3)"
+	Ext3GEnericEphemeralVolume = TestPattern{
+		Name:    "Generic Ephemeral-volume (ext3)",
+		VolType: GenericEphemeralVolume,
 		FsType:  "ext3",
 	}
 	// Ext3PreprovisionedPV is TestPattern for "Pre-provisioned PV (ext3)"
@@ -127,10 +140,16 @@ var (
 		VolType: InlineVolume,
 		FsType:  "ext4",
 	}
-	// Ext4EphemeralVolume is TestPattern for "Ephemeral-volume (ext4)"
-	Ext4EphemeralVolume = TestPattern{
-		Name:    "Ephemeral-volume (ext4)",
+	// Ext4EphemeralVolume is TestPattern for "CSI Ephemeral-volume (ext4)"
+	Ext4CSIEphemeralVolume = TestPattern{
+		Name:    "CSI Ephemeral-volume (ext4)",
 		VolType: CSIInlineVolume,
+		FsType:  "ext4",
+	}
+	// Ext4EphemeralVolume is TestPattern for "Generic Ephemeral-volume (ext4)"
+	Ext4GenericEphemeralVolume = TestPattern{
+		Name:    "Generic Ephemeral-volume (ext4)",
+		VolType: GenericEphemeralVolume,
 		FsType:  "ext4",
 	}
 	// Ext4PreprovisionedPV is TestPattern for "Pre-provisioned PV (ext4)"
@@ -155,10 +174,17 @@ var (
 		FsType:     "xfs",
 		FeatureTag: "[Slow]",
 	}
-	// XfsEphemeralVolume is TestPattern for "Ephemeral-volume (xfs)"
-	XfsEphemeralVolume = TestPattern{
-		Name:       "Ephemeral-volume (xfs)",
+	// XfsEphemeralVolume is TestPattern for "CSI Ephemeral-volume (xfs)"
+	XfsCSIEphemeralVolume = TestPattern{
+		Name:       "CSI Ephemeral-volume (xfs)",
 		VolType:    CSIInlineVolume,
+		FsType:     "xfs",
+		FeatureTag: "[Slow]",
+	}
+	// XfsEphemeralVolume is TestPattern for "Generic Ephemeral-volume (xfs)"
+	XfsGenericEphemeralVolume = TestPattern{
+		Name:       "Generic Ephemeral-volume (xfs)",
+		VolType:    GenericEphemeralVolume,
 		FsType:     "xfs",
 		FeatureTag: "[Slow]",
 	}
@@ -186,10 +212,17 @@ var (
 		FsType:     "ntfs",
 		FeatureTag: "[sig-windows]",
 	}
-	// NtfsEphemeralVolume is TestPattern for "Ephemeral-volume (ntfs)"
-	NtfsEphemeralVolume = TestPattern{
-		Name:       "Ephemeral-volume (ntfs)",
+	// NtfsEphemeralVolume is TestPattern for "CSI Ephemeral-volume (ntfs)"
+	NtfsCSIEphemeralVolume = TestPattern{
+		Name:       "CSI Ephemeral-volume (ntfs)",
 		VolType:    CSIInlineVolume,
+		FsType:     "ntfs",
+		FeatureTag: "[sig-windows]",
+	}
+	// NtfsEphemeralVolume is TestPattern for "Generic Ephemeral-volume (ntfs)"
+	NtfsGenericEphemeralVolume = TestPattern{
+		Name:       "Generic Ephemeral-volume (ntfs)",
+		VolType:    GenericEphemeralVolume,
 		FsType:     "ntfs",
 		FeatureTag: "[sig-windows]",
 	}
