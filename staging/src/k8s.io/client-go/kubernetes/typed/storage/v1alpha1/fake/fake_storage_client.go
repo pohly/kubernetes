@@ -28,6 +28,10 @@ type FakeStorageV1alpha1 struct {
 	*testing.Fake
 }
 
+func (c *FakeStorageV1alpha1) CSIStorageCapacities() v1alpha1.CSIStorageCapacityInterface {
+	return &FakeCSIStorageCapacities{c}
+}
+
 func (c *FakeStorageV1alpha1) VolumeAttachments() v1alpha1.VolumeAttachmentInterface {
 	return &FakeVolumeAttachments{c}
 }
