@@ -24,6 +24,7 @@ import (
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,13 +46,24 @@ var _ TestSuite = &ephemeralTestSuite{}
 
 // InitEphemeralTestSuite returns ephemeralTestSuite that implements TestSuite interface
 func InitEphemeralTestSuite() TestSuite {
+	genericLateBinding := testpatterns.DefaultFsGenericEphemeralVolume
+	genericLateBinding.Name += " (late-binding)"
+	genericLateBinding.BindingMode = storagev1.VolumeBindingWaitForFirstConsumer
+
+	genericImmediateBinding := testpatterns.DefaultFsGenericEphemeralVolume
+	genericImmediateBinding.Name += " (immediate-binding)"
+	genericImmediateBinding.BindingMode = storagev1.VolumeBindingImmediate
+
+	patterns := []testpatterns.TestPattern{
+		testpatterns.DefaultFsCSIEphemeralVolume,
+		genericLateBinding,
+		genericImmediateBinding,
+	}
+
 	return &ephemeralTestSuite{
 		tsInfo: TestSuiteInfo{
-			Name: "ephemeral",
-			TestPatterns: []testpatterns.TestPattern{
-				testpatterns.DefaultFsCSIEphemeralVolume,
-				testpatterns.DefaultFsGenericEphemeralVolume,
-			},
+			Name:         "ephemeral",
+			TestPatterns: patterns,
 		},
 	}
 }
