@@ -26,7 +26,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -40,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	ephemeralutil "k8s.io/kubernetes/pkg/volume/util/ephemeral"
 )
 
 const (
@@ -300,7 +300,7 @@ func (pl *nonCSILimits) filterVolumes(pod *v1.Pod, filteredVolumes sets.String) 
 			// just with a computed name and certain ownership.
 			// That is checked below once the pvc object is
 			// retrieved.
-			pvcName = pod.Name + "-" + vol.Name
+			pvcName = ephemeralutil.VolumeClaimName(pod, vol)
 			ephemeral = true
 		default:
 			continue
@@ -323,8 +323,10 @@ func (pl *nonCSILimits) filterVolumes(pod *v1.Pod, filteredVolumes sets.String) 
 		}
 
 		// The PVC for an ephemeral volume must be owned by the pod.
-		if ephemeral && !metav1.IsControlledBy(pvc, pod) {
-			return fmt.Errorf("PVC %s/%s is not owned by pod", pod.Namespace, pvcName)
+		if ephemeral {
+			if err := ephemeralutil.VolumeIsForPod(pod, pvc); err != nil {
+				return err
+			}
 		}
 
 		pvName := pvc.Spec.VolumeName

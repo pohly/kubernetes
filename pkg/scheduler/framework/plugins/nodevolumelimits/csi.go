@@ -22,7 +22,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/rand"
 	corelisters "k8s.io/client-go/listers/core/v1"
@@ -32,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	ephemeralutil "k8s.io/kubernetes/pkg/volume/util/ephemeral"
 
 	"k8s.io/klog/v2"
 )
@@ -175,8 +175,10 @@ func (pl *CSILimits) filterAttachableVolumes(
 		}
 
 		// The PVC for an ephemeral volume must be owned by the pod.
-		if ephemeral && !metav1.IsControlledBy(pvc, pod) {
-			return fmt.Errorf("PVC %s/%s is not owned by pod", pod.Namespace, pvcName)
+		if ephemeral {
+			if err := ephemeralutil.VolumeIsForPod(pod, pvc); err != nil {
+				return err
+			}
 		}
 
 		driverName, volumeHandle := pl.getCSIDriverInfo(csiNode, pvc)
