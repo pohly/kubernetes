@@ -142,6 +142,9 @@ type Status struct {
 	// failedPlugin is an optional field that records the plugin name a Pod failed by.
 	// It's set by the framework when code is Error, Unschedulable or UnschedulableAndUnresolvable.
 	failedPlugin string
+	// silent can be set to true to indicate that a failed status
+	// does not need to be reported to users.
+	silent bool
 }
 
 // Code returns code of the Status.
@@ -175,6 +178,24 @@ func (s *Status) WithFailedPlugin(plugin string) *Status {
 // FailedPlugin returns the failed plugin name.
 func (s *Status) FailedPlugin() string {
 	return s.failedPlugin
+}
+
+// SetSilent modifies whether the status is meant to be reported to users.
+func (s *Status) SetSilent(silent bool) {
+	s.silent = silent
+}
+
+// WithSilent modifies whether the status is meant to be reported to users
+// and returns a pointer to it.
+func (s *Status) WithSilent(silent bool) *Status {
+	s.SetSilent(silent)
+	return s
+}
+
+// IsSilent returns true if a failed status is meant to be reported
+// to users.
+func (s *Status) IsSilent() bool {
+	return s.silent
 }
 
 // Reasons returns reasons of the Status.

@@ -74,6 +74,14 @@ const (
 	WildCard              GVK = "*"
 )
 
+// SilentError can be implement by errors that occur as part of pod scheduling.
+// When implemented and IsSilent returns true, emitting events with the error
+// for the pod is skipped. This is useful for intermittent errors that do not
+// need to be reported (yet).
+type SilentError interface {
+	IsSilent() bool
+}
+
 // ClusterEvent abstracts how a system resource's state gets changed.
 // Resource represents the standard API resources such as Pod, Node, etc.
 // ActionType denotes the specific change such as Add, Update or Delete.
@@ -222,6 +230,18 @@ type FitError struct {
 	Pod         *v1.Pod
 	NumAllNodes int
 	Diagnosis   Diagnosis
+}
+
+var _ SilentError = &FitError{}
+
+// IsSilent returns false if any of the per-node statuses is meant to be reported.
+func (f *FitError) IsSilent() bool {
+	for _, status := range f.Diagnosis.NodeToStatusMap {
+		if !status.IsSilent() {
+			return false
+		}
+	}
+	return true
 }
 
 const (

@@ -388,8 +388,14 @@ func (sched *Scheduler) recordSchedulingFailure(fwk framework.Framework, podInfo
 	}
 
 	pod := podInfo.Pod
-	msg := truncateMessage(err.Error())
-	fwk.EventRecorder().Eventf(pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", msg)
+	silent := false
+	if silentError, ok := err.(framework.SilentError); ok {
+		silent = silentError.IsSilent()
+	}
+	if !silent {
+		msg := truncateMessage(err.Error())
+		fwk.EventRecorder().Eventf(pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", msg)
+	}
 	if err := updatePod(sched.client, pod, &v1.PodCondition{
 		Type:    v1.PodScheduled,
 		Status:  v1.ConditionFalse,

@@ -120,10 +120,11 @@ func (pl *VolumeBinding) EventsToRegister() []framework.ClusterEvent {
 	return events
 }
 
-// podHasPVCs returns 2 values:
+// podHasPVCs returns 3 values:
 // - the first one to denote if the given "pod" has any PVC defined.
-// - the second one to return any error if the requested PVC is illegal.
-func (pl *VolumeBinding) podHasPVCs(pod *v1.Pod) (bool, error) {
+// - the second one to determine whether the scheduler shall hide the error from the user
+// - the last one to return any error if the requested PVC is illegal.
+func (pl *VolumeBinding) podHasPVCs(pod *v1.Pod) (bool, bool, error) {
 	hasPVC := false
 	for _, vol := range pod.Spec.Volumes {
 		var pvcName string
@@ -141,24 +142,37 @@ func (pl *VolumeBinding) podHasPVCs(pod *v1.Pod) (bool, error) {
 		hasPVC = true
 		pvc, err := pl.PVCLister.PersistentVolumeClaims(pod.Namespace).Get(pvcName)
 		if err != nil {
+			silent := false
 			// The error usually has already enough context ("persistentvolumeclaim "myclaim" not found"),
 			// but we can do better generic ephemeral inline volumes where that situation
 			// is normal directly after creating a pod.
 			if ephemeral && apierrors.IsNotFound(err) {
 				err = fmt.Errorf("waiting for ephemeral volume controller to create the persistentvolumeclaim %q", pvcName)
+				if !ephemeralPVCShouldExist(pod) {
+					// This is normal. Hide the event for
+					// now and only show it when the
+					// situation persists.
+					silent = true
+				}
 			}
-			return hasPVC, err
+			return hasPVC, silent, err
 		}
 
 		if pvc.DeletionTimestamp != nil {
-			return hasPVC, fmt.Errorf("persistentvolumeclaim %q is being deleted", pvc.Name)
+			return hasPVC, false, fmt.Errorf("persistentvolumeclaim %q is being deleted", pvc.Name)
 		}
 
 		if ephemeral && !metav1.IsControlledBy(pvc, pod) {
-			return hasPVC, fmt.Errorf("persistentvolumeclaim %q was not created for the pod", pvc.Name)
+			return hasPVC, false, fmt.Errorf("persistentvolumeclaim %q was not created for the pod", pvc.Name)
 		}
 	}
-	return hasPVC, nil
+	return hasPVC, false, nil
+}
+
+// ephemeralPVCShouldExist returns true if the ephemeral volume controller
+// should have had enough time to create the PVC(s) for the pod.
+func ephemeralPVCShouldExist(pod *v1.Pod) bool {
+	return pod.CreationTimestamp.Add(30 * time.Second).Before(time.Now())
 }
 
 // PreFilter invoked at the prefilter extension point to check if pod has all
@@ -166,8 +180,10 @@ func (pl *VolumeBinding) podHasPVCs(pod *v1.Pod) (bool, error) {
 // UnschedulableAndUnresolvable is returned.
 func (pl *VolumeBinding) PreFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod) *framework.Status {
 	// If pod does not reference any PVC, we don't need to do anything.
-	if hasPVC, err := pl.podHasPVCs(pod); err != nil {
-		return framework.NewStatus(framework.UnschedulableAndUnresolvable, err.Error())
+	if hasPVC, silent, err := pl.podHasPVCs(pod); err != nil {
+		status := framework.NewStatus(framework.UnschedulableAndUnresolvable, err.Error())
+		status.SetSilent(silent)
+		return status
 	} else if !hasPVC {
 		state.Write(stateKey, &stateData{skip: true})
 		return nil
