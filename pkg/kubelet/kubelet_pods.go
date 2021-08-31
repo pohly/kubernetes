@@ -58,6 +58,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/volume/util/ephemeral"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
@@ -2026,7 +2027,7 @@ func (kl *Kubelet) hasHostMountPVC(pod *v1.Pod) bool {
 			if !utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume) {
 				continue
 			}
-			pvcName = pod.Name + "-" + volume.Name
+			pvcName = ephemeral.VolumeClaimName(pod, &volume)
 		default:
 			continue
 		}
