@@ -25,7 +25,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corelisters "k8s.io/client-go/listers/core/v1"
@@ -36,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
+	"k8s.io/kubernetes/pkg/volume/util/ephemeral"
 )
 
 const (
@@ -127,13 +127,13 @@ func (pl *VolumeBinding) podHasPVCs(pod *v1.Pod) (bool, error) {
 	hasPVC := false
 	for _, vol := range pod.Spec.Volumes {
 		var pvcName string
-		ephemeral := false
+		isEphemeral := false
 		switch {
 		case vol.PersistentVolumeClaim != nil:
 			pvcName = vol.PersistentVolumeClaim.ClaimName
 		case vol.Ephemeral != nil && pl.GenericEphemeralVolumeFeatureEnabled:
-			pvcName = pod.Name + "-" + vol.Name
-			ephemeral = true
+			pvcName = ephemeral.VolumeClaimName(pod, &vol)
+			isEphemeral = true
 		default:
 			// Volume is not using a PVC, ignore
 			continue
@@ -144,7 +144,7 @@ func (pl *VolumeBinding) podHasPVCs(pod *v1.Pod) (bool, error) {
 			// The error usually has already enough context ("persistentvolumeclaim "myclaim" not found"),
 			// but we can do better for generic ephemeral inline volumes where that situation
 			// is normal directly after creating a pod.
-			if ephemeral && apierrors.IsNotFound(err) {
+			if isEphemeral && apierrors.IsNotFound(err) {
 				err = fmt.Errorf("waiting for ephemeral volume controller to create the persistentvolumeclaim %q", pvcName)
 			}
 			return hasPVC, err
@@ -154,8 +154,10 @@ func (pl *VolumeBinding) podHasPVCs(pod *v1.Pod) (bool, error) {
 			return hasPVC, fmt.Errorf("persistentvolumeclaim %q is being deleted", pvc.Name)
 		}
 
-		if ephemeral && !metav1.IsControlledBy(pvc, pod) {
-			return hasPVC, fmt.Errorf("persistentvolumeclaim %q was not created for the pod", pvc.Name)
+		if isEphemeral {
+			if err := ephemeral.VolumeIsForPod(pod, pvc); err != nil {
+				return hasPVC, err
+			}
 		}
 	}
 	return hasPVC, nil
