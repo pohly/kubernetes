@@ -20,25 +20,76 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/spf13/pflag"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 )
 
 const logFlushFreqFlagName = "log-flush-frequency"
 
-var logFlushFreq = pflag.Duration(logFlushFreqFlagName, 5*time.Second, "Maximum number of seconds between log flushes")
+var (
+	logFlushFreqVar *pflag.Flag
+
+	// logFlushPeriod is the amount of time between log flushes. It might
+	// change over time while log flushing has already started, for example
+	// because flag parsing is done (again) later. Therefore access to it
+	// has to be protected with a mutex.
+	logFlushPeriod = &guardedDuration{
+		duration: 5 * time.Second,
+	}
+)
+
+type guardedDuration struct {
+	mutex    sync.Mutex
+	duration time.Duration
+}
+
+func (g *guardedDuration) String() string {
+	g.mutex.Lock()
+	defer g.mutex.Unlock()
+	return g.duration.String()
+}
+
+func (g *guardedDuration) Set(value string) error {
+	duration, err := time.ParseDuration(value)
+	if err != nil {
+		// No need to wrap, the flag package will add additional information.
+		return nil
+	}
+	g.mutex.Lock()
+	defer g.mutex.Unlock()
+	g.duration = duration
+	return nil
+}
+
+func (g *guardedDuration) Get() time.Duration {
+	g.mutex.Lock()
+	defer g.mutex.Unlock()
+	return g.duration
+}
+
+func (g *guardedDuration) Type() string {
+	return "duration"
+}
+
+var _ pflag.Value = &guardedDuration{}
 
 func init() {
 	klog.InitFlags(flag.CommandLine)
+	pflag.Var(logFlushPeriod, logFlushFreqFlagName, "Maximum number of seconds between log flushes")
+
+	// Look up the flag now for AddFlags, in case that a command replaces the global
+	// pflag.CommandLine.
+	logFlushFreqVar = pflag.Lookup(logFlushFreqFlagName)
+
 }
 
 // AddFlags registers this package's flags on arbitrary FlagSets, such that they point to the
 // same value as the global flags.
 func AddFlags(fs *pflag.FlagSet) {
-	fs.AddFlag(pflag.Lookup(logFlushFreqFlagName))
+	fs.AddFlag(logFlushFreqVar)
 }
 
 // KlogWriter serves as a bridge between the standard log package and the glog package.
@@ -54,8 +105,22 @@ func (writer KlogWriter) Write(data []byte) (n int, err error) {
 func InitLogs() {
 	log.SetOutput(KlogWriter{})
 	log.SetFlags(0)
-	// The default glog flush interval is 5 seconds.
-	go wait.Forever(klog.Flush, *logFlushFreq)
+	go flushForever()
+}
+
+// flushForever runs in a goroutine and calls FlushLogs with delays between
+// flushes that are determined by logFlushPeriod. That value may change at any
+// time. This makes it possible to call InitLogs before parsing flags.
+func flushForever() {
+	lastFlush := time.Now()
+	for {
+		// Sleep till it is time to flush again.
+		flushNext := lastFlush.Add(logFlushPeriod.Get())
+		now := time.Now()
+		time.Sleep(flushNext.Sub(now))
+		FlushLogs()
+		lastFlush = now
+	}
 }
 
 // FlushLogs flushes logs immediately.

@@ -24,8 +24,8 @@ import (
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/component-base/logs"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	"k8s.io/kubectl/pkg/util/logs"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/convert"
 )
 
