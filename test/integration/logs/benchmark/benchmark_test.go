@@ -201,7 +201,7 @@ func benchmarkOutputFormats(b *testing.B, config loadGeneratorConfig, discard bo
 					os.Stderr = stderr
 				}()
 				options := logs.NewOptions()
-				logger, flush = logsjson.Factory{}.Create(options.Config.Options)
+				logger, flush = logsjson.Factory{}.Create(options.Options)
 			}
 			klog.SetLogger(logger)
 			defer klog.ClearLogger()
@@ -218,8 +218,8 @@ func benchmarkOutputFormats(b *testing.B, config loadGeneratorConfig, discard bo
 					os.Stdout, os.Stderr = stdout, stderr
 				}()
 				options := logs.NewOptions()
-				options.Config.Options.JSON.SplitStream = true
-				logger, flush = logsjson.Factory{}.Create(options.Config.Options)
+				options.Options.JSON.SplitStream = true
+				logger, flush = logsjson.Factory{}.Create(options.Options)
 			}
 			klog.SetLogger(logger)
 			defer klog.ClearLogger()
