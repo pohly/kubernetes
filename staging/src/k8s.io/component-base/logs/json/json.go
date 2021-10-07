@@ -26,8 +26,7 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
-	"k8s.io/component-base/config"
-	"k8s.io/component-base/logs/registry"
+	logsapi "k8s.io/component-base/logs/api/v1"
 )
 
 var (
@@ -81,9 +80,9 @@ func epochMillisTimeEncoder(_ time.Time, enc zapcore.PrimitiveArrayEncoder) {
 // Factory produces JSON logger instances.
 type Factory struct{}
 
-var _ registry.LogFormatFactory = Factory{}
+var _ logsapi.LogFormatFactory = Factory{}
 
-func (f Factory) Create(options config.FormatOptions) (logr.Logger, func()) {
+func (f Factory) Create(options logsapi.FormatOptions) (logr.Logger, func()) {
 	// We intentionally avoid all os.File.Sync calls. Output is unbuffered,
 	// therefore we don't need to flush, and calling the underlying fsync
 	// would just slow down writing.
