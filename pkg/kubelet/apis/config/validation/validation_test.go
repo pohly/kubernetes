@@ -22,7 +22,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	componentbaseconfig "k8s.io/component-base/config"
+	logsapi "k8s.io/component-base/logs/api/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/config/validation"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -67,7 +67,7 @@ var (
 			"GracefulNodeShutdown":    true,
 			"MemoryQoS":               true,
 		},
-		Logging: componentbaseconfig.LoggingConfiguration{
+		Logging: logsapi.LoggingConfiguration{
 			Format: "text",
 		},
 	}

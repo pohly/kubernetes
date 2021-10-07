@@ -26,11 +26,12 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
+
 	"k8s.io/apimachinery/pkg/util/wait"
+	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/klog/v2"
 )
 
-const logFlushFreqFlagName = "log-flush-frequency"
 const deprecated = "will be removed in a future release, see https://github.com/kubernetes/enhancements/tree/master/keps/sig-instrumentation/2845-deprecate-klog-specific-flags-in-k8s-components"
 
 // TODO (https://github.com/kubernetes/kubernetes/issues/105310): once klog
@@ -41,7 +42,6 @@ const deprecated = "will be removed in a future release, see https://github.com/
 
 var (
 	packageFlags = flag.NewFlagSet("logging", flag.ContinueOnError)
-	logrFlush    func()
 
 	// Periodic flushing gets configured either via the global flag
 	// in this file or via LoggingConfiguration.
@@ -51,7 +51,7 @@ var (
 
 func init() {
 	klog.InitFlags(packageFlags)
-	packageFlags.DurationVar(&logFlushFreq, logFlushFreqFlagName, 5*time.Second, "Maximum number of seconds between log flushes")
+	packageFlags.DurationVar(&logFlushFreq, logsapi.LogFlushFreqFlagName, logsapi.LogFlushFreqDefault, "Maximum number of seconds between log flushes")
 }
 
 type addFlagsOptions struct {
@@ -68,6 +68,13 @@ func SkipLoggingConfigurationFlags() Option {
 		o.skipLoggingConfigurationFlags = true
 	}
 }
+
+// Options is an alias for LoggingConfiguration to comply with component-base
+// conventions.
+type Options = logsapi.LoggingConfiguration
+
+// NewOptions is an alias for NewLoggingConfiguration.
+var NewOptions = logsapi.NewLoggingConfiguration
 
 // AddFlags registers this package's flags on arbitrary FlagSets. This includes
 // the klog flags, with the original underscore as separator between. If
@@ -97,7 +104,7 @@ func AddFlags(fs *pflag.FlagSet, opts ...Option) {
 			if o.skipLoggingConfigurationFlags {
 				return
 			}
-		case logFlushFreqFlagName:
+		case logsapi.LogFlushFreqFlagName:
 			// unchanged, potentially skip it
 			if o.skipLoggingConfigurationFlags {
 				return
@@ -139,7 +146,7 @@ func AddGoFlags(fs *flag.FlagSet, opts ...Option) {
 			if o.skipLoggingConfigurationFlags {
 				return
 			}
-		case logFlushFreqFlagName:
+		case logsapi.LogFlushFreqFlagName:
 			// unchanged
 			if o.skipLoggingConfigurationFlags {
 				return
@@ -176,19 +183,14 @@ func InitLogs() {
 	if logFlushFreqAdded {
 		// The flag from this file was activated, so use it now.
 		// Otherwise LoggingConfiguration.Apply will do this.
-		go wait.Forever(FlushLogs, logFlushFreq)
+		go wait.Forever(logsapi.FlushLogs, logFlushFreq)
 	}
 }
 
 // FlushLogs flushes logs immediately. This should be called at the end of
 // the main function via defer to ensure that all pending log messages
 // are printed before exiting the program.
-func FlushLogs() {
-	klog.Flush()
-	if logrFlush != nil {
-		logrFlush()
-	}
-}
+var FlushLogs = logsapi.FlushLogs
 
 // NewLogger creates a new log.Logger which sends logs to klog.Info.
 func NewLogger(prefix string) *log.Logger {
