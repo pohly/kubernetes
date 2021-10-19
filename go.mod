@@ -503,6 +503,7 @@ replace (
 	k8s.io/csi-translation-lib => ./staging/src/k8s.io/csi-translation-lib
 	k8s.io/gengo => k8s.io/gengo v0.0.0-20210813121822-485abfe95c7c
 	k8s.io/klog/v2 => k8s.io/klog/v2 v2.30.0
+	k8s.io/klogr => ./staging/src/k8s.io/klogr
 	k8s.io/kube-aggregator => ./staging/src/k8s.io/kube-aggregator
 	k8s.io/kube-controller-manager => ./staging/src/k8s.io/kube-controller-manager
 	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20211115234752-e816edb12b65
