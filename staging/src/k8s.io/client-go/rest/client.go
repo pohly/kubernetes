@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/klogr"
 )
 
 const (
@@ -98,13 +99,24 @@ type RESTClient struct {
 	// If not set, defaultWarningHandler is used.
 	warningHandler WarningHandler
 
+	// Logger is used for those functions which cannot get a logger through
+	// their context.
+	logger klogr.Logger
+
 	// Set specific behavior of the client.  If not set http.DefaultClient will be used.
 	Client *http.Client
 }
 
 // NewRESTClient creates a new RESTClient. This client performs generic REST functions
-// such as Get, Put, Post, and Delete on specified paths.
+// such as Get, Put, Post, and Delete on specified paths. The current default logger from
+// k8s.io/klogr is used for logging.
 func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ClientContentConfig, rateLimiter flowcontrol.RateLimiter, client *http.Client) (*RESTClient, error) {
+	return NewRESTClientWithLogging(baseURL, versionedAPIPath, config, rateLimiter, client, klogr.TODO())
+}
+
+// NewRESTClientWithLogging creates a new RESTClient. In contrast to NewRESTClient,
+// the logger instance is specified explicitly.
+func NewRESTClientWithLogging(baseURL *url.URL, versionedAPIPath string, config ClientContentConfig, rateLimiter flowcontrol.RateLimiter, client *http.Client, logger klogr.Logger) (*RESTClient, error) {
 	if len(config.ContentType) == 0 {
 		config.ContentType = "application/json"
 	}
@@ -122,6 +134,7 @@ func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ClientConte
 		content:          config,
 		createBackoffMgr: readExpBackoffConfig,
 		rateLimiter:      rateLimiter,
+		logger:           logger,
 
 		Client: client,
 	}, nil

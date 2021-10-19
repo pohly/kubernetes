@@ -17,5 +17,6 @@ replace (
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/client-go => ../client-go
 	k8s.io/code-generator => ../code-generator
+	k8s.io/klogr => ../klogr
 	k8s.io/sample-controller => ../sample-controller
 )
