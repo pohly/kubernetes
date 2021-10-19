@@ -39,6 +39,7 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/klog/v2"
+	"k8s.io/klogr"
 )
 
 const (
@@ -140,6 +141,10 @@ type Config struct {
 	//
 	// socks5 proxying does not currently support spdy streaming endpoints.
 	Proxy func(*http.Request) (*url.URL, error)
+
+	// Logger is used instead of the global default logger from k8s.io/log
+	// if non-nil.
+	Logger *klogr.Logger
 
 	// Version forces a specific version to be used (if registered)
 	// Do we need this?
@@ -375,7 +380,13 @@ func RESTClientForConfigAndClient(config *Config, httpClient *http.Client) (*RES
 		Negotiator:         runtime.NewClientNegotiator(config.NegotiatedSerializer, gv),
 	}
 
-	restClient, err := NewRESTClient(baseURL, versionedAPIPath, clientContent, rateLimiter, httpClient)
+	var logger klogr.Logger
+	if config.Logger == nil {
+		logger = klogr.TODO()
+	} else {
+		logger = *config.Logger
+	}
+	restClient, err := NewRESTClientWithLogging(baseURL, versionedAPIPath, clientContent, rateLimiter, httpClient, logger)
 	if err == nil && config.WarningHandler != nil {
 		restClient.warningHandler = config.WarningHandler
 	}
@@ -442,7 +453,13 @@ func UnversionedRESTClientForConfigAndClient(config *Config, httpClient *http.Cl
 		Negotiator:         runtime.NewClientNegotiator(config.NegotiatedSerializer, gv),
 	}
 
-	restClient, err := NewRESTClient(baseURL, versionedAPIPath, clientContent, rateLimiter, httpClient)
+	var logger klogr.Logger
+	if config.Logger == nil {
+		logger = klogr.TODO()
+	} else {
+		logger = *config.Logger
+	}
+	restClient, err := NewRESTClientWithLogging(baseURL, versionedAPIPath, clientContent, rateLimiter, httpClient, logger)
 	if err == nil && config.WarningHandler != nil {
 		restClient.warningHandler = config.WarningHandler
 	}
@@ -623,6 +640,7 @@ func AnonymousClientConfig(config *Config) *Config {
 		Timeout:            config.Timeout,
 		Dial:               config.Dial,
 		Proxy:              config.Proxy,
+		Logger:             config.Logger,
 	}
 }
 
@@ -667,6 +685,7 @@ func CopyConfig(config *Config) *Config {
 		Timeout:            config.Timeout,
 		Dial:               config.Dial,
 		Proxy:              config.Proxy,
+		Logger:             config.Logger,
 	}
 	if config.ExecProvider != nil && config.ExecProvider.Config != nil {
 		c.ExecProvider.Config = config.ExecProvider.Config.DeepCopyObject()
