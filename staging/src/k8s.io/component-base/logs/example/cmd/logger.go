@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -26,12 +27,17 @@ import (
 	"k8s.io/component-base/cli"
 	"k8s.io/component-base/logs"
 	"k8s.io/klog/v2"
+	"k8s.io/klogr"
 
 	_ "k8s.io/component-base/logs/json/register"
 )
 
 func main() {
 	command := NewLoggerCommand()
+
+	// Intentionally broken: logging is not initialized yet.
+	klogr.DefaultLogger().Info("Oops, I shouldn't be logging yet!")
+
 	code := cli.Run(command)
 	os.Exit(code)
 }
@@ -46,14 +52,20 @@ func NewLoggerCommand() *cobra.Command {
 				os.Exit(1)
 			}
 			o.Apply()
-			runLogger()
+
+			// Initialize contextual logging.
+			ctx := context.Background()
+			logger := klogr.FromContext(ctx).WithName("example").WithValues("foo", "bar")
+			ctx = klogr.NewContext(ctx, logger)
+
+			runLogger(ctx)
 		},
 	}
 	o.AddFlags(cmd.Flags())
 	return cmd
 }
 
-func runLogger() {
+func runLogger(ctx context.Context) {
 	klog.Infof("Log using Infof, key: %s", "value")
 	klog.InfoS("Log using InfoS", "key", "value")
 	err := errors.New("fail")
@@ -62,6 +74,11 @@ func runLogger() {
 	data := SensitiveData{Key: "secret"}
 	klog.Infof("Log with sensitive key, data: %q", data)
 	klog.V(1).Info("Log less important message")
+
+	klogr.DefaultLogger().Info("Now the default logger is set, but using the one from the context is still better.")
+
+	logger := klogr.FromContext(ctx)
+	logger.Info("Log sensitive data through context", "data", data)
 }
 
 type SensitiveData struct {

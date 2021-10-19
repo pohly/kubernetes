@@ -25,6 +25,8 @@ import (
 	"k8s.io/component-base/config/v1alpha1"
 	"k8s.io/component-base/logs/registry"
 	"k8s.io/component-base/logs/sanitization"
+	"k8s.io/klogr"
+	"k8s.io/klogr/proxy"
 )
 
 // Options has klog format parameters
@@ -62,10 +64,13 @@ func (o *Options) Apply() {
 	factory, _ := registry.LogRegistry.Get(o.Config.Format)
 	if factory == nil {
 		klog.ClearLogger()
+		logger := proxy.New()
+		klogr.SetDefaultLogger(logger)
 	} else {
 		log, flush := factory.Create(o.Config.Options)
 		klog.SetLogger(log)
 		logrFlush = flush
+		klogr.SetDefaultLogger(log)
 	}
 	if o.Config.Sanitization {
 		klog.SetLogFilter(&sanitization.SanitizingFilter{})

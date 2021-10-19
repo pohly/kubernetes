@@ -52,6 +52,7 @@ replace (
 	k8s.io/component-base => ../component-base
 	k8s.io/controller-manager => ../controller-manager
 	k8s.io/csi-translation-lib => ../csi-translation-lib
+	k8s.io/klogr => ../klogr
 	k8s.io/legacy-cloud-providers => ../legacy-cloud-providers
 	k8s.io/mount-utils => ../mount-utils
 )

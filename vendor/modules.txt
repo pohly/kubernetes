@@ -2020,6 +2020,9 @@ k8s.io/gengo/types
 # k8s.io/klog/v2 v2.30.0 => k8s.io/klog/v2 v2.30.0
 ## explicit
 k8s.io/klog/v2
+# k8s.io/klogr v0.0.0 => ./staging/src/k8s.io/klogr
+k8s.io/klogr
+k8s.io/klogr/proxy
 # k8s.io/kube-aggregator v0.0.0 => ./staging/src/k8s.io/kube-aggregator
 ## explicit
 k8s.io/kube-aggregator/pkg/apis/apiregistration
@@ -2762,6 +2765,7 @@ sigs.k8s.io/yaml
 # k8s.io/csi-translation-lib => ./staging/src/k8s.io/csi-translation-lib
 # k8s.io/gengo => k8s.io/gengo v0.0.0-20210813121822-485abfe95c7c
 # k8s.io/klog/v2 => k8s.io/klog/v2 v2.30.0
+# k8s.io/klogr => ./staging/src/k8s.io/klogr
 # k8s.io/kube-aggregator => ./staging/src/k8s.io/kube-aggregator
 # k8s.io/kube-controller-manager => ./staging/src/k8s.io/kube-controller-manager
 # k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20210817084001-7fbd8d59e5b8
