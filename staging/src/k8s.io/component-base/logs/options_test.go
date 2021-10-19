@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/klogr"
 )
 
 func TestFlags(t *testing.T) {
@@ -92,6 +93,7 @@ func TestOptions(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
+			defer klogr.Reset()
 			o := NewOptions()
 			fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
 			o.AddFlags(fs)
