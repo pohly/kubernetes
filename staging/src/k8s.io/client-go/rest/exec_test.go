@@ -22,6 +22,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -334,6 +335,14 @@ func TestConfigToExecClusterRoundtrip(t *testing.T) {
 		}
 		actual.ExecProvider = nil
 		expected.ExecProvider = nil
+
+		if actual.Logger != nil {
+			if !reflect.DeepEqual(actual.Logger, expected.Logger) {
+				t.Fatalf("dropped the Logger field")
+			}
+		}
+		actual.Logger = nil
+		expected.Logger = nil
 
 		if diff := cmp.Diff(actual, expected); diff != "" {
 			t.Fatalf("we dropped some Config fields during roundtrip, -got, +want:\n %s", diff)
