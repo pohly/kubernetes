@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/klog/v2"
 )
 
 // CreateHTTPClient creates an http.Client that will invoke the provided roundTripper func
@@ -62,6 +63,17 @@ type RESTClient struct {
 	Client *http.Client
 	// Resp is returned to the caller after Req is recorded, unless Err or Client are set.
 	Resp *http.Response
+
+	// Logger is used when constructing a request. If not set, the default
+	// from k8s.io/klog is used.
+	Logger *klog.Logger
+}
+
+func (c *RESTClient) LoggerOrFallback() klog.Logger {
+	if c.Logger != nil {
+		return *c.Logger
+	}
+	return klog.Background()
 }
 
 func (c *RESTClient) Get() *restclient.Request {
@@ -102,7 +114,7 @@ func (c *RESTClient) Request() *restclient.Request {
 		GroupVersion: c.GroupVersion,
 		Negotiator:   runtime.NewClientNegotiator(c.NegotiatedSerializer, c.GroupVersion),
 	}
-	return restclient.NewRequestWithClient(&url.URL{Scheme: "https", Host: "localhost"}, c.VersionedAPIPath, config, CreateHTTPClient(c.do))
+	return restclient.NewRequestWithClient(&url.URL{Scheme: "https", Host: "localhost"}, c.VersionedAPIPath, config, CreateHTTPClient(c.do), c.LoggerOrFallback())
 }
 
 // do is invoked when a Request() created by this client is executed.
