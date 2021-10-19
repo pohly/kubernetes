@@ -31,6 +31,7 @@ require (
 	k8s.io/apimachinery v0.0.0
 	k8s.io/client-go v0.0.0
 	k8s.io/klog/v2 v2.40.1
+	k8s.io/klogr v0.0.0
 	k8s.io/utils v0.0.0-20211208161948-7d6a63dca704
 )
 
@@ -39,4 +40,5 @@ replace (
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/client-go => ../client-go
 	k8s.io/component-base => ../component-base
+	k8s.io/klogr => ../klogr
 )
