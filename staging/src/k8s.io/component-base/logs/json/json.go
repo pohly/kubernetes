@@ -62,6 +62,7 @@ func NewJSONLogger(infoStream, errorStream zapcore.WriteSyncer) (logr.Logger, fu
 var encoderConfig = zapcore.EncoderConfig{
 	MessageKey:     "msg",
 	CallerKey:      "caller",
+	NameKey:        "logger",
 	TimeKey:        "ts",
 	EncodeTime:     epochMillisTimeEncoder,
 	EncodeDuration: zapcore.StringDurationEncoder,
