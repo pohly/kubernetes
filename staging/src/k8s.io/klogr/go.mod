@@ -6,7 +6,7 @@ go 1.16
 
 require (
 	github.com/go-logr/logr v1.2.0
-	k8s.io/klog/v2 v2.30.0 // indirect
+	k8s.io/klog/v2 v2.30.0
 )
 
 replace k8s.io/klogr => ../klogr
