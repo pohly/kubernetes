@@ -30,6 +30,7 @@ import (
 	"github.com/go-logr/logr"
 
 	"k8s.io/klog/v2"
+	"k8s.io/klogr/logger"
 	"k8s.io/klogr/proxy"
 )
 
@@ -161,10 +162,7 @@ func TestOutput(t *testing.T) {
 		"regular error types when using logr.Error": {
 			text: "test",
 			err:  errors.New("whoops"),
-			// The message is printed to three different log files (info, warning, error), so we see it three times in our output buffer.
 			expectedOutput: `E klogr_test.go:<LINE>] "test" err="whoops"
-E klogr_test.go:<LINE>] "test" err="whoops"
-E klogr_test.go:<LINE>] "test" err="whoops"
 `,
 		},
 	}
@@ -210,15 +208,15 @@ E klogr_test.go:<LINE>] "test" err="whoops"
 			}
 			_, _, printWithKlogLine, _ := runtime.Caller(0)
 
-			testOutput := func(t *testing.T, expectedLine int, print func()) {
+			testOutput := func(t *testing.T, expectedLine int, print func(buffer *bytes.Buffer)) {
 				var tmpWriteBuffer bytes.Buffer
 				klog.SetOutput(&tmpWriteBuffer)
-				print()
+				print(&tmpWriteBuffer)
 				klog.Flush()
 
 				actual := tmpWriteBuffer.String()
 				// Strip varying header.
-				re := `(.).... ..:..:......... ....... klogr_test.go`
+				re := `^(.).... ..:..:......... ....... klogr_test.go`
 				actual = regexp.MustCompile(re).ReplaceAllString(actual, `${1} klogr_test.go`)
 
 				// Inject expected line. This matches the `if test.err != nil` check above.
@@ -236,15 +234,45 @@ E klogr_test.go:<LINE>] "test" err="whoops"
 				}
 			}
 
+			stripDuplicateErrors := func(buffer *bytes.Buffer) {
+				// klog writes errors three times into the
+				// buffer, once for each severity level (info,
+				// warning, error).
+				if test.err == nil {
+					return
+				}
+				actual := buffer.String()
+				parts := strings.Split(actual, "\n")
+				for i := range parts {
+					if parts[i] != "" && parts[i] != parts[0] {
+						// Mismatched lines. Don't change anything.
+						return
+					}
+				}
+				buffer.Truncate(len(parts[0]) + 1)
+			}
+
 			t.Run("proxy", func(t *testing.T) {
-				testOutput(t, printWithLoggerLine, func() {
+				testOutput(t, printWithLoggerLine, func(buffer *bytes.Buffer) {
 					printWithLogger(proxy.New())
+					stripDuplicateErrors(buffer)
+				})
+			})
+
+			t.Run("logger", func(t *testing.T) {
+				testOutput(t, printWithLoggerLine, func(buffer *bytes.Buffer) {
+					printWithLogger(logger.New(
+						logger.Options{
+							Output: buffer,
+							V:      10,
+						}))
 				})
 			})
 
 			t.Run("klog", func(t *testing.T) {
-				testOutput(t, printWithKlogLine, func() {
+				testOutput(t, printWithKlogLine, func(buffer *bytes.Buffer) {
 					printWithKlog()
+					stripDuplicateErrors(buffer)
 				})
 			})
 		})
