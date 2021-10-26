@@ -18,9 +18,11 @@ package klogr
 
 import (
 	"context"
+	"os"
 
 	"github.com/go-logr/logr"
-	"k8s.io/klogr/proxy"
+
+	"k8s.io/klogr/logger"
 )
 
 var (
@@ -106,5 +108,7 @@ func Reset() {
 }
 
 func newFallbackLogger() Logger {
-	return proxy.New().WithName(InitLogPrefix)
+	return logger.New(logger.Options{
+		Output: os.Stderr,
+	}).WithName(InitLogPrefix)
 }
