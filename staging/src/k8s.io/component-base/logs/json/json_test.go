@@ -69,7 +69,7 @@ func TestZapLoggerInfo(t *testing.T) {
 	for _, data := range testDataInfo {
 		var buffer bytes.Buffer
 		writer := zapcore.AddSync(&buffer)
-		sampleInfoLogger, _ := NewJSONLogger(writer, nil)
+		sampleInfoLogger, _ := NewJSONLogger(0, writer, nil)
 		sampleInfoLogger.Info(data.msg, data.keysValues...)
 		logStr := buffer.String()
 
@@ -99,7 +99,7 @@ func TestZapLoggerInfo(t *testing.T) {
 
 // TestZapLoggerEnabled test ZapLogger enabled
 func TestZapLoggerEnabled(t *testing.T) {
-	sampleInfoLogger, _ := NewJSONLogger(nil, nil)
+	sampleInfoLogger, _ := NewJSONLogger(0, nil, nil)
 	for i := 0; i < 11; i++ {
 		if !sampleInfoLogger.V(i).Enabled() {
 			t.Errorf("V(%d).Info should be enabled", i)
@@ -116,7 +116,7 @@ func TestZapLoggerV(t *testing.T) {
 	for i := 0; i < 11; i++ {
 		var buffer bytes.Buffer
 		writer := zapcore.AddSync(&buffer)
-		sampleInfoLogger, _ := NewJSONLogger(writer, nil)
+		sampleInfoLogger, _ := NewJSONLogger(0, writer, nil)
 		sampleInfoLogger.V(i).Info("test", "ns", "default", "podnum", 2, "time", time.Microsecond)
 		logStr := buffer.String()
 		var v, lineNo int
@@ -143,7 +143,7 @@ func TestZapLoggerError(t *testing.T) {
 	timeNow = func() time.Time {
 		return time.Date(1970, time.January, 1, 0, 0, 0, 123, time.UTC)
 	}
-	sampleInfoLogger, _ := NewJSONLogger(writer, nil)
+	sampleInfoLogger, _ := NewJSONLogger(0, writer, nil)
 	sampleInfoLogger.Error(fmt.Errorf("invalid namespace:%s", "default"), "wrong namespace", "ns", "default", "podnum", 2, "time", time.Microsecond)
 	logStr := buffer.String()
 	var ts float64
@@ -161,7 +161,7 @@ func TestZapLoggerError(t *testing.T) {
 
 func TestZapLoggerStreams(t *testing.T) {
 	var infoBuffer, errorBuffer bytes.Buffer
-	log, _ := NewJSONLogger(zapcore.AddSync(&infoBuffer), zapcore.AddSync(&errorBuffer))
+	log, _ := NewJSONLogger(0, zapcore.AddSync(&infoBuffer), zapcore.AddSync(&errorBuffer))
 
 	log.Error(fmt.Errorf("some error"), "failed")
 	log.Info("hello world")
