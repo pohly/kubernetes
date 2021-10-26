@@ -2065,7 +2065,8 @@ k8s.io/klog/v2
 # k8s.io/klogr v0.0.0 => ./staging/src/k8s.io/klogr
 ## explicit
 k8s.io/klogr
-k8s.io/klogr/proxy
+k8s.io/klogr/internal/serialize
+k8s.io/klogr/logger
 # k8s.io/kube-aggregator v0.0.0 => ./staging/src/k8s.io/kube-aggregator
 ## explicit
 k8s.io/kube-aggregator/pkg/apis/apiregistration

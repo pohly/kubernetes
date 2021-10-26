@@ -36,11 +36,14 @@ var (
 
 // NewJSONLogger creates a new json logr.Logger and its associated
 // flush function. The separate error stream is optional and may be nil.
-func NewJSONLogger(infoStream, errorStream zapcore.WriteSyncer) (logr.Logger, func()) {
+func NewJSONLogger(v config.VerbosityLevel, infoStream, errorStream zapcore.WriteSyncer) (logr.Logger, func()) {
+	// zap levels are inverted: everything with a verbosity >= threshold gets logged.
+	zapV := -zapcore.Level(v)
+
 	encoder := zapcore.NewJSONEncoder(encoderConfig)
 	var core zapcore.Core
 	if errorStream == nil {
-		core = zapcore.NewCore(encoder, zapcore.AddSync(infoStream), zapcore.Level(-127))
+		core = zapcore.NewCore(encoder, zapcore.AddSync(infoStream), zapV)
 	} else {
 		// Set up writing of error messages to stderr and info messages
 		// to stdout. Info messages get optionally buffered and flushed
@@ -55,10 +58,10 @@ func NewJSONLogger(infoStream, errorStream zapcore.WriteSyncer) (logr.Logger, fu
 			other:       infoStream,
 		}
 		highPriority := zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
-			return lvl >= zapcore.ErrorLevel
+			return lvl >= zapcore.ErrorLevel && lvl >= zapV
 		})
 		lowPriority := zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
-			return lvl < zapcore.ErrorLevel
+			return lvl < zapcore.ErrorLevel && lvl >= zapV
 		})
 		core = zapcore.NewTee(
 			zapcore.NewCore(encoder, flushError, highPriority),
@@ -92,11 +95,11 @@ type Factory struct{}
 
 var _ registry.LogFormatFactory = Factory{}
 
-func (f Factory) Create(options config.FormatOptions) (logr.Logger, func()) {
-	if options.JSON.SplitStream {
+func (f Factory) Create(c config.LoggingConfiguration) (logr.Logger, func()) {
+	if c.Options.JSON.SplitStream {
 		// stdout for info messages, stderr for errors.
 		infoStream := zapcore.Lock(os.Stdout)
-		size := options.JSON.InfoBufferSize.Value()
+		size := c.Options.JSON.InfoBufferSize.Value()
 		if size > 0 {
 			// Prevent integer overflow.
 			if size > 2*1024*1024*1024 {
@@ -107,12 +110,12 @@ func (f Factory) Create(options config.FormatOptions) (logr.Logger, func()) {
 				Size: int(size),
 			}
 		}
-		return NewJSONLogger(infoStream, zapcore.Lock(os.Stderr))
+		return NewJSONLogger(c.Verbosity, infoStream, zapcore.Lock(os.Stderr))
 	}
 	// The default is to write to stderr (same as in klog's text output,
 	// doesn't get mixed with normal program output).
 	out := zapcore.Lock(os.Stderr)
-	return NewJSONLogger(out, out)
+	return NewJSONLogger(c.Verbosity, out, out)
 }
 
 // writeWithFlushing is a wrapper around an output stream which flushes another
