@@ -59,6 +59,11 @@ func TestZapLoggerInfo(t *testing.T) {
 			format:     "{\"ts\":%f,\"caller\":\"json/json_test.go:%d\",\"msg\":\"test for duration value argument\",\"v\":0,\"duration\":\"5s\"}\n",
 			keysValues: []interface{}{"duration", time.Duration(5 * time.Second)},
 		},
+		{
+			msg:        "test for duplicate keys",
+			format:     "{\"ts\":%f,\"caller\":\"json/json_test.go:%d\",\"msg\":\"test for duplicate keys\",\"v\":0,\"akey\":\"avalue\",\"akey\":\"anothervalue\"}\n",
+			keysValues: []interface{}{"akey", "avalue", "akey", "anothervalue"},
+		},
 	}
 
 	for _, data := range testDataInfo {
