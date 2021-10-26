@@ -43,7 +43,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/klog/v2"
+	"k8s.io/klogr"
 	"k8s.io/kubernetes/pkg/controller"
 	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
@@ -124,10 +124,6 @@ var (
 	zone1Labels = map[string]string{v1.LabelFailureDomainBetaZone: "us-east-1", v1.LabelFailureDomainBetaRegion: "us-east-1a"}
 )
 
-func init() {
-	klog.InitFlags(nil)
-}
-
 type testEnv struct {
 	client                  clientset.Interface
 	reactor                 *pvtesting.VolumeReactor
@@ -144,7 +140,8 @@ type testEnv struct {
 	internalCSIStorageCapacityInformer storageinformersv1beta1.CSIStorageCapacityInformer
 }
 
-func newTestBinder(t *testing.T, stopCh <-chan struct{}, csiStorageCapacity ...bool) *testEnv {
+func newTestBinder(t *testing.T, ctx context.Context, csiStorageCapacity ...bool) *testEnv {
+	logger := klogr.FromContext(ctx)
 	client := &fake.Clientset{}
 	reactor := pvtesting.NewVolumeReactor(client, nil, nil, nil)
 	// TODO refactor all tests to use real watch mechanism, see #72327
@@ -185,10 +182,10 @@ func newTestBinder(t *testing.T, stopCh <-chan struct{}, csiStorageCapacity ...b
 		10*time.Second)
 
 	// Wait for informers cache sync
-	informerFactory.Start(stopCh)
-	for v, synced := range informerFactory.WaitForCacheSync(stopCh) {
+	informerFactory.Start(ctx.Done())
+	for v, synced := range informerFactory.WaitForCacheSync(ctx.Done()) {
 		if !synced {
-			klog.ErrorS(nil, "Error syncing informer", "informer", v)
+			logger.Error(nil, "Error syncing informer", "informer", v)
 			os.Exit(1)
 		}
 	}
@@ -812,15 +809,15 @@ func checkReasons(t *testing.T, actual, expected ConflictReasons) {
 }
 
 // findPodVolumes gets and finds volumes for given pod and node
-func findPodVolumes(binder SchedulerVolumeBinder, pod *v1.Pod, node *v1.Node) (*PodVolumes, ConflictReasons, error) {
-	boundClaims, claimsToBind, unboundClaimsImmediate, err := binder.GetPodVolumes(pod)
+func findPodVolumes(logger klogr.Logger, binder SchedulerVolumeBinder, pod *v1.Pod, node *v1.Node) (*PodVolumes, ConflictReasons, error) {
+	boundClaims, claimsToBind, unboundClaimsImmediate, err := binder.GetPodVolumes(logger, pod)
 	if err != nil {
 		return nil, nil, err
 	}
 	if len(unboundClaimsImmediate) > 0 {
 		return nil, nil, fmt.Errorf("pod has unbound immediate PersistentVolumeClaims")
 	}
-	return binder.FindPodVolumes(pod, boundClaims, claimsToBind, node)
+	return binder.FindPodVolumes(logger, pod, boundClaims, claimsToBind, node)
 }
 
 func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
@@ -972,11 +969,12 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 	}
 
 	run := func(t *testing.T, scenario scenarioType, csiStorageCapacity bool, csiDriver *storagev1.CSIDriver) {
-		ctx, cancel := context.WithCancel(context.Background())
+		logger, ctx := klogr.NewTestContext(t)
+		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
 		// Setup
-		testEnv := newTestBinder(t, ctx.Done(), csiStorageCapacity)
+		testEnv := newTestBinder(t, ctx, csiStorageCapacity)
 		testEnv.initVolumes(scenario.pvs, scenario.pvs)
 		if csiDriver != nil {
 			testEnv.addCSIDriver(csiDriver)
@@ -997,7 +995,7 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 		}
 
 		// Execute
-		podVolumes, reasons, err := findPodVolumes(testEnv.binder, scenario.pod, testNode)
+		podVolumes, reasons, err := findPodVolumes(logger, testEnv.binder, scenario.pod, testNode)
 
 		// Validate
 		if !scenario.shouldFail && err != nil {
@@ -1103,11 +1101,12 @@ func TestFindPodVolumesWithProvisioning(t *testing.T) {
 	}
 
 	run := func(t *testing.T, scenario scenarioType, csiStorageCapacity bool, csiDriver *storagev1.CSIDriver) {
-		ctx, cancel := context.WithCancel(context.Background())
+		logger, ctx := klogr.NewTestContext(t)
+		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
 		// Setup
-		testEnv := newTestBinder(t, ctx.Done(), csiStorageCapacity)
+		testEnv := newTestBinder(t, ctx, csiStorageCapacity)
 		testEnv.initVolumes(scenario.pvs, scenario.pvs)
 		if csiDriver != nil {
 			testEnv.addCSIDriver(csiDriver)
@@ -1128,7 +1127,7 @@ func TestFindPodVolumesWithProvisioning(t *testing.T) {
 		}
 
 		// Execute
-		podVolumes, reasons, err := findPodVolumes(testEnv.binder, scenario.pod, testNode)
+		podVolumes, reasons, err := findPodVolumes(logger, testEnv.binder, scenario.pod, testNode)
 
 		// Validate
 		if !scenario.shouldFail && err != nil {
@@ -1214,14 +1213,15 @@ func TestFindPodVolumesWithCSIMigration(t *testing.T) {
 	}
 
 	run := func(t *testing.T, scenario scenarioType) {
-		ctx, cancel := context.WithCancel(context.Background())
+		logger, ctx := klogr.NewTestContext(t)
+		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
 		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, true)()
 		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationGCE, true)()
 
 		// Setup
-		testEnv := newTestBinder(t, ctx.Done())
+		testEnv := newTestBinder(t, ctx)
 		testEnv.initVolumes(scenario.pvs, scenario.pvs)
 
 		var node *v1.Node
@@ -1251,7 +1251,7 @@ func TestFindPodVolumesWithCSIMigration(t *testing.T) {
 		}
 
 		// Execute
-		_, reasons, err := findPodVolumes(testEnv.binder, scenario.pod, node)
+		_, reasons, err := findPodVolumes(logger, testEnv.binder, scenario.pod, node)
 
 		// Validate
 		if !scenario.shouldFail && err != nil {
@@ -1334,11 +1334,12 @@ func TestAssumePodVolumes(t *testing.T) {
 	}
 
 	run := func(t *testing.T, scenario scenarioType) {
-		ctx, cancel := context.WithCancel(context.Background())
+		logger, ctx := klogr.NewTestContext(t)
+		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
 		// Setup
-		testEnv := newTestBinder(t, ctx.Done())
+		testEnv := newTestBinder(t, ctx)
 		testEnv.initClaims(scenario.podPVCs, scenario.podPVCs)
 		pod := makePod("test-pod").
 			withNamespace("testns").
@@ -1351,7 +1352,7 @@ func TestAssumePodVolumes(t *testing.T) {
 		testEnv.initVolumes(scenario.pvs, scenario.pvs)
 
 		// Execute
-		allBound, err := testEnv.binder.AssumePodVolumes(pod, "node1", podVolumes)
+		allBound, err := testEnv.binder.AssumePodVolumes(logger, pod, "node1", podVolumes)
 
 		// Validate
 		if !scenario.shouldFail && err != nil {
@@ -1383,7 +1384,8 @@ func TestAssumePodVolumes(t *testing.T) {
 }
 
 func TestRevertAssumedPodVolumes(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	logger, ctx := klogr.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	podPVCs := []*v1.PersistentVolumeClaim{unboundPVC, provisionedPVC}
@@ -1394,7 +1396,7 @@ func TestRevertAssumedPodVolumes(t *testing.T) {
 	expectedProvisionings := []*v1.PersistentVolumeClaim{selectedNodePVC}
 
 	// Setup
-	testEnv := newTestBinder(t, ctx.Done())
+	testEnv := newTestBinder(t, ctx)
 	testEnv.initClaims(podPVCs, podPVCs)
 	pod := makePod("test-pod").
 		withNamespace("testns").
@@ -1406,13 +1408,13 @@ func TestRevertAssumedPodVolumes(t *testing.T) {
 	}
 	testEnv.initVolumes(pvs, pvs)
 
-	allbound, err := testEnv.binder.AssumePodVolumes(pod, "node1", podVolumes)
+	allbound, err := testEnv.binder.AssumePodVolumes(logger, pod, "node1", podVolumes)
 	if allbound || err != nil {
 		t.Errorf("No volumes are assumed")
 	}
 	testEnv.validateAssume(t, pod, expectedBindings, expectedProvisionings)
 
-	testEnv.binder.RevertAssumedPodVolumes(podVolumes)
+	testEnv.binder.RevertAssumedPodVolumes(logger, podVolumes)
 	testEnv.validateCacheRestored(t, pod, bindings, provisionedPVCs)
 }
 
@@ -1511,11 +1513,12 @@ func TestBindAPIUpdate(t *testing.T) {
 	}
 
 	run := func(t *testing.T, scenario scenarioType) {
-		ctx, cancel := context.WithCancel(context.Background())
+		logger, ctx := klogr.NewTestContext(t)
+		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
 		// Setup
-		testEnv := newTestBinder(t, ctx.Done())
+		testEnv := newTestBinder(t, ctx)
 		pod := makePod("test-pod").
 			withNamespace("testns").
 			withNodeName("node1").Pod
@@ -1530,7 +1533,7 @@ func TestBindAPIUpdate(t *testing.T) {
 		testEnv.assumeVolumes(t, "node1", pod, scenario.bindings, scenario.provisionedPVCs)
 
 		// Execute
-		err := testEnv.internalBinder.bindAPIUpdate(pod, scenario.bindings, scenario.provisionedPVCs)
+		err := testEnv.internalBinder.bindAPIUpdate(logger, pod.Name, scenario.bindings, scenario.provisionedPVCs)
 
 		// Validate
 		if !scenario.shouldFail && err != nil {
@@ -1709,14 +1712,15 @@ func TestCheckBindings(t *testing.T) {
 	}
 
 	run := func(t *testing.T, scenario scenarioType) {
-		ctx, cancel := context.WithCancel(context.Background())
+		logger, ctx := klogr.NewTestContext(t)
+		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
 		// Setup
 		pod := makePod("test-pod").
 			withNamespace("testns").
 			withNodeName("node1").Pod
-		testEnv := newTestBinder(t, ctx.Done())
+		testEnv := newTestBinder(t, ctx)
 		testEnv.internalPodInformer.Informer().GetIndexer().Add(pod)
 		testEnv.initNodes([]*v1.Node{node1})
 		testEnv.initVolumes(scenario.initPVs, nil)
@@ -1736,7 +1740,7 @@ func TestCheckBindings(t *testing.T) {
 		}
 
 		// Execute
-		allBound, err := testEnv.internalBinder.checkBindings(pod, scenario.bindings, scenario.provisionedPVCs)
+		allBound, err := testEnv.internalBinder.checkBindings(logger, pod, scenario.bindings, scenario.provisionedPVCs)
 
 		// Validate
 		if !scenario.shouldFail && err != nil {
@@ -1837,7 +1841,8 @@ func TestCheckBindingsWithCSIMigration(t *testing.T) {
 	}
 
 	run := func(t *testing.T, scenario scenarioType) {
-		ctx, cancel := context.WithCancel(context.Background())
+		logger, ctx := klogr.NewTestContext(t)
+		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
 		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, scenario.migrationEnabled)()
@@ -1847,7 +1852,7 @@ func TestCheckBindingsWithCSIMigration(t *testing.T) {
 		pod := makePod("test-pod").
 			withNamespace("testns").
 			withNodeName("node1").Pod
-		testEnv := newTestBinder(t, ctx.Done())
+		testEnv := newTestBinder(t, ctx)
 		testEnv.internalPodInformer.Informer().GetIndexer().Add(pod)
 		testEnv.initNodes(scenario.initNodes)
 		testEnv.initCSINodes(scenario.initCSINodes)
@@ -1860,7 +1865,7 @@ func TestCheckBindingsWithCSIMigration(t *testing.T) {
 		testEnv.updateClaims(t, scenario.apiPVCs, true)
 
 		// Execute
-		allBound, err := testEnv.internalBinder.checkBindings(pod, scenario.bindings, scenario.provisionedPVCs)
+		allBound, err := testEnv.internalBinder.checkBindings(logger, pod, scenario.bindings, scenario.provisionedPVCs)
 
 		// Validate
 		if !scenario.shouldFail && err != nil {
@@ -2026,14 +2031,15 @@ func TestBindPodVolumes(t *testing.T) {
 	}
 
 	run := func(t *testing.T, scenario scenarioType) {
-		ctx, cancel := context.WithCancel(context.Background())
+		logger, ctx := klogr.NewTestContext(t)
+		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
 		// Setup
 		pod := makePod("test-pod").
 			withNamespace("testns").
 			withNodeName("node1").Pod
-		testEnv := newTestBinder(t, ctx.Done())
+		testEnv := newTestBinder(t, ctx)
 		testEnv.internalPodInformer.Informer().GetIndexer().Add(pod)
 		if scenario.nodes == nil {
 			scenario.nodes = []*v1.Node{node1}
@@ -2071,7 +2077,7 @@ func TestBindPodVolumes(t *testing.T) {
 			go func(scenario scenarioType) {
 				time.Sleep(5 * time.Second)
 				// Sleep a while to run after bindAPIUpdate in BindPodVolumes
-				klog.V(5).InfoS("Running delay function")
+				logger.V(5).Info("Running delay function")
 				scenario.delayFunc(t, testEnv, pod, scenario.initPVs, scenario.initPVCs)
 			}(scenario)
 		}
@@ -2081,7 +2087,7 @@ func TestBindPodVolumes(t *testing.T) {
 			StaticBindings:    bindings,
 			DynamicProvisions: claimsToProvision,
 		}
-		err := testEnv.binder.BindPodVolumes(pod, podVolumes)
+		err := testEnv.binder.BindPodVolumes(logger, pod, podVolumes)
 
 		// Validate
 		if !scenario.shouldFail && err != nil {
@@ -2107,9 +2113,10 @@ func TestFindAssumeVolumes(t *testing.T) {
 	pvs := []*v1.PersistentVolume{pvNode2, pvNode1a, pvNode1c}
 
 	// Setup
-	ctx, cancel := context.WithCancel(context.Background())
+	logger, ctx := klogr.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	testEnv := newTestBinder(t, ctx.Done())
+	testEnv := newTestBinder(t, ctx)
 	testEnv.initVolumes(pvs, pvs)
 	testEnv.initClaims(podPVCs, podPVCs)
 	pod := makePod("test-pod").
@@ -2128,7 +2135,7 @@ func TestFindAssumeVolumes(t *testing.T) {
 
 	// Execute
 	// 1. Find matching PVs
-	podVolumes, reasons, err := findPodVolumes(testEnv.binder, pod, testNode)
+	podVolumes, reasons, err := findPodVolumes(logger, testEnv.binder, pod, testNode)
 	if err != nil {
 		t.Errorf("Test failed: FindPodVolumes returned error: %v", err)
 	}
@@ -2138,7 +2145,7 @@ func TestFindAssumeVolumes(t *testing.T) {
 	expectedBindings := podVolumes.StaticBindings
 
 	// 2. Assume matches
-	allBound, err := testEnv.binder.AssumePodVolumes(pod, testNode.Name, podVolumes)
+	allBound, err := testEnv.binder.AssumePodVolumes(logger, pod, testNode.Name, podVolumes)
 	if err != nil {
 		t.Errorf("Test failed: AssumePodVolumes returned error: %v", err)
 	}
@@ -2154,7 +2161,7 @@ func TestFindAssumeVolumes(t *testing.T) {
 	// This should always return the original chosen pv
 	// Run this many times in case sorting returns different orders for the two PVs.
 	for i := 0; i < 50; i++ {
-		podVolumes, reasons, err := findPodVolumes(testEnv.binder, pod, testNode)
+		podVolumes, reasons, err := findPodVolumes(logger, testEnv.binder, pod, testNode)
 		if err != nil {
 			t.Errorf("Test failed: FindPodVolumes returned error: %v", err)
 		}
@@ -2264,11 +2271,12 @@ func TestCapacity(t *testing.T) {
 
 	run := func(t *testing.T, scenario scenarioType, featureEnabled, optIn bool) {
 		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIStorageCapacity, featureEnabled)()
-		ctx, cancel := context.WithCancel(context.Background())
+		logger, ctx := klogr.NewTestContext(t)
+		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
 		// Setup: the driver has the feature enabled, but the scheduler might not.
-		testEnv := newTestBinder(t, ctx.Done(), featureEnabled)
+		testEnv := newTestBinder(t, ctx, featureEnabled)
 		testEnv.addCSIDriver(makeCSIDriver(provisioner, optIn))
 		testEnv.addCSIStorageCapacities(scenario.capacities)
 
@@ -2282,7 +2290,7 @@ func TestCapacity(t *testing.T) {
 			withPVCSVolume(scenario.pvcs).Pod
 
 		// Execute
-		podVolumes, reasons, err := findPodVolumes(testEnv.binder, pod, testNode)
+		podVolumes, reasons, err := findPodVolumes(logger, testEnv.binder, pod, testNode)
 
 		// Validate
 		shouldFail := scenario.shouldFail
