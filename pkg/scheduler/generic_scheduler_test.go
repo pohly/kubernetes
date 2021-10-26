@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	ktesting "k8s.io/klogr/testing"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -976,7 +977,7 @@ func TestGenericScheduler(t *testing.T) {
 				cache.AddNode(node)
 			}
 
-			ctx := context.Background()
+			logger, ctx := ktesting.NewTestContext(t)
 			cs := clientsetfake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(cs, 0)
 			for _, pvc := range test.pvcs {
@@ -993,6 +994,7 @@ func TestGenericScheduler(t *testing.T) {
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
+				frameworkruntime.WithLogger(logger),
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -1080,6 +1082,7 @@ func TestFindFitAllError(t *testing.T) {
 }
 
 func TestFindFitSomeError(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	nodes := makeNodeList([]string{"3", "2", "1"})
 	scheduler := makeScheduler(nodes)
 	fwk, err := st.NewFramework(
@@ -1091,6 +1094,7 @@ func TestFindFitSomeError(t *testing.T) {
 		},
 		"",
 		frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(nil)),
+		frameworkruntime.WithLogger(logger),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1148,6 +1152,7 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
 			nodes := makeNodeList([]string{"1"})
 
 			plugin := st.FakeFilterPlugin{}
@@ -1165,6 +1170,7 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 			fwk, err := st.NewFramework(
 				registerPlugins, "",
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(nil)),
+				frameworkruntime.WithLogger(logger),
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -1303,6 +1309,7 @@ func TestZeroRequest(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
 			client := clientsetfake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 
@@ -1322,6 +1329,7 @@ func TestZeroRequest(t *testing.T) {
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithClientSet(client),
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
+				frameworkruntime.WithLogger(logger),
 			)
 			if err != nil {
 				t.Fatalf("error creating framework: %+v", err)
@@ -1409,6 +1417,7 @@ func TestNumFeasibleNodesToFind(t *testing.T) {
 }
 
 func TestFairEvaluationForNodes(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	numAllNodes := 500
 	nodeNames := make([]string, 0, numAllNodes)
 	for i := 0; i < numAllNodes; i++ {
@@ -1424,6 +1433,7 @@ func TestFairEvaluationForNodes(t *testing.T) {
 		},
 		"",
 		frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(nil)),
+		frameworkruntime.WithLogger(logger),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1476,6 +1486,7 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
 			// create three nodes in the cluster.
 			nodes := makeNodeList([]string{"node1", "node2", "node3"})
 			client := clientsetfake.NewSimpleClientset(test.pod)
@@ -1500,6 +1511,7 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 				registerPlugins, "",
 				frameworkruntime.WithClientSet(client),
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
+				frameworkruntime.WithLogger(logger),
 			)
 			if err != nil {
 				t.Fatal(err)
