@@ -79,7 +79,7 @@ func runLogger(ctx context.Context) {
 	klogr.TODO().Info("Now the default logger is set, but using the one from the context is still better.")
 
 	logger := klogr.FromContext(ctx)
-	logger.Info("Log sensitive data through context", "data", data)
+	logger.Info("Log sensitive data through context - TODO (?): support sanitization", "data", data)
 }
 
 type SensitiveData struct {

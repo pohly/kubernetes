@@ -18,6 +18,7 @@ package logs
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/spf13/pflag"
 
@@ -29,7 +30,7 @@ import (
 	"k8s.io/component-base/logs/sanitization"
 	"k8s.io/klog/v2"
 	"k8s.io/klogr"
-	"k8s.io/klogr/proxy"
+	klogger "k8s.io/klogr/logger"
 )
 
 // Options has klog format parameters
@@ -82,12 +83,13 @@ func (o *Options) apply() {
 	// if log format not exists, use nil loggr
 	factory, _ := registry.LogRegistry.Get(o.Config.Format)
 	if factory == nil {
-		klog.ClearLogger()
-		logger := proxy.New()
+		logger := klogger.New(klogger.Options{
+			Output: os.Stderr,
+			V:      int(o.Config.Verbosity),
+		})
 		klogr.SetFallbackLogger(logger)
 	} else {
-		log, flush := factory.Create(o.Config.Options)
-		klog.SetLogger(log)
+		log, flush := factory.Create(o.Config)
 		logrFlush = flush
 		klogr.SetFallbackLogger(log)
 	}

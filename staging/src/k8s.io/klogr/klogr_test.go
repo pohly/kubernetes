@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
 	"regexp"
 	"runtime"
@@ -29,18 +28,8 @@ import (
 
 	"github.com/go-logr/logr"
 
-	"k8s.io/klog/v2"
 	"k8s.io/klogr/logger"
-	"k8s.io/klogr/proxy"
 )
-
-func init() {
-	klog.InitFlags(nil)
-	flag.Set("v", "10")
-	flag.Set("logtostderr", "false")
-	flag.Set("alsologtostderr", "false")
-	flag.Set("stderrthreshold", "10")
-}
 
 // TestOutput ensures that direct calls into klog and indirect calls via the
 // proxy logger produce the same output.
@@ -183,36 +172,9 @@ func TestOutput(t *testing.T) {
 			}
 			_, _, printWithLoggerLine, _ := runtime.Caller(0)
 
-			printWithKlog := func() {
-				kv := []interface{}{}
-				if len(test.withValues) > 0 {
-					kv = append(kv, test.withValues...)
-					if len(test.withValues)%2 != 0 {
-						kv = append(kv, "(MISSING)")
-					}
-				}
-				if len(test.values) > 0 {
-					kv = append(kv, test.values...)
-				}
-				text := test.text
-				if len(test.withNames) > 0 {
-					text = strings.Join(test.withNames, "/") + ": " + text
-				}
-				if test.withHelper {
-					klogHelper(text, kv)
-				} else if test.err != nil {
-					klog.ErrorS(test.err, text, kv...)
-				} else {
-					klog.V(klog.Level(test.v)).InfoS(text, kv...)
-				}
-			}
-			_, _, printWithKlogLine, _ := runtime.Caller(0)
-
 			testOutput := func(t *testing.T, expectedLine int, print func(buffer *bytes.Buffer)) {
 				var tmpWriteBuffer bytes.Buffer
-				klog.SetOutput(&tmpWriteBuffer)
 				print(&tmpWriteBuffer)
-				klog.Flush()
 
 				actual := tmpWriteBuffer.String()
 				// Strip varying header.
@@ -234,31 +196,6 @@ func TestOutput(t *testing.T) {
 				}
 			}
 
-			stripDuplicateErrors := func(buffer *bytes.Buffer) {
-				// klog writes errors three times into the
-				// buffer, once for each severity level (info,
-				// warning, error).
-				if test.err == nil {
-					return
-				}
-				actual := buffer.String()
-				parts := strings.Split(actual, "\n")
-				for i := range parts {
-					if parts[i] != "" && parts[i] != parts[0] {
-						// Mismatched lines. Don't change anything.
-						return
-					}
-				}
-				buffer.Truncate(len(parts[0]) + 1)
-			}
-
-			t.Run("proxy", func(t *testing.T) {
-				testOutput(t, printWithLoggerLine, func(buffer *bytes.Buffer) {
-					printWithLogger(proxy.New())
-					stripDuplicateErrors(buffer)
-				})
-			})
-
 			t.Run("logger", func(t *testing.T) {
 				testOutput(t, printWithLoggerLine, func(buffer *bytes.Buffer) {
 					printWithLogger(logger.New(
@@ -266,13 +203,6 @@ func TestOutput(t *testing.T) {
 							Output: buffer,
 							V:      10,
 						}))
-				})
-			})
-
-			t.Run("klog", func(t *testing.T) {
-				testOutput(t, printWithKlogLine, func(buffer *bytes.Buffer) {
-					printWithKlog()
-					stripDuplicateErrors(buffer)
 				})
 			})
 		})
@@ -311,8 +241,4 @@ func (e *customErrorJSON) MarshalJSON() ([]byte, error) {
 func loggerHelper(logger logr.Logger, msg string, kv []interface{}) {
 	logger = logger.WithCallDepth(1)
 	logger.Info(msg, kv...)
-}
-
-func klogHelper(msg string, kv []interface{}) {
-	klog.InfoSDepth(1, msg, kv...)
 }

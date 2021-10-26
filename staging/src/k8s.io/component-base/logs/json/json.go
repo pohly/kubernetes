@@ -36,17 +36,20 @@ var (
 
 // NewJSONLogger creates a new json logr.Logger and its associated
 // flush function. The separate error stream is optional and may be nil.
-func NewJSONLogger(infoStream, errorStream zapcore.WriteSyncer) (logr.Logger, func()) {
+func NewJSONLogger(v config.VerbosityLevel, infoStream, errorStream zapcore.WriteSyncer) (logr.Logger, func()) {
+	// zap levels are inverted: everything with a verbosity >= threshold gets logged.
+	zapV := -zapcore.Level(v)
+
 	encoder := zapcore.NewJSONEncoder(encoderConfig)
 	var core zapcore.Core
 	if errorStream == nil {
-		core = zapcore.NewCore(encoder, infoStream, zapcore.Level(-127))
+		core = zapcore.NewCore(encoder, infoStream, zapV)
 	} else {
 		highPriority := zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
-			return lvl >= zapcore.ErrorLevel
+			return lvl >= zapcore.ErrorLevel && lvl >= zapV
 		})
 		lowPriority := zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
-			return lvl < zapcore.ErrorLevel
+			return lvl < zapcore.ErrorLevel && lvl >= zapV
 		})
 		core = zapcore.NewTee(
 			zapcore.NewCore(encoder, errorStream, highPriority),
@@ -80,9 +83,9 @@ type Factory struct{}
 
 var _ registry.LogFormatFactory = Factory{}
 
-func (f Factory) Create(options config.FormatOptions) (logr.Logger, func()) {
+func (f Factory) Create(c config.LoggingConfiguration) (logr.Logger, func()) {
 	stderr := zapcore.Lock(os.Stderr)
-	if options.JSON.SplitStream {
+	if c.Options.JSON.SplitStream {
 		stdout := zapcore.Lock(os.Stdout)
 		size := options.JSON.InfoBufferSize.Value()
 		if size > 0 {
@@ -96,8 +99,8 @@ func (f Factory) Create(options config.FormatOptions) (logr.Logger, func()) {
 			}
 		}
 		// stdout for info messages, stderr for errors.
-		return NewJSONLogger(stdout, stderr)
+		return NewJSONLogger(c.Verbosity, stdout, stderr)
 	}
 	// Write info messages and errors to stderr to prevent mixing with normal program output.
-	return NewJSONLogger(stderr, nil)
+	return NewJSONLogger(c.Verbosity, stderr, nil)
 }
