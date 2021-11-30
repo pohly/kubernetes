@@ -85,7 +85,7 @@ func (o *Options) apply() {
 		logger := proxy.New()
 		klogr.SetFallbackLogger(logger)
 	} else {
-		log, flush := factory.Create(o.Config.Options)
+		log, flush := factory.Create(o.Config)
 		klog.SetLogger(log)
 		logrFlush = flush
 		klogr.SetFallbackLogger(log)
