@@ -236,7 +236,7 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 	}
 	allErrors = append(allErrors, metrics.ValidateShowHiddenMetricsVersion(kc.ShowHiddenMetricsForVersion)...)
 
-	if errs := kc.Logging.ValidateAsField(field.NewPath("logging")); len(errs) > 0 {
+	if errs := kc.Logging.ValidateAsField(localFeatureGate, field.NewPath("logging")); len(errs) > 0 {
 		allErrors = append(allErrors, errs.ToAggregate().Errors()...)
 	}
 

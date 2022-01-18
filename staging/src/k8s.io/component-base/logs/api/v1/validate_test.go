@@ -21,11 +21,26 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/component-base/featuregate"
 )
 
 func TestValidation(t *testing.T) {
+	jsonOptionsEnabled := LoggingConfiguration{
+		Format: "text",
+		Options: FormatOptions{
+			JSON: JSONOptions{
+				SplitStream: true,
+				InfoBufferSize: resource.QuantityValue{
+					Quantity: *resource.NewQuantity(1024, resource.DecimalSI),
+				},
+			},
+		},
+	}
+	jsonErrors := `[options.json.splitStream: Forbidden: Feature LoggingAlphaOptions is disabled, options.json.infoBufferSize: Forbidden: Feature LoggingAlphaOptions is disabled]`
 	testcases := map[string]struct {
 		config       LoggingConfiguration
+		featureGate  featuregate.FeatureGate
 		expectErrors string
 	}{
 		"okay": {
@@ -105,11 +120,29 @@ func TestValidation(t *testing.T) {
 			},
 			expectErrors: `[format: Invalid value: "json": Unsupported log format, vmodule: Forbidden: Only supported for text log format]`,
 		},
+		"JSON used, default gates": {
+			config:       jsonOptionsEnabled,
+			featureGate:  defaultFeatureGate,
+			expectErrors: jsonErrors,
+		},
+		"JSON used, disabled gates": {
+			config:       jsonOptionsEnabled,
+			featureGate:  disabledFeatureGate,
+			expectErrors: jsonErrors,
+		},
+		"JSON used, enabled gates": {
+			config:      jsonOptionsEnabled,
+			featureGate: enabledFeatureGate,
+		},
 	}
 
 	for name, test := range testcases {
 		t.Run(name, func(t *testing.T) {
-			errs := test.config.ValidateAsField(nil)
+			featureGate := test.featureGate
+			if featureGate == nil {
+				featureGate = defaultFeatureGate
+			}
+			errs := test.config.ValidateAsField(featureGate, nil)
 			if len(errs) == 0 {
 				if test.expectErrors != "" {
 					t.Fatalf("did not get expected error(s): %s", test.expectErrors)

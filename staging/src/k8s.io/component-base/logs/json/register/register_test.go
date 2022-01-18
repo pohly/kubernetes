@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/component-base/featuregate"
 	logsapi "k8s.io/component-base/logs/api/v1"
 )
 
@@ -41,13 +42,63 @@ func TestJSONFlag(t *testing.T) {
 }
 
 func TestJSONFormatRegister(t *testing.T) {
+	defaultGates := featuregate.NewFeatureGate()
+	if err := defaultGates.Add(logsapi.FeatureGates); err != nil {
+		panic(err)
+	}
+	allEnabled := defaultGates.DeepCopy()
+	allDisabled := defaultGates.DeepCopy()
+	for feature := range defaultGates.GetAll() {
+		if err := allEnabled.SetFromMap(map[string]bool{string(feature): true}); err != nil {
+			panic(err)
+		}
+		if err := allDisabled.SetFromMap(map[string]bool{string(feature): false}); err != nil {
+			panic(err)
+		}
+	}
 	newOptions := logsapi.NewLoggingConfiguration()
 	testcases := []struct {
-		name string
-		args []string
-		want *logsapi.LoggingConfiguration
-		errs field.ErrorList
+		name        string
+		args        []string
+		featureGate featuregate.FeatureGate
+		want        *logsapi.LoggingConfiguration
+		errs        field.ErrorList
 	}{
+		{
+			name: "JSON log format, default gates",
+			args: []string{"--logging-format=json"},
+			want: func() *logsapi.LoggingConfiguration {
+				c := newOptions.DeepCopy()
+				c.Format = logsapi.JSONLogFormat
+				return c
+			}(),
+		},
+		{
+			name:        "JSON log format, disabled gates",
+			args:        []string{"--logging-format=json"},
+			featureGate: allDisabled,
+			want: func() *logsapi.LoggingConfiguration {
+				c := newOptions.DeepCopy()
+				c.Format = logsapi.JSONLogFormat
+				return c
+			}(),
+			errs: field.ErrorList{&field.Error{
+				Type:     "FieldValueForbidden",
+				Field:    "format",
+				BadValue: "",
+				Detail:   "Log format json is BETA and disabled, see LoggingBetaOptions feature",
+			}},
+		},
+		{
+			name:        "JSON log format, enabled gates",
+			args:        []string{"--logging-format=json"},
+			featureGate: allEnabled,
+			want: func() *logsapi.LoggingConfiguration {
+				c := newOptions.DeepCopy()
+				c.Format = logsapi.JSONLogFormat
+				return c
+			}(),
+		},
 		{
 			name: "JSON log format",
 			args: []string{"--logging-format=json"},
@@ -83,7 +134,11 @@ func TestJSONFormatRegister(t *testing.T) {
 			if !assert.Equal(t, tc.want, c) {
 				t.Errorf("Wrong Validate() result for %q. expect %v, got %v", tc.name, tc.want, c)
 			}
-			errs := c.ValidateAsField(nil)
+			featureGate := tc.featureGate
+			if featureGate == nil {
+				featureGate = defaultGates
+			}
+			errs := c.ValidateAsField(featureGate, nil)
 			if !assert.ElementsMatch(t, tc.errs, errs) {
 				t.Errorf("Wrong Validate() result for %q.\n expect:\t%+v\n got:\t%+v", tc.name, tc.errs, errs)
 

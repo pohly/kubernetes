@@ -24,7 +24,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/component-base/cli"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/logs"
+	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/klog/v2"
 
 	_ "k8s.io/component-base/logs/json/register"
@@ -37,10 +39,14 @@ func main() {
 }
 
 func NewLoggerCommand() *cobra.Command {
+	featureGates := featuregate.NewFeatureGate()
+	if err := featureGates.Add(logsapi.FeatureGates); err != nil {
+		panic(err)
+	}
 	o := logs.NewOptions()
 	cmd := &cobra.Command{
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := o.ValidateAndApply(); err != nil {
+			if err := o.ValidateAndApply(featureGates); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
 			}
@@ -48,6 +54,7 @@ func NewLoggerCommand() *cobra.Command {
 		},
 	}
 	o.AddFlags(cmd.Flags())
+	featureGates.AddFlag(cmd.Flags())
 	return cmd
 }
 
