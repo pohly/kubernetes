@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/spf13/pflag"
 
@@ -93,9 +92,10 @@ type LoggingConfiguration struct {
 	// Format Flag specifies the structure of log messages.
 	// default value of format is `text`
 	Format string
-	// Maximum number of seconds between log flushes. Ignored if the
-	// selected logging backend writes log messages without buffering.
-	FlushFrequency time.Duration
+	// The maximum delay between log flushes, specified as a string in the
+	// format understood by time.ParseDuration ("1m", "1h30m"). Ignored if
+	// the selected logging backend writes log messages without buffering.
+	FlushFrequency metav1.Duration
 	// Verbosity is the threshold that determines which log messages are
 	// logged. Default is zero which logs only the most important
 	// messages. Higher values enable additional messages. Error messages
