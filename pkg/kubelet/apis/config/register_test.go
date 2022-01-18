@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	componentconfigtesting "k8s.io/component-base/config/testing"
 )
@@ -34,6 +35,7 @@ func TestComponentConfigSetup(t *testing.T) {
 		AllowedTags: map[reflect.Type]bool{
 			reflect.TypeOf(metav1.TypeMeta{}):     true,
 			reflect.TypeOf(metav1.Duration{}):     true,
+			reflect.TypeOf(resource.Duration{}):   true,
 			reflect.TypeOf(v1.NodeConfigSource{}): true,
 			reflect.TypeOf(v1.Taint{}):            true,
 		},

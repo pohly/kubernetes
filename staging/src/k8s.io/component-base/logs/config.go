@@ -68,7 +68,7 @@ func BindLoggingFlags(c *config.LoggingConfiguration, fs *pflag.FlagSet) {
 	// No new log formats should be added after generation is of flag options
 	registry.LogRegistry.Freeze()
 
-	fs.DurationVar(&c.FlushFrequency, logFlushFreqFlagName, logFlushFreq, "Maximum number of seconds between log flushes")
+	fs.Var(&c.FlushFrequency, logFlushFreqFlagName, "Maximum number of seconds between log flushes")
 	fs.VarP(&c.Verbosity, "v", "v", "number for the log level verbosity")
 	fs.Var(&c.VModule, "vmodule", "comma-separated list of pattern=N settings for file-filtered logging (only works for text log format)")
 

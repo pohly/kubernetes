@@ -22,7 +22,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	time "time"
 	unsafe "unsafe"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -223,7 +222,7 @@ func autoConvert_config_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionCo
 
 func autoConvert_v1alpha1_LoggingConfiguration_To_config_LoggingConfiguration(in *LoggingConfiguration, out *config.LoggingConfiguration, s conversion.Scope) error {
 	out.Format = in.Format
-	out.FlushFrequency = time.Duration(in.FlushFrequency)
+	out.FlushFrequency = in.FlushFrequency
 	out.Verbosity = config.VerbosityLevel(in.Verbosity)
 	out.VModule = *(*config.VModuleConfiguration)(unsafe.Pointer(&in.VModule))
 	if err := Convert_v1alpha1_FormatOptions_To_config_FormatOptions(&in.Options, &out.Options, s); err != nil {
@@ -234,7 +233,7 @@ func autoConvert_v1alpha1_LoggingConfiguration_To_config_LoggingConfiguration(in
 
 func autoConvert_config_LoggingConfiguration_To_v1alpha1_LoggingConfiguration(in *config.LoggingConfiguration, out *LoggingConfiguration, s conversion.Scope) error {
 	out.Format = in.Format
-	out.FlushFrequency = time.Duration(in.FlushFrequency)
+	out.FlushFrequency = in.FlushFrequency
 	out.Verbosity = uint32(in.Verbosity)
 	out.VModule = *(*VModuleConfiguration)(unsafe.Pointer(&in.VModule))
 	if err := Convert_config_FormatOptions_To_v1alpha1_FormatOptions(&in.Options, &out.Options, s); err != nil {

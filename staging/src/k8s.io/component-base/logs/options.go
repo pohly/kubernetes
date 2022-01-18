@@ -91,5 +91,5 @@ func (o *Options) apply() {
 	if err := loggingFlags.Lookup("vmodule").Value.Set(o.Config.VModule.String()); err != nil {
 		panic(fmt.Errorf("internal error while setting klog vmodule: %v", err))
 	}
-	go wait.Forever(FlushLogs, o.Config.FlushFrequency)
+	go wait.Forever(FlushLogs, o.Config.FlushFrequency.Duration)
 }

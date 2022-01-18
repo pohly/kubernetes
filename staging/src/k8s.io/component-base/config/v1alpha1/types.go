@@ -17,8 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"time"
-
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -90,9 +88,11 @@ type LoggingConfiguration struct {
 	// Format Flag specifies the structure of log messages.
 	// default value of format is `text`
 	Format string `json:"format,omitempty"`
-	// Maximum number of seconds between log flushes. Ignored if the
-	// selected logging backend writes log messages without buffering.
-	FlushFrequency time.Duration `json:"flushFrequency"`
+	// Maximum number of seconds between log flushes, specified as float
+	// number or as a string in the format understood by time.ParseDuration
+	// ("1m", "1h30m"). Ignored if the selected logging backend writes log
+	// messages without buffering.
+	FlushFrequency resource.Duration `json:"flushFrequency"`
 	// Verbosity is the threshold that determines which log messages are
 	// logged. Default is zero which logs only the most important
 	// messages. Higher values enable additional messages. Error messages
