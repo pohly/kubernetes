@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/component-base/featuregate"
 )
 
 func TestFlags(t *testing.T) {
@@ -48,10 +49,11 @@ func TestFlags(t *testing.T) {
 func TestOptions(t *testing.T) {
 	newOptions := NewLoggingConfiguration()
 	testcases := []struct {
-		name string
-		args []string
-		want *LoggingConfiguration
-		errs field.ErrorList
+		name        string
+		args        []string
+		featureGate featuregate.FeatureGate
+		want        *LoggingConfiguration
+		errs        field.ErrorList
 	}{
 		{
 			name: "Default log format",
@@ -88,7 +90,7 @@ func TestOptions(t *testing.T) {
 			if !assert.Equal(t, tc.want, c) {
 				t.Errorf("Wrong Validate() result for %q. expect %v, got %v", tc.name, tc.want, c)
 			}
-			errs := c.ValidateAndApply()
+			errs := c.ValidateAndApply(defaultGates)
 			if !assert.ElementsMatch(t, tc.errs, errs) {
 				t.Errorf("Wrong Validate() result for %q.\n expect:\t%+v\n got:\t%+v", tc.name, tc.errs, errs)
 			}
