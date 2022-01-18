@@ -21,12 +21,27 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/component-base/featuregate"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 func TestValidation(t *testing.T) {
+	jsonOptionsEnabled := LoggingConfiguration{
+		Format: "text", // "json" gets tested in the json package.
+		Options: FormatOptions{
+			JSON: JSONOptions{
+				SplitStream: true,
+				InfoBufferSize: resource.QuantityValue{
+					Quantity: *resource.NewQuantity(1024, resource.DecimalSI),
+				},
+			},
+		},
+	}
 	testcases := map[string]struct {
-		config       LoggingConfiguration
-		expectErrors string
+		config                    LoggingConfiguration
+		alphaEnabled, betaEnabled bool
+		expectErrors              string
 	}{
 		"okay": {
 			config: LoggingConfiguration{
@@ -105,10 +120,34 @@ func TestValidation(t *testing.T) {
 			},
 			expectErrors: `[format: Invalid value: "json": Unsupported log format, vmodule: Forbidden: Only supported for text log format]`,
 		},
+		"JSON used, off+off": {
+			config:       jsonOptionsEnabled,
+			alphaEnabled: false,
+			betaEnabled:  false,
+			expectErrors: `[options.json.splitStream: Forbidden: Feature LoggingAlphaOptions is disabled, options.json.infoBufferSize: Forbidden: Feature LoggingAlphaOptions is disabled]`,
+		},
+		"JSON used, on+off": {
+			config:       jsonOptionsEnabled,
+			alphaEnabled: true,
+			betaEnabled:  false,
+		},
+		"JSON used, off+on": {
+			config:       jsonOptionsEnabled,
+			alphaEnabled: false,
+			betaEnabled:  true,
+			expectErrors: `[options.json.splitStream: Forbidden: Feature LoggingAlphaOptions is disabled, options.json.infoBufferSize: Forbidden: Feature LoggingAlphaOptions is disabled]`,
+		},
+		"JSON used, on+on": {
+			config:       jsonOptionsEnabled,
+			alphaEnabled: true,
+			betaEnabled:  true,
+		},
 	}
 
 	for name, test := range testcases {
 		t.Run(name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, LoggingAlphaOptions, test.alphaEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, featuregate.DefaultFeatureGate, LoggingBetaOptions, test.betaEnabled)()
 			errs := test.config.ValidateAsField(nil)
 			if len(errs) == 0 {
 				if test.expectErrors != "" {

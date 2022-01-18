@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 )
 
@@ -49,10 +50,11 @@ func TestFlags(t *testing.T) {
 func TestOptions(t *testing.T) {
 	newOptions := NewLoggingConfiguration()
 	testcases := []struct {
-		name string
-		args []string
-		want *LoggingConfiguration
-		errs field.ErrorList
+		name        string
+		args        []string
+		featureGate featuregate.FeatureGate
+		want        *LoggingConfiguration
+		errs        field.ErrorList
 	}{
 		{
 			name: "Default log format",

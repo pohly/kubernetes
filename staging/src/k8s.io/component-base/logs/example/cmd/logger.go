@@ -24,6 +24,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/component-base/cli"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/logs"
 	"k8s.io/klog/v2"
 
@@ -48,6 +49,7 @@ func NewLoggerCommand() *cobra.Command {
 		},
 	}
 	o.AddFlags(cmd.Flags())
+	featuregate.DefaultMutableFeatureGate.AddFlag(cmd.Flags())
 	return cmd
 }
 

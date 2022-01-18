@@ -21,6 +21,8 @@ import (
 	"sort"
 
 	"github.com/go-logr/logr"
+
+	"k8s.io/component-base/featuregate"
 )
 
 var logRegistry = newLogFormatRegistry()
@@ -34,6 +36,10 @@ type logFormatRegistry struct {
 // LogFormatFactory provides support for a certain additional,
 // non-default log format.
 type LogFormatFactory interface {
+	// Feature returns the name of the feature that controls
+	// support for the log format, if there is one.
+	Feature() featuregate.Feature
+
 	// Create returns a logger with the requested configuration.
 	// Returning a flush function for the logger is optional.
 	// If provided, the caller must ensure that it is called
