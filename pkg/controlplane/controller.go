@@ -163,9 +163,7 @@ func (c *Controller) Start() {
 
 	// Reconcile during first run removing itself until server is ready.
 	endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https", c.ExtraEndpointPorts)
-	if err := c.EndpointReconciler.RemoveEndpoints(kubernetesServiceName, c.PublicIP, endpointPorts); err == nil {
-		klog.Error("Found stale data, removed previous endpoints on kubernetes service, apiserver didn't exit successfully previously")
-	} else if !storage.IsNotFound(err) {
+	if err := c.EndpointReconciler.RemoveEndpoints(kubernetesServiceName, c.PublicIP, endpointPorts); err != nil && !storage.IsNotFound(err) {
 		klog.Errorf("Error removing old endpoints from kubernetes service: %v", err)
 	}
 
