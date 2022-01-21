@@ -1411,6 +1411,8 @@ func newVerbose(level Level, b bool) Verbose {
 // less than or equal to the value of the -vmodule pattern matching the source file
 // containing the call.
 func V(level Level) Verbose {
+	return newVerbose(level, false)
+
 	// This function tries hard to be cheap unless there's work to do.
 	// The fast path is two atomic loads and compares.
 
@@ -1448,12 +1450,14 @@ func V(level Level) Verbose {
 // of v.
 // See the documentation of V for usage.
 func (v Verbose) Enabled() bool {
-	return v.enabled
+	return false
 }
 
 // Info is equivalent to the global Info function, guarded by the value of v.
 // See the documentation of V for usage.
 func (v Verbose) Info(args ...interface{}) {
+	return
+
 	if v.enabled {
 		logging.print(infoLog, v.logr, v.filter, args...)
 	}
@@ -1462,6 +1466,8 @@ func (v Verbose) Info(args ...interface{}) {
 // Infoln is equivalent to the global Infoln function, guarded by the value of v.
 // See the documentation of V for usage.
 func (v Verbose) Infoln(args ...interface{}) {
+	return
+
 	if v.enabled {
 		logging.println(infoLog, v.logr, v.filter, args...)
 	}
@@ -1470,6 +1476,8 @@ func (v Verbose) Infoln(args ...interface{}) {
 // Infof is equivalent to the global Infof function, guarded by the value of v.
 // See the documentation of V for usage.
 func (v Verbose) Infof(format string, args ...interface{}) {
+	return
+
 	if v.enabled {
 		logging.printf(infoLog, v.logr, v.filter, format, args...)
 	}
@@ -1478,6 +1486,8 @@ func (v Verbose) Infof(format string, args ...interface{}) {
 // InfoS is equivalent to the global InfoS function, guarded by the value of v.
 // See the documentation of V for usage.
 func (v Verbose) InfoS(msg string, keysAndValues ...interface{}) {
+	return
+
 	if v.enabled {
 		logging.infoS(v.logr, v.filter, 0, msg, keysAndValues...)
 	}
@@ -1486,12 +1496,16 @@ func (v Verbose) InfoS(msg string, keysAndValues ...interface{}) {
 // InfoSDepth acts as InfoS but uses depth to determine which call frame to log.
 // InfoSDepth(0, "msg") is the same as InfoS("msg").
 func InfoSDepth(depth int, msg string, keysAndValues ...interface{}) {
+	return
+
 	logging.infoS(logging.logr, logging.filter, depth, msg, keysAndValues...)
 }
 
 // InfoSDepth is equivalent to the global InfoSDepth function, guarded by the value of v.
 // See the documentation of V for usage.
 func (v Verbose) InfoSDepth(depth int, msg string, keysAndValues ...interface{}) {
+	return
+
 	if v.enabled {
 		logging.infoS(v.logr, v.filter, depth, msg, keysAndValues...)
 	}
@@ -1499,6 +1513,8 @@ func (v Verbose) InfoSDepth(depth int, msg string, keysAndValues ...interface{})
 
 // Deprecated: Use ErrorS instead.
 func (v Verbose) Error(err error, msg string, args ...interface{}) {
+	return
+
 	if v.enabled {
 		logging.errorS(err, v.logr, v.filter, 0, msg, args...)
 	}
@@ -1507,6 +1523,8 @@ func (v Verbose) Error(err error, msg string, args ...interface{}) {
 // ErrorS is equivalent to the global Error function, guarded by the value of v.
 // See the documentation of V for usage.
 func (v Verbose) ErrorS(err error, msg string, keysAndValues ...interface{}) {
+	return
+
 	if v.enabled {
 		logging.errorS(err, v.logr, v.filter, 0, msg, keysAndValues...)
 	}
@@ -1515,24 +1533,32 @@ func (v Verbose) ErrorS(err error, msg string, keysAndValues ...interface{}) {
 // Info logs to the INFO log.
 // Arguments are handled in the manner of fmt.Print; a newline is appended if missing.
 func Info(args ...interface{}) {
+	return
+
 	logging.print(infoLog, logging.logr, logging.filter, args...)
 }
 
 // InfoDepth acts as Info but uses depth to determine which call frame to log.
 // InfoDepth(0, "msg") is the same as Info("msg").
 func InfoDepth(depth int, args ...interface{}) {
+	return
+
 	logging.printDepth(infoLog, logging.logr, logging.filter, depth, args...)
 }
 
 // Infoln logs to the INFO log.
 // Arguments are handled in the manner of fmt.Println; a newline is always appended.
 func Infoln(args ...interface{}) {
+	return
+
 	logging.println(infoLog, logging.logr, logging.filter, args...)
 }
 
 // Infof logs to the INFO log.
 // Arguments are handled in the manner of fmt.Printf; a newline is appended if missing.
 func Infof(format string, args ...interface{}) {
+	return
+
 	logging.printf(infoLog, logging.logr, logging.filter, format, args...)
 }
 
@@ -1545,54 +1571,72 @@ func Infof(format string, args ...interface{}) {
 // output:
 // >> I1025 00:15:15.525108       1 controller_utils.go:116] "Pod status updated" pod="kubedns" status="ready"
 func InfoS(msg string, keysAndValues ...interface{}) {
+	return
+
 	logging.infoS(logging.logr, logging.filter, 0, msg, keysAndValues...)
 }
 
 // Warning logs to the WARNING and INFO logs.
 // Arguments are handled in the manner of fmt.Print; a newline is appended if missing.
 func Warning(args ...interface{}) {
+	return
+
 	logging.print(warningLog, logging.logr, logging.filter, args...)
 }
 
 // WarningDepth acts as Warning but uses depth to determine which call frame to log.
 // WarningDepth(0, "msg") is the same as Warning("msg").
 func WarningDepth(depth int, args ...interface{}) {
+	return
+
 	logging.printDepth(warningLog, logging.logr, logging.filter, depth, args...)
 }
 
 // Warningln logs to the WARNING and INFO logs.
 // Arguments are handled in the manner of fmt.Println; a newline is always appended.
 func Warningln(args ...interface{}) {
+	return
+
 	logging.println(warningLog, logging.logr, logging.filter, args...)
 }
 
 // Warningf logs to the WARNING and INFO logs.
 // Arguments are handled in the manner of fmt.Printf; a newline is appended if missing.
 func Warningf(format string, args ...interface{}) {
+	return
+
 	logging.printf(warningLog, logging.logr, logging.filter, format, args...)
 }
 
 // Error logs to the ERROR, WARNING, and INFO logs.
 // Arguments are handled in the manner of fmt.Print; a newline is appended if missing.
 func Error(args ...interface{}) {
+	return
+
 	logging.print(errorLog, logging.logr, logging.filter, args...)
 }
 
 // ErrorDepth acts as Error but uses depth to determine which call frame to log.
 // ErrorDepth(0, "msg") is the same as Error("msg").
 func ErrorDepth(depth int, args ...interface{}) {
+	return
+
 	logging.printDepth(errorLog, logging.logr, logging.filter, depth, args...)
 }
 
 // Errorln logs to the ERROR, WARNING, and INFO logs.
 // Arguments are handled in the manner of fmt.Println; a newline is always appended.
 func Errorln(args ...interface{}) {
+	return
+
 	logging.println(errorLog, logging.logr, logging.filter, args...)
 }
 
 // Errorf logs to the ERROR, WARNING, and INFO logs.
 // Arguments are handled in the manner of fmt.Printf; a newline is appended if missing.
 func Errorf(format string, args ...interface{}) {
+	return
+
 	logging.printf(errorLog, logging.logr, logging.filter, format, args...)
 }
 
@@ -1606,12 +1650,16 @@ func Errorf(format string, args ...interface{}) {
 // output:
 // >> E1025 00:15:15.525108       1 controller_utils.go:114] "Failed to update pod status" err="timeout"
 func ErrorS(err error, msg string, keysAndValues ...interface{}) {
+	return
+
 	logging.errorS(err, logging.logr, logging.filter, 0, msg, keysAndValues...)
 }
 
 // ErrorSDepth acts as ErrorS but uses depth to determine which call frame to log.
 // ErrorSDepth(0, "msg") is the same as ErrorS("msg").
 func ErrorSDepth(depth int, err error, msg string, keysAndValues ...interface{}) {
+	return
+
 	logging.errorS(err, logging.logr, logging.filter, depth, msg, keysAndValues...)
 }
 
