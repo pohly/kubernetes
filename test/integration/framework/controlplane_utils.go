@@ -23,7 +23,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path"
-	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -49,6 +48,7 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	_ "k8s.io/component-base/logs" // Ensure that klog flags are initialized, we want to modify the default.
 	"k8s.io/component-base/version"
 	"k8s.io/klog/v2"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
@@ -64,6 +64,13 @@ import (
 const (
 	UnprivilegedUserToken = "unprivileged-user"
 )
+
+func init() {
+	// Log at level 4 by default. Can be changed via -v on the command
+	// line. k8s.io/component-base/logs called klog.InitFlags for us.
+	v := flag.Lookup("v").Value
+	v.Set("4")
+}
 
 // Config is a struct of configuration directives for NewControlPlaneComponents.
 type Config struct {
@@ -138,13 +145,6 @@ func DefaultOpenAPIConfig() *openapicommon.Config {
 func startAPIServerOrDie(controlPlaneConfig *controlplane.Config, incomingServer *httptest.Server, apiServerReceiver APIServerReceiver) (*controlplane.Instance, *httptest.Server, CloseFunc) {
 	var m *controlplane.Instance
 	var s *httptest.Server
-
-	// Ensure we log at least level 4
-	v := flag.Lookup("v").Value
-	level, _ := strconv.Atoi(v.String())
-	if level < 4 {
-		v.Set("4")
-	}
 
 	if incomingServer != nil {
 		s = incomingServer
