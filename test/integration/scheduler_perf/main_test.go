@@ -22,6 +22,10 @@ import (
 	"os"
 	"testing"
 
+	"github.com/spf13/pflag"
+
+	"k8s.io/component-base/logs"
+	_ "k8s.io/component-base/logs/json/register"
 	ktesting "k8s.io/klogr/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -29,9 +33,29 @@ import (
 func TestMain(m *testing.M) {
 	ktesting.DefaultOptions.Verbosity = 0 // Run with -v=0 by default.
 	ktesting.DefaultOptions.AddFlags(flag.CommandLine)
+
+	// This whole boilerplate code will be simpler if the utility code for
+	// contextual logging is merged.
+	o := logs.NewOptions()
+
+	// component-base only supports pflag at the moment.
+	var fs pflag.FlagSet
+	o.AddFlags(&fs)
+	// Not ideal. https://github.com/spf13/pflag/pull/330 would be better.
+	fs.VisitAll(func(f *pflag.Flag) {
+		if flag.CommandLine.Lookup(f.Name) == nil {
+			flag.CommandLine.Var(f.Value, f.Name, f.Usage)
+		}
+	})
 	flag.Parse()
+	if err := o.ValidateAndApply(); err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
+
 	if err := ktesting.DefaultOptions.Validate(); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v", err)
 	}
+
 	framework.EtcdMain(m.Run)
 }
