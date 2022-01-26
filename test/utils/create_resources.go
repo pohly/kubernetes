@@ -59,7 +59,14 @@ func CreatePodWithRetries(c clientset.Interface, namespace string, obj *v1.Pod) 
 	}
 	createFunc := func() (bool, error) {
 		_, err := c.CoreV1().Pods(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
-		if err == nil || apierrors.IsAlreadyExists(err) {
+		if err == nil {
+			return true, nil
+		}
+		if apierrors.IsAlreadyExists(err) {
+			if obj.Name == "" {
+				// In this case, a generateName conflict error is considered to have occurred.
+				return false, nil
+			}
 			return true, nil
 		}
 		return false, fmt.Errorf("Failed to create object with non-retriable error: %v ", err)
@@ -73,7 +80,14 @@ func CreateRCWithRetries(c clientset.Interface, namespace string, obj *v1.Replic
 	}
 	createFunc := func() (bool, error) {
 		_, err := c.CoreV1().ReplicationControllers(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
-		if err == nil || apierrors.IsAlreadyExists(err) {
+		if err == nil {
+			return true, nil
+		}
+		if apierrors.IsAlreadyExists(err) {
+			if obj.Name == "" {
+				// In this case, a generateName conflict error is considered to have occurred.
+				return false, nil
+			}
 			return true, nil
 		}
 		return false, fmt.Errorf("failed to create object with non-retriable error: %v", err)
@@ -87,7 +101,14 @@ func CreateReplicaSetWithRetries(c clientset.Interface, namespace string, obj *a
 	}
 	createFunc := func() (bool, error) {
 		_, err := c.AppsV1().ReplicaSets(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
-		if err == nil || apierrors.IsAlreadyExists(err) {
+		if err == nil {
+			return true, nil
+		}
+		if apierrors.IsAlreadyExists(err) {
+			if obj.Name == "" {
+				// In this case, a generateName conflict error is considered to have occurred.
+				return false, nil
+			}
 			return true, nil
 		}
 		return false, fmt.Errorf("failed to create object with non-retriable error: %v", err)
@@ -101,7 +122,14 @@ func CreateDeploymentWithRetries(c clientset.Interface, namespace string, obj *a
 	}
 	createFunc := func() (bool, error) {
 		_, err := c.AppsV1().Deployments(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
-		if err == nil || apierrors.IsAlreadyExists(err) {
+		if err == nil {
+			return true, nil
+		}
+		if apierrors.IsAlreadyExists(err) {
+			if obj.Name == "" {
+				// In this case, a generateName conflict error is considered to have occurred.
+				return false, nil
+			}
 			return true, nil
 		}
 		return false, fmt.Errorf("failed to create object with non-retriable error: %v", err)
@@ -115,7 +143,14 @@ func CreateDaemonSetWithRetries(c clientset.Interface, namespace string, obj *ap
 	}
 	createFunc := func() (bool, error) {
 		_, err := c.AppsV1().DaemonSets(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
-		if err == nil || apierrors.IsAlreadyExists(err) {
+		if err == nil {
+			return true, nil
+		}
+		if apierrors.IsAlreadyExists(err) {
+			if obj.Name == "" {
+				// In this case, a generateName conflict error is considered to have occurred.
+				return false, nil
+			}
 			return true, nil
 		}
 		return false, fmt.Errorf("failed to create object with non-retriable error: %v", err)
@@ -129,7 +164,14 @@ func CreateJobWithRetries(c clientset.Interface, namespace string, obj *batch.Jo
 	}
 	createFunc := func() (bool, error) {
 		_, err := c.BatchV1().Jobs(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
-		if err == nil || apierrors.IsAlreadyExists(err) {
+		if err == nil {
+			return true, nil
+		}
+		if apierrors.IsAlreadyExists(err) {
+			if obj.Name == "" {
+				// In this case, a generateName conflict error is considered to have occurred.
+				return false, nil
+			}
 			return true, nil
 		}
 		return false, fmt.Errorf("failed to create object with non-retriable error: %v", err)
@@ -143,7 +185,14 @@ func CreateSecretWithRetries(c clientset.Interface, namespace string, obj *v1.Se
 	}
 	createFunc := func() (bool, error) {
 		_, err := c.CoreV1().Secrets(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
-		if err == nil || apierrors.IsAlreadyExists(err) {
+		if err == nil {
+			return true, nil
+		}
+		if apierrors.IsAlreadyExists(err) {
+			if obj.Name == "" {
+				// In this case, a generateName conflict error is considered to have occurred.
+				return false, nil
+			}
 			return true, nil
 		}
 		return false, fmt.Errorf("failed to create object with non-retriable error: %v", err)
@@ -157,7 +206,14 @@ func CreateConfigMapWithRetries(c clientset.Interface, namespace string, obj *v1
 	}
 	createFunc := func() (bool, error) {
 		_, err := c.CoreV1().ConfigMaps(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
-		if err == nil || apierrors.IsAlreadyExists(err) {
+		if err == nil {
+			return true, nil
+		}
+		if apierrors.IsAlreadyExists(err) {
+			if obj.Name == "" {
+				// In this case, a generateName conflict error is considered to have occurred.
+				return false, nil
+			}
 			return true, nil
 		}
 		return false, fmt.Errorf("failed to create object with non-retriable error: %v", err)
@@ -171,7 +227,14 @@ func CreateServiceWithRetries(c clientset.Interface, namespace string, obj *v1.S
 	}
 	createFunc := func() (bool, error) {
 		_, err := c.CoreV1().Services(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
-		if err == nil || apierrors.IsAlreadyExists(err) {
+		if err == nil {
+			return true, nil
+		}
+		if apierrors.IsAlreadyExists(err) {
+			if obj.Name == "" {
+				// In this case, a generateName conflict error is considered to have occurred.
+				return false, nil
+			}
 			return true, nil
 		}
 		return false, fmt.Errorf("failed to create object with non-retriable error: %v", err)
@@ -185,7 +248,14 @@ func CreateStorageClassWithRetries(c clientset.Interface, obj *storage.StorageCl
 	}
 	createFunc := func() (bool, error) {
 		_, err := c.StorageV1().StorageClasses().Create(context.TODO(), obj, metav1.CreateOptions{})
-		if err == nil || apierrors.IsAlreadyExists(err) {
+		if err == nil {
+			return true, nil
+		}
+		if apierrors.IsAlreadyExists(err) {
+			if obj.Name == "" {
+				// In this case, a generateName conflict error is considered to have occurred.
+				return false, nil
+			}
 			return true, nil
 		}
 		return false, fmt.Errorf("failed to create object with non-retriable error: %v", err)
@@ -199,7 +269,14 @@ func CreateResourceQuotaWithRetries(c clientset.Interface, namespace string, obj
 	}
 	createFunc := func() (bool, error) {
 		_, err := c.CoreV1().ResourceQuotas(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
-		if err == nil || apierrors.IsAlreadyExists(err) {
+		if err == nil {
+			return true, nil
+		}
+		if apierrors.IsAlreadyExists(err) {
+			if obj.Name == "" {
+				// In this case, a generateName conflict error is considered to have occurred.
+				return false, nil
+			}
 			return true, nil
 		}
 		return false, fmt.Errorf("failed to create object with non-retriable error: %v", err)
@@ -213,7 +290,14 @@ func CreatePersistentVolumeWithRetries(c clientset.Interface, obj *v1.Persistent
 	}
 	createFunc := func() (bool, error) {
 		_, err := c.CoreV1().PersistentVolumes().Create(context.TODO(), obj, metav1.CreateOptions{})
-		if err == nil || apierrors.IsAlreadyExists(err) {
+		if err == nil {
+			return true, nil
+		}
+		if apierrors.IsAlreadyExists(err) {
+			if obj.Name == "" {
+				// In this case, a generateName conflict error is considered to have occurred.
+				return false, nil
+			}
 			return true, nil
 		}
 		return false, fmt.Errorf("failed to create object with non-retriable error: %v", err)
@@ -227,7 +311,14 @@ func CreatePersistentVolumeClaimWithRetries(c clientset.Interface, namespace str
 	}
 	createFunc := func() (bool, error) {
 		_, err := c.CoreV1().PersistentVolumeClaims(namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
-		if err == nil || apierrors.IsAlreadyExists(err) {
+		if err == nil {
+			return true, nil
+		}
+		if apierrors.IsAlreadyExists(err) {
+			if obj.Name == "" {
+				// In this case, a generateName conflict error is considered to have occurred.
+				return false, nil
+			}
 			return true, nil
 		}
 		return false, fmt.Errorf("failed to create object with non-retriable error: %v", err)
