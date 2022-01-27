@@ -26,6 +26,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-logr/logr"
 
@@ -91,11 +92,24 @@ func TestOutput(t *testing.T) {
 			expectedOutput: `I klogr_test.go:<LINE>] "test" akey="avalue" akey="avalue2"
 `,
 		},
-		"print the duplicate keys in values and arguments": {
+		"override single value": {
 			withValues: []interface{}{"akey", "avalue"},
 			text:       "test",
 			values:     []interface{}{"akey", "avalue2"},
-			expectedOutput: `I klogr_test.go:<LINE>] "test" akey="avalue" akey="avalue2"
+			expectedOutput: `I klogr_test.go:<LINE>] "test" akey="avalue2"
+`,
+		},
+		"override WithValues": {
+			withValues: []interface{}{"duration", time.Hour, "X", "y"},
+			text:       "test",
+			values:     []interface{}{"duration", time.Minute, "A", "b"},
+			expectedOutput: `I klogr_test.go:<LINE>] "test" X="y" duration="1m0s" A="b"
+`,
+		},
+		"duplicates": {
+			text:   "test",
+			values: []interface{}{"duration", time.Minute, "A", "b", "duration", time.Hour},
+			expectedOutput: `I klogr_test.go:<LINE>] "test" duration="1m0s" A="b" duration="1h0m0s"
 `,
 		},
 		"preserve order of key/value pairs": {
@@ -187,10 +201,23 @@ E klogr_test.go:<LINE>] "test" err="whoops"
 
 			printWithKlog := func() {
 				kv := []interface{}{}
+				haveKeyInValues := func(key interface{}) bool {
+					for i := 0; i < len(test.values); i += 2 {
+						if key == test.values[i] {
+							return true
+						}
+					}
+					return false
+				}
 				if len(test.withValues) > 0 {
-					kv = append(kv, test.withValues...)
-					if len(test.withValues)%2 != 0 {
-						kv = append(kv, "(MISSING)")
+					withValues := test.withValues
+					if len(withValues)%2 != 0 {
+						withValues = append(withValues, "(MISSING)")
+					}
+					for i := 0; i < len(withValues); i += 2 {
+						if !haveKeyInValues(withValues[i]) {
+							kv = append(kv, withValues[i], withValues[i+1])
+						}
 					}
 				}
 				if len(test.values) > 0 {

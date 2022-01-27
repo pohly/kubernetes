@@ -64,9 +64,31 @@ func (l klogger) mergeKVs(kvList []interface{}) []interface{} {
 	if len(l.values) == 0 {
 		return kvList
 	}
+
+	// To filter out key/value pairs in l.values that get superseded by
+	// key/value pairs in kvList, first collect all keys in the later.
+	haveKey := map[interface{}]bool{}
+	for i := 0; i < len(kvList); i += 2 {
+		haveKey[kvList[i]] = true
+	}
+
+	// We know the maximum length. Might be shorter after filtering out
+	// duplicates.
 	kv := make([]interface{}, 0, len(l.values)+len(kvList))
-	kv = append(kv, l.values...)
+
+	// Copy those values that are not superseeded.
+	for i := 0; i < len(l.values); i += 2 {
+		key := l.values[i]
+		if !haveKey[key] {
+			kv = append(kv, key, l.values[i+1])
+		}
+	}
+
+	// Duplicates in the parameters are not filtered out. That would cause
+	// additional runtime overhead and can be avoided by code review and/or
+	// static code analysis.
 	kv = append(kv, kvList...)
+
 	return kv
 }
 
