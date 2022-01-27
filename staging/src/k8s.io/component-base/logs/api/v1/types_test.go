@@ -25,6 +25,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/yaml"
 )
 
@@ -125,6 +126,8 @@ func TestVModule(t *testing.T) {
 // TestCompatibility ensures that a) valid JSON remains valid and has the same
 // effect and b) that new fields are covered by the test data.
 func TestCompatibility(t *testing.T) {
+	ns := time.Nanosecond
+
 	testcases := map[string]struct {
 		// fixture holds a representation of a LoggingConfiguration struct in YAML format.
 		fixture string
@@ -149,7 +152,11 @@ func TestCompatibility(t *testing.T) {
 			// and must be updated for the test case to pass.
 			fixture: `
 format: json
+# flushFrequency is how Kubernetes 1.23 serialized the value.
+# We still need to support that even though it is deprecated.
 flushFrequency: 1
+# This is the more user-friendly field from Kubernetes 1.24.
+flushFrequencyDuration: "1h"
 verbosity: 5
 vmodule:
 - filePattern: someFile
@@ -164,9 +171,10 @@ options:
 			baseConfig:      LoggingConfiguration{},
 			expectAllFields: true,
 			expectConfig: LoggingConfiguration{
-				Format:         JSONLogFormat,
-				FlushFrequency: time.Nanosecond,
-				Verbosity:      VerbosityLevel(5),
+				Format:                 JSONLogFormat,
+				FlushFrequency:         &ns,
+				FlushFrequencyDuration: metav1.Duration{Duration: time.Hour},
+				Verbosity:              VerbosityLevel(5),
 				VModule: VModuleConfiguration{
 					{
 						FilePattern: "someFile",

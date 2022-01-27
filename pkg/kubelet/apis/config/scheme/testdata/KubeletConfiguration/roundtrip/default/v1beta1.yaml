@@ -54,6 +54,7 @@ kubeAPIBurst: 10
 kubeAPIQPS: 5
 logging:
   flushFrequency: 5000000000
+  flushFrequencyDuration: 5s
   format: text
   options:
     json:

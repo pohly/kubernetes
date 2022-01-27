@@ -174,7 +174,7 @@ func (c *LoggingConfiguration) AddFlags(fs *pflag.FlagSet) {
 	// No new log formats should be added after generation is of flag options
 	logRegistry.freeze()
 
-	fs.DurationVar(&c.FlushFrequency, LogFlushFreqFlagName, c.FlushFrequency, "Maximum number of seconds between log flushes")
+	fs.DurationVar(&c.FlushFrequencyDuration.Duration, LogFlushFreqFlagName, c.FlushFrequencyDuration.Duration, "Maximum number of seconds between log flushes")
 	fs.VarP(&c.Verbosity, "v", "v", "number for the log level verbosity")
 	fs.Var(&c.VModule, "vmodule", "comma-separated list of pattern=N settings for file-filtered logging (only works for text log format)")
 
@@ -203,7 +203,19 @@ func (c *LoggingConfiguration) apply() {
 	if err := loggingFlags.Lookup("vmodule").Value.Set(c.VModule.String()); err != nil {
 		panic(fmt.Errorf("internal error while setting klog vmodule: %v", err))
 	}
-	go wait.Forever(FlushLogs, c.FlushFrequency)
+
+	flushFrequencyDuration := c.FlushFrequencyDuration.Duration
+	if c.FlushFrequency != nil {
+		// If the deprecated field is set, we assume that the user
+		// wants that instead of the default (?) value in
+		// c.FlushFrequencyDuration.
+		flushFrequencyDuration = *c.FlushFrequency
+
+		// Final logging format was set above, therefore we can warn
+		// here.
+		klog.InfoS("WARNING: using %s as log flush frequency duration as configured with `flushFrequency`. `flushFrequency` is deprecated. `flushFrequencyDuration` should be used instead.", flushFrequencyDuration)
+	}
+	go wait.Forever(FlushLogs, flushFrequencyDuration)
 }
 
 // SetRecommendedLoggingConfiguration sets the default logging configuration
@@ -216,8 +228,8 @@ func (c *LoggingConfiguration) SetRecommendedLoggingConfiguration() {
 	if c.Format == "" {
 		c.Format = "text"
 	}
-	if c.FlushFrequency == 0 {
-		c.FlushFrequency = 5 * time.Second
+	if c.FlushFrequencyDuration.Duration == 0 {
+		c.FlushFrequencyDuration.Duration = 5 * time.Second
 	}
 	var empty resource.QuantityValue
 	if c.Options.JSON.InfoBufferSize == empty {

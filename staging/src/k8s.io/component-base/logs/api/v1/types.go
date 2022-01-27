@@ -24,6 +24,7 @@ import (
 
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Supported output formats.
@@ -46,7 +47,12 @@ type LoggingConfiguration struct {
 	// Maximum number of nanoseconds (i.e. 1s = 1000000000) between log
 	// flushes. Ignored if the selected logging backend writes log
 	// messages without buffering.
-	FlushFrequency time.Duration `json:"flushFrequency"`
+	//
+	// Deprecated: use FlushFrequencyDuration instead
+	FlushFrequency *time.Duration `json:"flushFrequency,omitempty"`
+	// Maximum amount of time between log flushes. Ignored if the selected
+	// logging backend writes log messages without buffering.
+	FlushFrequencyDuration metav1.Duration `json:"flushFrequencyDuration"`
 	// Verbosity is the threshold that determines which log messages are
 	// logged. Default is zero which logs only the most important
 	// messages. Higher values enable additional messages. Error messages
