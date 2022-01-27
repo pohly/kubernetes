@@ -45,6 +45,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klogr"
 	ktesting "k8s.io/klogr/testing"
+	_ "k8s.io/klogr/testing/init"
 	"k8s.io/kubernetes/pkg/controller"
 	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
@@ -124,10 +125,6 @@ var (
 	// node topology for CSI migration
 	zone1Labels = map[string]string{v1.LabelFailureDomainBetaZone: "us-east-1", v1.LabelFailureDomainBetaRegion: "us-east-1a"}
 )
-
-func TestMain(m *testing.M) {
-	ktesting.TestMainWithLogging(m)
-}
 
 type testEnv struct {
 	client                  clientset.Interface

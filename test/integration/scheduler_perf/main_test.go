@@ -17,11 +17,16 @@ limitations under the License.
 package benchmark
 
 import (
+	"flag"
 	"testing"
 
+	ktesting "k8s.io/klogr/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
 func TestMain(m *testing.M) {
+	ktesting.DefaultOptions.Verbosity = 0 // Run with -v=0 by default.
+	ktesting.DefaultOptions.AddFlags(flag.CommandLine)
+
 	framework.EtcdMain(m.Run)
 }
