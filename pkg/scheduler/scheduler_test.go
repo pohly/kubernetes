@@ -46,6 +46,8 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 	clientcache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
+	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -546,6 +548,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 
 	for _, item := range table {
 		t.Run(item.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
 			var gotError error
 			var gotPod *v1.Pod
 			var gotForgetPod *v1.Pod
@@ -579,6 +582,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			)
 			fwk, err := st.NewFramework(registerPluginFuncs,
 				testSchedulerName,
+				frameworkruntime.WithLogger(logger),
 				frameworkruntime.WithClientSet(client),
 				frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, testSchedulerName)))
 			if err != nil {
@@ -793,7 +797,8 @@ func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
 }
 
 func TestSchedulerNoPhantomPodAfterExpire(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
 	scache := internalcache.New(100*time.Millisecond, ctx.Done())
@@ -858,7 +863,8 @@ func TestSchedulerNoPhantomPodAfterExpire(t *testing.T) {
 }
 
 func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
 	scache := internalcache.New(10*time.Minute, ctx.Done())
@@ -956,7 +962,8 @@ func setupTestSchedulerWithOnePodOnNode(ctx context.Context, t *testing.T, queue
 }
 
 func TestSchedulerFailedSchedulingReasons(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
 	scache := internalcache.New(10*time.Minute, ctx.Done())
@@ -1070,6 +1077,7 @@ func setupTestScheduler(ctx context.Context, queuedPodStore *clientcache.FIFO, c
 		frameworkruntime.WithEventRecorder(recorder),
 		frameworkruntime.WithInformerFactory(informerFactory),
 		frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
+		frameworkruntime.WithLogger(klog.FromContext(ctx)),
 	)
 
 	errChan := make(chan error, 1)
@@ -1221,7 +1229,8 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 
 	for _, item := range table {
 		t.Run(item.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			fakeVolumeBinder := volumebinding.NewFakeVolumeBinder(item.volumeBinderConfig)
 			s, bindingChan, errChan := setupTestSchedulerWithVolumeBinding(ctx, fakeVolumeBinder, eventBroadcaster)
@@ -1311,6 +1320,7 @@ func TestSchedulerBinding(t *testing.T) {
 
 	for _, test := range table {
 		t.Run(test.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
 			pod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: test.podName,
@@ -1327,7 +1337,10 @@ func TestSchedulerBinding(t *testing.T) {
 			fwk, err := st.NewFramework([]st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-			}, "", frameworkruntime.WithClientSet(client), frameworkruntime.WithEventRecorder(&events.FakeRecorder{}))
+			}, "",
+				frameworkruntime.WithClientSet(client), frameworkruntime.WithEventRecorder(&events.FakeRecorder{}),
+				frameworkruntime.WithLogger(logger),
+			)
 			if err != nil {
 				t.Fatal(err)
 			}
