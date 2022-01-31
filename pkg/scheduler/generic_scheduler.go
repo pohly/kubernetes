@@ -28,6 +28,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klogr"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
@@ -88,6 +89,8 @@ func (g *genericScheduler) snapshot() error {
 // Schedule tries to schedule the given pod to one of the nodes in the node list.
 // If it succeeds, it will return the name of the node.
 // If it fails, it will return a FitError error with reasons.
+//
+// Schedule itself ensures that the pod name is part of all log entries.
 func (g *genericScheduler) Schedule(ctx context.Context, extenders []framework.Extender, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) (result ScheduleResult, err error) {
 	trace := utiltrace.New("Scheduling", utiltrace.Field{Key: "namespace", Value: pod.Namespace}, utiltrace.Field{Key: "name", Value: pod.Name})
 	defer trace.LogIfLong(100 * time.Millisecond)
@@ -100,6 +103,10 @@ func (g *genericScheduler) Schedule(ctx context.Context, extenders []framework.E
 	if g.nodeInfoSnapshot.NumNodes() == 0 {
 		return result, ErrNoNodesAvailable
 	}
+
+	logger := klogr.FromContext(ctx)
+	logger = klogr.LoggerWithValues(logger, "pod", klogr.KObj(pod))
+	ctx = klogr.NewContext(ctx, logger)
 
 	feasibleNodes, diagnosis, err := g.findNodesThatFitPod(ctx, extenders, fwk, state, pod)
 	if err != nil {
@@ -286,11 +293,14 @@ func (g *genericScheduler) findNodesThatPassFilters(
 	errCh := parallelize.NewErrorChannel()
 	var statusesLock sync.Mutex
 	var feasibleNodesLen int32
+	logger := klogr.FromContext(ctx)
 	ctx, cancel := context.WithCancel(ctx)
 	checkNode := func(i int) {
 		// We check the nodes starting from where we left off in the previous scheduling cycle,
 		// this is to make sure all nodes have the same chance of being examined across pods.
 		nodeInfo := nodes[(g.nextStartNodeIndex+i)%len(nodes)]
+		logger := klogr.LoggerWithValues(logger, "node", klogr.KObj(nodeInfo.Node()))
+		ctx := klogr.NewContext(ctx, logger)
 		status := fwk.RunFilterPluginsWithNominatedPods(ctx, state, pod, nodeInfo)
 		if status.Code() == framework.Error {
 			errCh.SendErrorWithCancel(status.AsError(), cancel)
