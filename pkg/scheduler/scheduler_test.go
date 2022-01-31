@@ -43,6 +43,7 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 	clientcache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
+	"k8s.io/klogr"
 	ktesting "k8s.io/klogr/testing"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -643,7 +644,7 @@ func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
 }
 
 func TestSchedulerNoPhantomPodAfterExpire(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
+	_, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
@@ -711,7 +712,7 @@ func TestSchedulerNoPhantomPodAfterExpire(t *testing.T) {
 }
 
 func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
+	_, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
@@ -815,7 +816,7 @@ func setupTestSchedulerWithOnePodOnNode(ctx context.Context, t *testing.T, queue
 }
 
 func TestSchedulerFailedSchedulingReasons(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
+	_, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
@@ -928,7 +929,7 @@ func setupTestScheduler(ctx context.Context, queuedPodStore *clientcache.FIFO, s
 		frameworkruntime.WithEventRecorder(recorder),
 		frameworkruntime.WithInformerFactory(informerFactory),
 		frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
-		frameworkruntime.WithLogger(logger),
+		frameworkruntime.WithLogger(klogr.FromContext(ctx)),
 	)
 
 	algo := NewGenericScheduler(
