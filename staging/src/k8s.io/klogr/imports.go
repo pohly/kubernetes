@@ -29,6 +29,5 @@ type LogSink = logr.LogSink
 type Level = int
 
 var (
-	New        = logr.New
-	NewContext = logr.NewContext
+	New = logr.New
 )

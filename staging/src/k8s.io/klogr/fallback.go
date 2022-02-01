@@ -28,6 +28,8 @@ var (
 	// will get written once before being read and thus doesn't mutex locking.
 	fallbackLogger       Logger = newFallbackLogger()
 	fallbackLoggerWasSet        = false
+
+	contextualLoggingEnabled = true
 )
 
 // InitLogPrefix gets insert into all log messages that were emitted through
@@ -52,11 +54,26 @@ func SetFallbackLogger(log Logger) {
 	fallbackLoggerWasSet = true
 }
 
+// EnableContextualLogging controls whether contextual logging is enabled.
+// By default it is enabled. When disabled, FromContext avoids looking up
+// the logger in the context and always returns the fallback logger.
+// LoggerWithValues, LoggerWithName, and NewContext become no-ops
+// and return their input logger respectively context. This may be useful
+// to avoid the additional overhead for contextual logging.
+//
+// Like SetFallbackLogger this must be called during initialization before
+// goroutines are started.
+func EnableContextualLogging(enabled bool) {
+	contextualLoggingEnabled = enabled
+}
+
 // FromContext retrieves a logger set by the caller or, if not set,
 // falls back to the program's fallback logger.
 func FromContext(ctx context.Context) Logger {
-	if logger, err := logr.FromContext(ctx); err == nil {
-		return logger
+	if contextualLoggingEnabled {
+		if logger, err := logr.FromContext(ctx); err == nil {
+			return logger
+		}
 	}
 
 	return fallbackLogger
