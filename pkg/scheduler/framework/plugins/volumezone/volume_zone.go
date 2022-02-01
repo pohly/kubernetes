@@ -29,7 +29,7 @@ import (
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	storagehelpers "k8s.io/component-helpers/storage/volume"
-	"k8s.io/klog/v2"
+	"k8s.io/klogr"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
@@ -104,6 +104,7 @@ func (pl *VolumeZone) Filter(ctx context.Context, _ *framework.CycleState, pod *
 		return nil
 	}
 
+	logger := klogr.FromContext(ctx)
 	for i := range pod.Spec.Volumes {
 		volume := pod.Spec.Volumes[i]
 		if volume.PersistentVolumeClaim == nil {
@@ -152,12 +153,12 @@ func (pl *VolumeZone) Filter(ctx context.Context, _ *framework.CycleState, pod *
 			nodeV := nodeConstraints[k]
 			volumeVSet, err := volumehelpers.LabelZonesToSet(v)
 			if err != nil {
-				klog.InfoS("Failed to parse label, ignoring the label", "label", fmt.Sprintf("%s:%s", k, v), "err", err)
+				logger.Info("Failed to parse label, ignoring the label", "label", fmt.Sprintf("%s:%s", k, v), "err", err)
 				continue
 			}
 
 			if !volumeVSet.Has(nodeV) {
-				klog.V(10).InfoS("Won't schedule pod onto node due to volume (mismatch on label key)", "pod", klog.KObj(pod), "node", klog.KObj(node), "PV", klog.KRef("", pvName), "PVLabelKey", k)
+				logger.V(10).Info("Won't schedule pod onto node due to volume (mismatch on label key)", "pod", klogr.KObj(pod), "node", klogr.KObj(node), "PV", klogr.KRef("", pvName), "PVLabelKey", k)
 				return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict)
 			}
 		}

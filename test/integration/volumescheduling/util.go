@@ -34,6 +34,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/events"
+	ktesting "k8s.io/klogr/testing"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/pkg/features"
@@ -58,7 +59,8 @@ type testContext struct {
 // configuration. Alpha resources are enabled automatically if the corresponding feature
 // is enabled.
 func initTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interface) *testContext {
-	ctx, cancelFunc := context.WithCancel(context.Background())
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancelFunc := context.WithCancel(ctx)
 	testCtx := testContext{
 		ctx:      ctx,
 		cancelFn: cancelFunc,
@@ -121,11 +123,12 @@ func initTestSchedulerWithOptions(
 
 	var err error
 	testCtx.scheduler, err = scheduler.New(
+		testCtx.ctx,
 		testCtx.clientSet,
 		testCtx.informerFactory,
 		nil,
 		profile.NewRecorderFactory(eventBroadcaster),
-		testCtx.ctx.Done())
+	)
 
 	if err != nil {
 		t.Fatalf("Couldn't create scheduler: %v", err)

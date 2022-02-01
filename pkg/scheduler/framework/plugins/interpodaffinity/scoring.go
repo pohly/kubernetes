@@ -22,8 +22,9 @@ import (
 	"math"
 	"sync/atomic"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/klogr"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
@@ -158,6 +159,7 @@ func (pl *InterPodAffinity) PreScore(
 		}
 	}
 
+	logger := klogr.FromContext(pCtx)
 	state := &preScoreState{
 		topologyScore: make(map[string]map[string]int64),
 	}
@@ -179,7 +181,7 @@ func (pl *InterPodAffinity) PreScore(
 				return framework.AsStatus(fmt.Errorf("updating PreferredAntiAffinityTerms: %w", err))
 			}
 		}
-		state.namespaceLabels = GetNamespaceLabelsSnapshot(pod.Namespace, pl.nsLister)
+		state.namespaceLabels = GetNamespaceLabelsSnapshot(logger, pod.Namespace, pl.nsLister)
 	}
 
 	topoScores := make([]scoreMap, len(allNodes))
