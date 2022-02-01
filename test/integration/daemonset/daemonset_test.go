@@ -88,11 +88,11 @@ func setupScheduler(
 	})
 
 	sched, err := scheduler.New(
+		ctx,
 		cs,
 		informerFactory,
 		nil,
 		profile.NewRecorderFactory(eventBroadcaster),
-		ctx.Done(),
 	)
 	if err != nil {
 		t.Fatalf("Couldn't create scheduler: %v", err)

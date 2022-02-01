@@ -1376,7 +1376,7 @@ func TestSelectBestCandidate(t *testing.T) {
 			}
 			offset, numCandidates := pl.GetOffsetAndNumCandidates(int32(len(nodeInfos)))
 			candidates, _, _ := pe.DryRunPreemption(context.Background(), tt.pod, nodeInfos, nil, offset, numCandidates)
-			s := pe.SelectCandidate(candidates)
+			s := pe.SelectCandidate(logger, candidates)
 			if s == nil || len(s.Name()) == 0 {
 				return
 			}
@@ -1456,7 +1456,7 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 				t.Fatal(err)
 			}
 			pl := DefaultPreemption{fh: f}
-			if got := pl.PodEligibleToPreemptOthers(test.pod, test.nominatedNodeStatus); got != test.expected {
+			if got := pl.PodEligibleToPreemptOthers(logger, test.pod, test.nominatedNodeStatus); got != test.expected {
 				t.Errorf("expected %t, got %t for pod: %s", test.expected, got, test.pod.Name)
 			}
 		})
@@ -1606,7 +1606,9 @@ func TestPreempt(t *testing.T) {
 	labelKeys := []string{"hostname", "zone", "region"}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			logger, _ := ktesting.NewTestContext(t)
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
 			client := clientsetfake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 			podInformer := informerFactory.Core().V1().Pods().Informer()
@@ -1621,12 +1623,9 @@ func TestPreempt(t *testing.T) {
 				return true, nil, nil
 			})
 
-			stop := make(chan struct{})
-			defer close(stop)
-
-			cache := internalcache.New(time.Duration(0), stop)
+			cache := internalcache.New(ctx, time.Duration(0))
 			for _, pod := range test.pods {
-				cache.AddPod(pod)
+				cache.AddPod(logger, pod)
 			}
 			cachedNodeInfoMap := map[string]*framework.NodeInfo{}
 			nodes := make([]*v1.Node, len(test.nodeNames))
@@ -1639,7 +1638,7 @@ func TestPreempt(t *testing.T) {
 					node.ObjectMeta.Labels[labelKeys[i]] = label
 				}
 				node.Name = node.ObjectMeta.Labels["hostname"]
-				cache.AddNode(node)
+				cache.AddNode(logger, node)
 				nodes[i] = node
 
 				// Set nodeInfo to extenders to mock extenders' cache for preemption.

@@ -391,7 +391,7 @@ func New(plArgs runtime.Object, fh framework.Handle, fts feature.Features) (fram
 			CSIStorageCapacityInformer: fh.SharedInformerFactory().Storage().V1beta1().CSIStorageCapacities(),
 		}
 	}
-	binder := NewVolumeBinder(fh.ClientSet(), podInformer, nodeInformer, csiNodeInformer, pvcInformer, pvInformer, storageClassInformer, capacityCheck, time.Duration(args.BindTimeoutSeconds)*time.Second)
+	binder := NewVolumeBinder(fh.Logger(), fh.ClientSet(), podInformer, nodeInformer, csiNodeInformer, pvcInformer, pvInformer, storageClassInformer, capacityCheck, time.Duration(args.BindTimeoutSeconds)*time.Second)
 
 	// build score function
 	var scorer volumeCapacityScorer

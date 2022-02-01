@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
@@ -2438,10 +2439,11 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
 			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes)
 			l, _ := snapshot.NodeInfos().List()
 			p := plugintesting.SetupPlugin(t, frameworkruntime.FactoryAdapter(feature.Features{}, New), &config.InterPodAffinityArgs{}, snapshot)
-			gotAffinityPodsMap, gotAntiAffinityPodsMap := p.(*InterPodAffinity).getIncomingAffinityAntiAffinityCounts(framework.NewPodInfo(tt.pod), l, true)
+			gotAffinityPodsMap, gotAntiAffinityPodsMap := p.(*InterPodAffinity).getIncomingAffinityAntiAffinityCounts(logger, framework.NewPodInfo(tt.pod), l, true)
 			if !reflect.DeepEqual(gotAffinityPodsMap, tt.wantAffinityPodsMap) {
 				t.Errorf("getTPMapMatchingIncomingAffinityAntiAffinity() gotAffinityPodsMap = %#v, want %#v", gotAffinityPodsMap, tt.wantAffinityPodsMap)
 			}

@@ -31,6 +31,7 @@ import (
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/klog/v2/ktesting"
 	_ "k8s.io/klog/v2/ktesting/init"
+	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
@@ -78,7 +79,7 @@ func (pl *FakePostFilterPlugin) CandidatesToVictimsMap(candidates []Candidate) m
 	return nil
 }
 
-func (pl *FakePostFilterPlugin) PodEligibleToPreemptOthers(pod *v1.Pod, nominatedNodeStatus *framework.Status) bool {
+func (pl *FakePostFilterPlugin) PodEligibleToPreemptOthers(logger klog.Logger, pod *v1.Pod, nominatedNodeStatus *framework.Status) bool {
 	return true
 }
 
