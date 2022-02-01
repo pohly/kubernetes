@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/klog/v2/ktesting"
@@ -274,7 +273,9 @@ func TestSchedulerWithExtenders(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			logger, _ := ktesting.NewTestContext(t)
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
 			client := clientsetfake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 
@@ -282,9 +283,9 @@ func TestSchedulerWithExtenders(t *testing.T) {
 			for ii := range test.extenders {
 				extenders = append(extenders, &test.extenders[ii])
 			}
-			cache := internalcache.New(time.Duration(0), wait.NeverStop)
+			cache := internalcache.New(ctx, time.Duration(0))
 			for _, name := range test.nodes {
-				cache.AddNode(createNode(name))
+				cache.AddNode(logger, createNode(name))
 			}
 			fwk, err := st.NewFramework(
 				test.registerPlugins, "",
@@ -309,7 +310,7 @@ func TestSchedulerWithExtenders(t *testing.T) {
 				emptySnapshot,
 				schedulerapi.DefaultPercentageOfNodesToScore)
 			podIgnored := &v1.Pod{}
-			result, err := scheduler.SchedulePod(context.Background(), fwk, framework.NewCycleState(), podIgnored)
+			result, err := scheduler.SchedulePod(ctx, fwk, framework.NewCycleState(), podIgnored)
 			if test.expectsErr {
 				if err == nil {
 					t.Errorf("Unexpected non-error, result %+v", result)
