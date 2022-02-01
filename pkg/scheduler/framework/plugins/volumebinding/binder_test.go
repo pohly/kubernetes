@@ -173,6 +173,7 @@ func newTestBinder(t *testing.T, ctx context.Context, csiStorageCapacity ...bool
 		}
 	}
 	binder := NewVolumeBinder(
+		logger,
 		client,
 		podInformer,
 		nodeInformer,

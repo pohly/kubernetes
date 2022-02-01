@@ -33,6 +33,8 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
+	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -52,10 +54,11 @@ const (
 
 func TestCreate(t *testing.T) {
 	client := fake.NewSimpleClientset()
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	factory := newConfigFactory(client, stopCh)
-	if _, err := factory.create(); err != nil {
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	factory := newConfigFactory(client, ctx.Done())
+	if _, err := factory.create(logger); err != nil {
 		t.Error(err)
 	}
 }
@@ -93,8 +96,9 @@ func TestDefaultErrorFunc(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stopCh := make(chan struct{})
-			defer close(stopCh)
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
 
 			client := fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testPod}})
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
@@ -103,22 +107,22 @@ func TestDefaultErrorFunc(t *testing.T) {
 			podInformer.Informer().GetStore().Add(testPod)
 
 			queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(testingclock.NewFakeClock(time.Now())))
-			schedulerCache := internalcache.New(30*time.Second, stopCh)
+			schedulerCache := internalcache.New(ctx, 30*time.Second)
 
-			queue.Add(testPod)
+			queue.Add(logger, testPod)
 			queue.Pop()
 
 			if tt.podUpdatedDuringScheduling {
 				podInformer.Informer().GetStore().Update(testPodUpdated)
-				queue.Update(testPod, testPodUpdated)
+				queue.Update(logger, testPod, testPodUpdated)
 			}
 			if tt.podDeletedDuringScheduling {
 				podInformer.Informer().GetStore().Delete(testPod)
-				queue.Delete(testPod)
+				queue.Delete(logger, testPod)
 			}
 
 			testPodInfo := &framework.QueuedPodInfo{PodInfo: framework.NewPodInfo(testPod)}
-			errFunc := MakeDefaultErrorFunc(client, podInformer.Lister(), queue, schedulerCache)
+			errFunc := MakeDefaultErrorFunc(logger, client, podInformer.Lister(), queue, schedulerCache)
 			errFunc(testPodInfo, tt.injectErr)
 
 			var got *v1.Pod
@@ -167,8 +171,9 @@ func TestDefaultErrorFunc_NodeNotFound(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stopCh := make(chan struct{})
-			defer close(stopCh)
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
 
 			client := fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testPod}}, &v1.NodeList{Items: tt.nodes})
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
@@ -177,19 +182,19 @@ func TestDefaultErrorFunc_NodeNotFound(t *testing.T) {
 			podInformer.Informer().GetStore().Add(testPod)
 
 			queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(testingclock.NewFakeClock(time.Now())))
-			schedulerCache := internalcache.New(30*time.Second, stopCh)
+			schedulerCache := internalcache.New(ctx, 30*time.Second)
 
 			for i := range tt.nodes {
 				node := tt.nodes[i]
 				// Add node to schedulerCache no matter it's deleted in API server or not.
-				schedulerCache.AddNode(&node)
+				schedulerCache.AddNode(logger, &node)
 				if node.Name == tt.nodeNameToDelete {
 					client.CoreV1().Nodes().Delete(context.TODO(), node.Name, metav1.DeleteOptions{})
 				}
 			}
 
 			testPodInfo := &framework.QueuedPodInfo{PodInfo: framework.NewPodInfo(testPod)}
-			errFunc := MakeDefaultErrorFunc(client, podInformer.Lister(), queue, schedulerCache)
+			errFunc := MakeDefaultErrorFunc(logger, client, podInformer.Lister(), queue, schedulerCache)
 			errFunc(testPodInfo, tt.injectErr)
 
 			gotNodes := schedulerCache.Dump().Nodes
@@ -205,8 +210,9 @@ func TestDefaultErrorFunc_NodeNotFound(t *testing.T) {
 }
 
 func TestDefaultErrorFunc_PodAlreadyBound(t *testing.T) {
-	stopCh := make(chan struct{})
-	defer close(stopCh)
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	nodeFoo := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	testPod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "default"}, Spec: v1.PodSpec{NodeName: "foo"}}
@@ -218,13 +224,13 @@ func TestDefaultErrorFunc_PodAlreadyBound(t *testing.T) {
 	podInformer.Informer().GetStore().Add(testPod)
 
 	queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(testingclock.NewFakeClock(time.Now())))
-	schedulerCache := internalcache.New(30*time.Second, stopCh)
+	schedulerCache := internalcache.New(ctx, 30*time.Second)
 
 	// Add node to schedulerCache no matter it's deleted in API server or not.
-	schedulerCache.AddNode(&nodeFoo)
+	schedulerCache.AddNode(logger, &nodeFoo)
 
 	testPodInfo := &framework.QueuedPodInfo{PodInfo: framework.NewPodInfo(testPod)}
-	errFunc := MakeDefaultErrorFunc(client, podInformer.Lister(), queue, schedulerCache)
+	errFunc := MakeDefaultErrorFunc(logger, client, podInformer.Lister(), queue, schedulerCache)
 	errFunc(testPodInfo, fmt.Errorf("binding rejected: timeout"))
 
 	pod := getPodFromPriorityQueue(queue, testPod)
@@ -310,6 +316,7 @@ func (f *fakeExtender) IsIgnorable() bool {
 }
 
 func (f *fakeExtender) ProcessPreemption(
+	_ klog.Logger,
 	_ *v1.Pod,
 	_ map[string]*extenderv1.Victims,
 	_ framework.NodeInfoLister,

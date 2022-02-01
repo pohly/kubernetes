@@ -32,13 +32,13 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	dyfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
-
-	"k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
@@ -223,11 +223,14 @@ func TestUpdatePodInCache(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			sched := &Scheduler{
-				Cache:           cache.New(ttl, ctx.Done()),
+				Cache:           cache.New(ctx, ttl),
 				SchedulingQueue: queue.NewTestQueue(ctx, nil),
+				SchedulingQueue: schedulerQueue,
+				logger:          logger,
 			}
 			sched.addPodToCache(tt.oldObj)
 			sched.updatePodInCache(tt.oldObj, tt.newObj)
@@ -433,7 +436,8 @@ func TestAddAllEventHandlers(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
 			informerFactory := informers.NewSharedInformerFactory(fake.NewSimpleClientset(), 0)
@@ -441,6 +445,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 			testSched := Scheduler{
 				StopEverything:  ctx.Done(),
 				SchedulingQueue: schedulingQueue,
+				logger:          logger,
 			}
 
 			dynclient := dyfake.NewSimpleDynamicClient(scheme)

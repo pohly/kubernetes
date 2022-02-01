@@ -226,6 +226,7 @@ type CapacityCheck struct {
 //
 // capacityCheck determines whether storage capacity is checked (CSIStorageCapacity feature).
 func NewVolumeBinder(
+	logger klog.Logger,
 	kubeClient clientset.Interface,
 	podInformer coreinformers.PodInformer,
 	nodeInformer coreinformers.NodeInformer,
@@ -241,8 +242,8 @@ func NewVolumeBinder(
 		classLister:   storageClassInformer.Lister(),
 		nodeLister:    nodeInformer.Lister(),
 		csiNodeLister: csiNodeInformer.Lister(),
-		pvcCache:      NewPVCAssumeCache(pvcInformer.Informer()),
-		pvCache:       NewPVAssumeCache(pvInformer.Informer()),
+		pvcCache:      NewPVCAssumeCache(logger, pvcInformer.Informer()),
+		pvCache:       NewPVAssumeCache(logger, pvInformer.Informer()),
 		bindTimeout:   bindTimeout,
 		translator:    csitrans.New(),
 	}

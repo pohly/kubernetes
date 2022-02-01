@@ -31,6 +31,7 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2/ktesting"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	"k8s.io/klog/v2"
@@ -74,7 +75,7 @@ func TestSchedule100Node3KPods(t *testing.T) {
 		t.Skip("Skipping because we want to run short tests")
 	}
 
-	config := getBaseConfig(100, 3000)
+	config := getBaseConfig(t, 100, 3000)
 	err := writePodAndNodeTopologyToConfig(config)
 	if err != nil {
 		t.Errorf("Misconfiguration happened for nodes/pods chosen to have predicates and priorities")
@@ -115,8 +116,8 @@ type testConfig struct {
 }
 
 // getBaseConfig returns baseConfig after initializing number of nodes and pods.
-func getBaseConfig(nodes int, pods int) *testConfig {
-	destroyFunc, podInformer, clientset, _ := mustSetupScheduler(nil)
+func getBaseConfig(tl ktesting.TL, nodes int, pods int) *testConfig {
+	destroyFunc, podInformer, clientset, _ := mustSetupScheduler(tl, nil)
 	return &testConfig{
 		clientset:   clientset,
 		destroyFunc: destroyFunc,

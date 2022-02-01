@@ -119,6 +119,11 @@ type Scheduler struct {
 	percentageOfNodesToScore int32
 
 	nextStartNodeIndex int
+
+	// logger *must* be initialized when creating a Scheduler,
+	// otherwise logging functions will access a nil sink and
+	// panic.
+	logger klog.Logger
 }
 
 type schedulerOptions struct {
@@ -252,6 +257,7 @@ var defaultSchedulerOptions = schedulerOptions{
 
 // newScheduler creates a Scheduler object.
 func newScheduler(
+	logger klog.Logger,
 	cache internalcache.Cache,
 	extenders []framework.Extender,
 	nextPod func() *framework.QueuedPodInfo,
@@ -273,23 +279,22 @@ func newScheduler(
 		client:                   client,
 		nodeInfoSnapshot:         nodeInfoSnapshot,
 		percentageOfNodesToScore: percentageOfNodesToScore,
+		logger:                   logger,
 	}
 	sched.SchedulePod = sched.schedulePod
 	return &sched
 }
 
 // New returns a Scheduler
-func New(client clientset.Interface,
+func New(ctx context.Context,
+	client clientset.Interface,
 	informerFactory informers.SharedInformerFactory,
 	dynInformerFactory dynamicinformer.DynamicSharedInformerFactory,
 	recorderFactory profile.RecorderFactory,
-	stopCh <-chan struct{},
 	opts ...Option) (*Scheduler, error) {
 
-	stopEverything := stopCh
-	if stopEverything == nil {
-		stopEverything = wait.NeverStop
-	}
+	logger := klog.FromContext(ctx)
+	stopEverything := ctx.Done()
 
 	options := defaultSchedulerOptions
 	for _, opt := range opts {
@@ -305,7 +310,7 @@ func New(client clientset.Interface,
 		}
 		options.profiles = cfg.Profiles
 	}
-	schedulerCache := internalcache.New(durationToExpireAssumedPod, stopEverything)
+	schedulerCache := internalcache.New(ctx, durationToExpireAssumedPod)
 
 	registry := frameworkplugins.NewInTreeRegistry()
 	if err := registry.Merge(options.frameworkOutOfTreeRegistry); err != nil {
@@ -339,7 +344,7 @@ func New(client clientset.Interface,
 	metrics.Register()
 
 	// Create the config from component config
-	sched, err := configurator.create()
+	sched, err := configurator.create(logger)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create scheduler: %v", err)
 	}
@@ -363,14 +368,15 @@ func unionedGVKs(m map[framework.ClusterEvent]sets.String) map[framework.GVK]fra
 
 // Run begins watching and scheduling. It starts scheduling and blocked until the context is done.
 func (sched *Scheduler) Run(ctx context.Context) {
-	sched.SchedulingQueue.Run()
+	logger := klog.FromContext(ctx)
+	sched.SchedulingQueue.Run(logger)
 	wait.UntilWithContext(ctx, sched.scheduleOne, 0)
 	sched.SchedulingQueue.Close()
 }
 
 // handleSchedulingFailure records an event for the pod that indicates the
 // pod has failed to schedule. Also, update the pod condition and nominated node name if set.
-func (sched *Scheduler) handleSchedulingFailure(fwk framework.Framework, podInfo *framework.QueuedPodInfo, err error, reason string, nominatingInfo *framework.NominatingInfo) {
+func (sched *Scheduler) handleSchedulingFailure(logger klog.Logger, fwk framework.Framework, podInfo *framework.QueuedPodInfo, err error, reason string, nominatingInfo *framework.NominatingInfo) {
 	sched.Error(podInfo, err)
 
 	// Update the scheduling queue with the nominated pod information. Without
@@ -378,19 +384,19 @@ func (sched *Scheduler) handleSchedulingFailure(fwk framework.Framework, podInfo
 	// and the time the scheduler receives a Pod Update for the nominated pod.
 	// Here we check for nil only for tests.
 	if sched.SchedulingQueue != nil {
-		sched.SchedulingQueue.AddNominatedPod(podInfo.PodInfo, nominatingInfo)
+		sched.SchedulingQueue.AddNominatedPod(logger, podInfo.PodInfo, nominatingInfo)
 	}
 
 	pod := podInfo.Pod
 	msg := truncateMessage(err.Error())
 	fwk.EventRecorder().Eventf(pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", msg)
-	if err := updatePod(sched.client, pod, &v1.PodCondition{
+	if err := updatePod(logger, sched.client, pod, &v1.PodCondition{
 		Type:    v1.PodScheduled,
 		Status:  v1.ConditionFalse,
 		Reason:  reason,
 		Message: err.Error(),
 	}, nominatingInfo); err != nil {
-		klog.ErrorS(err, "Error updating pod", "pod", klog.KObj(pod))
+		logger.Error(err, "Error updating pod", "pod", klog.KObj(pod))
 	}
 }
 
@@ -404,8 +410,8 @@ func truncateMessage(message string) string {
 	return message[:max-len(suffix)] + suffix
 }
 
-func updatePod(client clientset.Interface, pod *v1.Pod, condition *v1.PodCondition, nominatingInfo *framework.NominatingInfo) error {
-	klog.V(3).InfoS("Updating pod condition", "pod", klog.KObj(pod), "conditionType", condition.Type, "conditionStatus", condition.Status, "conditionReason", condition.Reason)
+func updatePod(logger klog.Logger, client clientset.Interface, pod *v1.Pod, condition *v1.PodCondition, nominatingInfo *framework.NominatingInfo) error {
+	logger.V(3).Info("Updating pod condition", "pod", klog.KObj(pod), "conditionType", condition.Type, "conditionStatus", condition.Status, "conditionReason", condition.Reason)
 	podStatusCopy := pod.Status.DeepCopy()
 	// NominatedNodeName is updated only if we are trying to set it, and the value is
 	// different from the existing one.
@@ -421,20 +427,20 @@ func updatePod(client clientset.Interface, pod *v1.Pod, condition *v1.PodConditi
 
 // assume signals to the cache that a pod is already in the cache, so that binding can be asynchronous.
 // assume modifies `assumed`.
-func (sched *Scheduler) assume(assumed *v1.Pod, host string) error {
+func (sched *Scheduler) assume(logger klog.Logger, assumed *v1.Pod, host string) error {
 	// Optimistically assume that the binding will succeed and send it to apiserver
 	// in the background.
 	// If the binding fails, scheduler will release resources allocated to assumed pod
 	// immediately.
 	assumed.Spec.NodeName = host
 
-	if err := sched.Cache.AssumePod(assumed); err != nil {
-		klog.ErrorS(err, "Scheduler cache AssumePod failed")
+	if err := sched.Cache.AssumePod(logger, assumed); err != nil {
+		logger.Error(err, "Scheduler cache AssumePod failed")
 		return err
 	}
 	// if "assumed" is a nominated pod, we should remove it from internal cache
 	if sched.SchedulingQueue != nil {
-		sched.SchedulingQueue.DeleteNominatedPodIfExists(assumed)
+		sched.SchedulingQueue.DeleteNominatedPodIfExists(logger, assumed)
 	}
 
 	return nil
@@ -444,8 +450,9 @@ func (sched *Scheduler) assume(assumed *v1.Pod, host string) error {
 // The precedence for binding is: (1) extenders and (2) framework plugins.
 // We expect this to run asynchronously, so we handle binding metrics internally.
 func (sched *Scheduler) bind(ctx context.Context, fwk framework.Framework, assumed *v1.Pod, targetNode string, state *framework.CycleState) (err error) {
+	logger := klog.FromContext(ctx)
 	defer func() {
-		sched.finishBinding(fwk, assumed, targetNode, err)
+		sched.finishBinding(logger, fwk, assumed, targetNode, err)
 	}()
 
 	bound, err := sched.extendersBinding(assumed, targetNode)
@@ -476,12 +483,12 @@ func (sched *Scheduler) extendersBinding(pod *v1.Pod, node string) (bool, error)
 	return false, nil
 }
 
-func (sched *Scheduler) finishBinding(fwk framework.Framework, assumed *v1.Pod, targetNode string, err error) {
+func (sched *Scheduler) finishBinding(logger klog.Logger, fwk framework.Framework, assumed *v1.Pod, targetNode string, err error) {
 	if finErr := sched.Cache.FinishBinding(assumed); finErr != nil {
-		klog.ErrorS(finErr, "Scheduler cache FinishBinding failed")
+		logger.Error(finErr, "Scheduler cache FinishBinding failed")
 	}
 	if err != nil {
-		klog.V(1).InfoS("Failed to bind pod", "pod", klog.KObj(assumed))
+		logger.V(1).Info("Failed to bind pod", "pod", klog.KObj(assumed))
 		return
 	}
 
@@ -499,19 +506,20 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 	if podInfo == nil || podInfo.Pod == nil {
 		return
 	}
+	logger := klog.FromContext(ctx)
 	pod := podInfo.Pod
 	fwk, err := sched.frameworkForPod(pod)
 	if err != nil {
 		// This shouldn't happen, because we only accept for scheduling the pods
 		// which specify a scheduler name that matches one of the profiles.
-		klog.ErrorS(err, "Error occurred")
+		logger.Error(err, "Error occurred")
 		return
 	}
-	if sched.skipPodSchedule(fwk, pod) {
+	if sched.skipPodSchedule(logger, fwk, pod) {
 		return
 	}
 
-	klog.V(3).InfoS("Attempting to schedule pod", "pod", klog.KObj(pod))
+	logger.V(3).Info("Attempting to schedule pod", "pod", klog.KObj(pod))
 
 	// Synchronously attempt to find a fit for the pod.
 	start := time.Now()
@@ -532,15 +540,15 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 		var nominatingInfo *framework.NominatingInfo
 		if fitError, ok := err.(*framework.FitError); ok {
 			if !fwk.HasPostFilterPlugins() {
-				klog.V(3).InfoS("No PostFilter plugins are registered, so no preemption will be performed")
+				logger.V(3).Info("No PostFilter plugins are registered, so no preemption will be performed")
 			} else {
 				// Run PostFilter plugins to try to make the pod schedulable in a future scheduling cycle.
 				result, status := fwk.RunPostFilterPlugins(ctx, state, pod, fitError.Diagnosis.NodeToStatusMap)
 				if status.Code() == framework.Error {
-					klog.ErrorS(nil, "Status after running PostFilter plugins for pod", "pod", klog.KObj(pod), "status", status)
+					logger.Error(nil, "Status after running PostFilter plugins for pod", "pod", klog.KObj(pod), "status", status)
 				} else {
 					fitError.Diagnosis.PostFilterMsg = status.Message()
-					klog.V(5).InfoS("Status after running PostFilter plugins for pod", "pod", klog.KObj(pod), "status", status)
+					logger.V(5).Info("Status after running PostFilter plugins for pod", "pod", klog.KObj(pod), "status", status)
 				}
 				if result != nil {
 					nominatingInfo = result.NominatingInfo
@@ -556,10 +564,10 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 			metrics.PodUnschedulable(fwk.ProfileName(), metrics.SinceInSeconds(start))
 		} else {
 			nominatingInfo = clearNominatedNode
-			klog.ErrorS(err, "Error selecting node for pod", "pod", klog.KObj(pod))
+			logger.Error(err, "Error selecting node for pod", "pod", klog.KObj(pod))
 			metrics.PodScheduleError(fwk.ProfileName(), metrics.SinceInSeconds(start))
 		}
-		sched.handleSchedulingFailure(fwk, podInfo, err, v1.PodReasonUnschedulable, nominatingInfo)
+		sched.handleSchedulingFailure(logger, fwk, podInfo, err, v1.PodReasonUnschedulable, nominatingInfo)
 		return
 	}
 	metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInSeconds(start))
@@ -568,7 +576,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 	assumedPodInfo := podInfo.DeepCopy()
 	assumedPod := assumedPodInfo.Pod
 	// assume modifies `assumedPod` by setting NodeName=scheduleResult.SuggestedHost
-	err = sched.assume(assumedPod, scheduleResult.SuggestedHost)
+	err = sched.assume(logger, assumedPod, scheduleResult.SuggestedHost)
 	if err != nil {
 		metrics.PodScheduleError(fwk.ProfileName(), metrics.SinceInSeconds(start))
 		// This is most probably result of a BUG in retrying logic.
@@ -576,7 +584,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 		// This relies on the fact that Error will check if the pod has been bound
 		// to a node and if so will not add it back to the unscheduled pods queue
 		// (otherwise this would cause an infinite loop).
-		sched.handleSchedulingFailure(fwk, assumedPodInfo, err, SchedulerError, clearNominatedNode)
+		sched.handleSchedulingFailure(logger, fwk, assumedPodInfo, err, SchedulerError, clearNominatedNode)
 		return
 	}
 
@@ -586,9 +594,9 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 		// trigger un-reserve to clean up state associated with the reserved Pod
 		fwk.RunReservePluginsUnreserve(schedulingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
 		if forgetErr := sched.Cache.ForgetPod(assumedPod); forgetErr != nil {
-			klog.ErrorS(forgetErr, "Scheduler cache ForgetPod failed")
+			logger.Error(forgetErr, "Scheduler cache ForgetPod failed")
 		}
-		sched.handleSchedulingFailure(fwk, assumedPodInfo, sts.AsError(), SchedulerError, clearNominatedNode)
+		sched.handleSchedulingFailure(logger, fwk, assumedPodInfo, sts.AsError(), SchedulerError, clearNominatedNode)
 		return
 	}
 
@@ -606,15 +614,15 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 		// One of the plugins returned status different than success or wait.
 		fwk.RunReservePluginsUnreserve(schedulingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
 		if forgetErr := sched.Cache.ForgetPod(assumedPod); forgetErr != nil {
-			klog.ErrorS(forgetErr, "Scheduler cache ForgetPod failed")
+			logger.Error(forgetErr, "Scheduler cache ForgetPod failed")
 		}
-		sched.handleSchedulingFailure(fwk, assumedPodInfo, runPermitStatus.AsError(), reason, clearNominatedNode)
+		sched.handleSchedulingFailure(logger, fwk, assumedPodInfo, runPermitStatus.AsError(), reason, clearNominatedNode)
 		return
 	}
 
 	// At the end of a successful scheduling cycle, pop and move up Pods if needed.
 	if len(podsToActivate.Map) != 0 {
-		sched.SchedulingQueue.Activate(podsToActivate.Map)
+		sched.SchedulingQueue.Activate(logger, podsToActivate.Map)
 		// Clear the entries after activation.
 		podsToActivate.Map = make(map[string]*v1.Pod)
 	}
@@ -639,7 +647,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 			// trigger un-reserve plugins to clean up state associated with the reserved Pod
 			fwk.RunReservePluginsUnreserve(bindingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
 			if forgetErr := sched.Cache.ForgetPod(assumedPod); forgetErr != nil {
-				klog.ErrorS(forgetErr, "scheduler cache ForgetPod failed")
+				logger.Error(forgetErr, "scheduler cache ForgetPod failed")
 			} else {
 				// "Forget"ing an assumed Pod in binding cycle should be treated as a PodDelete event,
 				// as the assumed Pod had occupied a certain amount of resources in scheduler cache.
@@ -647,11 +655,11 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 				// Avoid moving the assumed Pod itself as it's always Unschedulable.
 				// It's intentional to "defer" this operation; otherwise MoveAllToActiveOrBackoffQueue() would
 				// update `q.moveRequest` and thus move the assumed pod to backoffQ anyways.
-				defer sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(internalqueue.AssignedPodDelete, func(pod *v1.Pod) bool {
+				defer sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, internalqueue.AssignedPodDelete, func(pod *v1.Pod) bool {
 					return assumedPod.UID != pod.UID
 				})
 			}
-			sched.handleSchedulingFailure(fwk, assumedPodInfo, waitOnPermitStatus.AsError(), reason, clearNominatedNode)
+			sched.handleSchedulingFailure(logger, fwk, assumedPodInfo, waitOnPermitStatus.AsError(), reason, clearNominatedNode)
 			return
 		}
 
@@ -662,14 +670,14 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 			// trigger un-reserve plugins to clean up state associated with the reserved Pod
 			fwk.RunReservePluginsUnreserve(bindingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
 			if forgetErr := sched.Cache.ForgetPod(assumedPod); forgetErr != nil {
-				klog.ErrorS(forgetErr, "scheduler cache ForgetPod failed")
+				logger.Error(forgetErr, "scheduler cache ForgetPod failed")
 			} else {
 				// "Forget"ing an assumed Pod in binding cycle should be treated as a PodDelete event,
 				// as the assumed Pod had occupied a certain amount of resources in scheduler cache.
 				// TODO(#103853): de-duplicate the logic.
-				sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(internalqueue.AssignedPodDelete, nil)
+				sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, internalqueue.AssignedPodDelete, nil)
 			}
-			sched.handleSchedulingFailure(fwk, assumedPodInfo, preBindStatus.AsError(), SchedulerError, clearNominatedNode)
+			sched.handleSchedulingFailure(logger, fwk, assumedPodInfo, preBindStatus.AsError(), SchedulerError, clearNominatedNode)
 			return
 		}
 
@@ -679,17 +687,17 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 			// trigger un-reserve plugins to clean up state associated with the reserved Pod
 			fwk.RunReservePluginsUnreserve(bindingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
 			if err := sched.Cache.ForgetPod(assumedPod); err != nil {
-				klog.ErrorS(err, "scheduler cache ForgetPod failed")
+				logger.Error(err, "scheduler cache ForgetPod failed")
 			} else {
 				// "Forget"ing an assumed Pod in binding cycle should be treated as a PodDelete event,
 				// as the assumed Pod had occupied a certain amount of resources in scheduler cache.
 				// TODO(#103853): de-duplicate the logic.
-				sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(internalqueue.AssignedPodDelete, nil)
+				sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, internalqueue.AssignedPodDelete, nil)
 			}
-			sched.handleSchedulingFailure(fwk, assumedPodInfo, fmt.Errorf("binding rejected: %w", err), SchedulerError, clearNominatedNode)
+			sched.handleSchedulingFailure(logger, fwk, assumedPodInfo, fmt.Errorf("binding rejected: %w", err), SchedulerError, clearNominatedNode)
 		} else {
 			// Calculating nodeResourceString can be heavy. Avoid it if klog verbosity is below 2.
-			klog.V(2).InfoS("Successfully bound pod to node", "pod", klog.KObj(pod), "node", scheduleResult.SuggestedHost, "evaluatedNodes", scheduleResult.EvaluatedNodes, "feasibleNodes", scheduleResult.FeasibleNodes)
+			logger.V(2).Info("Successfully bound pod to node", "pod", klog.KObj(pod), "node", scheduleResult.SuggestedHost, "evaluatedNodes", scheduleResult.EvaluatedNodes, "feasibleNodes", scheduleResult.FeasibleNodes)
 			metrics.PodScheduled(fwk.ProfileName(), metrics.SinceInSeconds(start))
 			metrics.PodSchedulingAttempts.Observe(float64(podInfo.Attempts))
 			metrics.PodSchedulingDuration.WithLabelValues(getAttemptsLabel(podInfo)).Observe(metrics.SinceInSeconds(podInfo.InitialAttemptTimestamp))
@@ -699,7 +707,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 
 			// At the end of a successful binding cycle, move up Pods if needed.
 			if len(podsToActivate.Map) != 0 {
-				sched.SchedulingQueue.Activate(podsToActivate.Map)
+				sched.SchedulingQueue.Activate(logger, podsToActivate.Map)
 				// Unlike the logic in scheduling cycle, we don't bother deleting the entries
 				// as `podsToActivate.Map` is no longer consumed.
 			}
@@ -725,11 +733,11 @@ func (sched *Scheduler) frameworkForPod(pod *v1.Pod) (framework.Framework, error
 }
 
 // skipPodSchedule returns true if we could skip scheduling the pod for specified cases.
-func (sched *Scheduler) skipPodSchedule(fwk framework.Framework, pod *v1.Pod) bool {
+func (sched *Scheduler) skipPodSchedule(logger klog.Logger, fwk framework.Framework, pod *v1.Pod) bool {
 	// Case 1: pod is being deleted.
 	if pod.DeletionTimestamp != nil {
 		fwk.EventRecorder().Eventf(pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", "skip schedule deleting pod: %v/%v", pod.Namespace, pod.Name)
-		klog.V(3).InfoS("Skip schedule deleting pod", "pod", klog.KObj(pod))
+		logger.V(3).Info("Skip schedule deleting pod", "pod", klog.KObj(pod))
 		return true
 	}
 
