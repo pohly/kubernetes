@@ -33,9 +33,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/klogr"
 	ktesting "k8s.io/klogr/testing"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -418,13 +418,16 @@ func TestFindNodesThatPassExtenders(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
 			var extenders []framework.Extender
 			for ii := range tt.extenders {
 				extenders = append(extenders, &tt.extenders[ii])
 			}
 
 			pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "1", UID: types.UID("1")}}
-			got, err := findNodesThatPassExtenders(extenders, pod, tt.nodes, tt.filteredNodesStatuses)
+			got, err := findNodesThatPassExtenders(ctx, extenders, pod, tt.nodes, tt.filteredNodesStatuses)
 			if tt.expectsErr {
 				if err == nil {
 					t.Error("Unexpected non-error")
@@ -966,20 +969,21 @@ func TestGenericScheduler(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			cache := internalcache.New(time.Duration(0), wait.NeverStop)
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			cache := internalcache.New(ctx, time.Duration(0))
 			for _, pod := range test.pods {
-				cache.AddPod(pod)
+				cache.AddPod(logger, pod)
 			}
 			var nodes []*v1.Node
 			for _, name := range test.nodes {
 				node := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: name, Labels: map[string]string{"hostname": name}}}
 				nodes = append(nodes, node)
-				cache.AddNode(node)
+				cache.AddNode(logger, node)
 			}
 
-			logger, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
-			defer cancel()
 			cs := clientsetfake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(cs, 0)
 			for _, pvc := range test.pvcs {
@@ -1033,23 +1037,27 @@ func TestGenericScheduler(t *testing.T) {
 }
 
 // makeScheduler makes a simple genericScheduler for testing.
-func makeScheduler(nodes []*v1.Node) *genericScheduler {
-	cache := internalcache.New(time.Duration(0), wait.NeverStop)
+func makeScheduler(ctx context.Context, nodes []*v1.Node) *genericScheduler {
+	logger := klogr.FromContext(ctx)
+	cache := internalcache.New(ctx, time.Duration(0))
 	for _, n := range nodes {
-		cache.AddNode(n)
+		cache.AddNode(logger, n)
 	}
 
 	s := NewGenericScheduler(
 		cache,
 		emptySnapshot,
 		schedulerapi.DefaultPercentageOfNodesToScore)
-	cache.UpdateSnapshot(s.(*genericScheduler).nodeInfoSnapshot)
+	cache.UpdateSnapshot(logger, s.(*genericScheduler).nodeInfoSnapshot)
 	return s.(*genericScheduler)
 }
 
 func TestFindFitAllError(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	nodes := makeNodeList([]string{"3", "2", "1"})
-	scheduler := makeScheduler(nodes)
+	scheduler := makeScheduler(ctx, nodes)
 	fwk, err := st.NewFramework(
 		[]st.RegisterPluginFunc{
 			st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
@@ -1084,9 +1092,11 @@ func TestFindFitAllError(t *testing.T) {
 }
 
 func TestFindFitSomeError(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	nodes := makeNodeList([]string{"3", "2", "1"})
-	scheduler := makeScheduler(nodes)
+	scheduler := makeScheduler(ctx, nodes)
 	fwk, err := st.NewFramework(
 		[]st.RegisterPluginFunc{
 			st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
@@ -1154,7 +1164,9 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			logger, _ := ktesting.NewTestContext(t)
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
 			nodes := makeNodeList([]string{"1"})
 
 			plugin := st.FakeFilterPlugin{}
@@ -1178,11 +1190,11 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			scheduler := makeScheduler(nodes)
-			if err := scheduler.cache.UpdateSnapshot(scheduler.nodeInfoSnapshot); err != nil {
+			scheduler := makeScheduler(ctx, nodes)
+			if err := scheduler.cache.UpdateSnapshot(logger, scheduler.nodeInfoSnapshot); err != nil {
 				t.Fatal(err)
 			}
-			fwk.AddNominatedPod(framework.NewPodInfo(&v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "nominated"}, Spec: v1.PodSpec{Priority: &midPriority}}),
+			fwk.AddNominatedPod(logger, framework.NewPodInfo(&v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "nominated"}, Spec: v1.PodSpec{Priority: &midPriority}}),
 				&framework.NominatingInfo{NominatingMode: framework.ModeOverride, NominatedNodeName: "1"})
 
 			_, _, err = scheduler.findNodesThatFitPod(context.Background(), nil, fwk, framework.NewCycleState(), test.pod)
@@ -1419,14 +1431,16 @@ func TestNumFeasibleNodesToFind(t *testing.T) {
 }
 
 func TestFairEvaluationForNodes(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	numAllNodes := 500
 	nodeNames := make([]string, 0, numAllNodes)
 	for i := 0; i < numAllNodes; i++ {
 		nodeNames = append(nodeNames, strconv.Itoa(i))
 	}
 	nodes := makeNodeList(nodeNames)
-	g := makeScheduler(nodes)
+	g := makeScheduler(ctx, nodes)
 	fwk, err := st.NewFramework(
 		[]st.RegisterPluginFunc{
 			st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
@@ -1488,14 +1502,16 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			logger, _ := ktesting.NewTestContext(t)
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
 			// create three nodes in the cluster.
 			nodes := makeNodeList([]string{"node1", "node2", "node3"})
 			client := clientsetfake.NewSimpleClientset(test.pod)
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
-			cache := internalcache.New(time.Duration(0), wait.NeverStop)
+			cache := internalcache.New(ctx, time.Duration(0))
 			for _, n := range nodes {
-				cache.AddNode(n)
+				cache.AddNode(logger, n)
 			}
 			plugin := st.FakeFilterPlugin{FailedNodeReturnCodeMap: test.nodeReturnCodeMap}
 			registerFakeFilterFunc := st.RegisterFilterPlugin(

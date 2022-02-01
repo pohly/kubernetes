@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/kubernetes"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
-	"k8s.io/klog/v2"
+	"k8s.io/klogr"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 )
@@ -56,7 +56,7 @@ func GetPodStartTime(pod *v1.Pod) *metav1.Time {
 func GetEarliestPodStartTime(victims *extenderv1.Victims) *metav1.Time {
 	if len(victims.Pods) == 0 {
 		// should not reach here.
-		klog.ErrorS(fmt.Errorf("victims.Pods is empty. Should not reach here"), "")
+		klogr.Background().Error(nil, "victims.Pods is empty. Should not reach here")
 		return nil
 	}
 

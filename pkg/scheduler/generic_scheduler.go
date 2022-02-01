@@ -24,8 +24,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"k8s.io/klog/v2"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klogr"
@@ -81,9 +79,9 @@ type genericScheduler struct {
 
 // snapshot snapshots scheduler cache and node infos for all fit and priority
 // functions.
-func (g *genericScheduler) snapshot() error {
+func (g *genericScheduler) snapshot(logger klogr.Logger) error {
 	// Used for all fit and priority funcs.
-	return g.cache.UpdateSnapshot(g.nodeInfoSnapshot)
+	return g.cache.UpdateSnapshot(logger, g.nodeInfoSnapshot)
 }
 
 // Schedule tries to schedule the given pod to one of the nodes in the node list.
@@ -95,7 +93,8 @@ func (g *genericScheduler) Schedule(ctx context.Context, extenders []framework.E
 	trace := utiltrace.New("Scheduling", utiltrace.Field{Key: "namespace", Value: pod.Namespace}, utiltrace.Field{Key: "name", Value: pod.Name})
 	defer trace.LogIfLong(100 * time.Millisecond)
 
-	if err := g.snapshot(); err != nil {
+	logger := klogr.FromContext(ctx)
+	if err := g.snapshot(logger); err != nil {
 		return result, err
 	}
 	trace.Step("Snapshotting scheduler cache and node infos done")
@@ -104,7 +103,6 @@ func (g *genericScheduler) Schedule(ctx context.Context, extenders []framework.E
 		return result, ErrNoNodesAvailable
 	}
 
-	logger := klogr.FromContext(ctx)
 	logger = logger.WithValues("pod", klogr.KObj(pod))
 	ctx = klogr.NewContext(ctx, logger)
 
@@ -207,7 +205,7 @@ func (g *genericScheduler) evaluateNominatedNode(ctx context.Context, extenders 
 		return nil, err
 	}
 
-	feasibleNodes, err = findNodesThatPassExtenders(extenders, pod, feasibleNodes, diagnosis.NodeToStatusMap)
+	feasibleNodes, err = findNodesThatPassExtenders(ctx, extenders, pod, feasibleNodes, diagnosis.NodeToStatusMap)
 	if err != nil {
 		return nil, err
 	}
@@ -248,7 +246,7 @@ func (g *genericScheduler) findNodesThatFitPod(ctx context.Context, extenders []
 	if len(pod.Status.NominatedNodeName) > 0 {
 		feasibleNodes, err := g.evaluateNominatedNode(ctx, extenders, pod, fwk, state, diagnosis)
 		if err != nil {
-			klog.ErrorS(err, "Evaluation failed on nominated node", "pod", klog.KObj(pod), "node", pod.Status.NominatedNodeName)
+			klogr.FromContext(ctx).Error(err, "Evaluation failed on nominated node", "pod", klogr.KObj(pod), "node", pod.Status.NominatedNodeName)
 		}
 		// Nominated node passes all the filters, scheduler is good to assign this node to the pod.
 		if len(feasibleNodes) != 0 {
@@ -260,7 +258,7 @@ func (g *genericScheduler) findNodesThatFitPod(ctx context.Context, extenders []
 		return nil, diagnosis, err
 	}
 
-	feasibleNodes, err = findNodesThatPassExtenders(extenders, pod, feasibleNodes, diagnosis.NodeToStatusMap)
+	feasibleNodes, err = findNodesThatPassExtenders(ctx, extenders, pod, feasibleNodes, diagnosis.NodeToStatusMap)
 	if err != nil {
 		return nil, diagnosis, err
 	}
@@ -345,7 +343,8 @@ func (g *genericScheduler) findNodesThatPassFilters(
 	return feasibleNodes, nil
 }
 
-func findNodesThatPassExtenders(extenders []framework.Extender, pod *v1.Pod, feasibleNodes []*v1.Node, statuses framework.NodeToStatusMap) ([]*v1.Node, error) {
+func findNodesThatPassExtenders(ctx context.Context, extenders []framework.Extender, pod *v1.Pod, feasibleNodes []*v1.Node, statuses framework.NodeToStatusMap) ([]*v1.Node, error) {
+	logger := klogr.FromContext(ctx)
 	// Extenders are called sequentially.
 	// Nodes in original feasibleNodes can be excluded in one extender, and pass on to the next
 	// extender in a decreasing manner.
@@ -365,7 +364,7 @@ func findNodesThatPassExtenders(extenders []framework.Extender, pod *v1.Pod, fea
 		feasibleList, failedMap, failedAndUnresolvableMap, err := extender.Filter(pod, feasibleNodes)
 		if err != nil {
 			if extender.IsIgnorable() {
-				klog.InfoS("Skipping extender as it returned error and has ignorable flag set", "extender", extender, "err", err)
+				logger.Info("Skipping extender as it returned error and has ignorable flag set", "extender", extender, "err", err)
 				continue
 			}
 			return nil, err
@@ -437,11 +436,12 @@ func prioritizeNodes(
 	}
 
 	// Additional details logged at level 10 if enabled.
-	klogV := klog.V(10)
-	if klogV.Enabled() {
+	logger := klogr.FromContext(ctx)
+	loggerV := logger.V(10)
+	if loggerV.Enabled() {
 		for plugin, nodeScoreList := range scoresMap {
 			for _, nodeScore := range nodeScoreList {
-				klogV.InfoS("Plugin scored node for pod", "pod", klog.KObj(pod), "plugin", plugin, "node", nodeScore.Name, "score", nodeScore.Score)
+				loggerV.Info("Plugin scored node for pod", "pod", klogr.KObj(pod), "plugin", plugin, "node", nodeScore.Name, "score", nodeScore.Score)
 			}
 		}
 	}
@@ -479,8 +479,8 @@ func prioritizeNodes(
 				mu.Lock()
 				for i := range *prioritizedList {
 					host, score := (*prioritizedList)[i].Host, (*prioritizedList)[i].Score
-					if klogV.Enabled() {
-						klogV.InfoS("Extender scored node for pod", "pod", klog.KObj(pod), "extender", extenders[extIndex].Name(), "node", host, "score", score)
+					if loggerV.Enabled() {
+						loggerV.Info("Extender scored node for pod", "pod", klogr.KObj(pod), "extender", extenders[extIndex].Name(), "node", host, "score", score)
 					}
 					combinedScores[host] += score * weight
 				}
@@ -496,9 +496,9 @@ func prioritizeNodes(
 		}
 	}
 
-	if klogV.Enabled() {
+	if loggerV.Enabled() {
 		for i := range result {
-			klogV.InfoS("Calculated node's final score for pod", "pod", klog.KObj(pod), "node", result[i].Name, "score", result[i].Score)
+			loggerV.Info("Calculated node's final score for pod", "pod", klogr.KObj(pod), "node", result[i].Name, "score", result[i].Score)
 		}
 	}
 	return result, nil

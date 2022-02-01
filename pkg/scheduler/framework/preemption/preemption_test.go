@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/klogr"
 	ktesting "k8s.io/klogr/testing"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -77,7 +78,7 @@ func (pl *FakePostFilterPlugin) CandidatesToVictimsMap(candidates []Candidate) m
 	return nil
 }
 
-func (pl *FakePostFilterPlugin) PodEligibleToPreemptOthers(pod *v1.Pod, nominatedNodeStatus *framework.Status) bool {
+func (pl *FakePostFilterPlugin) PodEligibleToPreemptOthers(logger klogr.Logger, pod *v1.Pod, nominatedNodeStatus *framework.Status) bool {
 	return true
 }
 

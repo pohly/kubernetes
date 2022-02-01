@@ -25,7 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
-	"k8s.io/klog/v2"
+	"k8s.io/klogr"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
@@ -143,7 +143,8 @@ func (s *preFilterState) updateWithPod(updatedPod, preemptorPod *v1.Pod, node *v
 
 // PreFilter invoked at the prefilter extension point.
 func (pl *PodTopologySpread) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) *framework.Status {
-	s, err := pl.calPreFilterState(pod)
+	logger := klogr.FromContext(ctx)
+	s, err := pl.calPreFilterState(logger, pod)
 	if err != nil {
 		return framework.AsStatus(err)
 	}
@@ -194,7 +195,7 @@ func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error
 }
 
 // calPreFilterState computes preFilterState describing how pods are spread on topologies.
-func (pl *PodTopologySpread) calPreFilterState(pod *v1.Pod) (*preFilterState, error) {
+func (pl *PodTopologySpread) calPreFilterState(logger klogr.Logger, pod *v1.Pod) (*preFilterState, error) {
 	allNodes, err := pl.sharedLister.NodeInfos().List()
 	if err != nil {
 		return nil, fmt.Errorf("listing NodeInfos: %w", err)
@@ -230,7 +231,7 @@ func (pl *PodTopologySpread) calPreFilterState(pod *v1.Pod) (*preFilterState, er
 	for _, n := range allNodes {
 		node := n.Node()
 		if node == nil {
-			klog.ErrorS(nil, "Node not found")
+			logger.Error(nil, "Node not found")
 			continue
 		}
 		// In accordance to design, if NodeAffinity or NodeSelector is defined,
@@ -297,12 +298,13 @@ func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.C
 		return nil
 	}
 
+	logger := klogr.FromContext(ctx)
 	podLabelSet := labels.Set(pod.Labels)
 	for _, c := range s.Constraints {
 		tpKey := c.TopologyKey
 		tpVal, ok := node.Labels[c.TopologyKey]
 		if !ok {
-			klog.V(5).InfoS("Node doesn't have required label", "node", klog.KObj(node), "label", tpKey)
+			logger.V(5).Info("Node doesn't have required label", "node", klogr.KObj(node), "label", tpKey)
 			return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonNodeLabelNotMatch)
 		}
 
@@ -315,7 +317,7 @@ func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.C
 		paths, ok := s.TpKeyToCriticalPaths[tpKey]
 		if !ok {
 			// error which should not happen
-			klog.ErrorS(nil, "Internal error occurred while retrieving paths from topology key", "topologyKey", tpKey, "paths", s.TpKeyToCriticalPaths)
+			logger.Error(nil, "Internal error occurred while retrieving paths from topology key", "topologyKey", tpKey, "paths", s.TpKeyToCriticalPaths)
 			continue
 		}
 		// judging criteria:
@@ -327,7 +329,7 @@ func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.C
 		}
 		skew := matchNum + selfMatchNum - minMatchNum
 		if skew > c.MaxSkew {
-			klog.V(5).InfoS("Node failed spreadConstraint: matchNum + selfMatchNum - minMatchNum > maxSkew", "node", klog.KObj(node), "topologyKey", tpKey, "matchNum", matchNum, "selfMatchNum", selfMatchNum, "minMatchNum", minMatchNum, "maxSkew", c.MaxSkew)
+			logger.V(5).Info("Node failed spreadConstraint: matchNum + selfMatchNum - minMatchNum > maxSkew", "node", klogr.KObj(node), "topologyKey", tpKey, "matchNum", matchNum, "selfMatchNum", selfMatchNum, "minMatchNum", minMatchNum, "maxSkew", c.MaxSkew)
 			return framework.NewStatus(framework.Unschedulable, ErrReasonConstraintsNotMatch)
 		}
 	}

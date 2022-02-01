@@ -91,6 +91,7 @@ type frameworkImpl struct {
 	kubeConfig      *restclient.Config
 	eventRecorder   events.EventRecorder
 	informerFactory informers.SharedInformerFactory
+	logger          klogr.Logger
 
 	metricsRecorder *metricsRecorder
 	profileName     string
@@ -272,6 +273,11 @@ func NewFramework(r Registry, profile *config.KubeSchedulerProfile, opts ...Opti
 		opt(&options)
 	}
 
+	logger := klogr.TODO()
+	if options.logger != nil {
+		logger = *options.logger
+	}
+
 	f := &frameworkImpl{
 		registry:             r,
 		snapshotSharedLister: options.snapshotSharedLister,
@@ -286,10 +292,7 @@ func NewFramework(r Registry, profile *config.KubeSchedulerProfile, opts ...Opti
 		extenders:            options.extenders,
 		PodNominator:         options.podNominator,
 		parallelizer:         options.parallelizer,
-	}
-	logger := klogr.TODO()
-	if options.logger != nil {
-		logger = *options.logger
+		logger:               logger,
 	}
 
 	if profile == nil {
@@ -816,7 +819,8 @@ func addNominatedPods(ctx context.Context, fh framework.Handle, pod *v1.Pod, sta
 		// This may happen only in tests.
 		return false, state, nodeInfo, nil
 	}
-	nominatedPodInfos := fh.NominatedPodsForNode(nodeInfo.Node().Name)
+	logger := klogr.FromContext(ctx)
+	nominatedPodInfos := fh.NominatedPodsForNode(logger, nodeInfo.Node().Name)
 	if len(nominatedPodInfos) == 0 {
 		return false, state, nodeInfo, nil
 	}
@@ -1314,4 +1318,9 @@ func (f *frameworkImpl) ProfileName() string {
 // Parallelizer returns a parallelizer holding parallelism for scheduler.
 func (f *frameworkImpl) Parallelizer() parallelize.Parallelizer {
 	return f.parallelizer
+}
+
+// Logger returns a logger for background activities.
+func (f *frameworkImpl) Logger() klogr.Logger {
+	return f.logger
 }

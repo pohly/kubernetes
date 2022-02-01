@@ -35,6 +35,7 @@ import (
 	dyfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	ktesting "k8s.io/klogr/testing"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	"k8s.io/kubernetes/pkg/scheduler/internal/queue"
@@ -214,13 +215,15 @@ func TestUpdatePodInCache(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
-			schedulerCache := cache.New(ttl, ctx.Done())
+			schedulerCache := cache.New(ctx, ttl)
 			schedulerQueue := queue.NewTestQueue(ctx, nil)
 			sched := &Scheduler{
 				SchedulerCache:  schedulerCache,
 				SchedulingQueue: schedulerQueue,
+				logger:          logger,
 			}
 			sched.addPodToCache(tt.oldObj)
 			sched.updatePodInCache(tt.oldObj, tt.newObj)
@@ -422,11 +425,13 @@ func TestAddAllEventHandlers(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			testSched := Scheduler{
 				StopEverything:  ctx.Done(),
 				SchedulingQueue: queue.NewTestQueue(ctx, nil),
+				logger:          logger,
 			}
 
 			client := fake.NewSimpleClientset()
