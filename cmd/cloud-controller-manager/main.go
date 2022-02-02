@@ -28,6 +28,7 @@ import (
 	"os"
 
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/app"
 	cloudcontrollerconfig "k8s.io/cloud-provider/app/config"
@@ -71,7 +72,7 @@ func main() {
 	}
 
 	command := app.NewCloudControllerManagerCommand(ccmOptions, cloudInitializer, controllerInitializers, fss, wait.NeverStop)
-	code := cli.Run(command)
+	code := cli.Run(command, cli.FeatureGate(utilfeature.DefaultFeatureGate))
 	os.Exit(code)
 }
 
