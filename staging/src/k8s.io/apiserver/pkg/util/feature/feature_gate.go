@@ -14,6 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package feature is a legacy package that exposes the shared FeatureGate
+// from k8s.io/component-base/featuregate under the import path where
+// it was originally located.
 package feature
 
 import (
@@ -22,12 +25,12 @@ import (
 
 var (
 	// DefaultMutableFeatureGate is a mutable version of DefaultFeatureGate.
-	// Only top-level commands/options setup and the k8s.io/component-base/featuregate/testing package should make use of this.
+	// Only top-level commands/options setup should make use of this.
 	// Tests that need to modify feature gates for the duration of their test should use:
 	//   defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.<FeatureName>, <value>)()
-	DefaultMutableFeatureGate featuregate.MutableFeatureGate = featuregate.NewFeatureGate()
+	DefaultMutableFeatureGate featuregate.MutableFeatureGate = featuregate.DefaultMutableFeatureGate
 
 	// DefaultFeatureGate is a shared global FeatureGate.
 	// Top-level commands/options setup that needs to modify this feature gate should use DefaultMutableFeatureGate.
-	DefaultFeatureGate featuregate.FeatureGate = DefaultMutableFeatureGate
+	DefaultFeatureGate featuregate.FeatureGate = featuregate.DefaultFeatureGate
 )
