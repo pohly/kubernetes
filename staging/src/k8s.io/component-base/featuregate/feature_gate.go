@@ -60,6 +60,16 @@ var (
 		allAlphaGate: setUnsetAlphaGates,
 		allBetaGate:  setUnsetBetaGates,
 	}
+
+	// DefaultMutableFeatureGate is a mutable version of DefaultFeatureGate.
+	// Only top-level commands/options setup should make use of this.
+	// Tests that need to modify feature gates for the duration of their test should use:
+	//   defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.<FeatureName>, <value>)()
+	DefaultMutableFeatureGate MutableFeatureGate = NewFeatureGate()
+
+	// DefaultFeatureGate is a shared global FeatureGate.
+	// Top-level commands/options setup that needs to modify this feature gate should use DefaultMutableFeatureGate.
+	DefaultFeatureGate FeatureGate = DefaultMutableFeatureGate
 )
 
 type FeatureSpec struct {

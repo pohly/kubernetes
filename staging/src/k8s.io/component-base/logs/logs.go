@@ -27,6 +27,7 @@ import (
 
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 )
 
@@ -178,6 +179,8 @@ func InitLogs() {
 		// Otherwise LoggingConfiguration.Apply will do this.
 		go wait.Forever(FlushLogs, logFlushFreq)
 	}
+
+	klog.EnableContextualLogging(featuregate.DefaultFeatureGate.Enabled(ContextualLogging))
 }
 
 // FlushLogs flushes logs immediately. This should be called at the end of
