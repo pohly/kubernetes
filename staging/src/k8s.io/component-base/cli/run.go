@@ -25,9 +25,26 @@ import (
 	"github.com/spf13/cobra"
 
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/logs"
 	"k8s.io/klog/v2"
 )
+
+// RunOption implements the functional options pattern for Run
+type RunOption func (o *runOptions)
+
+// FeatureGate can be used to enable or disable features. If this option is not
+// used, the parameter is nil, or a specific feature has not been registered,
+// the default for the feature will be used.
+func FeatureGate(featureGate featuregate.FeatureGate) RunOption {
+	return func (o *runOptions) {
+		o.featureGate = featureGate
+	}
+}
+
+type runOptions struct {
+	featureGate featuregate.FeatureGate
+}
 
 // Run provides the common boilerplate code around executing a cobra command.
 // For example, it ensures that logging is set up properly. Logging
@@ -42,8 +59,8 @@ import (
 //
 // Commands like kubectl where logging is not normally part of the runtime output
 // should use RunNoErrOutput instead and deal with the returned error themselves.
-func Run(cmd *cobra.Command) int {
-	if logsInitialized, err := run(cmd); err != nil {
+func Run(cmd *cobra.Command, opts ...RunOption) int {
+	if logsInitialized, err := run(cmd, opts...); err != nil {
 		// If the error is about flag parsing, then printing that error
 		// with the decoration that klog would add ("E0923
 		// 23:02:03.219216 4168816 run.go:61] unknown shorthand flag")
@@ -80,14 +97,19 @@ func Run(cmd *cobra.Command) int {
 
 // RunNoErrOutput is a version of Run which returns the cobra command error
 // instead of printing it.
-func RunNoErrOutput(cmd *cobra.Command) error {
-	_, err := run(cmd)
+func RunNoErrOutput(cmd *cobra.Command, opts ... RunOption) error {
+	_, err := run(cmd, opts...)
 	return err
 }
 
-func run(cmd *cobra.Command) (logsInitialized bool, err error) {
+func run(cmd *cobra.Command, opts ...RunOption) (logsInitialized bool, err error) {
 	rand.Seed(time.Now().UnixNano())
 	defer logs.FlushLogs()
+
+	var o runOptions
+	for _, option := range opts {
+		option(&o)
+	}
 
 	cmd.SetGlobalNormalizationFunc(cliflag.WordSepNormalizeFunc)
 
@@ -125,20 +147,20 @@ func run(cmd *cobra.Command) (logsInitialized bool, err error) {
 	case cmd.PersistentPreRun != nil:
 		pre := cmd.PersistentPreRun
 		cmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
-			logs.InitLogs()
+			logs.InitLogs(logs.FeatureGate(o.featureGate))
 			logsInitialized = true
 			pre(cmd, args)
 		}
 	case cmd.PersistentPreRunE != nil:
 		pre := cmd.PersistentPreRunE
 		cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
-			logs.InitLogs()
+			logs.InitLogs(logs.FeatureGate(o.featureGate))
 			logsInitialized = true
 			return pre(cmd, args)
 		}
 	default:
 		cmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
-			logs.InitLogs()
+			logs.InitLogs(logs.FeatureGate(o.featureGate))
 			logsInitialized = true
 		}
 	}

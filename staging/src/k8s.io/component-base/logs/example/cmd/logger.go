@@ -25,21 +25,26 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/component-base/cli"
 	"k8s.io/component-base/logs"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 	"k8s.io/klogr"
 
 	_ "k8s.io/component-base/logs/json/register"
 )
 
+var featureGate = featuregate.NewFeatureGate()
+
 func main() {
+	runtime.Must(featureGate.Add(logs.FeatureGates))
 	command := NewLoggerCommand()
 
 	// Intentionally broken: logging is not initialized yet.
 	klogr.TODO().Info("Oops, I shouldn't be logging yet!")
 
-	code := cli.Run(command)
+	code := cli.Run(command, cli.FeatureGate(featureGate))
 	os.Exit(code)
 }
 
@@ -59,6 +64,7 @@ func NewLoggerCommand() *cobra.Command {
 			runLogger(ctx)
 		},
 	}
+	featureGate.AddFlag(cmd.Flags())
 	o.AddFlags(cmd.Flags())
 	return cmd
 }
@@ -84,7 +90,7 @@ func runLogger(ctx context.Context) {
 
 	// This intentionally uses the same key/value multiple times. Only the
 	// second example could be detected via static code analysis.
-	logger.WithName("myname").WithValues("duration", time.Hour).Info("runtime", "duration", time.Minute)
+	klogr.LoggerWithValues(klogr.LoggerWithName(logger, "myname"), "duration", time.Hour).Info("runtime", "duration", time.Minute)
 	logger.Info("another runtime", "duration", time.Hour, "duration", time.Minute)
 }
 

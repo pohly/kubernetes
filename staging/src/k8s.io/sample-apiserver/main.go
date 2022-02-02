@@ -20,6 +20,7 @@ import (
 	"os"
 
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/cli"
 	"k8s.io/sample-apiserver/pkg/cmd/server"
 )
@@ -28,6 +29,6 @@ func main() {
 	stopCh := genericapiserver.SetupSignalHandler()
 	options := server.NewWardleServerOptions(os.Stdout, os.Stderr)
 	cmd := server.NewCommandStartWardleServer(options, stopCh)
-	code := cli.Run(cmd)
+	code := cli.Run(cmd, cli.FeatureGate(utilfeature.DefaultFeatureGate))
 	os.Exit(code)
 }

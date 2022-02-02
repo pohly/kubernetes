@@ -23,6 +23,7 @@ package main
 import (
 	"os"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/cli"
 	_ "k8s.io/component-base/logs/json/register"          // for JSON log format registration
 	_ "k8s.io/component-base/metrics/prometheus/clientgo" // load all the prometheus client-go plugin
@@ -32,6 +33,6 @@ import (
 
 func main() {
 	command := app.NewControllerManagerCommand()
-	code := cli.Run(command)
+	code := cli.Run(command, cli.FeatureGate(utilfeature.DefaultFeatureGate))
 	os.Exit(code)
 }

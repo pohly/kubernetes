@@ -86,6 +86,9 @@ const (
 // FeatureGate indicates whether a given feature is enabled or not
 type FeatureGate interface {
 	// Enabled returns true if the key is enabled.
+	// Depending on the implementation, it might panic when the key is unknown.
+	// The stand-alone Enabled function can be used in cases where it is
+	// uncertain whether a key is known.
 	Enabled(key Feature) bool
 	// KnownFeatures returns a slice of strings describing the FeatureGate's known features.
 	KnownFeatures() []string
@@ -111,6 +114,22 @@ type MutableFeatureGate interface {
 	Add(features map[Feature]FeatureSpec) error
 	// GetAll returns a copy of the map of known feature names to feature specs.
 	GetAll() map[Feature]FeatureSpec
+}
+
+// Enabled is a wrapper around FeatureGate.Enabled. If the feature gate is nil
+// or the key is not known, it returns false for both return
+// values. FeatureGate.Enabled would panic in this case. Otherwise Enabled
+// returns the result of FeatureGate.Enabled and true.
+func Enabled(f FeatureGate, key Feature) (enabled, ok bool) {
+	if f == nil {
+		return false, false
+	}
+	for knownKey := range f.DeepCopy().GetAll() {
+		if knownKey == key {
+			return f.Enabled(key), true
+		}
+	}
+	return false, false
 }
 
 // featureGate implements FeatureGate as well as pflag.Value for flag parsing.

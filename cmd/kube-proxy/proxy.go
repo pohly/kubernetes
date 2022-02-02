@@ -19,6 +19,7 @@ package main
 import (
 	"os"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/cli"
 	_ "k8s.io/component-base/metrics/prometheus/restclient" // for client metric registration
 	_ "k8s.io/component-base/metrics/prometheus/version"    // for version metric registration
@@ -27,6 +28,6 @@ import (
 
 func main() {
 	command := app.NewProxyCommand()
-	code := cli.Run(command)
+	code := cli.Run(command, cli.FeatureGate(utilfeature.DefaultFeatureGate))
 	os.Exit(code)
 }

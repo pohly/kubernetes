@@ -27,7 +27,9 @@ import (
 
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
+	"k8s.io/klogr"
 )
 
 const logFlushFreqFlagName = "log-flush-frequency"
@@ -167,10 +169,31 @@ func (writer KlogWriter) Write(data []byte) (n int, err error) {
 	return len(data), nil
 }
 
+// InitLogOption implements the functional options pattern for InitLogs
+type InitLogOption func(o *initLogOptions)
+
+// FeatureGate can be used to enable or disable features. If this option is not
+// used, the parameter is nil, or a specific feature has not been registered,
+// the default for the feature will be used.
+func FeatureGate(featureGate featuregate.FeatureGate) InitLogOption {
+	return func(o *initLogOptions) {
+		o.featureGate = featureGate
+	}
+}
+
+type initLogOptions struct {
+	featureGate featuregate.FeatureGate
+}
+
 // InitLogs initializes logs the way we want for Kubernetes.
 // It should be called after parsing flags. If called before that,
 // it will use the default log settings.
-func InitLogs() {
+func InitLogs(opts ...InitLogOption) {
+	var o initLogOptions
+	for _, option := range opts {
+		option(&o)
+	}
+
 	log.SetOutput(KlogWriter{})
 	log.SetFlags(0)
 	if logFlushFreqAdded {
@@ -178,6 +201,12 @@ func InitLogs() {
 		// Otherwise LoggingConfiguration.Apply will do this.
 		go wait.Forever(FlushLogs, logFlushFreq)
 	}
+
+	enabled, ok := featuregate.Enabled(o.featureGate, ContextualLogging)
+	if !ok {
+		enabled = FeatureGates[ContextualLogging].Default
+	}
+	klogr.EnableContextualLogging(enabled)
 }
 
 // FlushLogs flushes logs immediately. This should be called at the end of

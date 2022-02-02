@@ -21,12 +21,13 @@ import (
 
 	"k8s.io/apiextensions-apiserver/pkg/cmd/server"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/cli"
 )
 
 func main() {
 	stopCh := genericapiserver.SetupSignalHandler()
 	cmd := server.NewServerCommand(os.Stdout, os.Stderr, stopCh)
-	code := cli.Run(cmd)
+	code := cli.Run(cmd, cli.FeatureGate(utilfeature.DefaultFeatureGate))
 	os.Exit(code)
 }
