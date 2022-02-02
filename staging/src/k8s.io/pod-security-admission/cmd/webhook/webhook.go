@@ -19,6 +19,7 @@ package main
 import (
 	"os"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/cli"
 	_ "k8s.io/component-base/logs/json/register" // for JSON log format registration
 	"k8s.io/pod-security-admission/cmd/webhook/server"
@@ -26,6 +27,6 @@ import (
 
 func main() {
 	command := server.NewServerCommand()
-	code := cli.Run(command)
+	code := cli.Run(command, cli.FeatureGate(utilfeature.DefaultFeatureGate))
 	os.Exit(code)
 }
