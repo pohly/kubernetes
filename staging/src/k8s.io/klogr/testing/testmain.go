@@ -18,37 +18,21 @@ package testing
 
 import (
 	"context"
-	"flag"
-	"fmt"
-	"os"
-	"testing"
 
 	"github.com/go-logr/logr"
 )
 
-// DefaultOptions is the global default logging configuration
-// for a unit test. It is used by NewTestContext and TestMainWithLogging.
+// DefaultOptions is the global default logging configuration for a unit
+// test. It is used by NewTestContext and k8s.io/klogr/testing/init.
 var DefaultOptions = NewOptions()
 
 // NewTestContext returns a logger and context for use in a unit test case or
 // benchmark. The tl parameter can be a testing.T or testing.B pointer that
-// will receive all log output. TestMainWithLogging can be used to enable
+// will receive all log output. Importing k8s.io/klogr/testing/init will add
 // command line flags that modify the configuration of that log output.
 func NewTestContext(tl TL) (logr.Logger, context.Context) {
 	logger := NewLogger(tl, DefaultOptions)
 	ctx := logr.NewContext(context.Background(), logger)
 	return logger, ctx
 
-}
-
-// TestMainWithLogging can be used as a test's TestMain implementation.
-// It adds, parses and validates logging command line options before
-// running tests.
-func TestMainWithLogging(m *testing.M) {
-	DefaultOptions.AddFlags(flag.CommandLine)
-	flag.Parse()
-	if err := DefaultOptions.Validate(); err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v", err)
-	}
-	os.Exit(m.Run())
 }

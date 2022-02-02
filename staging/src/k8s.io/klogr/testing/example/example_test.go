@@ -13,11 +13,8 @@ import (
 	"k8s.io/klogr"
 	"k8s.io/klogr/internal/test"
 	ktesting "k8s.io/klogr/testing"
+	_ "k8s.io/klogr/testing/init"
 )
-
-func TestMain(m *testing.M) {
-	ktesting.TestMainWithLogging(m)
-}
 
 func TestKlogr(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)

@@ -20,6 +20,13 @@ import (
 	"flag"
 )
 
+// VerbosityFlagName is used by Options.AddFlags for the command line flag that controls
+// verbosity of the testing loggers created by NewTestContext.
+//
+// This must be different than -v (might be used by the global klog logger)
+// and -test.v (used by `go test` to pass its own -v parameter).
+var VerbosityFlagName = "testing.v"
+
 // Options is a subset of the LoggingConfiguration that can be applied to
 // logging during unit testing.
 type Options struct {
@@ -38,18 +45,7 @@ func NewOptions() Options {
 	}
 }
 
-// AddFlags needs to be called by TestMain to add logging command line options.
-// If -v is already taken by klog, it will use -testing.v instead.
+// AddFlags registers the command line flags that control the options.
 func (o *Options) AddFlags(fs *flag.FlagSet) {
-	flagName := "v"
-	if fs.Lookup(flagName) != nil {
-		flagName = "testing.v"
-	}
-	fs.IntVar(&o.Verbosity, flagName, o.Verbosity, "number for the log level verbosity of the testing logger")
-}
-
-// Validate should be called after command line parsing to check that the
-// selected options are usable.
-func (o *Options) Validate() error {
-	return nil
+	fs.IntVar(&o.Verbosity, VerbosityFlagName, o.Verbosity, "number for the log level verbosity of the testing logger")
 }
