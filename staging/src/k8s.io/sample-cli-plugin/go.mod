@@ -16,5 +16,6 @@ replace (
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/cli-runtime => ../cli-runtime
 	k8s.io/client-go => ../client-go
+	k8s.io/klog/v2 => github.com/pohly/klog/v2 v2.40.2-0.20220214120605-811b9422fa7d
 	k8s.io/sample-cli-plugin => ../sample-cli-plugin
 )

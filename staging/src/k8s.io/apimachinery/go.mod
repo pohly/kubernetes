@@ -30,7 +30,7 @@ require (
 	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
 	gopkg.in/inf.v0 v0.9.1
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	k8s.io/klog/v2 v2.40.1
+	k8s.io/klog/v2 v2.40.2-0.20220214120605-811b9422fa7d
 	k8s.io/kube-openapi v0.0.0-20211115234752-e816edb12b65
 	k8s.io/utils v0.0.0-20211208161948-7d6a63dca704
 	sigs.k8s.io/json v0.0.0-20211208200746-9f7c6b3444d2
@@ -38,4 +38,7 @@ require (
 	sigs.k8s.io/yaml v1.2.0
 )
 
-replace k8s.io/apimachinery => ../apimachinery
+replace (
+	k8s.io/apimachinery => ../apimachinery
+	k8s.io/klog/v2 => github.com/pohly/klog/v2 v2.40.2-0.20220214120605-811b9422fa7d
+)

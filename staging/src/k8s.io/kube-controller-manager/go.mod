@@ -19,5 +19,6 @@ replace (
 	k8s.io/component-base => ../component-base
 	k8s.io/component-helpers => ../component-helpers
 	k8s.io/controller-manager => ../controller-manager
+	k8s.io/klog/v2 => github.com/pohly/klog/v2 v2.40.2-0.20220214120605-811b9422fa7d
 	k8s.io/kube-controller-manager => ../kube-controller-manager
 )

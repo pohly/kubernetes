@@ -18,3 +18,5 @@ replace (
 )
 
 replace sigs.k8s.io/json => github.com/liggitt/json v0.0.0-20211020163728-48258682683b
+
+replace k8s.io/klog/v2 => github.com/pohly/klog/v2 v2.40.2-0.20220214120605-811b9422fa7d
