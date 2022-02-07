@@ -81,7 +81,7 @@ func (o *Options) apply() {
 	if factory == nil {
 		klog.ClearLogger()
 	} else {
-		log, flush := factory.Create(o.Config.Options)
+		log, flush := factory.Create(o.Config)
 		klog.SetLogger(log)
 		logrFlush = flush
 	}
