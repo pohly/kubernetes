@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"k8s.io/component-base/config"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -69,7 +70,7 @@ func TestZapLoggerInfo(t *testing.T) {
 	for _, data := range testDataInfo {
 		var buffer bytes.Buffer
 		writer := zapcore.AddSync(&buffer)
-		sampleInfoLogger, _ := NewJSONLogger(writer, nil, nil)
+		sampleInfoLogger, _ := NewJSONLogger(0, writer, nil, nil)
 		sampleInfoLogger.Info(data.msg, data.keysValues...)
 		logStr := buffer.String()
 
@@ -99,10 +100,18 @@ func TestZapLoggerInfo(t *testing.T) {
 
 // TestZapLoggerEnabled test ZapLogger enabled
 func TestZapLoggerEnabled(t *testing.T) {
-	sampleInfoLogger, _ := NewJSONLogger(nil, nil, nil)
-	for i := 0; i < 11; i++ {
-		if !sampleInfoLogger.V(i).Enabled() {
-			t.Errorf("V(%d).Info should be enabled", i)
+	maxV := 12
+	sampleInfoLogger, _ := NewJSONLogger(config.VerbosityLevel(maxV-2), nil, nil, nil)
+	for i := 0; i < maxV; i++ {
+		enabled := sampleInfoLogger.V(i).Enabled()
+		if i+1 == maxV {
+			if enabled {
+				t.Errorf("V(%d).Info should be disabled", i)
+			}
+		} else {
+			if !enabled {
+				t.Errorf("V(%d).Info should be enabled", i)
+			}
 		}
 	}
 }
@@ -113,12 +122,22 @@ func TestZapLoggerV(t *testing.T) {
 		return time.Date(1970, time.January, 1, 0, 0, 0, 123, time.UTC)
 	}
 
-	for i := 0; i < 11; i++ {
+	maxV := 12
+	for i := 0; i < maxV; i++ {
 		var buffer bytes.Buffer
 		writer := zapcore.AddSync(&buffer)
-		sampleInfoLogger, _ := NewJSONLogger(writer, nil, nil)
+		sampleInfoLogger, _ := NewJSONLogger(config.VerbosityLevel(maxV-2), writer, nil, nil)
 		sampleInfoLogger.V(i).Info("test", "ns", "default", "podnum", 2, "time", time.Microsecond)
 		logStr := buffer.String()
+
+		if i+1 == maxV {
+			// No output for this particular verbosity.
+			if logStr != "" {
+				t.Fatalf("Expected no output at v=%d, got: %s", i, logStr)
+			}
+			continue
+		}
+
 		var v, lineNo int
 		expectFormat := "{\"ts\":0.000123,\"caller\":\"json/json_test.go:%d\",\"msg\":\"test\",\"v\":%d,\"ns\":\"default\",\"podnum\":2,\"time\":\"1µs\"}\n"
 		n, err := fmt.Sscanf(logStr, expectFormat, &lineNo, &v)
@@ -143,7 +162,7 @@ func TestZapLoggerError(t *testing.T) {
 	timeNow = func() time.Time {
 		return time.Date(1970, time.January, 1, 0, 0, 0, 123, time.UTC)
 	}
-	sampleInfoLogger, _ := NewJSONLogger(writer, nil, nil)
+	sampleInfoLogger, _ := NewJSONLogger(0, writer, nil, nil)
 	sampleInfoLogger.Error(fmt.Errorf("invalid namespace:%s", "default"), "wrong namespace", "ns", "default", "podnum", 2, "time", time.Microsecond)
 	logStr := buffer.String()
 	var ts float64
@@ -161,7 +180,7 @@ func TestZapLoggerError(t *testing.T) {
 
 func TestZapLoggerStreams(t *testing.T) {
 	var infoBuffer, errorBuffer bytes.Buffer
-	log, _ := NewJSONLogger(zapcore.AddSync(&infoBuffer), zapcore.AddSync(&errorBuffer), nil)
+	log, _ := NewJSONLogger(0, zapcore.AddSync(&infoBuffer), zapcore.AddSync(&errorBuffer), nil)
 
 	log.Error(fmt.Errorf("some error"), "failed")
 	log.Info("hello world")
