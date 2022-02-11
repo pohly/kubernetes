@@ -11,6 +11,7 @@ require (
 )
 
 replace (
+	github.com/go-logr/logr => github.com/go-logr/logr v1.2.0
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 )
