@@ -6,6 +6,7 @@ go 1.16
 
 require (
 	github.com/emicklei/go-restful v2.9.5+incompatible // indirect
+	github.com/go-logr/logr v1.2.2 // indirect
 	github.com/go-openapi/jsonreference v0.19.5 // indirect
 	github.com/go-openapi/swag v0.19.14 // indirect
 	github.com/gogo/protobuf v1.3.2
@@ -24,4 +25,7 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.1 // indirect
 )
 
-replace k8s.io/code-generator => ../code-generator
+replace (
+	github.com/go-logr/logr => github.com/go-logr/logr v1.2.0
+	k8s.io/code-generator => ../code-generator
+)
