@@ -545,6 +545,7 @@ func dropDisabledFields(
 	dropDisabledTopologySpreadConstraintsFields(podSpec, oldPodSpec)
 	dropDisabledNodeInclusionPolicyFields(podSpec, oldPodSpec)
 	dropDisabledMatchLabelKeysField(podSpec, oldPodSpec)
+	// TODO: drop alpha fields
 }
 
 // dropDisabledTopologySpreadConstraintsFields removes disabled fields from PodSpec related
