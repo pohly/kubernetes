@@ -96,6 +96,12 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&RangeAllocation{},
 		&ConfigMap{},
 		&ConfigMapList{},
+		&ResourceClass{},
+		&ResourceClassList{},
+		&ResourceClaim{},
+		&ResourceClaimList{},
+		&PodScheduling{},
+		&PodSchedulingList{},
 	)
 
 	return nil

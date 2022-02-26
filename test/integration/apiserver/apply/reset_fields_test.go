@@ -52,6 +52,8 @@ var resetFieldsStatusData = map[schema.GroupVersionResource]string{
 	gvr("", "v1", "persistentvolumes"):                              `{"status": {"message": "hello2"}}`,
 	gvr("", "v1", "resourcequotas"):                                 `{"status": {"used": {"cpu": "25M"}}}`,
 	gvr("", "v1", "services"):                                       `{"status": {"loadBalancer": {"ingress": [{"ip": "127.0.0.2"}]}}}`,
+	gvr("", "v1", "podschedulings"):                                 `{"status": {"claims": [{"podResourceClaimName": "my-claim", "unsuitableNodes": ["node2"]}]}}`, // Not really a conflict with status_test.go: Apply just stores both nodes. Conflict testing therefore gets disabled for podschedulings.
+	gvr("", "v1", "resourceclaims"):                                 `{"status": {"driverName": "other.example.com"}}`,
 	gvr("extensions", "v1beta1", "ingresses"):                       `{"status": {"loadBalancer": {"ingress": [{"ip": "127.0.0.2"}]}}}`,
 	gvr("networking.k8s.io", "v1beta1", "ingresses"):                `{"status": {"loadBalancer": {"ingress": [{"ip": "127.0.0.2"}]}}}`,
 	gvr("networking.k8s.io", "v1", "ingresses"):                     `{"status": {"loadBalancer": {"ingress": [{"ip": "127.0.0.2"}]}}}`,
@@ -84,6 +86,10 @@ var noConflicts = map[string]struct{}{
 	// namespaces only have a spec.finalizers field which is also skipped,
 	// thus it will never have a conflict.
 	"namespaces": {},
+	// podschedulings.status only has a list which contains items with a list,
+	// therefore apply works because it simply merges either the outer or
+	// the inner list.
+	"podschedulings": {},
 }
 
 var image2 = image.GetE2EImage(image.Etcd)
@@ -104,6 +110,9 @@ var resetFieldsSpecData = map[schema.GroupVersionResource]string{
 	gvr("", "v1", "replicationcontrollers"):                                        `{"spec": {"selector": {"new": "stuff2"}}}`,
 	gvr("", "v1", "resourcequotas"):                                                `{"spec": {"hard": {"cpu": "25M"}}}`,
 	gvr("", "v1", "services"):                                                      `{"spec": {"externalName": "service2name"}}`,
+	gvr("", "v1", "resourceclasses"):                                               `{"driverName": "other.example.com"}`,
+	gvr("", "v1", "resourceclaims"):                                                `{"spec": {"resourceClassName": "class2name"}}`, // ResourceClassName is immutable, but that doesn't matter for the test.
+	gvr("", "v1", "podschedulings"):                                                `{"spec": {"selectedNode": "node2name"}}`,
 	gvr("apps", "v1", "daemonsets"):                                                `{"spec": {"template": {"spec": {"containers": [{"image": "` + image2 + `", "name": "container6"}]}}}}`,
 	gvr("apps", "v1", "deployments"):                                               `{"metadata": {"labels": {"a":"c"}}, "spec": {"template": {"spec": {"containers": [{"image": "` + image2 + `", "name": "container6"}]}}}}`,
 	gvr("apps", "v1", "replicasets"):                                               `{"spec": {"template": {"spec": {"containers": [{"image": "` + image2 + `", "name": "container4"}]}}}}`,

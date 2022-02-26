@@ -48,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	podshelper "k8s.io/kubernetes/pkg/apis/core/pods"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	validationsets "k8s.io/kubernetes/pkg/apis/core/validation/util/sets"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/pkg/features"
@@ -3680,6 +3681,9 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 			allErrs = append(allErrs, validateWindows(spec, fldPath)...)
 		}
 	}
+
+	// TODO: validate spec.ResourceClaims
+
 	return allErrs
 }
 
@@ -6991,4 +6995,207 @@ func sameLoadBalancerClass(oldService, service *core.Service) bool {
 		return false
 	}
 	return *oldService.Spec.LoadBalancerClass == *service.Spec.LoadBalancerClass
+}
+
+// ValidateResourceClaim validates a ResourceClaim.
+func ValidateResourceClaim(resourceClaim *core.ResourceClaim) field.ErrorList {
+	allErrs := ValidateObjectMeta(&resourceClaim.ObjectMeta, true, validateResourceClaimName, field.NewPath("metadata"))
+	allErrs = append(allErrs, validateResourceClaimSpec(&resourceClaim.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, validateResourceClaimStatus(&resourceClaim.Status, field.NewPath("status"))...)
+	return allErrs
+}
+
+func validateResourceClaimSpec(spec *core.ResourceClaimSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for _, msg := range ValidateClassName(spec.ResourceClassName, false) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceClassName"), spec.ResourceClassName, msg))
+	}
+	return allErrs
+}
+
+// ValidateResourceClaimSpecUnmodified checks that a ResourceClaimSpec doesn't change.
+func ValidateResourceClaimSpecUnmodified(spec, oldSpec *core.ResourceClaimSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if spec.ResourceClassName != oldSpec.ResourceClassName {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("resourceClassName"), "updates are forbidden"))
+	}
+	allErrs = append(allErrs, ValidateResourceClaimParametersReferenceUnmodified(spec.ParametersRef, oldSpec.ParametersRef, fldPath.Child("parameters"))...)
+	if spec.AllocationMode != oldSpec.AllocationMode {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("allocationMode"), "updates are forbidden"))
+	}
+	return allErrs
+}
+
+// ValidateResourceClaimParametersReferenceUnmodified checks that ResourceClaimParametersReference doesn't change.
+func ValidateResourceClaimParametersReferenceUnmodified(parameters, oldParameters *core.ResourceClaimParametersReference, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if (parameters == nil) != (oldParameters == nil) {
+		// One nil, the other not.
+		allErrs = append(allErrs, field.Forbidden(fldPath, "updates are forbidden"))
+	} else if parameters != nil {
+		if parameters.APIGroup != oldParameters.APIGroup {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("apiGroup"), "updates are forbidden"))
+		}
+		if parameters.Kind != oldParameters.Kind {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("kind"), "updates are forbidden"))
+		}
+		if parameters.Name != oldParameters.Name {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("name"), "updates are forbidden"))
+		}
+	}
+	return allErrs
+}
+
+var validateResourceClaimName = apimachineryvalidation.NameIsDNSSubdomain
+
+// ValidateResourceClass validates a ResourceClass.
+func ValidateResourceClass(resourceClass *core.ResourceClass) field.ErrorList {
+	allErrs := ValidateObjectMeta(&resourceClass.ObjectMeta, false, ValidateClassName, field.NewPath("metadata"))
+	allErrs = append(allErrs, validateResourceDriverName(resourceClass.DriverName, field.NewPath("driverName"))...)
+
+	return allErrs
+}
+
+// ValidateResourceClassUpdate tests if an update to ResourceClass is valid.
+func ValidateResourceClassUpdate(resourceClass, oldResourceClass *core.ResourceClass) field.ErrorList {
+	allErrs := ValidateObjectMetaUpdate(&resourceClass.ObjectMeta, &oldResourceClass.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateResourceClass(resourceClass)...)
+	return allErrs
+}
+
+func validateResourceClaimStatus(resourceClaimStatus *core.ResourceClaimStatus, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	return allErrs
+}
+
+// ValidateResourceClaimUpdate tests if an update to ResourceClaim is valid.
+func ValidateResourceClaimUpdate(resourceClaim, oldResourceClaim *core.ResourceClaim) field.ErrorList {
+	allErrs := ValidateObjectMetaUpdate(&resourceClaim.ObjectMeta, &oldResourceClaim.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateResourceClaimSpecUnmodified(&resourceClaim.Spec, &oldResourceClaim.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, ValidateResourceClaim(resourceClaim)...)
+	return allErrs
+}
+
+// ValidateResourceClaimStatusUpdate tests if an update to the status of a ResourceClaim is valid.
+func ValidateResourceClaimStatusUpdate(resourceClaim, oldResourceClaim *core.ResourceClaim) field.ErrorList {
+	allErrs := ValidateObjectMetaUpdate(&resourceClaim.ObjectMeta, &oldResourceClaim.ObjectMeta, field.NewPath("metadata"))
+	fldPath := field.NewPath("status")
+	// The name might not be set yet.
+	if resourceClaim.Status.DriverName != "" {
+		allErrs = append(allErrs, validateResourceDriverName(resourceClaim.Status.DriverName, fldPath.Child("driverName"))...)
+	}
+	allErrs = append(allErrs, validateAllocationResult(resourceClaim.Status.Allocation, fldPath.Child("allocation"))...)
+	allErrs = append(allErrs, validateSet(resourceClaim.Status.ReservedFor, v1.ResourceClaimReservedForMaxSize,
+		validateResourceClaimUserReference, fldPath.Child("reservedFor"))...)
+
+	// Now check for invariants that must be valid for a ResourceClaim.
+	if len(resourceClaim.Status.ReservedFor) > 0 {
+		if resourceClaim.Status.Allocation == nil {
+			allErrs = append(allErrs, field.Invalid(fldPath, resourceClaim.Status.ReservedFor, "only allocated claims can get reserved"))
+		} else {
+			if !resourceClaim.Status.Allocation.SharedResource && len(resourceClaim.Status.ReservedFor) > 1 {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("reservedFor"), resourceClaim.Status.ReservedFor, "the claim cannot be reserved more than once"))
+			}
+			// Items may be removed from ReservedFor while the claim is meant to be deallocated,
+			// but not added.
+			if resourceClaim.DeletionTimestamp != nil ||
+				resourceClaim.Status.DeallocationRequested {
+				oldSet := validationsets.NewGeneric(oldResourceClaim.Status.ReservedFor...)
+				newSet := validationsets.NewGeneric(resourceClaim.Status.ReservedFor...)
+				newItems := newSet.Difference(oldSet)
+				if len(newItems) > 0 {
+					allErrs = append(allErrs, field.Invalid(fldPath.Child("reservedFor"), newItems, "new entries may not get added while the claim is meant to be deallocated"))
+				}
+			}
+		}
+	}
+
+	return allErrs
+}
+
+func validateAllocationResult(allocation *core.AllocationResult, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if allocation != nil {
+		if len(allocation.ResourceHandle) > core.ResourceHandleMaxSize {
+			allErrs = append(allErrs, field.TooLongMaxLength(fldPath.Child("resourceHandle"), allocation.ResourceHandle, core.ResourceHandleMaxSize))
+		}
+		if allocation.AvailableOnNodes != nil {
+			allErrs = append(allErrs, ValidateNodeSelector(allocation.AvailableOnNodes, fldPath.Child("availableOnNodes"))...)
+		}
+	}
+	return allErrs
+}
+
+func validateResourceClaimUserReference(ref core.ResourceClaimUserReference, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	// APIGroup is empty for the legacy group.
+	if ref.Resource == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("apiGroup"), "resource must not be empty"))
+	}
+	if ref.Name == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "name must not be empty"))
+	}
+	if ref.UID == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("uid"), "uid must not be empty"))
+	}
+	return allErrs
+}
+
+func validateResourceDriverName(driverName string, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if driverName == "" {
+		allErrs = append(allErrs, field.Required(fldPath, driverName))
+	} else {
+		allErrs = append(allErrs, ValidateQualifiedName(strings.ToLower(driverName), fldPath)...)
+	}
+	return allErrs
+}
+
+// validateSet ensures that a slice contains no duplicates and does not exceed a certain maximum size.
+func validateSet[T comparable](set []T, maxSize int, validateItem func(item T, fldPath *field.Path) field.ErrorList, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allItems := validationsets.NewGeneric[T]()
+	for i, item := range set {
+		if allItems.Has(item) {
+			allErrs = append(allErrs, field.Duplicate(fldPath, item))
+		} else {
+			allErrs = append(allErrs, validateItem(item, fldPath.Index(i))...)
+			allItems.Insert(item)
+		}
+	}
+	if len(allItems) > maxSize {
+		allErrs = append(allErrs, field.TooLongMaxLength(fldPath, set, maxSize))
+	}
+	return allErrs
+}
+
+// ValidatePodScheduling validates a PodScheduling.
+func ValidatePodScheduling(resourceClaim *core.PodScheduling) field.ErrorList {
+	allErrs := ValidateObjectMeta(&resourceClaim.ObjectMeta, true, ValidatePodName, field.NewPath("metadata"))
+	allErrs = append(allErrs, validatePodSchedulingSpec(&resourceClaim.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, validatePodSchedulingStatus(&resourceClaim.Status, field.NewPath("status"))...)
+	return allErrs
+}
+
+func validatePodSchedulingSpec(spec *core.PodSchedulingSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	return allErrs
+}
+
+func validatePodSchedulingStatus(status *core.PodSchedulingStatus, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	return allErrs
+}
+
+// ValidatePodSchedulingUpdate tests if an update to PodScheduling is valid.
+func ValidatePodSchedulingUpdate(resourceClaim, oldPodScheduling *core.PodScheduling) field.ErrorList {
+	allErrs := ValidateObjectMetaUpdate(&resourceClaim.ObjectMeta, &oldPodScheduling.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidatePodScheduling(resourceClaim)...)
+	return allErrs
+}
+
+// ValidatePodSchedulingStatusUpdate tests if an update to the status of a PodScheduling is valid.
+func ValidatePodSchedulingStatusUpdate(resourceClaim, oldPodScheduling *core.PodScheduling) field.ErrorList {
+	allErrs := ValidateObjectMetaUpdate(&resourceClaim.ObjectMeta, &oldPodScheduling.ObjectMeta, field.NewPath("metadata"))
+	return allErrs
 }
