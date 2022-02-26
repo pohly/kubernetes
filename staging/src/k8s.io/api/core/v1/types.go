@@ -2289,6 +2289,14 @@ type ResourceRequirements struct {
 	// More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
 	// +optional
 	Requests ResourceList `json:"requests,omitempty" protobuf:"bytes,2,rep,name=requests,casttype=ResourceList,castkey=ResourceName"`
+	// The entries are the names of resources in PodSpec.ResourceClaims
+	// that are used by the container.
+	//
+	// This field is immutable and alpha. It requires enabling the
+	// DynamicResourceAllocation feature gate.
+	//
+	// +listType=set
+	Claims []string `json:"claims,omitempty" protobuf:"bytes,3,opt,name=claims"`
 }
 
 const (
@@ -3315,6 +3323,7 @@ type PodSpec struct {
 	// - spec.containers[*].securityContext.runAsGroup
 	// +optional
 	OS *PodOS `json:"os,omitempty" protobuf:"bytes,36,opt,name=os"`
+
 	// Use the host's user namespace.
 	// Optional: Default to true.
 	// If set to true or not present, the pod will be run in the host user namespace, useful
@@ -3327,6 +3336,20 @@ type PodSpec struct {
 	// +k8s:conversion-gen=false
 	// +optional
 	HostUsers *bool `json:"hostUsers,omitempty" protobuf:"bytes,37,opt,name=hostUsers"`
+
+	// ResourceClaims defines which ResourceClaims must be allocated
+	// and reserved before the Pod is allowed to start. The resources
+	// will be made available to those containers which reference them
+	// by name.
+	//
+	// This field is immutable and alpha. It requires enabling the
+	// DynamicResourceAllocation feature gate.
+	//
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	ResourceClaims []PodResourceClaim `json:"resourceClaims,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name" protobuf:"bytes,37,rep,name=resourceClaims"`
 }
 
 // OSName is the set of OS'es that can be used in OS.
@@ -6648,4 +6671,487 @@ type PortStatus struct {
 	// +kubebuilder:validation:Pattern=`^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$`
 	// +kubebuilder:validation:MaxLength=316
 	Error *string `json:"error,omitempty" protobuf:"bytes,3,opt,name=error"`
+}
+
+// PodResourceClaim references exactly one ResourceClaim through a ClaimSource
+// and adds a name to it that is used inside a Pod.
+type PodResourceClaim struct {
+	// A name under which this resource can be referenced by the containers.
+	Name string `json:"name" protobuf:"bytes,1,name=name"`
+
+	// Source determines where to find the ResourceClaim.
+	Source ClaimSource `json:"source,omitempty" protobuf:"bytes,2,name=source"`
+}
+
+// ClaimSource references exactly one ResourceClaim, either by name or by
+// embedding a template for a ResourceClaim that will get created by the
+// control plane.
+//
+// Additional options might get added in the future, so code using this struct
+// must error out when none of the options that it supports are set.
+type ClaimSource struct {
+	// The resource is independent of the Pod and defined by
+	// a separate ResourceClaim in the same namespace as
+	// the Pod. Either this or Template must be set, but not both.
+	ResourceClaimName *string `json:"resourceClaimName,omitempty" protobuf:"bytes,2,opt,name=resourceClaimName"`
+
+	// Will be used to create a stand-alone ResourceClaim to allocate the resource.
+	// The pod in which this PodResource is embedded will be the
+	// owner of the ResourceClaim, i.e. the ResourceClaim will be deleted together with the
+	// pod.  The name of the ResourceClaim will be `<pod name>-<resource name>` where
+	// `<resource name>` is the name PodResource.Name
+	// Pod validation will reject the pod if the concatenated name
+	// is not valid for a ResourceClaim (for example, too long).
+	//
+	// An existing ResourceClaim with that name that is not owned by the pod
+	// will *not* be used for the pod to avoid using an unrelated
+	// resource by mistake. Scheduling and pod startup are then blocked until
+	// the unrelated ResourceClaim is removed.
+	//
+	// This field is immutable and no changes will be made to the
+	// corresponding ResourceClaim by the control plane after creating the
+	// ResourceClaim.
+	//
+	// Either this or ResourceClaimName must be set, but not both.
+	Template *ResourceClaimTemplate `json:"template,omitempty" protobuf:"bytes,3,opt,name=template"`
+}
+
+// ResourceClaimTemplate is used to produce ResourceClaim objects by embedding
+// such a template in the ResourceRequirements of a Pod.
+type ResourceClaimTemplate struct {
+	// May contain labels and annotations that will be copied into the PVC
+	// when creating it. No other fields are allowed and will be rejected during
+	// validation.
+	//
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// The specification for the ResourceClaim. The entire content is
+	// copied unchanged into the PVC that gets created from this
+	// template. The same fields as in a ResourceClaim are also valid here.
+	Spec ResourceClaimSpec `json:"spec" protobuf:"bytes,2,name=spec"`
+}
+
+// ResourceClaimSpec defines how a resource is to be allocated.
+type ResourceClaimSpec struct {
+	// ResourceClassName references the driver and additional parameters
+	// via the name of a ResourceClass that was created as part of the
+	// driver deployment.
+	//
+	// The apiserver does not check that the referenced class exists.
+	ResourceClassName string `json:"resourceClassName" protobuf:"bytes,1,name=resourceClassName"`
+
+	// ParametersRef references a separate object with arbitrary parameters
+	// that will be used by the driver when allocating a resource for the
+	// claim.
+	//
+	// The object must be in the same namespace as the ResourceClaim.
+	ParametersRef *ResourceClaimParametersReference `json:"parametersRef,omitempty" protobuf:"bytes,2,opt,name=parametersRef"`
+
+	// Allocation can start immediately or when a Pod wants to use the
+	// resource. AllocationModeWaitForFirstConsumer is the default.
+	AllocationMode AllocationMode `json:"allocationMode,omitempty" protobuf:"bytes,3,opt,name=allocationMode"`
+}
+
+// AllocationMode describes whether a ResourceClaim gets allocated immediately
+// when it gets created (AllocationModeImmediate) or whether allocation is
+// delayed until it is needed for a Pod
+// (AllocationModeWaitForFirstConsumer). Other modes might get added in the
+// future.
+type AllocationMode string
+
+const (
+	// When a ResourceClaim has AllocationModeWaitForFirstConsumer, allocation is
+	// delayed until a Pod gets scheduled that needs the ResourceClaim. The
+	// scheduler will consider all resource requirements of that Pod and
+	// trigger allocation for a node that fits the Pod.
+	AllocationModeWaitForFirstConsumer AllocationMode = "WaitForFirstConsumer"
+
+	// When a ResourceClaim has AllocationModeImmediate, allocation starts
+	// as soon as the ResourceClaim gets created. This is done without
+	// considering the needs of Pods that will use the ResourceClaim
+	// because those Pods are not known yet.
+	AllocationModeImmediate AllocationMode = "Immediate"
+)
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.25
+
+// ResourceClaim is created by users to describe which resources they need.
+// Its status tracks whether the resource has been allocated and what the
+// resulting attributes are.
+//
+// This is an alpha type and requires enabling the DynamicResourceAllocation
+// feature gate.
+type ResourceClaim struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// The driver must set a finalizer here before it attempts to allocate
+	// the resource. It removes the finalizer again when a) the allocation
+	// attempt has definitely failed or b) when the allocated resource was
+	// freed. This ensures that resources are not leaked.
+	metav1.ObjectMeta `json:"metadata" protobuf:"bytes,1,name=metadata"`
+
+	// Spec describes the desired attributes of a resource that then needs
+	// to be allocated. It can only be set once when creating the
+	// ResourceClaim.
+	Spec ResourceClaimSpec `json:"spec" protobuf:"bytes,2,name=spec"`
+
+	// Status describes whether the resource is available and with which
+	// attributes.
+	Status ResourceClaimStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
+}
+
+// ResourceClaimStatus tracks whether the resource has been allocated and what
+// the resulting attributes are.
+type ResourceClaimStatus struct {
+	// DriverName is a copy of the driver name from the ResourceClass at
+	// the time when allocation started. It's necessary to enable usage of
+	// the claim by kubelet in case that the ResourceClass got removed in
+	// the meantime. It also helps the resource driver to determine whether
+	// it needs to handle a claim that got marked for deletion.
+	DriverName string `json:"driverName,omitempty" protobuf:"bytes,1,opt,name=driverName"`
+
+	// Allocation is set by the resource driver once a resource has been
+	// allocated successfully. Nil indicates that the resource is not
+	// allocated.
+	Allocation *AllocationResult `json:"allocation,omitempty" protobuf:"bytes,2,opt,name=allocation"`
+
+	// ReservedFor indicates which entities are currently allowed to use
+	// the claim. Usually those are Pods, but other objects are also
+	// possible as long as they exist as resources in the apiserver. The
+	// ResourceClaim controller in the kube-controller-manager checks for
+	// stale entries that reference non-existent objects and removes them.
+	//
+	// A scheduler must add a Pod that it is scheduling. This must be done
+	// in an atomic ResourceClaim update because there might be multiple
+	// schedulers working on different Pods that compete for access to the
+	// same ResourceClaim, the ResourceClaim might have been marked for
+	// deletion, or even been deallocated already.
+	//
+	// kubelet will check this before allowing a Pod to run because a a
+	// user might have selected a node manually without reserving resources
+	// or a scheduler might have missed that step, for example because it
+	// doesn't support dynamic resource allocation or the feature was
+	// disabled.
+	//
+	// The maximum size is 32 (= [ResourceClaimReservedForMaxSize]).
+	//
+	// +listType=set
+	ReservedFor []ResourceClaimUserReference `json:"reservedFor,omitempty" protobuf:"bytes,3,opt,name=reservedFor"`
+
+	// DeallocationRequested gets set by the scheduler when it detects the
+	// situation where pod scheduling cannot proceed because some claim was
+	// allocated for a node that cannot provide some other required
+	// resource. It can only be set for claims that are not currently
+	// reserved.
+	//
+	// The driver then needs to deallocate this claim and reset the field
+	// together with clearing the Allocation field. The scheduler then will
+	// try again.
+	//
+	// While DeallocationRequested is set, no new users may be added to
+	// ReservedFor.
+	DeallocationRequested bool `json:"deallocationRequested,omitempty" protobuf:"varint,4,opt,name=deallocationRequested"`
+}
+
+// ReservedForMaxSize is the maximum number of entries in
+// [ResourceClaimStatus.ReservedFor].
+const ResourceClaimReservedForMaxSize = 32
+
+// AllocationResult contains attributed of an allocated resource.
+type AllocationResult struct {
+	// ResourceHandle contains arbitrary data returned by the driver after a
+	// successful allocation. This is opaque for
+	// Kubernetes. Driver documentation may explain to users how to
+	// interpret this data if needed.
+	//
+	// Resource drivers can use this to store some data directly or
+	// cross-reference some other place where information is stored.
+	// This data is guaranteed to be available when a Pod is about
+	// to run on a node, in contrast to the ResourceClass which
+	// may have been deleted in the meantime.
+	//
+	// The maximum size of this field is 16KiB (= [ResourceHandleMaxSize]).
+	ResourceHandle string `json:"resourceHandle,omitempty" protobuf:"bytes,1,opt,name=resourceHandle"`
+
+	// This field will get set by the resource driver after it has
+	// allocated the resource driver to inform the scheduler where it can
+	// schedule Pods using the ResourceClaim.
+	//
+	// Node-local resources can use the `kubernetes.io/hostname` label
+	// to select a specific node.
+	//
+	// Setting this field is optional. If null, the resource is available
+	// everywhere.
+	AvailableOnNodes *NodeSelector `json:"availableOnNodes,omitempty" protobuf:"bytes,2,opt,name=availableOnNodes"`
+
+	// ShareableResource determines whether the resource supports more
+	// than one user at a time.
+	ShareableResource bool `json:"shareableResource,omitempty" protobuf:"varint,3,opt,name=shareableResource"`
+}
+
+// ResourceHandleMaxSize is the maximum size of [AllocationResult.ResourceHandle].
+const ResourceHandleMaxSize = 16 * 1024
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.25
+
+// ResourceClaimList is a collection of resource classes.
+type ResourceClaimList struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Items is the list of resource claims.
+	Items []ResourceClaim `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.25
+
+// PodScheduling objects get created by a scheduler when it handles a pod which
+// uses one or more unallocated ResourceClaims with delayed allocation.
+//
+// This is an alpha type and requires enabling the DynamicResourceAllocation
+// feature gate.
+type PodScheduling struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// The name must be the same as the corresponding Pod.  That Pod must
+	// be listed as owner in OwnerReferences to ensure that the
+	// PodScheduling object gets deleted when no longer needed. Normally
+	// the scheduler will delete it.
+	//
+	// Drivers must ignore PodScheduling objects where the owning pod
+	// already got deleted because such objects are orphaned and will be
+	// removed soon.
+	metav1.ObjectMeta `json:"metadata" protobuf:"bytes,1,name=metadata"`
+
+	// Spec is set and updated by the scheduler.
+	Spec PodSchedulingSpec `json:"spec" protobuf:"bytes,2,name=spec"`
+
+	// Status is updated by resource drivers.
+	Status PodSchedulingStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
+}
+
+// PodSchedulingSpec contains the request for information about resources
+// required by a pod and eventually communicates the decision of the scheduler
+// to move ahead with pod scheduling for a specific node.
+type PodSchedulingSpec struct {
+	// When allocation is delayed, the scheduler must set the node for
+	// which it wants the resource(s) to be allocated before the driver(s)
+	// start with allocation.
+	//
+	// The driver must ensure that the allocated resource is available on
+	// this node or update ResourceSchedulingStatus.UnsuitableNodes to
+	// indicate where allocation might succeed.
+	//
+	// When allocation succeeds, drivers should immediately add the pod to
+	// the ResourceClaimStatus.ReservedFor field together with setting
+	// ResourceClaimStatus.Allocated. This optimization may save scheduling
+	// attempts and roundtrips through the API server because the scheduler
+	// does not need to reserve the claim for the pod itself.
+	//
+	// The selected node may change over time, for example when the initial
+	// choice turns out to be unsuitable after all. Drivers must not
+	// reallocate for a different node when they see such a change because
+	// it would lead to race conditions. Instead, the scheduler will
+	// trigger deallocation of specific claims as needed through the
+	// ResourceClaimStatus.DeallocationRequested field.
+	SelectedNode string `json:"selectedNode,omitempty" protobuf:"bytes,1,opt,name=selectedNode"`
+
+	// When allocation is delayed, and the scheduler needs to decide on
+	// which node a Pod should run, it will ask the driver(s) on which
+	// nodes the resource might be made available. To trigger that check,
+	// the scheduler provides the names of nodes which might be suitable
+	// for the Pod. Will be updated periodically until all resources are
+	// allocated.
+	//
+	// The ResourceClass.SuiteableNodes node selector can be used to filter
+	// out nodes based on labels. This prevents adding nodes here that the
+	// driver then would need to reject through UnsuitableNodes.
+	//
+	// The size of this field is limited to 256 (=
+	// [PodSchedulingNodeListMaxSize]).  This is large enough for many
+	// clusters. Larger clusters may need more attempts to find a node that
+	// suits all pending resources.
+	//
+	// +listType=set
+	PotentialNodes []string `json:"potentialNodes,omitempty" protobuf:"bytes,2,opt,name=potentialNodes"`
+}
+
+// PodSchedulingStatus is where resource drivers provide information about
+// where the could allocate a resource and whether allocation failed.
+type PodSchedulingStatus struct {
+	// Each resource driver is responsible for providing information about
+	// those resources in the Pod that the driver manages. It can skip
+	// adding that information when it already allocated the resource.
+	//
+	// A driver must add entries here for all its pending claims, even if
+	// the ResourceSchedulingStatus.UnsuitabeNodes field is empty, because
+	// the scheduler may decide to wait with selecting a node until it has
+	// information from all drivers.
+	//
+	// +listType=map
+	// +listMapKey=podResourceClaimName
+	// +optional
+	Claims []ResourceClaimSchedulingStatus `json:"claims,omitempty" protobuf:"bytes,1,opt,name=claims"`
+
+	// If there ever is a need to support other kinds of resources
+	// than ResourceClaim, then new fields could get added here
+	// for those other resources.
+}
+
+// ResourceClaimSchedulingStatus contains information about one particular
+// claim while scheduling a pod.
+type ResourceClaimSchedulingStatus struct {
+	// PodResourceClaimName matches the PodResourceClaim.Name field.
+	PodResourceClaimName string `json:"podResourceClaimName,omitempty" protobuf:"bytes,1,opt,name=podResourceClaimName"`
+
+	// UnsuitableNodes lists nodes that the claim cannot be allocated for.
+	// Nodes listed here will be ignored by the scheduler when selecting a
+	// node for a Pod. All other nodes are potential candidates, either
+	// because no information is available yet or because allocation might
+	// succeed.
+	//
+	// A change of the PodSchedulingSpec.PotentialNodes field and/or a failed
+	// allocation attempt trigger an update of this field: the driver
+	// then checks all nodes listed in PotentialNodes and UnsuitableNodes
+	// and updates UnsuitableNodes.
+	//
+	// It must include the prior UnsuitableNodes in this check because the
+	// scheduler will not list those again in PotentialNodes but they might
+	// still be unsuitable.
+	//
+	// This can change, so the driver also must refresh this information
+	// periodically and/or after changing resource allocation for some
+	// other ResourceClaim until a node gets selected by the scheduler.
+	//
+	// The size of this field is limited to 256 (=
+	// [PodSchedulingNodeListMaxSize]), the same as for
+	// PodSchedulingSpec.PotentialNodes.
+	//
+	// +listType=set
+	UnsuitableNodes []string `json:"unsuitableNodes,omitempty" protobuf:"bytes,2,opt,name=unsuitableNodes"`
+}
+
+// PodSchedulingNodeListMaxSize defines the maximum number of entries in the
+// node lists that are stored in PodScheduling objects. This limit is part
+// of the API.
+const PodSchedulingNodeListMaxSize = 256
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.25
+
+// PodSchedulingList is a collection of pod scheduling objects.
+type PodSchedulingList struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Items is the list of resource claims.
+	Items []PodScheduling `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
+
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.25
+
+// ResourceClass is used by administrators to influence how resources
+// are allocated.
+//
+// This is an alpha type and requires enabling the DynamicResourceAllocation
+// feature gate.
+type ResourceClass struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// DriverName determines which resource driver is to be used for
+	// allocation of a ResourceClaim that uses this class.
+	//
+	// Resource drivers have a unique name in reverse domain order
+	// (acme.example.com).
+	DriverName string `json:"driverName,omitempty" protobuf:"bytes,2,opt,name=driverName"`
+
+	// ParametersRef references an arbitrary separate object that may hold
+	// parameters that will be used by the driver when allocating a
+	// resource that uses this class. The driver will be able to
+	// distinguish between parameters stored here and and those stored in
+	// ResourceClaimSpec. These parameters here can only be set by cluster
+	// administrators.
+	ParametersRef *ResourceClassParametersReference `json:"parametersRef,omitempty" protobuf:"bytes,3,opt,name=parametersRef"`
+
+	// Only nodes matching the selector will be considered by the scheduler
+	// when trying to find a Node that fits a Pod when that Pod uses
+	// a ResourceClaim that has not been allocated yet.
+	//
+	// Setting this field is optional. If null, all nodes are candidates.
+	SuitableNodes *NodeSelector `json:"suitableNodes,omitempty" protobuf:"bytes,4,opt,name=suitableNodes"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.25
+
+// ResourceClassList is a collection of resource classes.
+type ResourceClassList struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Items is the list of resource classes.
+	Items []ResourceClass `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
+
+// ResourceClassParametersReference contains enough information to let you
+// locate the parameters for a ResourceClass.
+type ResourceClassParametersReference struct {
+	// APIGroup is the group for the resource being referenced. It is
+	// empty for the core API. This matches the group in the APIVersion
+	// that is used when creating the resources.
+	APIGroup string `json:"apiGroup,omitempty" protobuf:"bytes,1,opt,name=apiGroup"`
+	// Kind is the type of resource being referenced. This is the same
+	// value as in the parameter object's metadata.
+	Kind string `json:"kind" protobuf:"bytes,2,name=kind"`
+	// Name is the name of resource being referenced.
+	Name string `json:"name" protobuf:"bytes,3,name=name"`
+	// Namespace that contains the referenced resource. Must be empty
+	// for cluster-scoped resources and non-empty for namespaced
+	// resources.
+	Namespace string `json:"namespace,omitempty" protobuf:"bytes,4,opt,name=namespace"`
+}
+
+// ResourceClaimParametersReference contains enough information to let you
+// locate the parameters for a ResourceClaim. The object must be in the same
+// namespace as the ResourceClaim.
+type ResourceClaimParametersReference struct {
+	// APIGroup is the group for the resource being referenced. It is
+	// empty for the core API. This matches the group in the APIVersion
+	// that is used when creating the resources.
+	APIGroup string `json:"apiGroup,omitempty" protobuf:"bytes,1,opt,name=apiGroup"`
+	// Kind is the type of resource being referenced. This is the same
+	// value as in the parameter object's metadata, for example "ConfigMap".
+	Kind string `json:"kind" protobuf:"bytes,2,name=kind"`
+	// Name is the name of resource being referenced.
+	Name string `json:"name" protobuf:"bytes,3,name=name"`
+}
+
+// ResourceClaimParametersReference contains enough information to let you
+// locate the user of a ResourceClaim. The user must be a resource in the same
+// namespace as the ResourceClaim.
+type ResourceClaimUserReference struct {
+	// APIGroup is the group for the resource being referenced. It is
+	// empty for the core API. This matches the group in the APIVersion
+	// that is used when creating the resources.
+	APIGroup string `json:"apiGroup,omitempty" protobuf:"bytes,1,opt,name=apiGroup"`
+	// Resource is the type of resource being referenced, for example "pods".
+	Resource string `json:"resource" protobuf:"bytes,3,name=resource"`
+	// Name is the name of resource being referenced.
+	Name string `json:"name" protobuf:"bytes,4,name=name"`
+	// UID identifies exactly one incarnation of the resource.
+	UID types.UID `json:"uid" protobuf:"bytes,5,name=uid"`
 }

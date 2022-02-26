@@ -1935,3 +1935,120 @@ func TestDropHostUsers(t *testing.T) {
 	}
 
 }
+
+func TestDropDynamicResourceAllocation(t *testing.T) {
+	resourceClaimName := "external-claim"
+
+	podWithClaims := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Resources: api.ResourceRequirements{
+							Claims: []string{"my-claim"},
+						},
+					},
+				},
+				InitContainers: []api.Container{
+					{
+						Resources: api.ResourceRequirements{
+							Claims: []string{"my-claim"},
+						},
+					},
+				},
+				EphemeralContainers: []api.EphemeralContainer{
+					{
+						EphemeralContainerCommon: api.EphemeralContainerCommon{
+							Resources: api.ResourceRequirements{
+								Claims: []string{"my-claim"},
+							},
+						},
+					},
+				},
+				ResourceClaims: []api.PodResourceClaim{
+					{
+						Name: "my-claim",
+						Claim: api.ClaimSource{
+							ResourceClaimName: &resourceClaimName,
+						},
+					},
+				},
+			},
+		}
+	}
+	podWithoutClaims := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				Containers:          []api.Container{{}},
+				InitContainers:      []api.Container{{}},
+				EphemeralContainers: []api.EphemeralContainer{{}},
+			},
+		}
+	}
+
+	podInfo := []struct {
+		description string
+		hasClaims   bool
+		pod         func() *api.Pod
+	}{
+		{
+			description: "with claims",
+			hasClaims:   true,
+			pod:         podWithClaims,
+		},
+		{
+			description: "without claims",
+			hasClaims:   false,
+			pod:         podWithoutClaims,
+		},
+		{
+			description: "without old pod",
+			pod:         func() *api.Pod { return nil },
+		},
+	}
+
+	for _, enabled := range []bool{true, false} {
+		for _, oldPodInfo := range podInfo {
+			for _, newPodInfo := range podInfo {
+				oldPodHasClaims, oldPod := oldPodInfo.hasClaims, oldPodInfo.pod()
+				newPodHasClaims, newPod := newPodInfo.hasClaims, newPodInfo.pod()
+				if newPod == nil {
+					continue
+				}
+
+				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, enabled)()
+
+					DropDisabledPodFields(newPod, oldPod)
+
+					// old pod should never be changed
+					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
+						t.Errorf("old pod changed: %v", cmp.Diff(oldPod, oldPodInfo.pod()))
+					}
+
+					switch {
+					case enabled || oldPodHasClaims:
+						// new pod should not be changed if the feature is enabled, or if the old pod had claims
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
+						}
+					case newPodHasClaims:
+						// new pod should be changed
+						if reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod was not changed")
+						}
+						// new pod should not have claims
+						if exp := podWithoutClaims(); !reflect.DeepEqual(newPod, exp) {
+							t.Errorf("new pod had claims: %v", cmp.Diff(newPod, exp))
+						}
+					default:
+						// new pod should not need to be changed
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
+						}
+					}
+				})
+			}
+		}
+	}
+}

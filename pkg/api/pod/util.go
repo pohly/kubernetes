@@ -545,6 +545,7 @@ func dropDisabledFields(
 	dropDisabledTopologySpreadConstraintsFields(podSpec, oldPodSpec)
 	dropDisabledNodeInclusionPolicyFields(podSpec, oldPodSpec)
 	dropDisabledMatchLabelKeysField(podSpec, oldPodSpec)
+	dropDisabledDynamicResourceAllocationFields(podSpec, oldPodSpec)
 }
 
 // dropDisabledTopologySpreadConstraintsFields removes disabled fields from PodSpec related
@@ -770,4 +771,36 @@ func setsWindowsHostProcess(podSpec *api.PodSpec) bool {
 	})
 
 	return inUse
+}
+
+// dropDisabledDynamicResourceAllocationFields removes pod claim references from
+// container specs and pod-level resource claims unless they are already used
+// by the old pod spec.
+func dropDisabledDynamicResourceAllocationFields(podSpec, oldPodSpec *api.PodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) && !dynamicResourceAllocationInUse(oldPodSpec) {
+		dropResourceClaimRequests(podSpec.Containers)
+		dropResourceClaimRequests(podSpec.InitContainers)
+		dropEphemeralResourceClaimRequests(podSpec.EphemeralContainers)
+		podSpec.ResourceClaims = nil
+	}
+}
+
+func dynamicResourceAllocationInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+
+	return len(podSpec.ResourceClaims) > 0
+}
+
+func dropResourceClaimRequests(containers []api.Container) {
+	for i := range containers {
+		containers[i].Resources.Claims = nil
+	}
+}
+
+func dropEphemeralResourceClaimRequests(containers []api.EphemeralContainer) {
+	for i := range containers {
+		containers[i].Resources.Claims = nil
+	}
 }

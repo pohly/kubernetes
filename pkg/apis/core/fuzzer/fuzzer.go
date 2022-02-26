@@ -544,5 +544,24 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				j.Service = &empty
 			}
 		},
+		func(obj *core.ResourceClass, c fuzz.Continue) {
+			c.FuzzNoCustom(obj) // fuzz self without calling this function again
+		},
+		func(obj *core.ResourceClaimSpec, c fuzz.Continue) {
+			c.FuzzNoCustom(obj) // fuzz self without calling this function again
+
+			// Custom fuzzing for allocation mode: pick one valid mode randomly.
+			modes := []core.AllocationMode{
+				core.AllocationModeImmediate,
+				core.AllocationModeWaitForFirstConsumer,
+			}
+			obj.AllocationMode = modes[c.Rand.Intn(len(modes))]
+		},
+		func(obj *core.PodScheduling, c fuzz.Continue) {
+			c.FuzzNoCustom(obj) // fuzz self without calling this function again
+		},
+		func(obj *core.PodScheduling, c fuzz.Continue) {
+			c.FuzzNoCustom(obj) // fuzz self without calling this function again
+		},
 	}
 }
