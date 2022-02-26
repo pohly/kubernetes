@@ -99,6 +99,18 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 			Stub:             `{"metadata": {"name": "rc1"}, "spec": {"selector": {"new": "stuff"}, "template": {"metadata": {"labels": {"new": "stuff"}}, "spec": {"containers": [{"image": "` + image + `", "name": "container8"}]}}}}`,
 			ExpectedEtcdPath: "/registry/controllers/" + namespace + "/rc1",
 		},
+		gvr("", "v1", "resourceclasses"): {
+			Stub:             `{"metadata": {"name": "class1name"}, "driverName": "example.com"}`,
+			ExpectedEtcdPath: "/registry/resourceclasses/class1name",
+		},
+		gvr("", "v1", "resourceclaims"): {
+			Stub:             `{"metadata": {"name": "claim1name"}, "spec": {"resourceClassName": "class1name", "allocationMode": "WaitForFirstConsumer"}}`,
+			ExpectedEtcdPath: "/registry/resourceclaims/" + namespace + "/claim1name",
+		},
+		gvr("", "v1", "podschedulings"): {
+			Stub:             `{"metadata": {"name": "pod1name"}, "spec": {"selectedNode": "node1name", "potentialNodes": ["node1name", "node2name"]}}`,
+			ExpectedEtcdPath: "/registry/podschedulings/" + namespace + "/pod1name",
+		},
 		// --
 
 		// k8s.io/kubernetes/pkg/apis/apps/v1
