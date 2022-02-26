@@ -2711,6 +2711,26 @@ func ValidateVolumeDevices(devices []core.VolumeDevice, volmounts map[string]str
 	return allErrs
 }
 
+func validateResourceClaimNames(claimNames []string, podClaimNames sets.String, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	names := sets.NewString()
+	for i, name := range claimNames {
+		if name == "" {
+			allErrs = append(allErrs, field.Required(fldPath.Index(i), "name cannot be empty"))
+		} else {
+			if names.Has(name) {
+				allErrs = append(allErrs, field.Duplicate(fldPath.Index(i), name))
+			} else {
+				names.Insert(name)
+			}
+			if !podClaimNames.Has(name) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Index(i), name, "not defined in pod.spec.resourceClaims"))
+			}
+		}
+	}
+	return allErrs
+}
+
 func validateProbe(probe *core.Probe, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
@@ -2933,7 +2953,7 @@ func validatePullPolicy(policy core.PullPolicy, fldPath *field.Path) field.Error
 
 // validateEphemeralContainers is called by pod spec and template validation to validate the list of ephemeral containers.
 // Note that this is called for pod template even though ephemeral containers aren't allowed in pod templates.
-func validateEphemeralContainers(ephemeralContainers []core.EphemeralContainer, containers, initContainers []core.Container, volumes map[string]core.VolumeSource, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+func validateEphemeralContainers(ephemeralContainers []core.EphemeralContainer, containers, initContainers []core.Container, volumes map[string]core.VolumeSource, podClaimNames sets.String, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(ephemeralContainers) == 0 {
@@ -2954,7 +2974,7 @@ func validateEphemeralContainers(ephemeralContainers []core.EphemeralContainer, 
 		idxPath := fldPath.Index(i)
 
 		c := (*core.Container)(&ec.EphemeralContainerCommon)
-		allErrs = append(allErrs, validateContainerCommon(c, volumes, idxPath, opts)...)
+		allErrs = append(allErrs, validateContainerCommon(c, volumes, podClaimNames, idxPath, opts)...)
 		// Ephemeral containers don't need looser constraints for pod templates, so it's convenient to apply both validations
 		// here where we've already converted EphemeralContainerCommon to Container.
 		allErrs = append(allErrs, validateContainerOnlyForPod(c, idxPath)...)
@@ -3016,7 +3036,7 @@ func validateFieldAllowList(value interface{}, allowedFields map[string]bool, er
 }
 
 // validateInitContainers is called by pod spec and template validation to validate the list of init containers
-func validateInitContainers(containers []core.Container, regularContainers []core.Container, volumes map[string]core.VolumeSource, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+func validateInitContainers(containers []core.Container, regularContainers []core.Container, volumes map[string]core.VolumeSource, podClaimNames sets.String, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	var allErrs field.ErrorList
 
 	allNames := sets.String{}
@@ -3027,7 +3047,7 @@ func validateInitContainers(containers []core.Container, regularContainers []cor
 		idxPath := fldPath.Index(i)
 
 		// Apply the validation common to all container types
-		allErrs = append(allErrs, validateContainerCommon(&ctr, volumes, idxPath, opts)...)
+		allErrs = append(allErrs, validateContainerCommon(&ctr, volumes, podClaimNames, idxPath, opts)...)
 
 		// Names must be unique within regular and init containers. Collisions with ephemeral containers
 		// will be detected by validateEphemeralContainers().
@@ -3060,7 +3080,7 @@ func validateInitContainers(containers []core.Container, regularContainers []cor
 
 // validateContainerCommon applies validation common to all container types. It's called by regular, init, and ephemeral
 // container list validation to require a properly formatted name, image, etc.
-func validateContainerCommon(ctr *core.Container, volumes map[string]core.VolumeSource, path *field.Path, opts PodValidationOptions) field.ErrorList {
+func validateContainerCommon(ctr *core.Container, volumes map[string]core.VolumeSource, podClaimNames sets.String, path *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	namePath := path.Child("name")
@@ -3096,6 +3116,7 @@ func validateContainerCommon(ctr *core.Container, volumes map[string]core.Volume
 	allErrs = append(allErrs, ValidateEnvFrom(ctr.EnvFrom, path.Child("envFrom"))...)
 	allErrs = append(allErrs, ValidateVolumeMounts(ctr.VolumeMounts, volDevices, volumes, ctr, path.Child("volumeMounts"))...)
 	allErrs = append(allErrs, ValidateVolumeDevices(ctr.VolumeDevices, volMounts, volumes, path.Child("volumeDevices"))...)
+	allErrs = append(allErrs, validateResourceClaimNames(ctr.Resources.Claims, podClaimNames, path.Child("resources", "claims"))...)
 	allErrs = append(allErrs, validatePullPolicy(ctr.ImagePullPolicy, path.Child("imagePullPolicy"))...)
 	allErrs = append(allErrs, ValidateResourceRequirements(&ctr.Resources, path.Child("resources"), opts)...)
 	allErrs = append(allErrs, ValidateSecurityContext(ctr.SecurityContext, path.Child("securityContext"))...)
@@ -3150,7 +3171,7 @@ func validateHostUsers(spec *core.PodSpec, fldPath *field.Path) field.ErrorList 
 }
 
 // validateContainers is called by pod spec and template validation to validate the list of regular containers.
-func validateContainers(containers []core.Container, volumes map[string]core.VolumeSource, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+func validateContainers(containers []core.Container, volumes map[string]core.VolumeSource, podClaimNames sets.String, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(containers) == 0 {
@@ -3162,7 +3183,7 @@ func validateContainers(containers []core.Container, volumes map[string]core.Vol
 		path := fldPath.Index(i)
 
 		// Apply validation common to all containers
-		allErrs = append(allErrs, validateContainerCommon(&ctr, volumes, path, opts)...)
+		allErrs = append(allErrs, validateContainerCommon(&ctr, volumes, podClaimNames, path, opts)...)
 
 		// Container names must be unique within the list of regular containers.
 		// Collisions with init or ephemeral container names will be detected by the init or ephemeral
@@ -3602,9 +3623,11 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 
 	vols, vErrs := ValidateVolumes(spec.Volumes, podMeta, fldPath.Child("volumes"), opts)
 	allErrs = append(allErrs, vErrs...)
-	allErrs = append(allErrs, validateContainers(spec.Containers, vols, fldPath.Child("containers"), opts)...)
-	allErrs = append(allErrs, validateInitContainers(spec.InitContainers, spec.Containers, vols, fldPath.Child("initContainers"), opts)...)
-	allErrs = append(allErrs, validateEphemeralContainers(spec.EphemeralContainers, spec.Containers, spec.InitContainers, vols, fldPath.Child("ephemeralContainers"), opts)...)
+	podClaimNames, claimErrs := validatePodResourceClaims(spec.ResourceClaims, fldPath.Child("resourceClaims"))
+	allErrs = append(allErrs, claimErrs...)
+	allErrs = append(allErrs, validateContainers(spec.Containers, vols, podClaimNames, fldPath.Child("containers"), opts)...)
+	allErrs = append(allErrs, validateInitContainers(spec.InitContainers, spec.Containers, vols, podClaimNames, fldPath.Child("initContainers"), opts)...)
+	allErrs = append(allErrs, validateEphemeralContainers(spec.EphemeralContainers, spec.Containers, spec.InitContainers, vols, podClaimNames, fldPath.Child("ephemeralContainers"), opts)...)
 	allErrs = append(allErrs, validateRestartPolicy(&spec.RestartPolicy, fldPath.Child("restartPolicy"))...)
 	allErrs = append(allErrs, validateDNSPolicy(&spec.DNSPolicy, fldPath.Child("dnsPolicy"))...)
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabels(spec.NodeSelector, fldPath.Child("nodeSelector"))...)
@@ -3680,6 +3703,7 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 			allErrs = append(allErrs, validateWindows(spec, fldPath)...)
 		}
 	}
+
 	return allErrs
 }
 
@@ -3781,6 +3805,55 @@ func validateWindows(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 		}
 		return true
 	})
+	return allErrs
+}
+
+func validatePodResourceClaims(claims []core.PodResourceClaim, fldPath *field.Path) (sets.String, field.ErrorList) {
+	allErrs := field.ErrorList{}
+	podClaimNames := sets.NewString()
+	for i, claim := range claims {
+		allErrs = append(allErrs, validatePodResourceClaim(claim, podClaimNames, fldPath.Index(i))...)
+	}
+	return podClaimNames, allErrs
+}
+
+func validatePodResourceClaim(claim core.PodResourceClaim, podClaimNames sets.String, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if claim.Name == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "a name is required to reference the claim"))
+	} else if podClaimNames.Has(claim.Name) {
+		allErrs = append(allErrs, field.Duplicate(fldPath, claim.Name))
+	} else {
+		podClaimNames.Insert(claim.Name)
+	}
+	allErrs = append(allErrs, validatePodResourceClaimSource(claim.Claim, fldPath.Child("claim"))...)
+
+	return allErrs
+}
+
+func validatePodResourceClaimSource(claimSource core.ClaimSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if claimSource.ResourceClaimName != nil && claimSource.Template != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, claimSource, "either resourceClaimName or template must be set, not both"))
+	}
+	if claimSource.ResourceClaimName == nil && claimSource.Template == nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, claimSource, "either resourceClaimName or template must be set, both are unset"))
+	}
+	if claimSource.ResourceClaimName != nil {
+		for _, msg := range validateResourceClaimName(*claimSource.ResourceClaimName, false) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceClaimName"), *claimSource.ResourceClaimName, msg))
+		}
+	}
+	if claimSource.Template != nil {
+		allErrs = append(allErrs, validateResourceClaimTemplate(claimSource.Template, fldPath.Child("template"))...)
+	}
+	return allErrs
+}
+
+func validateResourceClaimTemplate(template *core.ResourceClaimTemplate, fldPath *field.Path) field.ErrorList {
+	// Meta data support is exactly the same as for PVC templates.
+	allErrs := validatePersistentVolumeClaimTemplateObjectMeta(&template.ObjectMeta, fldPath.Child("metadata"))
+	allErrs = append(allErrs, validateResourceClaimSpec(&template.Spec, fldPath.Child("spec"))...)
 	return allErrs
 }
 
@@ -6995,4 +7068,259 @@ func sameLoadBalancerClass(oldService, service *core.Service) bool {
 		return false
 	}
 	return *oldService.Spec.LoadBalancerClass == *service.Spec.LoadBalancerClass
+}
+
+// ValidateResourceClaim validates a ResourceClaim.
+func ValidateResourceClaim(resourceClaim *core.ResourceClaim) field.ErrorList {
+	allErrs := ValidateObjectMeta(&resourceClaim.ObjectMeta, true, validateResourceClaimName, field.NewPath("metadata"))
+	allErrs = append(allErrs, validateResourceClaimSpec(&resourceClaim.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+var validateResourceClaimName = apimachineryvalidation.NameIsDNSSubdomain
+
+func validateResourceClaimSpec(spec *core.ResourceClaimSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for _, msg := range ValidateClassName(spec.ResourceClassName, false) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceClassName"), spec.ResourceClassName, msg))
+	}
+	allErrs = append(allErrs, validateResourceClaimParameters(spec.ParametersRef, fldPath.Child("parametersRef"))...)
+	switch spec.AllocationMode {
+	case core.AllocationModeImmediate, core.AllocationModeWaitForFirstConsumer:
+	default:
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("allocationMode"), spec.AllocationMode, "unknown mode"))
+	}
+	return allErrs
+}
+
+// It would have been nice to use Go generics to reuse the same validation
+// function for Kind and Name in both types, but generics cannot be used to
+// access common fields in structs.
+
+func validateResourceClaimParameters(ref *core.ResourceClaimParametersReference, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if ref != nil {
+		if ref.Kind == "" {
+			allErrs = append(allErrs, field.Required(fldPath.Child("kind"), "must be specified"))
+		}
+		if ref.Name == "" {
+			allErrs = append(allErrs, field.Required(fldPath.Child("name"), "must be specified"))
+		}
+	}
+	return allErrs
+}
+
+func validateResourceClassParameters(ref *core.ResourceClassParametersReference, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if ref != nil {
+		if ref.Kind == "" {
+			allErrs = append(allErrs, field.Required(fldPath.Child("kind"), "must be specified"))
+		}
+		if ref.Name == "" {
+			allErrs = append(allErrs, field.Required(fldPath.Child("name"), "must be specified"))
+		}
+		if ref.Namespace != "" {
+			for _, msg := range ValidateNamespaceName(ref.Namespace, false) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("namespace"), ref.Namespace, msg))
+			}
+		}
+	}
+	return allErrs
+}
+
+// ValidateResourceClass validates a ResourceClass.
+func ValidateResourceClass(resourceClass *core.ResourceClass) field.ErrorList {
+	allErrs := ValidateObjectMeta(&resourceClass.ObjectMeta, false, ValidateClassName, field.NewPath("metadata"))
+	allErrs = append(allErrs, validateResourceDriverName(resourceClass.DriverName, field.NewPath("driverName"))...)
+	allErrs = append(allErrs, validateResourceClassParameters(resourceClass.ParametersRef, field.NewPath("parametersRef"))...)
+
+	return allErrs
+}
+
+// ValidateResourceClassUpdate tests if an update to ResourceClass is valid.
+func ValidateResourceClassUpdate(resourceClass, oldResourceClass *core.ResourceClass) field.ErrorList {
+	allErrs := ValidateObjectMetaUpdate(&resourceClass.ObjectMeta, &oldResourceClass.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateResourceClass(resourceClass)...)
+	return allErrs
+}
+
+// ValidateResourceClaimUpdate tests if an update to ResourceClaim is valid.
+func ValidateResourceClaimUpdate(resourceClaim, oldResourceClaim *core.ResourceClaim) field.ErrorList {
+	allErrs := ValidateObjectMetaUpdate(&resourceClaim.ObjectMeta, &oldResourceClaim.ObjectMeta, field.NewPath("metadata"))
+	if !apiequality.Semantic.DeepEqual(oldResourceClaim.Spec, resourceClaim.Spec) {
+		specDiff := cmp.Diff(oldResourceClaim.Spec, resourceClaim.Spec)
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), fmt.Sprintf("spec is immutable after creation\n%v", specDiff)))
+	}
+	allErrs = append(allErrs, ValidateResourceClaim(resourceClaim)...)
+	return allErrs
+}
+
+// ValidateResourceClaimStatusUpdate tests if an update to the status of a ResourceClaim is valid.
+func ValidateResourceClaimStatusUpdate(resourceClaim, oldResourceClaim *core.ResourceClaim) field.ErrorList {
+	allErrs := ValidateObjectMetaUpdate(&resourceClaim.ObjectMeta, &oldResourceClaim.ObjectMeta, field.NewPath("metadata"))
+	fldPath := field.NewPath("status")
+	// The name might not be set yet.
+	if resourceClaim.Status.DriverName != "" {
+		allErrs = append(allErrs, validateResourceDriverName(resourceClaim.Status.DriverName, fldPath.Child("driverName"))...)
+	} else if resourceClaim.Status.Allocation != nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("driverName"), "must be set when a claim is allocated"))
+	}
+
+	allErrs = append(allErrs, validateAllocationResult(resourceClaim.Status.Allocation, fldPath.Child("allocation"))...)
+	allErrs = append(allErrs, validateSet(resourceClaim.Status.ReservedFor, v1.ResourceClaimReservedForMaxSize,
+		validateResourceClaimUserReference, fldPath.Child("reservedFor"))...)
+
+	// Now check for invariants that must be valid for a ResourceClaim.
+	if len(resourceClaim.Status.ReservedFor) > 0 {
+		if resourceClaim.Status.Allocation == nil {
+			allErrs = append(allErrs, field.Invalid(fldPath, resourceClaim.Status.ReservedFor, "only allocated claims can get reserved"))
+		} else {
+			if !resourceClaim.Status.Allocation.SharedResource && len(resourceClaim.Status.ReservedFor) > 1 {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("reservedFor"), "the claim cannot be reserved more than once"))
+			}
+			// Items may be removed from ReservedFor while the claim is meant to be deallocated,
+			// but not added.
+			if resourceClaim.DeletionTimestamp != nil ||
+				resourceClaim.Status.DeallocationRequested {
+				oldSet := sets.New(oldResourceClaim.Status.ReservedFor...)
+				newSet := sets.New(resourceClaim.Status.ReservedFor...)
+				newItems := newSet.Difference(oldSet)
+				if len(newItems) > 0 {
+					allErrs = append(allErrs, field.Forbidden(fldPath.Child("reservedFor"), "new entries may not get added while the claim is meant to be deallocated"))
+				}
+			}
+		}
+	}
+
+	// Once deallocation has been requested, that request cannot be removed
+	// anymore because the deallocation may already have started. The field
+	// can only get reset by the driver together with removing the
+	// allocation.
+	if oldResourceClaim.Status.DeallocationRequested &&
+		!resourceClaim.Status.DeallocationRequested &&
+		resourceClaim.Status.Allocation != nil {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("deallocationRequested"), "deallocation cannot be canceled because it may already have started"))
+	}
+
+	return allErrs
+}
+
+func validateAllocationResult(allocation *core.AllocationResult, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if allocation != nil {
+		if len(allocation.ResourceHandle) > core.ResourceHandleMaxSize {
+			allErrs = append(allErrs, field.TooLongMaxLength(fldPath.Child("resourceHandle"), allocation.ResourceHandle, core.ResourceHandleMaxSize))
+		}
+		if allocation.AvailableOnNodes != nil {
+			allErrs = append(allErrs, ValidateNodeSelector(allocation.AvailableOnNodes, fldPath.Child("availableOnNodes"))...)
+		}
+	}
+	return allErrs
+}
+
+func validateResourceClaimUserReference(ref core.ResourceClaimUserReference, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	// APIGroup is empty for the legacy group.
+	if ref.Resource == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("apiGroup"), "resource must not be empty"))
+	}
+	if ref.Name == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "name must not be empty"))
+	}
+	if ref.UID == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("uid"), "uid must not be empty"))
+	}
+	return allErrs
+}
+
+func validateResourceDriverName(driverName string, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if driverName == "" {
+		allErrs = append(allErrs, field.Required(fldPath, driverName))
+	} else {
+		allErrs = append(allErrs, ValidateQualifiedName(strings.ToLower(driverName), fldPath)...)
+	}
+	return allErrs
+}
+
+// validateSet ensures that a slice contains no duplicates and does not exceed a certain maximum size.
+func validateSet[T comparable](set []T, maxSize int, validateItem func(item T, fldPath *field.Path) field.ErrorList, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allItems := sets.New[T]()
+	for i, item := range set {
+		if allItems.Has(item) {
+			allErrs = append(allErrs, field.Duplicate(fldPath, item))
+		} else {
+			allErrs = append(allErrs, validateItem(item, fldPath.Index(i))...)
+			allItems.Insert(item)
+		}
+	}
+	if len(allItems) > maxSize {
+		allErrs = append(allErrs, field.TooLongMaxLength(fldPath, set, maxSize))
+	}
+	return allErrs
+}
+
+// ValidatePodScheduling validates a PodScheduling.
+func ValidatePodScheduling(resourceClaim *core.PodScheduling) field.ErrorList {
+	allErrs := ValidateObjectMeta(&resourceClaim.ObjectMeta, true, ValidatePodName, field.NewPath("metadata"))
+	allErrs = append(allErrs, validatePodSchedulingSpec(&resourceClaim.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+func validatePodSchedulingSpec(spec *core.PodSchedulingSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	// Checking PotentialNodes for duplicates is intentionally not done. It
+	// could be fairly expensive and the only component which normally has
+	// permissions to set this field, kube-scheduler, is a trusted
+	// component.  Also, if it gets this wrong because of a bug, then the
+	// effect is limited (same semantic).
+	if len(spec.PotentialNodes) > core.PodSchedulingNodeListMaxSize {
+		allErrs = append(allErrs, field.TooLongMaxLength(fldPath.Child("potentialNodes"), nil, core.PodSchedulingNodeListMaxSize))
+	}
+	return allErrs
+}
+
+// ValidatePodSchedulingUpdate tests if an update to PodScheduling is valid.
+func ValidatePodSchedulingUpdate(resourceClaim, oldPodScheduling *core.PodScheduling) field.ErrorList {
+	allErrs := ValidateObjectMetaUpdate(&resourceClaim.ObjectMeta, &oldPodScheduling.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidatePodScheduling(resourceClaim)...)
+	return allErrs
+}
+
+// ValidatePodSchedulingStatusUpdate tests if an update to the status of a PodScheduling is valid.
+func ValidatePodSchedulingStatusUpdate(resourceClaim, oldPodScheduling *core.PodScheduling) field.ErrorList {
+	allErrs := ValidateObjectMetaUpdate(&resourceClaim.ObjectMeta, &oldPodScheduling.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, validatePodSchedulingStatus(&resourceClaim.Status, field.NewPath("status"))...)
+	return allErrs
+}
+
+func validatePodSchedulingStatus(status *core.PodSchedulingStatus, fldPath *field.Path) field.ErrorList {
+	return validatePodSchedulingClaims(status.Claims, fldPath.Child("claims"))
+}
+
+func validatePodSchedulingClaims(claimStatuses []core.ResourceClaimSchedulingStatus, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	podResourceClaimNames := sets.NewString()
+	for i, claimStatus := range claimStatuses {
+		allErrs = append(allErrs, validatePodSchedulingClaim(claimStatus, fldPath.Index(i))...)
+		if podResourceClaimNames.Has(claimStatus.PodResourceClaimName) {
+			allErrs = append(allErrs, field.Duplicate(fldPath.Index(i), claimStatus))
+		} else {
+			podResourceClaimNames.Insert(claimStatus.PodResourceClaimName)
+		}
+	}
+	return allErrs
+}
+
+func validatePodSchedulingClaim(claim core.ResourceClaimSchedulingStatus, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	// Checking UnsuitableNodes for duplicates is intentionally not done. It
+	// could be fairly expensive and if a resource driver gets this wrong,
+	// then it is only going to have a negative effect for the pods relying
+	// on this driver.
+	if len(claim.UnsuitableNodes) > core.PodSchedulingNodeListMaxSize {
+		allErrs = append(allErrs, field.TooLongMaxLength(fldPath.Child("unsuitableNodes"), nil, core.PodSchedulingNodeListMaxSize))
+	}
+	return allErrs
 }
