@@ -40,6 +40,8 @@ const testNamespace = "statusnamespace"
 
 var statusData = map[schema.GroupVersionResource]string{
 	gvr("", "v1", "persistentvolumes"):                              `{"status": {"message": "hello"}}`,
+	gvr("", "v1", "podschedulings"):                                 `{"status": {"claims": [{"podResourceClaimName": "my-claim", "unsuitableNodes": ["node1"]}]}}`,
+	gvr("", "v1", "resourceclaims"):                                 `{"status": {"driverName": "example.com"}}`,
 	gvr("", "v1", "resourcequotas"):                                 `{"status": {"used": {"cpu": "5M"}}}`,
 	gvr("", "v1", "services"):                                       `{"status": {"loadBalancer": {"ingress": [{"ip": "127.0.0.1"}]}}}`,
 	gvr("extensions", "v1beta1", "ingresses"):                       `{"status": {"loadBalancer": {"ingress": [{"ip": "127.0.0.1"}]}}}`,

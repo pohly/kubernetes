@@ -5366,7 +5366,7 @@ func TestAlphaLocalStorageCapacityIsolation(t *testing.T) {
 				resource.BinarySI),
 		},
 	}
-	if errs := ValidateResourceRequirements(&containerLimitCase, field.NewPath("resources"), PodValidationOptions{}); len(errs) != 0 {
+	if errs := ValidateResourceRequirements(&containerLimitCase, nil, field.NewPath("resources"), PodValidationOptions{}); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 }
@@ -6836,7 +6836,7 @@ func TestValidateEphemeralContainers(t *testing.T) {
 			},
 		},
 	} {
-		if errs := validateEphemeralContainers(ephemeralContainers, containers, initContainers, vols, field.NewPath("ephemeralContainers"), PodValidationOptions{}); len(errs) != 0 {
+		if errs := validateEphemeralContainers(ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{}); len(errs) != 0 {
 			t.Errorf("expected success for '%s' but got errors: %v", title, errs)
 		}
 	}
@@ -7118,7 +7118,7 @@ func TestValidateEphemeralContainers(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.title+"__@L"+tc.line, func(t *testing.T) {
-			errs := validateEphemeralContainers(tc.ephemeralContainers, containers, initContainers, vols, field.NewPath("ephemeralContainers"), PodValidationOptions{})
+			errs := validateEphemeralContainers(tc.ephemeralContainers, containers, initContainers, vols, nil, field.NewPath("ephemeralContainers"), PodValidationOptions{})
 			if len(errs) == 0 {
 				t.Fatal("expected error but received none")
 			}
@@ -7219,6 +7219,7 @@ func TestValidateLinuxPodSecurityContext(t *testing.T) {
 
 func TestValidateContainers(t *testing.T) {
 	volumeDevices := make(map[string]core.VolumeSource)
+	podClaimNames := sets.NewString("my-claim")
 	capabilities.SetForTests(capabilities.Capabilities{
 		AllowPrivileged: true,
 	})
@@ -7331,6 +7332,15 @@ func TestValidateContainers(t *testing.T) {
 			TerminationMessagePolicy: "File",
 		},
 		{
+			Name:  "claim-request",
+			Image: "image",
+			Resources: core.ResourceRequirements{
+				Claims: []string{"my-claim"},
+			},
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+		},
+		{
 			Name:  "same-host-port-different-protocol",
 			Image: "image",
 			Ports: []core.ContainerPort{
@@ -7397,7 +7407,7 @@ func TestValidateContainers(t *testing.T) {
 			TerminationMessagePolicy: "File",
 		},
 	}
-	if errs := validateContainers(successCase, volumeDevices, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
+	if errs := validateContainers(successCase, volumeDevices, podClaimNames, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -7997,6 +8007,54 @@ func TestValidateContainers(t *testing.T) {
 			field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "containers[0].resources.requests"}},
 		},
 		{
+			"claim name duplicates",
+			line(),
+			[]core.Container{
+				{
+					Name:  "abc-123",
+					Image: "image",
+					Resources: core.ResourceRequirements{
+						Claims: []string{"my-claim", "my-claim"},
+					},
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			},
+			field.ErrorList{{Type: field.ErrorTypeDuplicate, Field: "containers[0].resources.claims[1]"}},
+		},
+		{
+			"claim name empty",
+			line(),
+			[]core.Container{
+				{
+					Name:  "abc-123",
+					Image: "image",
+					Resources: core.ResourceRequirements{
+						Claims: []string{""},
+					},
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			},
+			field.ErrorList{{Type: field.ErrorTypeRequired, Field: "containers[0].resources.claims[0]"}},
+		},
+		{
+			"claim name empty",
+			line(),
+			[]core.Container{
+				{
+					Name:  "abc-123",
+					Image: "image",
+					Resources: core.ResourceRequirements{
+						Claims: []string{"no-such-claim"},
+					},
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			},
+			field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "containers[0].resources.claims[0]"}},
+		},
+		{
 			"Invalid env from",
 			line(),
 			[]core.Container{
@@ -8021,7 +8079,7 @@ func TestValidateContainers(t *testing.T) {
 	}
 	for _, tc := range errorCases {
 		t.Run(tc.title+"__@L"+tc.line, func(t *testing.T) {
-			errs := validateContainers(tc.containers, volumeDevices, field.NewPath("containers"), PodValidationOptions{})
+			errs := validateContainers(tc.containers, volumeDevices, podClaimNames, field.NewPath("containers"), PodValidationOptions{})
 			if len(errs) == 0 {
 				t.Fatal("expected error but received none")
 			}
@@ -8071,7 +8129,7 @@ func TestValidateInitContainers(t *testing.T) {
 			TerminationMessagePolicy: "File",
 		},
 	}
-	if errs := validateInitContainers(successCase, containers, volumeDevices, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
+	if errs := validateInitContainers(successCase, containers, volumeDevices, nil, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -8263,7 +8321,7 @@ func TestValidateInitContainers(t *testing.T) {
 	}
 	for _, tc := range errorCases {
 		t.Run(tc.title+"__@L"+tc.line, func(t *testing.T) {
-			errs := validateInitContainers(tc.initContainers, containers, volumeDevices, field.NewPath("initContainers"), PodValidationOptions{})
+			errs := validateInitContainers(tc.initContainers, containers, volumeDevices, nil, field.NewPath("initContainers"), PodValidationOptions{})
 			if len(errs) == 0 {
 				t.Fatal("expected error but received none")
 			}
@@ -8734,6 +8792,9 @@ func TestValidatePodSpec(t *testing.T) {
 	badfsGroupChangePolicy1 := core.PodFSGroupChangePolicy("invalid")
 	badfsGroupChangePolicy2 := core.PodFSGroupChangePolicy("")
 
+	externalClaimName := "some-claim"
+	invalidClaimName := "^%$#$@#"
+
 	successCases := map[string]core.PodSpec{
 		"populate basic fields, leave defaults for most": {
 			Volumes:       []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
@@ -8887,6 +8948,37 @@ func TestValidatePodSpec(t *testing.T) {
 			},
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
+		},
+		"resource claim reference": {
+			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []string{"my-claim"}}}},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+			ResourceClaims: []core.PodResourceClaim{
+				{
+					Name: "my-claim",
+					Source: core.ClaimSource{
+						ResourceClaimName: &externalClaimName,
+					},
+				},
+			},
+		},
+		"resource claim template": {
+			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []string{"my-claim"}}}},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+			ResourceClaims: []core.PodResourceClaim{
+				{
+					Name: "my-claim",
+					Source: core.ClaimSource{
+						Template: &core.ResourceClaimTemplate{
+							Spec: core.ResourceClaimSpec{
+								ResourceClassName: "some-class",
+								AllocationMode:    core.AllocationModeImmediate,
+							},
+						},
+					},
+				},
+			},
 		},
 	}
 	for k, v := range successCases {
@@ -9092,6 +9184,106 @@ func TestValidatePodSpec(t *testing.T) {
 			},
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
+		},
+		"resource claim source missing": {
+			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []string{"my-claim"}}}},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+			ResourceClaims: []core.PodResourceClaim{
+				{
+					Name: "my-claim",
+				},
+			},
+		},
+		"resource claim reference and template": {
+			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []string{"my-claim"}}}},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+			ResourceClaims: []core.PodResourceClaim{
+				{
+					Name: "my-claim",
+					Source: core.ClaimSource{
+						ResourceClaimName: &externalClaimName,
+						Template: &core.ResourceClaimTemplate{
+							Spec: core.ResourceClaimSpec{
+								ResourceClassName: "some-class",
+								AllocationMode:    core.AllocationModeImmediate,
+							},
+						},
+					},
+				},
+			},
+		},
+		"invalid resource claim reference": {
+			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []string{"my-claim"}}}},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+			ResourceClaims: []core.PodResourceClaim{
+				{
+					Name: "my-claim",
+					Source: core.ClaimSource{
+						ResourceClaimName: &invalidClaimName,
+					},
+				},
+			},
+		},
+		"empty resource claim reference": {
+			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []string{"my-claim"}}}},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+			ResourceClaims: []core.PodResourceClaim{
+				{
+					Name: "",
+					Source: core.ClaimSource{
+						ResourceClaimName: &externalClaimName,
+					},
+				},
+			},
+		},
+		"wrong pod claim name": {
+			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []string{"no-such-claim"}}}},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+			ResourceClaims: []core.PodResourceClaim{
+				{
+					Name: "my-claim",
+					Source: core.ClaimSource{
+						ResourceClaimName: &externalClaimName,
+					},
+				},
+			},
+		},
+		"duplicate pod claim name": {
+			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []string{"my-claim"}}}},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+			ResourceClaims: []core.PodResourceClaim{
+				{
+					Name: "my-claim",
+					Source: core.ClaimSource{
+						ResourceClaimName: &externalClaimName,
+					},
+				},
+				{
+					Name: "my-claim",
+					Source: core.ClaimSource{
+						ResourceClaimName: &externalClaimName,
+					},
+				},
+			},
+		},
+		"empty resource claim template": {
+			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []string{"my-claim"}}}},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+			ResourceClaims: []core.PodResourceClaim{
+				{
+					Name: "my-claim",
+					Source: core.ClaimSource{
+						Template: &core.ResourceClaimTemplate{},
+					},
+				},
+			},
 		},
 	}
 	for k, v := range failureCases {
@@ -18476,6 +18668,84 @@ func TestValidateOSFields(t *testing.T) {
 		"Priority",
 		"PriorityClassName",
 		"ReadinessGates",
+		"ResourceClaims[*].Name",
+		"ResourceClaims[*].Source.ResourceClaimName",
+		"ResourceClaims[*].Source.Template.ObjectMeta.Annotations[*]",
+		"ResourceClaims[*].Source.Template.ObjectMeta.CreationTimestamp.Time.ext",
+		"ResourceClaims[*].Source.Template.ObjectMeta.CreationTimestamp.Time.loc.cacheEnd",
+		"ResourceClaims[*].Source.Template.ObjectMeta.CreationTimestamp.Time.loc.cacheStart",
+		"ResourceClaims[*].Source.Template.ObjectMeta.CreationTimestamp.Time.loc.cacheZone.isDST",
+		"ResourceClaims[*].Source.Template.ObjectMeta.CreationTimestamp.Time.loc.cacheZone.name",
+		"ResourceClaims[*].Source.Template.ObjectMeta.CreationTimestamp.Time.loc.cacheZone.offset",
+		"ResourceClaims[*].Source.Template.ObjectMeta.CreationTimestamp.Time.loc.extend",
+		"ResourceClaims[*].Source.Template.ObjectMeta.CreationTimestamp.Time.loc.name",
+		"ResourceClaims[*].Source.Template.ObjectMeta.CreationTimestamp.Time.loc.tx[*].index",
+		"ResourceClaims[*].Source.Template.ObjectMeta.CreationTimestamp.Time.loc.tx[*].isstd",
+		"ResourceClaims[*].Source.Template.ObjectMeta.CreationTimestamp.Time.loc.tx[*].isutc",
+		"ResourceClaims[*].Source.Template.ObjectMeta.CreationTimestamp.Time.loc.tx[*].when",
+		"ResourceClaims[*].Source.Template.ObjectMeta.CreationTimestamp.Time.loc.zone[*].isDST",
+		"ResourceClaims[*].Source.Template.ObjectMeta.CreationTimestamp.Time.loc.zone[*].name",
+		"ResourceClaims[*].Source.Template.ObjectMeta.CreationTimestamp.Time.loc.zone[*].offset",
+		"ResourceClaims[*].Source.Template.ObjectMeta.CreationTimestamp.Time.wall",
+		"ResourceClaims[*].Source.Template.ObjectMeta.DeletionGracePeriodSeconds",
+		"ResourceClaims[*].Source.Template.ObjectMeta.DeletionTimestamp.Time.ext",
+		"ResourceClaims[*].Source.Template.ObjectMeta.DeletionTimestamp.Time.loc.cacheEnd",
+		"ResourceClaims[*].Source.Template.ObjectMeta.DeletionTimestamp.Time.loc.cacheStart",
+		"ResourceClaims[*].Source.Template.ObjectMeta.DeletionTimestamp.Time.loc.cacheZone.isDST",
+		"ResourceClaims[*].Source.Template.ObjectMeta.DeletionTimestamp.Time.loc.cacheZone.name",
+		"ResourceClaims[*].Source.Template.ObjectMeta.DeletionTimestamp.Time.loc.cacheZone.offset",
+		"ResourceClaims[*].Source.Template.ObjectMeta.DeletionTimestamp.Time.loc.extend",
+		"ResourceClaims[*].Source.Template.ObjectMeta.DeletionTimestamp.Time.loc.name",
+		"ResourceClaims[*].Source.Template.ObjectMeta.DeletionTimestamp.Time.loc.tx[*].index",
+		"ResourceClaims[*].Source.Template.ObjectMeta.DeletionTimestamp.Time.loc.tx[*].isstd",
+		"ResourceClaims[*].Source.Template.ObjectMeta.DeletionTimestamp.Time.loc.tx[*].isutc",
+		"ResourceClaims[*].Source.Template.ObjectMeta.DeletionTimestamp.Time.loc.tx[*].when",
+		"ResourceClaims[*].Source.Template.ObjectMeta.DeletionTimestamp.Time.loc.zone[*].isDST",
+		"ResourceClaims[*].Source.Template.ObjectMeta.DeletionTimestamp.Time.loc.zone[*].name",
+		"ResourceClaims[*].Source.Template.ObjectMeta.DeletionTimestamp.Time.loc.zone[*].offset",
+		"ResourceClaims[*].Source.Template.ObjectMeta.DeletionTimestamp.Time.wall",
+		"ResourceClaims[*].Source.Template.ObjectMeta.Finalizers[*]",
+		"ResourceClaims[*].Source.Template.ObjectMeta.GenerateName",
+		"ResourceClaims[*].Source.Template.ObjectMeta.Generation",
+		"ResourceClaims[*].Source.Template.ObjectMeta.Labels[*]",
+		"ResourceClaims[*].Source.Template.ObjectMeta.ManagedFields[*].APIVersion",
+		"ResourceClaims[*].Source.Template.ObjectMeta.ManagedFields[*].FieldsType",
+		"ResourceClaims[*].Source.Template.ObjectMeta.ManagedFields[*].FieldsV1.Raw[*]",
+		"ResourceClaims[*].Source.Template.ObjectMeta.ManagedFields[*].Manager",
+		"ResourceClaims[*].Source.Template.ObjectMeta.ManagedFields[*].Operation",
+		"ResourceClaims[*].Source.Template.ObjectMeta.ManagedFields[*].Subresource",
+		"ResourceClaims[*].Source.Template.ObjectMeta.ManagedFields[*].Time.Time.ext",
+		"ResourceClaims[*].Source.Template.ObjectMeta.ManagedFields[*].Time.Time.loc.cacheEnd",
+		"ResourceClaims[*].Source.Template.ObjectMeta.ManagedFields[*].Time.Time.loc.cacheStart",
+		"ResourceClaims[*].Source.Template.ObjectMeta.ManagedFields[*].Time.Time.loc.cacheZone.isDST",
+		"ResourceClaims[*].Source.Template.ObjectMeta.ManagedFields[*].Time.Time.loc.cacheZone.name",
+		"ResourceClaims[*].Source.Template.ObjectMeta.ManagedFields[*].Time.Time.loc.cacheZone.offset",
+		"ResourceClaims[*].Source.Template.ObjectMeta.ManagedFields[*].Time.Time.loc.extend",
+		"ResourceClaims[*].Source.Template.ObjectMeta.ManagedFields[*].Time.Time.loc.name",
+		"ResourceClaims[*].Source.Template.ObjectMeta.ManagedFields[*].Time.Time.loc.tx[*].index",
+		"ResourceClaims[*].Source.Template.ObjectMeta.ManagedFields[*].Time.Time.loc.tx[*].isstd",
+		"ResourceClaims[*].Source.Template.ObjectMeta.ManagedFields[*].Time.Time.loc.tx[*].isutc",
+		"ResourceClaims[*].Source.Template.ObjectMeta.ManagedFields[*].Time.Time.loc.tx[*].when",
+		"ResourceClaims[*].Source.Template.ObjectMeta.ManagedFields[*].Time.Time.loc.zone[*].isDST",
+		"ResourceClaims[*].Source.Template.ObjectMeta.ManagedFields[*].Time.Time.loc.zone[*].name",
+		"ResourceClaims[*].Source.Template.ObjectMeta.ManagedFields[*].Time.Time.loc.zone[*].offset",
+		"ResourceClaims[*].Source.Template.ObjectMeta.ManagedFields[*].Time.Time.wall",
+		"ResourceClaims[*].Source.Template.ObjectMeta.Name",
+		"ResourceClaims[*].Source.Template.ObjectMeta.Namespace",
+		"ResourceClaims[*].Source.Template.ObjectMeta.OwnerReferences[*].APIVersion",
+		"ResourceClaims[*].Source.Template.ObjectMeta.OwnerReferences[*].BlockOwnerDeletion",
+		"ResourceClaims[*].Source.Template.ObjectMeta.OwnerReferences[*].Controller",
+		"ResourceClaims[*].Source.Template.ObjectMeta.OwnerReferences[*].Kind",
+		"ResourceClaims[*].Source.Template.ObjectMeta.OwnerReferences[*].Name",
+		"ResourceClaims[*].Source.Template.ObjectMeta.OwnerReferences[*].UID",
+		"ResourceClaims[*].Source.Template.ObjectMeta.ResourceVersion",
+		"ResourceClaims[*].Source.Template.ObjectMeta.SelfLink",
+		"ResourceClaims[*].Source.Template.ObjectMeta.UID",
+		"ResourceClaims[*].Source.Template.Spec.AllocationMode",
+		"ResourceClaims[*].Source.Template.Spec.ParametersRef.APIGroup",
+		"ResourceClaims[*].Source.Template.Spec.ParametersRef.Kind",
+		"ResourceClaims[*].Source.Template.Spec.ParametersRef.Name",
+		"ResourceClaims[*].Source.Template.Spec.ResourceClassName",
 		"RestartPolicy",
 		"RuntimeClassName",
 		"SchedulerName",
@@ -20559,9 +20829,10 @@ func TestValidatePodTemplateSpecSeccomp(t *testing.T) {
 func TestValidateResourceRequirements(t *testing.T) {
 	path := field.NewPath("resources")
 	tests := []struct {
-		name         string
-		requirements core.ResourceRequirements
-		opts         PodValidationOptions
+		name          string
+		requirements  core.ResourceRequirements
+		opts          PodValidationOptions
+		podClaimNames sets.String
 	}{
 		{
 			name: "limits and requests of hugepage resource are equal",
@@ -20601,20 +20872,28 @@ func TestValidateResourceRequirements(t *testing.T) {
 			},
 			opts: PodValidationOptions{},
 		},
+		{
+			name: "resource claims",
+			requirements: core.ResourceRequirements{
+				Claims: []string{"my-resource"},
+			},
+			podClaimNames: sets.NewString("my-resource"),
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if errs := ValidateResourceRequirements(&tc.requirements, path, tc.opts); len(errs) != 0 {
+			if errs := ValidateResourceRequirements(&tc.requirements, tc.podClaimNames, path, tc.opts); len(errs) != 0 {
 				t.Errorf("unexpected errors: %v", errs)
 			}
 		})
 	}
 
 	errTests := []struct {
-		name         string
-		requirements core.ResourceRequirements
-		opts         PodValidationOptions
+		name          string
+		requirements  core.ResourceRequirements
+		opts          PodValidationOptions
+		podClaimNames sets.String
 	}{
 		{
 			name: "hugepage resource without cpu or memory",
@@ -20628,11 +20907,18 @@ func TestValidateResourceRequirements(t *testing.T) {
 			},
 			opts: PodValidationOptions{},
 		},
+		{
+			name: "resource claims",
+			requirements: core.ResourceRequirements{
+				Claims: []string{"my-resource", "no-such-resource"},
+			},
+			podClaimNames: sets.NewString("my-resource"),
+		},
 	}
 
 	for _, tc := range errTests {
 		t.Run(tc.name, func(t *testing.T) {
-			if errs := ValidateResourceRequirements(&tc.requirements, path, tc.opts); len(errs) == 0 {
+			if errs := ValidateResourceRequirements(&tc.requirements, nil, path, tc.opts); len(errs) == 0 {
 				t.Error("expected errors")
 			}
 		})

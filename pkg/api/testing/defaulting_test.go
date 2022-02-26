@@ -65,6 +65,7 @@ func TestDefaulting(t *testing.T) {
 		{Group: "", Version: "v1", Kind: "PodTemplateList"}:                                                     {},
 		{Group: "", Version: "v1", Kind: "ReplicationController"}:                                               {},
 		{Group: "", Version: "v1", Kind: "ReplicationControllerList"}:                                           {},
+		{Group: "", Version: "v1", Kind: "ResourceClaim"}:                                                       {},
 		{Group: "", Version: "v1", Kind: "Secret"}:                                                              {},
 		{Group: "", Version: "v1", Kind: "SecretList"}:                                                          {},
 		{Group: "", Version: "v1", Kind: "Service"}:                                                             {},

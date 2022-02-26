@@ -152,6 +152,7 @@ func testWorkloadDefaults(t *testing.T, featuresEnabled bool) {
 		".Spec.InitContainers[0].StartupProbe.TimeoutSeconds":                                              "1",
 		".Spec.InitContainers[0].TerminationMessagePath":                                                   `"/dev/termination-log"`,
 		".Spec.InitContainers[0].TerminationMessagePolicy":                                                 `"File"`,
+		".Spec.ResourceClaims[0].Source.Template.Spec.AllocationMode":                                      `"WaitForFirstConsumer"`,
 		".Spec.RestartPolicy":                                                                         `"Always"`,
 		".Spec.SchedulerName":                                                                         `"default-scheduler"`,
 		".Spec.SecurityContext":                                                                       `{}`,
@@ -298,6 +299,7 @@ func testPodDefaults(t *testing.T, featuresEnabled bool) {
 		".Spec.InitContainers[0].StartupProbe.ProbeHandler.GRPC.Service":                                   `""`,
 		".Spec.InitContainers[0].StartupProbe.ProbeHandler.HTTPGet.Path":                                   `"/"`,
 		".Spec.InitContainers[0].StartupProbe.ProbeHandler.HTTPGet.Scheme":                                 `"HTTP"`,
+		".Spec.ResourceClaims[0].Source.Template.Spec.AllocationMode":                                      `"WaitForFirstConsumer"`,
 		".Spec.RestartPolicy":                                                                         `"Always"`,
 		".Spec.SchedulerName":                                                                         `"default-scheduler"`,
 		".Spec.SecurityContext":                                                                       `{}`,
@@ -1918,4 +1920,30 @@ func TestSetDefaultServiceInternalTrafficPolicy(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSetDefaultAllocationMode(t *testing.T) {
+	claim := &v1.ResourceClaim{}
+
+	// field should be defaulted
+	defaultMode := v1.AllocationModeWaitForFirstConsumer
+	output := roundTrip(t, runtime.Object(claim)).(*v1.ResourceClaim)
+	outMode := output.Spec.AllocationMode
+	if outMode != defaultMode {
+		t.Errorf("Expected AllocationMode to be defaulted to: %+v, got: %+v", defaultMode, outMode)
+	}
+
+	// field should not change
+	nonDefaultMode := v1.AllocationModeImmediate
+	claim = &v1.ResourceClaim{
+		Spec: v1.ResourceClaimSpec{
+			AllocationMode: nonDefaultMode,
+		},
+	}
+	output = roundTrip(t, runtime.Object(claim)).(*v1.ResourceClaim)
+	outMode = output.Spec.AllocationMode
+	if outMode != v1.AllocationModeImmediate {
+		t.Errorf("Expected AllocationMode to remain %+v, got: %+v", nonDefaultMode, outMode)
+	}
+
 }
