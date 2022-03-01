@@ -604,6 +604,32 @@ func AddHandlers(h printers.PrintHandler) {
 
 	h.TableHandler(clusterCIDRColumnDefinitions, printClusterCIDR)
 	h.TableHandler(clusterCIDRColumnDefinitions, printClusterCIDRList)
+
+	resourceClassColumnDefinitions := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "DriverName", Type: "string", Description: apiv1.ResourceClass{}.SwaggerDoc()["driverName"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	_ = h.TableHandler(resourceClassColumnDefinitions, printResourceClass)
+	_ = h.TableHandler(resourceClassColumnDefinitions, printResourceClassList)
+
+	resourceClaimColumnDefinitions := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "ClassName", Type: "string", Description: apiv1.ResourceClaimSpec{}.SwaggerDoc()["resourceClassName"]},
+		{Name: "AllocationMode", Type: "string", Description: apiv1.ResourceClaimSpec{}.SwaggerDoc()["allocationMode"]},
+		{Name: "State", Type: "string", Description: "A summary of the current state (allocated, pending, reserved, etc.)."},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	_ = h.TableHandler(resourceClaimColumnDefinitions, printResourceClaim)
+	_ = h.TableHandler(resourceClaimColumnDefinitions, printResourceClaimList)
+
+	podSchedulingColumnDefinitions := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "SelectedNode", Type: "string", Description: apiv1.PodSchedulingSpec{}.SwaggerDoc()["selectedNode"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	_ = h.TableHandler(podSchedulingColumnDefinitions, printPodScheduling)
+	_ = h.TableHandler(podSchedulingColumnDefinitions, printPodSchedulingList)
 }
 
 // Pass ports=nil for all ports.
@@ -2697,6 +2723,89 @@ func printScale(obj *autoscaling.Scale, options printers.GenerateOptions) ([]met
 	}
 	row.Cells = append(row.Cells, obj.Name, int64(obj.Spec.Replicas), int64(obj.Status.Replicas), translateTimestampSince(obj.CreationTimestamp))
 	return []metav1.TableRow{row}, nil
+}
+
+func printResourceClass(obj *api.ResourceClass, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	row := metav1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+	row.Cells = append(row.Cells, obj.Name, obj.DriverName, translateTimestampSince(obj.CreationTimestamp))
+
+	return []metav1.TableRow{row}, nil
+}
+
+func printResourceClassList(list *api.ResourceClassList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	rows := make([]metav1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printResourceClass(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+func printResourceClaim(obj *api.ResourceClaim, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	row := metav1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+	row.Cells = append(row.Cells, obj.Name, obj.Spec.ResourceClassName, string(obj.Spec.AllocationMode), resourceClaimState(obj), translateTimestampSince(obj.CreationTimestamp))
+
+	return []metav1.TableRow{row}, nil
+}
+
+func resourceClaimState(obj *api.ResourceClaim) string {
+	var states []string
+	if obj.DeletionTimestamp != nil {
+		states = append(states, "deleted")
+	}
+	if obj.Status.Allocation == nil {
+		if obj.DeletionTimestamp == nil {
+			states = append(states, "pending")
+		}
+	} else {
+		states = append(states, "allocated")
+		if len(obj.Status.ReservedFor) > 0 {
+			states = append(states, "reserved")
+		} else if obj.DeletionTimestamp != nil || obj.Status.DeallocationRequested {
+			states = append(states, "deallocating")
+		}
+	}
+	return strings.Join(states, ",")
+}
+
+func printResourceClaimList(list *api.ResourceClaimList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	rows := make([]metav1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printResourceClaim(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+func printPodScheduling(obj *api.PodScheduling, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	row := metav1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+	row.Cells = append(row.Cells, obj.Name, obj.Spec.SelectedNode, translateTimestampSince(obj.CreationTimestamp))
+
+	return []metav1.TableRow{row}, nil
+}
+
+func printPodSchedulingList(list *api.PodSchedulingList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	rows := make([]metav1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printPodScheduling(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
 }
 
 func printBoolPtr(value *bool) string {
