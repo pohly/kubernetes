@@ -19,7 +19,7 @@ require (
 	golang.org/x/tools v0.1.10-0.20220218145154-897bd77cd717
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/gengo v0.0.0-20211129171323-c02415ce4185
-	k8s.io/klog/v2 v2.40.1
+	k8s.io/klog/v2 v2.50.2
 	k8s.io/kube-openapi v0.0.0-20211115234752-e816edb12b65
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.1 // indirect
 )
