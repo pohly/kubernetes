@@ -262,6 +262,14 @@ const (
 	// Enables usage of hugepages-<size> in downward API.
 	DownwardAPIHugePages featuregate.Feature = "DownwardAPIHugePages"
 
+	// owner: @pohly
+	// kep: http://kep.k8s.io/3063
+	// alpha: v1.25
+	//
+	// Enables support for resources with custom parameters and a lifecycle
+	// that is independent of a Pod.
+	DynamicResourceAllocation featuregate.Feature = "DynamicResourceAllocation"
+
 	// owner: @andrewsykim
 	// kep: https://kep.k8s.io/1672
 	// alpha: v1.20
@@ -874,6 +882,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	DisableKubeletCloudCredentialProviders: {Default: false, PreRelease: featuregate.Alpha},
 
 	DownwardAPIHugePages: {Default: true, PreRelease: featuregate.Beta}, // on by default in 1.22
+
+	DynamicResourceAllocation: {Default: false, PreRelease: featuregate.Alpha},
 
 	EndpointSliceTerminatingCondition: {Default: true, PreRelease: featuregate.Beta},
 
