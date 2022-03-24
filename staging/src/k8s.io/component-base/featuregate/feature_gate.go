@@ -373,3 +373,17 @@ func (f *featureGate) DeepCopy() MutableFeatureGate {
 		closed:  f.closed,
 	}
 }
+
+// EnabledOrDefault is a wrapper around FeatureGate.Enabled. If the feature
+// gate is nil or the key is not known, it returns the default value, otherwise
+// the result of FeatureGate.Enabled.
+func EnabledOrDefault(f FeatureGate, key Feature, defaultEnabled bool) bool {
+	if f != nil {
+		for knownKey := range f.DeepCopy().GetAll() {
+			if knownKey == key {
+				return f.Enabled(key)
+			}
+		}
+	}
+	return defaultEnabled
+}
