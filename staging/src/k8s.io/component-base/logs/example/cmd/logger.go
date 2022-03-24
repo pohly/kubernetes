@@ -17,9 +17,11 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -32,6 +34,10 @@ import (
 
 func main() {
 	command := NewLoggerCommand()
+
+	// Intentionally broken: logging is not initialized yet.
+	klog.TODO().Info("Oops, I shouldn't be logging yet!")
+
 	code := cli.Run(command)
 	os.Exit(code)
 }
@@ -44,14 +50,19 @@ func NewLoggerCommand() *cobra.Command {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
 			}
-			runLogger()
+
+			// Initialize contextual logging.
+			logger := klog.Background().WithName("example").WithValues("foo", "bar")
+			ctx := klog.NewContext(context.Background(), logger)
+
+			runLogger(ctx)
 		},
 	}
 	o.AddFlags(cmd.Flags())
 	return cmd
 }
 
-func runLogger() {
+func runLogger(ctx context.Context) {
 	fmt.Println("This is normal output via stdout.")
 	fmt.Fprintln(os.Stderr, "This is other output via stderr.")
 	klog.Infof("Log using Infof, key: %s", "value")
@@ -62,6 +73,18 @@ func runLogger() {
 	data := SensitiveData{Key: "secret"}
 	klog.Infof("Log with sensitive key, data: %q", data)
 	klog.V(1).Info("Log less important message")
+
+	// This is the fallback that can be used if neither logger nor context
+	// are available... but it's better to pass some kind of parameter.
+	klog.TODO().Info("Now the default logger is set, but using the one from the context is still better.")
+
+	logger := klog.FromContext(ctx)
+	logger.Info("Log sensitive data through context", "data", data)
+
+	// This intentionally uses the same key/value multiple times. Only the
+	// second example could be detected via static code analysis.
+	logger.WithName("myname").WithValues("duration", time.Hour).Info("runtime", "duration", time.Minute)
+	logger.Info("another runtime", "duration", time.Hour, "duration", time.Minute)
 }
 
 type SensitiveData struct {
