@@ -39,7 +39,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 	utilpointer "k8s.io/utils/pointer"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 const nobodyUser = int64(65534)
