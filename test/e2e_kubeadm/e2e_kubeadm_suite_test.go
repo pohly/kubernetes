@@ -24,7 +24,6 @@ import (
 	"testing"
 
 	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/ginkgo/v2/config"
 	"github.com/onsi/ginkgo/v2/types"
 	"github.com/onsi/gomega"
 	"github.com/spf13/pflag"
@@ -33,6 +32,9 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 )
+
+var suiteCfg types.SuiteConfig
+var reportCfg types.ReporterConfig
 
 func TestMain(m *testing.M) {
 	// Copy go flags in TestMain, to ensure go test flags are registered (no longer available in init() as of go1.13)
@@ -55,16 +57,13 @@ func TestE2E(t *testing.T) {
 			t.Fatalf("Failed creating report directory: %v", err)
 		} else {
 			// Configure a junit reporter to write to the directory
-			junitFile := fmt.Sprintf("junit_%s_%02d.xml", framework.TestContext.ReportPrefix, config.GinkgoConfig.ParallelNode)
+			junitFile := fmt.Sprintf("junit_%s_%02d.xml", framework.TestContext.ReportPrefix, suiteCfg.ParallelProcess)
 			junitPath := filepath.Join(reportDir, junitFile)
 			reporters = append(reporters, morereporters.NewJUnitReporter(junitPath))
 		}
 	}
 	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "E2EKubeadm suite", reporters)
 }
-
-var suiteCfg types.SuiteConfig
-var reportCfg types.ReporterConfig
 
 var _ = ginkgo.BeforeEach(func() {
 	suiteCfg = types.SuiteConfig{}

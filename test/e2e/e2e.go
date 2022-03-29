@@ -31,7 +31,6 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/ginkgo/v2/config"
 	"github.com/onsi/ginkgo/v2/reporters"
 	"github.com/onsi/ginkgo/v2/types"
 	"github.com/onsi/gomega"
@@ -75,6 +74,9 @@ const (
 	namespaceCleanupTimeout = 15 * time.Minute
 )
 
+var suiteCfg types.SuiteConfig
+var reportCfg types.ReporterConfig
+
 var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Reference common test to make the import valid.
 	commontest.CurrentSuite = commontest.E2E
@@ -110,7 +112,7 @@ func RunE2ETests(t *testing.T) {
 		if err := os.MkdirAll(framework.TestContext.ReportDir, 0755); err != nil {
 			klog.Errorf("Failed creating report directory: %v", err)
 		} else {
-			r = append(r, reporters.NewJUnitReporter(path.Join(framework.TestContext.ReportDir, fmt.Sprintf("junit_%v%02d.xml", framework.TestContext.ReportPrefix, config.GinkgoConfig.ParallelNode))))
+			r = append(r, reporters.NewJUnitReporter(path.Join(framework.TestContext.ReportDir, fmt.Sprintf("junit_%v%02d.xml", framework.TestContext.ReportPrefix, suiteCfg.ParallelProcess))))
 		}
 	}
 
@@ -123,12 +125,9 @@ func RunE2ETests(t *testing.T) {
 		r = append(r, e2ereporters.NewDetailsReporterFile(framework.TestContext.SpecSummaryOutput))
 	}
 
-	klog.Infof("Starting e2e run %q on Ginkgo node %d", framework.RunID, config.GinkgoConfig.ParallelNode)
+	klog.Infof("Starting e2e run %q on Ginkgo node %d", framework.RunID, suiteCfg.ParallelProcess)
 	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Kubernetes e2e suite", r)
 }
-
-var suiteCfg types.SuiteConfig
-var reportCfg types.ReporterConfig
 
 var _ = ginkgo.BeforeEach(func() {
 	suiteCfg = types.SuiteConfig{}
