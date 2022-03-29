@@ -37,8 +37,18 @@ type FailurePanic struct {
 	FullStackTrace string // A full stack trace starting at the source of the failure
 }
 
+const GINKGO_PANIC = `
+Your test failed.
+Ginkgo panics to prevent subsequent assertions from running.
+Normally Ginkgo rescues this panic so you shouldn't see it.
+But, if you make an assertion in a goroutine, Ginkgo can't capture the panic.
+To circumvent this, you should call
+	defer GinkgoRecover()
+at the top of the goroutine that caused this panic.
+`
+
 // String makes FailurePanic look like the old Ginkgo panic when printed.
-func (FailurePanic) String() string { return ginkgo.GINKGO_PANIC }
+func (FailurePanic) String() string { return GINKGO_PANIC }
 
 // Fail wraps ginkgo.Fail so that it panics with more useful
 // information about the failure. This function will panic with a
