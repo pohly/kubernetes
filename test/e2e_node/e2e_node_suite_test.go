@@ -55,6 +55,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/ginkgo/v2/config"
 	morereporters "github.com/onsi/ginkgo/v2/reporters"
+	"github.com/onsi/ginkgo/v2/types"
 	"github.com/onsi/gomega"
 	"github.com/spf13/pflag"
 	"k8s.io/klog/v2"
@@ -185,6 +186,20 @@ func TestE2eNode(t *testing.T) {
 	}
 	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "E2eNode Suite", reporters)
 }
+
+var suiteCfg types.SuiteConfig
+var reportCfg types.ReporterConfig
+
+var _ = ginkgo.BeforeEach(func() {
+	suiteCfg = types.SuiteConfig{}
+	reportCfg = types.ReporterConfig{}
+	// Turn on verbose by default to get spec names
+	reportCfg.Verbose = true
+	// Turn on EmitSpecProgress to get spec progress (especially on interrupt)
+	suiteCfg.EmitSpecProgress = true
+	// Randomize specs as well as suites
+	suiteCfg.RandomizeAllSpecs = true
+})
 
 // Setup the kubelet on the node
 var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {

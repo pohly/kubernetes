@@ -33,6 +33,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/ginkgo/v2/config"
 	"github.com/onsi/ginkgo/v2/reporters"
+	"github.com/onsi/ginkgo/v2/types"
 	"github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -129,6 +130,20 @@ func RunE2ETests(t *testing.T) {
 	klog.Infof("Starting e2e run %q on Ginkgo node %d", framework.RunID, config.GinkgoConfig.ParallelNode)
 	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Kubernetes e2e suite", r)
 }
+
+var suiteCfg types.SuiteConfig
+var reportCfg types.ReporterConfig
+
+var _ = ginkgo.BeforeEach(func() {
+	suiteCfg = types.SuiteConfig{}
+	reportCfg = types.ReporterConfig{}
+	// Turn on verbose by default to get spec names
+	reportCfg.Verbose = true
+	// Turn on EmitSpecProgress to get spec progress (especially on interrupt)
+	suiteCfg.EmitSpecProgress = true
+	// Randomize specs as well as suites
+	suiteCfg.RandomizeAllSpecs = true
+})
 
 // getDefaultClusterIPFamily obtains the default IP family of the cluster
 // using the Cluster IP address of the kubernetes service created in the default namespace
