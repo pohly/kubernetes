@@ -135,7 +135,7 @@ func PatchItems(f *framework.Framework, driverNamespace *v1.Namespace, items ...
 // - the test invokes the returned cleanup function,
 //   usually in an AfterEach
 // - the test suite terminates, potentially after
-//   skipping the test's AfterEach (https://github.com/onsi/ginkgo/issues/222)
+//   skipping the test's AfterEach (https://github.com/onsi/ginkgo/v2/issues/222)
 //
 // PatchItems has the some limitations as LoadFromManifests:
 // - only some common items are supported, unknown ones trigger an error
