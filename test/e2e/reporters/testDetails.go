@@ -59,12 +59,12 @@ func NewDetailsReporterFile(filename string) *DetailsReporter {
 	return NewDetailsReporterWithWriter(f)
 }
 
-// SpecSuiteWillBegin is implemented as a noop to satisfy the reporter interface for ginkgo.
-func (reporter *DetailsReporter) SpecSuiteWillBegin(cfg config.GinkgoConfigType, summary *types.SuiteSummary) {
+// SuiteWillBegin is implemented as a noop to satisfy the reporter interface for ginkgo.
+func (reporter *DetailsReporter) SuiteWillBegin(cfg config.GinkgoConfigType, summary *types.SuiteSummary) {
 }
 
-// SpecSuiteDidEnd is implemented as a noop to satisfy the reporter interface for ginkgo.
-func (reporter *DetailsReporter) SpecSuiteDidEnd(summary *types.SuiteSummary) {}
+// SuiteDidEnd is implemented as a noop to satisfy the reporter interface for ginkgo.
+func (reporter *DetailsReporter) SuiteDidEnd(summary *types.SuiteSummary) {}
 
 // SpecDidComplete is invoked by Ginkgo each time a spec is completed (including skipped specs).
 func (reporter *DetailsReporter) SpecDidComplete(specSummary *types.SpecSummary) {
