@@ -101,10 +101,6 @@ func RunE2ETests(t *testing.T) {
 	defer logs.FlushLogs()
 
 	gomega.RegisterFailHandler(framework.Fail)
-	// Disable skipped tests unless they are explicitly requested.
-	if config.GinkgoConfig.FocusString == "" && config.GinkgoConfig.SkipString == "" {
-		config.GinkgoConfig.SkipString = `\[Flaky\]|\[Feature:.+\]`
-	}
 
 	// Run tests through the Ginkgo runner with output to console + JUnit for Jenkins
 	var r []ginkgo.Reporter
@@ -143,6 +139,10 @@ var _ = ginkgo.BeforeEach(func() {
 	suiteCfg.EmitSpecProgress = true
 	// Randomize specs as well as suites
 	suiteCfg.RandomizeAllSpecs = true
+	// Disable skipped tests unless they are explicitly requested.
+	if len(suiteCfg.FocusStrings) == 0 && len(suiteCfg.SkipStrings) == 0 {
+		suiteCfg.SkipStrings = []string{`\[Flaky\]|\[Feature:.+\]`}
+	}
 })
 
 // getDefaultClusterIPFamily obtains the default IP family of the cluster
