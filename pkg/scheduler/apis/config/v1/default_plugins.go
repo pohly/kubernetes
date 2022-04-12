@@ -18,8 +18,10 @@ package v1
 
 import (
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	v1 "k8s.io/kube-scheduler/config/v1"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/utils/pointer"
 )
@@ -51,6 +53,10 @@ func getDefaultPlugins() *v1.Plugins {
 				{Name: names.DefaultBinder},
 			},
 		},
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+		plugins.MultiPoint.Enabled = append(plugins.MultiPoint.Enabled, v1.Plugin{Name: names.DynamicResources})
 	}
 
 	return plugins
