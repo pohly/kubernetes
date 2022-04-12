@@ -539,6 +539,7 @@ leaderElection:
 					Score:      defaults.ExpandedPluginsV1.Score,
 					Reserve:    defaults.ExpandedPluginsV1.Reserve,
 					PreBind:    defaults.ExpandedPluginsV1.PreBind,
+					PostBind:   defaults.ExpandedPluginsV1.PostBind,
 				},
 			},
 		},
