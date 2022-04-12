@@ -51,6 +51,7 @@ func getDefaultPlugins() *v1.Plugins {
 				{Name: names.NodeResourcesBalancedAllocation, Weight: pointer.Int32(1)},
 				{Name: names.ImageLocality, Weight: pointer.Int32(1)},
 				{Name: names.DefaultBinder},
+				{Name: names.DynamicResources},
 			},
 		},
 	}

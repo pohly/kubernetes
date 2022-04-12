@@ -345,6 +345,7 @@ var PluginsV1 = &config.Plugins{
 			{Name: names.NodeResourcesBalancedAllocation, Weight: 1},
 			{Name: names.ImageLocality, Weight: 1},
 			{Name: names.DefaultBinder},
+			{Name: names.DynamicResources},
 		},
 	},
 }
@@ -365,6 +366,7 @@ var ExpandedPluginsV1 = &config.Plugins{
 			{Name: names.VolumeBinding},
 			{Name: names.PodTopologySpread},
 			{Name: names.InterPodAffinity},
+			{Name: names.DynamicResources},
 		},
 	},
 	Filter: config.PluginSet{
@@ -384,11 +386,13 @@ var ExpandedPluginsV1 = &config.Plugins{
 			{Name: names.VolumeZone},
 			{Name: names.PodTopologySpread},
 			{Name: names.InterPodAffinity},
+			{Name: names.DynamicResources},
 		},
 	},
 	PostFilter: config.PluginSet{
 		Enabled: []config.Plugin{
 			{Name: names.DefaultPreemption},
+			{Name: names.DynamicResources},
 		},
 	},
 	PreScore: config.PluginSet{
@@ -397,6 +401,7 @@ var ExpandedPluginsV1 = &config.Plugins{
 			{Name: names.NodeAffinity},
 			{Name: names.PodTopologySpread},
 			{Name: names.InterPodAffinity},
+			{Name: names.DynamicResources},
 		},
 	},
 	Score: config.PluginSet{
@@ -429,6 +434,7 @@ var ExpandedPluginsV1 = &config.Plugins{
 	Reserve: config.PluginSet{
 		Enabled: []config.Plugin{
 			{Name: names.VolumeBinding},
+			{Name: names.DynamicResources},
 		},
 	},
 	PreBind: config.PluginSet{
@@ -439,6 +445,11 @@ var ExpandedPluginsV1 = &config.Plugins{
 	Bind: config.PluginSet{
 		Enabled: []config.Plugin{
 			{Name: names.DefaultBinder},
+		},
+	},
+	PostBind: config.PluginSet{
+		Enabled: []config.Plugin{
+			{Name: names.DynamicResources},
 		},
 	},
 }
