@@ -24,6 +24,7 @@ import (
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kube-scheduler/config/v1beta2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/utils/pointer"
 )
@@ -109,6 +110,96 @@ func TestApplyFeatureGates(t *testing.T) {
 				Bind: v1beta2.PluginSet{
 					Enabled: []v1beta2.Plugin{
 						{Name: names.DefaultBinder},
+					},
+				},
+			},
+		},
+		{
+			name:     "dynamic resource allocation enabled",
+			features: map[featuregate.Feature]bool{features.DynamicResourceAllocation: true},
+			wantConfig: &v1beta2.Plugins{
+				QueueSort: v1beta2.PluginSet{
+					Enabled: []v1beta2.Plugin{
+						{Name: names.PrioritySort},
+					},
+				},
+				PreFilter: v1beta2.PluginSet{
+					Enabled: []v1beta2.Plugin{
+						{Name: names.NodeResourcesFit},
+						{Name: names.NodePorts},
+						{Name: names.VolumeRestrictions},
+						{Name: names.PodTopologySpread},
+						{Name: names.InterPodAffinity},
+						{Name: names.VolumeBinding},
+						{Name: names.NodeAffinity},
+						{Name: names.DynamicResources},
+					},
+				},
+				Filter: v1beta2.PluginSet{
+					Enabled: []v1beta2.Plugin{
+						{Name: names.NodeUnschedulable},
+						{Name: names.NodeName},
+						{Name: names.TaintToleration},
+						{Name: names.NodeAffinity},
+						{Name: names.NodePorts},
+						{Name: names.NodeResourcesFit},
+						{Name: names.VolumeRestrictions},
+						{Name: names.EBSLimits},
+						{Name: names.GCEPDLimits},
+						{Name: names.NodeVolumeLimits},
+						{Name: names.AzureDiskLimits},
+						{Name: names.VolumeBinding},
+						{Name: names.VolumeZone},
+						{Name: names.PodTopologySpread},
+						{Name: names.InterPodAffinity},
+						{Name: names.DynamicResources},
+					},
+				},
+				PostFilter: v1beta2.PluginSet{
+					Enabled: []v1beta2.Plugin{
+						{Name: names.DefaultPreemption},
+						{Name: names.DynamicResources},
+					},
+				},
+				PreScore: v1beta2.PluginSet{
+					Enabled: []v1beta2.Plugin{
+						{Name: names.InterPodAffinity},
+						{Name: names.PodTopologySpread},
+						{Name: names.TaintToleration},
+						{Name: names.NodeAffinity},
+						{Name: names.DynamicResources},
+					},
+				},
+				Score: v1beta2.PluginSet{
+					Enabled: []v1beta2.Plugin{
+						{Name: names.NodeResourcesBalancedAllocation, Weight: pointer.Int32Ptr(1)},
+						{Name: names.ImageLocality, Weight: pointer.Int32Ptr(1)},
+						{Name: names.InterPodAffinity, Weight: pointer.Int32Ptr(1)},
+						{Name: names.NodeResourcesFit, Weight: pointer.Int32Ptr(1)},
+						{Name: names.NodeAffinity, Weight: pointer.Int32Ptr(1)},
+						{Name: names.PodTopologySpread, Weight: pointer.Int32Ptr(2)},
+						{Name: names.TaintToleration, Weight: pointer.Int32Ptr(1)},
+					},
+				},
+				Reserve: v1beta2.PluginSet{
+					Enabled: []v1beta2.Plugin{
+						{Name: names.VolumeBinding},
+						{Name: names.DynamicResources},
+					},
+				},
+				PreBind: v1beta2.PluginSet{
+					Enabled: []v1beta2.Plugin{
+						{Name: names.VolumeBinding},
+					},
+				},
+				Bind: v1beta2.PluginSet{
+					Enabled: []v1beta2.Plugin{
+						{Name: names.DefaultBinder},
+					},
+				},
+				PostBind: v1beta2.PluginSet{
+					Enabled: []v1beta2.Plugin{
+						{Name: names.DynamicResources},
 					},
 				},
 			},
