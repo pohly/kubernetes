@@ -376,6 +376,14 @@ func addAllEventHandlers(
 			informerFactory.Core().V1().PersistentVolumeClaims().Informer().AddEventHandler(
 				buildEvtResHandler(at, framework.PersistentVolumeClaim, "Pvc"),
 			)
+		case framework.PodScheduling:
+			_, _ = informerFactory.Resource().V1alpha1().PodSchedulings().Informer().AddEventHandler(
+				buildEvtResHandler(at, framework.PodScheduling, "PodScheduling"),
+			)
+		case framework.ResourceClaim:
+			_, _ = informerFactory.Resource().V1alpha1().ResourceClaims().Informer().AddEventHandler(
+				buildEvtResHandler(at, framework.ResourceClaim, "ResourceClaim"),
+			)
 		case framework.StorageClass:
 			if at&framework.Add != 0 {
 				informerFactory.Storage().V1().StorageClasses().Informer().AddEventHandler(
