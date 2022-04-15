@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
 	"gopkg.in/yaml.v2"
 
 	// Never, ever remove the line with "/ginkgo". Without it,
@@ -33,6 +34,7 @@ import (
 	// "github.com/onsi/ginkgo/v2"
 
 	"k8s.io/component-base/version"
+	"k8s.io/klog/v2"
 	conformancetestdata "k8s.io/kubernetes/test/conformance/testdata"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/config"
@@ -135,3 +137,43 @@ func TestMain(m *testing.M) {
 func TestE2E(t *testing.T) {
 	RunE2ETests(t)
 }
+
+var _ = ginkgo.ReportAfterSuite("Kubernetes e2e suite report", func(report ginkgo.Report) {
+	var f *os.File
+	var err error
+	// The DetailsRepoerter will output details about every test (name, files, lines, etc) which helps
+	// when documenting our tests.
+	if len(framework.TestContext.SpecSummaryOutput) > 1 {
+		if _, err = os.Stat(framework.TestContext.SpecSummaryOutput); os.IsNotExist(err) {
+			f, err = os.Create(framework.TestContext.SpecSummaryOutput)
+			if err != nil {
+				klog.Errorf("Failed to create reporter: %v", err)
+				return
+			}
+		} else {
+			f, _ = os.OpenFile(framework.TestContext.SpecSummaryOutput, os.O_RDWR|os.O_APPEND, 0660)
+		}
+
+		for _, specReport := range report.SpecReports {
+			if f != nil {
+				b, err := specReport.MarshalJSON()
+				if err != nil {
+					klog.Errorf("Error in detail reporter: %v", err)
+					return
+				}
+				_, err = f.Write(b)
+				if err != nil {
+					klog.Errorf("Error saving test details in detail reporter: %v", err)
+					return
+				}
+				// Printing newline between records for easier viewing in various tools.
+				_, err = fmt.Fprintln(f, "")
+				if err != nil {
+					klog.Errorf("Error saving test details in detail reporter: %v", err)
+					return
+				}
+			}
+		}
+		f.Close()
+	}
+})
