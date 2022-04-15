@@ -29,4 +29,6 @@ cd "${KUBE_ROOT}"
 hack/make-rules/build.sh vendor/github.com/onsi/ginkgo/v2/ginkgo test/e2e/e2e.test
 
 # dump spec
-./_output/bin/ginkgo --dryRun=true --focus='[Conformance]' ./_output/bin/e2e.test -- --spec-dump "${KUBE_ROOT}/_output/specsummaries.json" > /dev/null
+# TODO: update the focus string when the new Ginkgo release for dumping spec with dry run mode is available.
+# see: https://github.com/onsi/ginkgo/issues/935
+./_output/bin/ginkgo --focus="NoSpecsMatchThisString" ./_output/bin/e2e.test -- --spec-dump "${KUBE_ROOT}/_output/specsummaries.json" > /dev/null
