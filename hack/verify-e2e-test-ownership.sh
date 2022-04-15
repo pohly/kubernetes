@@ -16,9 +16,7 @@
 
 # This script verifies the following e2e test ownership policies
 # - tests MUST start with [sig-foo]
-# - tests MUST use top-level SIGDescribe
 # - tests SHOULD NOT have multiple [sig-foo] tags
-# - tests MUST NOT use nested SIGDescribe
 # TODO: these two can be dropped if KubeDescribe is gone from codebase
 # - tests MUST NOT have [k8s.io] in test names
 # - tests MUST NOT use KubeDescribe
@@ -63,8 +61,10 @@ function ensure_dependencies() {
   if ! { [ -f "${e2e_test}" ] && [[ "${REUSE_BUILD_OUTPUT}" =~ ^[yY]$ ]]; }; then
     hack/make-rules/build.sh test/e2e/e2e.test
   fi
+  # TODO: update the focus string when the new Ginkgo release for dumping spec with dry run mode is available.
+  # see: https://github.com/onsi/ginkgo/issues/935
   if ! { [ -f "${spec_summaries}" ] && [[ "${REUSE_BUILD_OUTPUT}" =~ ^[yY]$ ]]; }; then
-    "${ginkgo}" --dryRun=true "${e2e_test}" -- --spec-dump "${spec_summaries}" > /dev/null
+    "${ginkgo}" --focus="NoSpecsMatchThisString" "${e2e_test}" -- --spec-dump "${spec_summaries}" > /dev/null
   fi
 }
 
@@ -73,21 +73,24 @@ function ensure_dependencies() {
 function generate_results_json() {
   readonly results_jq=${tmpdir}/results.jq
   cat >"${results_jq}" <<EOS
-  [.[] | . as { ComponentTexts: \$text, ComponentCodeLocations: \$code } | {
-      calls: [ \$text | range(1;length) as \$i | {
+  [.[] | . as { ContainerHierarchyTexts: \$text, ContainerHierarchyLocations: \$code, LeafNodeText: \$leafText,  LeafNodeLocation: \$leafCode} | {
+      calls: ([ \$text | range(0;length) as \$i | {
         sig: ((\$text[\$i] | match("\\\[(sig-[^\\\]]+)\\\]") | .captures[0].string) // "unknown"),
         text: \$text[\$i],
         # unused, but if we ever wanted to have policies based on other tags...
         # tags: \$text[\$i] | [match("(\\\[[^\\\]]+\\\])"; "g").string],
-        line: \$code[\$i] | "\(.FileName):\(.LineNumber)",
-      } + (\$code[\$i] | .FullStackTrace | match("^(.*)\\\.(.+)\\\(.*\\n") | .captures | {
-          package: .[0].string,
-          func: .[1].string
-      })],
+        line: \$code[\$i] | "\(.FileName):\(.LineNumber)"
+      }] + [{
+        sig: ((\$leafText | match("\\\[(sig-[^\\\]]+)\\\]") | .captures[0].string) // "unknown"),
+        text: \$leafText,
+        # unused, but if we ever wanted to have policies based on other tags...
+        # tags: \$leafText | [match("(\\\[[^\\\]]+\\\])"; "g").string],
+        line: \$leafCode | "\(.FileName):\(.LineNumber)"
+      }]),
     } | {
       owner: .calls[0].sig,
+      calls: .calls,
       testname: .calls | map(.text) | join(" "),
-      calls,
       policies: [(
         .calls[0] |
           {
@@ -95,12 +98,6 @@ function generate_results_json() {
             level: "FAIL",
             category: "unowned_test",
             reason: "must start with [sig-foo]",
-            found: .,
-          }, {
-            fail: (.func != "SIGDescribe"),
-            level: "FAIL",
-            category: "no_sig_describe",
-            reason: "must use top-level SIGDescribe",
             found: .,
           }
         ), (
@@ -110,13 +107,6 @@ function generate_results_json() {
             level: "WARN",
             category: "too_many_sigs",
             reason: "should not have multiple [sig-foo] tags",
-            found: .,
-          }),
-          (map(select(.func == "SIGDescribe")) // [] | {
-            fail: . | any,
-            level: "FAIL",
-            category: "nested_sig_describe",
-            reason: "must not use nested SIGDescribe",
             found: .,
           })
         )
