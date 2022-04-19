@@ -57,13 +57,13 @@ func StartPodLogs(f *framework.Framework, driverNamespace *v1.Namespace) func() 
 	if framework.TestContext.ReportDir == "" {
 		to.LogWriter = ginkgo.GinkgoWriter
 	} else {
-		test := ginkgo.CurrentGinkgoTestDescription()
+		specReport := ginkgo.CurrentSpecReport()
 		// Clean up each individual component text such that
 		// it contains only characters that are valid as file
 		// name.
 		reg := regexp.MustCompile("[^a-zA-Z0-9_-]+")
 		var components []string
-		for _, component := range test.ComponentTexts {
+		for _, component := range specReport.ContainerHierarchyTexts {
 			components = append(components, reg.ReplaceAllString(component, "_"))
 		}
 		// We end the prefix with a slash to ensure that all logs

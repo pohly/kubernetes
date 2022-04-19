@@ -33,6 +33,7 @@ import (
 
 	systemdutil "github.com/coreos/go-systemd/v22/util"
 	"github.com/onsi/ginkgo/v2"
+	ginkgotypes "github.com/onsi/ginkgo/v2/types"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/gstruct"
 	"github.com/onsi/gomega/types"
@@ -43,7 +44,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("when querying /stats/summary", func() {
 		ginkgo.AfterEach(func() {
-			if !ginkgo.CurrentGinkgoTestDescription().Failed {
+			if !ginkgo.CurrentSpecReport().State.Is(ginkgotypes.SpecStateFailureStates) {
 				return
 			}
 			if framework.TestContext.DumpLogsOnFailure {

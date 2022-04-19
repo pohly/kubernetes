@@ -37,6 +37,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
+	ginkgotypes "github.com/onsi/ginkgo/v2/types"
 )
 
 var _ = common.SIGDescribe("Services GCE [Slow]", func() {
@@ -53,7 +54,7 @@ var _ = common.SIGDescribe("Services GCE [Slow]", func() {
 	})
 
 	ginkgo.AfterEach(func() {
-		if ginkgo.CurrentGinkgoTestDescription().Failed {
+		if ginkgo.CurrentSpecReport().State.Is(ginkgotypes.SpecStateFailureStates) {
 			DescribeSvc(f.Namespace.Name)
 		}
 		for _, lb := range serviceLBNames {

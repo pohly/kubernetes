@@ -50,6 +50,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
+	ginkgotypes "github.com/onsi/ginkgo/v2/types"
 	"github.com/onsi/gomega"
 
 	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
@@ -391,7 +392,7 @@ func (f *Framework) AfterEach() {
 		// Whether to delete namespace is determined by 3 factors: delete-namespace flag, delete-namespace-on-failure flag and the test result
 		// if delete-namespace set to false, namespace will always be preserved.
 		// if delete-namespace is true and delete-namespace-on-failure is false, namespace will be preserved if test failed.
-		if TestContext.DeleteNamespace && (TestContext.DeleteNamespaceOnFailure || !ginkgo.CurrentGinkgoTestDescription().Failed) {
+		if TestContext.DeleteNamespace && (TestContext.DeleteNamespaceOnFailure || !ginkgo.CurrentSpecReport().State.Is(ginkgotypes.SpecStateFailureStates)) {
 			for _, ns := range f.namespacesToDelete {
 				ginkgo.By(fmt.Sprintf("Destroying namespace %q for this suite.", ns.Name))
 				if err := f.ClientSet.CoreV1().Namespaces().Delete(context.TODO(), ns.Name, metav1.DeleteOptions{}); err != nil {
@@ -399,7 +400,7 @@ func (f *Framework) AfterEach() {
 						nsDeletionErrors[ns.Name] = err
 
 						// Dump namespace if we are unable to delete the namespace and the dump was not already performed.
-						if !ginkgo.CurrentGinkgoTestDescription().Failed && TestContext.DumpLogsOnFailure {
+						if !ginkgo.CurrentSpecReport().State.Is(ginkgotypes.SpecStateFailureStates) && TestContext.DumpLogsOnFailure {
 							DumpAllNamespaceInfo(f.ClientSet, ns.Name)
 						}
 					} else {
@@ -433,7 +434,7 @@ func (f *Framework) AfterEach() {
 
 	// run all aftereach functions in random order to ensure no dependencies grow
 	for _, afterEachFn := range f.afterEaches {
-		afterEachFn(f, ginkgo.CurrentGinkgoTestDescription().Failed)
+		afterEachFn(f, ginkgo.CurrentSpecReport().State.Is(ginkgotypes.SpecStateFailureStates))
 	}
 
 	if TestContext.GatherKubeSystemResourceUsageData != "false" && TestContext.GatherKubeSystemResourceUsageData != "none" && f.gatherer != nil {
@@ -511,7 +512,7 @@ func (f *Framework) DeleteNamespace(name string) {
 		}
 	}()
 	// if current test failed then we should dump namespace information
-	if !f.SkipNamespaceCreation && ginkgo.CurrentGinkgoTestDescription().Failed && TestContext.DumpLogsOnFailure {
+	if !f.SkipNamespaceCreation && ginkgo.CurrentSpecReport().State.Is(ginkgotypes.SpecStateFailureStates) && TestContext.DumpLogsOnFailure {
 		DumpAllNamespaceInfo(f.ClientSet, name)
 	}
 

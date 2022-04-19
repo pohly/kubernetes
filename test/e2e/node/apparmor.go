@@ -24,6 +24,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
+	ginkgotypes "github.com/onsi/ginkgo/v2/types"
 )
 
 var _ = SIGDescribe("AppArmor", func() {
@@ -36,7 +37,7 @@ var _ = SIGDescribe("AppArmor", func() {
 			e2esecurity.LoadAppArmorProfiles(f.Namespace.Name, f.ClientSet)
 		})
 		ginkgo.AfterEach(func() {
-			if !ginkgo.CurrentGinkgoTestDescription().Failed {
+			if !ginkgo.CurrentSpecReport().State.Is(ginkgotypes.SpecStateFailureStates) {
 				return
 			}
 			e2ekubectl.LogFailedContainers(f.ClientSet, f.Namespace.Name, framework.Logf)

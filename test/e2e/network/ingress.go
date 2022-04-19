@@ -45,6 +45,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
+	ginkgotypes "github.com/onsi/ginkgo/v2/types"
 )
 
 const (
@@ -102,7 +103,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 
 		// Platform specific cleanup
 		ginkgo.AfterEach(func() {
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
+			if ginkgo.CurrentSpecReport().State.Is(ginkgotypes.SpecStateFailureStates) {
 				e2eingress.DescribeIng(ns)
 			}
 			if jig.Ingress == nil {
@@ -147,7 +148,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 
 		// Platform specific cleanup
 		ginkgo.AfterEach(func() {
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
+			if ginkgo.CurrentSpecReport().State.Is(ginkgotypes.SpecStateFailureStates) {
 				e2eingress.DescribeIng(ns)
 			}
 			if jig.Ingress == nil {
