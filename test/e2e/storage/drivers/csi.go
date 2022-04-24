@@ -250,7 +250,7 @@ func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*storageframewo
 	// test that it breaks.
 	// TODO: enable this check once issue is resolved for csi-host-path driver
 	// (https://github.com/kubernetes/kubernetes/pull/104858).
-	if regexp.MustCompile("should unmount if pod is.*deleted while kubelet is down").MatchString(ginkgo.CurrentGinkgoTestDescription().FullTestText) {
+	if regexp.MustCompile("should unmount if pod is.*deleted while kubelet is down").MatchString(ginkgo.CurrentSpecReport().FullText()) {
 		o.DriverContainerArguments = append(o.DriverContainerArguments, "--check-volume-lifecycle=false")
 	}
 
