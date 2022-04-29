@@ -14,9 +14,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script checks coding style for go language files in each
-# Kubernetes package by golint.
-# Usage: `hack/verify-golangci-lint.sh`.
+# This script checks the coding style for the Go language files using
+# golangci-lint. Which checks are enabled depends on command line flags. The
+# default is a minimal set of checks that all existing code passes without
+# issues.
+
+usage () {
+    cat <<EOF >&2
+Usage: $0 [-r <revision>|-a] [-s] [packages]"
+   -r <revision>: only report issues in code added since that revision
+   -a: automatically select the common base of origin/master and HEAD
+       as revision
+   -s: select a strict configuration for new code
+   [packages]: check specific packages or directories instead of everything
+EOF
+    exit 1
+}
 
 set -o errexit
 set -o nounset
@@ -25,6 +38,45 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"
+
+invocation=(./hack/verify-golangci-lint.sh "$@")
+golangci=(golangci-lint run)
+golangci_config="${KUBE_ROOT}/.golangci.yaml"
+base=
+strict=
+githubactions=
+while getopts "r:as" o; do
+    case "${o}" in
+        r)
+            base="${OPTARG}"
+            if [ ! "$base" ]; then
+                echo "ERROR: -c needs a non-empty parameter" >&2
+                echo >&2
+                usage
+            fi
+            ;;
+        a)
+            base="$(git merge-base origin/master HEAD)"
+            ;;
+        s)
+            golangci_config="${KUBE_ROOT}/.golangci-strict.yaml"
+            strict=1
+            ;;
+        *)
+            usage
+            ;;
+    esac
+done
+shift $((OPTIND-1))
+golangci+=(--config="${golangci_config}")
+
+if [ "$base" ]; then
+    # Must be a something that git can resolve to a commit.
+    # "git rev-parse --verify" checks that and prints a detailed
+    # error.
+    base="$(git rev-parse --verify "$base")"
+    golangci+=(--new --new-from-rev="$base")
+fi
 
 kube::golang::verify_go_version
 
@@ -44,29 +96,25 @@ popd >/dev/null
 
 cd "${KUBE_ROOT}"
 
-## The config is in ${KUBE_ROOT}/.golangci.yaml where it will be found
-## even when golangci-lint is invoked in a sub-directory.
-##
-## The logcheck plugin currently has to be configured via env variables
-## (https://github.com/golangci/golangci-lint/issues/1512).
-##
-## Remember to clean the golangci-lint cache when changing
-## the configuration and running this script multiple times,
-## otherwise golangci-lint will report stale results:
-## _output/local/bin/golangci-lint cache clean
+# The logcheck plugin currently has to be configured via env variables
+# (https://github.com/golangci/golangci-lint/issues/1512).
+#
+# Remember to clean the golangci-lint cache when changing
+# the configuration and running this script multiple times,
+# otherwise golangci-lint will report stale results:
+# _output/local/bin/golangci-lint cache clean
 export LOGCHECK_CONFIG="${KUBE_ROOT}/hack/logcheck.conf"
-
-echo 'running golangci-lint ' >&2
+echo "running ${golangci[*]}" >&2
 res=0
 if [[ "$#" -gt 0 ]]; then
-    golangci-lint run "$@" >&2 || res=$?
+    "${golangci[@]}" "$@" >&2 || res=$?
 else
-    golangci-lint run ./... >&2 || res=$?
+    "${golangci[@]}" ./... >&2 || res=$?
     for d in staging/src/k8s.io/*; do
         MODPATH="staging/src/k8s.io/$(basename "${d}")"
         echo "running golangci-lint for ${KUBE_ROOT}/${MODPATH}"
         pushd "${KUBE_ROOT}/${MODPATH}" >/dev/null
-            golangci-lint --path-prefix "${MODPATH}" run ./... >&2 || res=$?
+            "${golangci[@]}" --path-prefix "${MODPATH}" ./... >&2 || res=$?
         popd >/dev/null
     done
 fi
@@ -77,9 +125,14 @@ if [ "$res" -eq 0 ]; then
 else
   {
     echo
-    echo 'Please review the above warnings. You can test via "./hack/verify-golangci-lint.sh"'
+    echo "Please review the above warnings. You can test via \"${invocation[*]}\""
     echo 'If the above warnings do not make sense, you can exempt this warning with a comment'
     echo ' (if your reviewer is okay with it).'
+    if [ "$strict" ]; then
+        echo 'The more strict .golangci-strict.yaml was used. If you feel that this warns about issues'
+        echo 'that should be ignored by default, then please discuss with your reviewer and propose'
+        echo 'a change for .golangci-strict.yaml as part of your PR.'
+    fi
     echo 'In general please prefer to fix the error, we have already disabled specific lints'
     echo ' that the project chooses to ignore.'
     echo 'See: https://golangci-lint.run/usage/false-positives/'
