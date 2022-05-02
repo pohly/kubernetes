@@ -184,7 +184,8 @@ func TestE2eNode(t *testing.T) {
 			klog.Errorf("Failed creating report directory: %v", err)
 		}
 	}
-	ginkgo.RunSpecs(t, "E2eNode Suite")
+	suiteConfig, reporterConfig := framework.CreateGinkgoConfig()
+	ginkgo.RunSpecs(t, "E2eNode Suite", suiteConfig, reporterConfig)
 }
 
 // Setup the kubelet on the node

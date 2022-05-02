@@ -50,5 +50,6 @@ func TestE2E(t *testing.T) {
 			t.Fatalf("Failed creating report directory: %v", err)
 		}
 	}
-	ginkgo.RunSpecs(t, "E2EKubeadm suite")
+	suiteConfig, reporterConfig := framework.CreateGinkgoConfig()
+	ginkgo.RunSpecs(t, "E2EKubeadm suite", suiteConfig, reporterConfig)
 }

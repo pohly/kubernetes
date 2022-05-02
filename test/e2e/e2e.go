@@ -30,7 +30,6 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/ginkgo/v2/config"
 	"github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -104,10 +103,6 @@ func RunE2ETests(t *testing.T) {
 	defer logs.FlushLogs()
 	progressReporter = e2ereporters.NewProgressReporter(framework.TestContext.ProgressReportURL)
 	gomega.RegisterFailHandler(framework.Fail)
-	// Disable skipped tests unless they are explicitly requested.
-	if config.GinkgoConfig.FocusString == "" && config.GinkgoConfig.SkipString == "" {
-		config.GinkgoConfig.SkipString = `\[Flaky\]|\[Feature:.+\]`
-	}
 
 	// Run tests through the Ginkgo runner with output to console + JUnit for Jenkins
 	if framework.TestContext.ReportDir != "" {
@@ -119,8 +114,9 @@ func RunE2ETests(t *testing.T) {
 		}
 	}
 
-	klog.Infof("Starting e2e run %q on Ginkgo node %d", framework.RunID, config.GinkgoConfig.ParallelNode)
-	ginkgo.RunSpecs(t, "Kubernetes e2e suite")
+	suiteConfig, reporterConfig := framework.CreateGinkgoConfig()
+	klog.Infof("Starting e2e run %q on Ginkgo node %d", framework.RunID, suiteConfig.ParallelProcess)
+	ginkgo.RunSpecs(t, "Kubernetes e2e suite", suiteConfig, reporterConfig)
 }
 
 // getDefaultClusterIPFamily obtains the default IP family of the cluster
