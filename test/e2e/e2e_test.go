@@ -22,10 +22,12 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/ginkgo/v2/types"
 	"gopkg.in/yaml.v2"
 
 	// Never, ever remove the line with "/ginkgo". Without it,
@@ -138,6 +140,33 @@ func TestMain(m *testing.M) {
 func TestE2E(t *testing.T) {
 	RunE2ETests(t)
 }
+
+var _ = ginkgo.ReportAfterEach(func(report ginkgo.SpecReport) {
+	testName := strings.Join(report.ContainerHierarchyTexts, " ")
+	if len(report.LeafNodeText) > 0 {
+		testName = testName + " " + report.LeafNodeText
+	}
+	switch report.State {
+	case types.SpecStateFailed:
+		if len(testName) > 0 {
+			progressReporter.Failures = append(progressReporter.Failures, testName)
+		} else {
+			progressReporter.Failures = append(progressReporter.Failures, "Unknown test name")
+		}
+		progressReporter.TestsFailed++
+		progressReporter.LastMsg = fmt.Sprintf("FAILED %v", testName)
+	case types.SpecStatePassed:
+		progressReporter.TestsCompleted++
+		progressReporter.LastMsg = fmt.Sprintf("PASSED %v", testName)
+	case types.SpecStateSkipped:
+		progressReporter.TestsSkipped++
+		return
+	default:
+		return
+	}
+
+	progressReporter.SendUpdates()
+})
 
 var _ = ginkgo.ReportAfterSuite("Kubernetes e2e suite report", func(report ginkgo.Report) {
 	var err error
