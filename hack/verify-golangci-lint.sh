@@ -43,7 +43,7 @@ source "${KUBE_ROOT}/hack/lib/util.sh"
 
 invocation=(./hack/verify-golangci-lint.sh "$@")
 golangci=(golangci-lint run)
-golangci_config="${KUBE_ROOT}/.golangci.yaml"
+golangci_config="${KUBE_ROOT}/hack/golangci.yaml"
 base=
 strict=
 githubactions=
@@ -61,7 +61,7 @@ while getopts "r:asg:" o; do
             base="$(git merge-base origin/master HEAD)"
             ;;
         s)
-            golangci_config="${KUBE_ROOT}/.golangci-strict.yaml"
+            golangci_config="${KUBE_ROOT}/hack/golangci-strict.yaml"
             strict=1
             ;;
         g)
