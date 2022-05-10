@@ -15,9 +15,6 @@ issues:
     - path: conversion\.go
       linters:
         - ineffassign
-    - path: .*_test.go
-      linters:
-        - errcheck
 
 linters:
   enable: # please keep this alphabetized
