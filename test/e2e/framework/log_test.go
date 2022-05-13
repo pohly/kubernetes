@@ -24,8 +24,6 @@ import (
 	"testing"
 
 	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/ginkgo/v2/config"
-	"github.com/onsi/ginkgo/v2/reporters"
 	"github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
 
@@ -41,15 +39,29 @@ import (
 //
 //
 //
+//
+//
+//
+//
+//
+//
+//
+//
+// Thus must be line 50 (first line is 1)
 
-func runTests(t *testing.T, reporter ginkgo.Reporter) {
-	// This source code line will be part of the stack dump comparison.
-	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Logging Suite", []ginkgo.Reporter{reporter})
+// This is included in a stack backtrace, in constrast to the anonymous function
+// in "fails" below.
+func failHelper(msg string) {
+	framework.Fail(msg)
 }
 
 var _ = ginkgo.Describe("log", func() {
 	ginkgo.BeforeEach(func() {
 		framework.Logf("before")
+	})
+	ginkgo.AfterEach(func() {
+		framework.Logf("after")
+		framework.ExpectEqual(true, false, "true is never false either")
 	})
 	ginkgo.It("fails", func() {
 		func() {
@@ -66,28 +78,28 @@ var _ = ginkgo.Describe("log", func() {
 	ginkgo.It("equal", func() {
 		framework.ExpectEqual(0, 1, "of course it's not equal...")
 	})
-	ginkgo.AfterEach(func() {
-		framework.Logf("after")
-		framework.ExpectEqual(true, false, "true is never false either")
+	ginkgo.It("fails with helper", func() {
+		failHelper("I'm failing.")
 	})
 })
 
 func TestFailureOutput(t *testing.T) {
-	// Run the Ginkgo suite with output collected by a custom
-	// reporter in adddition to the default one. To see what the full
-	// Ginkgo report looks like, run this test with "go test -v".
-	config.DefaultReporterConfig.FullTrace = true
+	// Run the Ginkgo suite with spec results collected via ReportAfterEach
+	// in adddition to the default one. To see what the full
+	// Ginkgo output looks like, run this test with "go test -v".
 	gomega.RegisterFailHandler(framework.Fail)
+	var report []ginkgo.SpecReport
+	ginkgo.ReportAfterEach(func(spec ginkgo.SpecReport) {
+		report = append(report, spec)
+	})
 	fakeT := &testing.T{}
-	reporter := reporters.NewFakeReporter()
-	runTests(fakeT, reporter)
+	ginkgo.RunSpecs(fakeT, "Logging Suite")
 
 	// Now check the output.
-	actual := normalizeReport(*reporter)
+	actual := normalizeReport(report)
 
 	// output from AfterEach
 	commonOutput := `
-
 INFO: after
 FAIL: true is never false either
 Expected
@@ -96,17 +108,14 @@ to equal
     <bool>: false
 
 Full Stack Trace
-k8s.io/kubernetes/test/e2e/framework_test.glob..func1.6()
-	log_test.go:71
-k8s.io/kubernetes/test/e2e/framework_test.runTests()
-	log_test.go:47
-
+k8s.io/kubernetes/test/e2e/framework_test.glob..func1.2()
+	log_test.go:64
 `
 
 	// Sorted by name!
 	expected := suiteResults{
 		testResult{
-			name: "[Top Level] log asserts",
+			name: "log asserts",
 			output: `INFO: before
 FAIL: false is never true
 Expected
@@ -115,23 +124,18 @@ to equal
     <bool>: true
 
 Full Stack Trace
-k8s.io/kubernetes/test/e2e/framework_test.glob..func1.3()
-	log_test.go:60
-k8s.io/kubernetes/test/e2e/framework_test.runTests()
-	log_test.go:47` + commonOutput,
+k8s.io/kubernetes/test/e2e/framework_test.glob..func1.4()
+	log_test.go:72` + commonOutput,
 			failure: `false is never true
 Expected
     <bool>: false
 to equal
     <bool>: true`,
-			stack: `k8s.io/kubernetes/test/e2e/framework_test.glob..func1.3()
-	log_test.go:60
-k8s.io/kubernetes/test/e2e/framework_test.runTests()
-	log_test.go:47
-`,
+			stack: `k8s.io/kubernetes/test/e2e/framework_test.glob..func1.4()
+	log_test.go:72`,
 		},
 		testResult{
-			name: "[Top Level] log equal",
+			name: "log equal",
 			output: `INFO: before
 FAIL: of course it's not equal...
 Expected
@@ -140,23 +144,18 @@ to equal
     <int>: 1
 
 Full Stack Trace
-k8s.io/kubernetes/test/e2e/framework_test.glob..func1.5()
-	log_test.go:67
-k8s.io/kubernetes/test/e2e/framework_test.runTests()
-	log_test.go:47` + commonOutput,
+k8s.io/kubernetes/test/e2e/framework_test.glob..func1.6()
+	log_test.go:79` + commonOutput,
 			failure: `of course it's not equal...
 Expected
     <int>: 0
 to equal
     <int>: 1`,
-			stack: `k8s.io/kubernetes/test/e2e/framework_test.glob..func1.5()
-	log_test.go:67
-k8s.io/kubernetes/test/e2e/framework_test.runTests()
-	log_test.go:47
-`,
+			stack: `k8s.io/kubernetes/test/e2e/framework_test.glob..func1.6()
+	log_test.go:79`,
 		},
 		testResult{
-			name: "[Top Level] log error",
+			name: "log error",
 			output: `INFO: before
 FAIL: hard-coded error
 Unexpected error:
@@ -167,10 +166,8 @@ Unexpected error:
 occurred
 
 Full Stack Trace
-k8s.io/kubernetes/test/e2e/framework_test.glob..func1.4()
-	log_test.go:64
-k8s.io/kubernetes/test/e2e/framework_test.runTests()
-	log_test.go:47` + commonOutput,
+k8s.io/kubernetes/test/e2e/framework_test.glob..func1.5()
+	log_test.go:76` + commonOutput,
 			failure: `hard-coded error
 Unexpected error:
     <*errors.errorString>: {
@@ -178,28 +175,36 @@ Unexpected error:
     }
     an error with a long, useless description
 occurred`,
-			stack: `k8s.io/kubernetes/test/e2e/framework_test.glob..func1.4()
-	log_test.go:64
-k8s.io/kubernetes/test/e2e/framework_test.runTests()
-	log_test.go:47
-`,
+			stack: `k8s.io/kubernetes/test/e2e/framework_test.glob..func1.5()
+	log_test.go:76`,
 		},
 		testResult{
-			name: "[Top Level] log fails",
+			name: "log fails",
 			output: `INFO: before
 FAIL: I'm failing.
 
 Full Stack Trace
-k8s.io/kubernetes/test/e2e/framework_test.glob..func1.2()
-	log_test.go:57
-k8s.io/kubernetes/test/e2e/framework_test.runTests()
-	log_test.go:47` + commonOutput,
+k8s.io/kubernetes/test/e2e/framework_test.glob..func1.3()
+	log_test.go:69` + commonOutput,
 			failure: "I'm failing.",
-			stack: `k8s.io/kubernetes/test/e2e/framework_test.glob..func1.2()
-	log_test.go:57
-k8s.io/kubernetes/test/e2e/framework_test.runTests()
-	log_test.go:47
-`,
+			stack: `k8s.io/kubernetes/test/e2e/framework_test.glob..func1.3()
+	log_test.go:69`,
+		},
+		testResult{
+			name: "log fails with helper",
+			output: `INFO: before
+FAIL: I'm failing.
+
+Full Stack Trace
+k8s.io/kubernetes/test/e2e/framework_test.failHelper()
+	log_test.go:55
+k8s.io/kubernetes/test/e2e/framework_test.glob..func1.7()
+	log_test.go:82` + commonOutput,
+			failure: "I'm failing.",
+			stack: `k8s.io/kubernetes/test/e2e/framework_test.failHelper()
+	log_test.go:55
+k8s.io/kubernetes/test/e2e/framework_test.glob..func1.7()
+	log_test.go:82`,
 		},
 	}
 	// assert.Equal prints a useful diff if the slices are not
@@ -226,12 +231,12 @@ type testResult struct {
 
 type suiteResults []testResult
 
-func normalizeReport(report reporters.FakeReporter) suiteResults {
+func normalizeReport(report []ginkgo.SpecReport) suiteResults {
 	var results suiteResults
-	for _, spec := range report.SpecSummaries {
+	for _, spec := range report {
 		results = append(results, testResult{
-			name:    strings.Join(spec.ComponentTexts, " "),
-			output:  normalizeLocation(stripAddresses(stripTimes(spec.CapturedOutput))),
+			name:    strings.Join(spec.ContainerHierarchyTexts, " ") + " " + spec.LeafNodeText,
+			output:  normalizeLocation(stripAddresses(stripTimes(spec.CapturedGinkgoWriterOutput))),
 			failure: stripAddresses(stripTimes(spec.Failure.Message)),
 			stack:   normalizeLocation(spec.Failure.Location.FullStackTrace),
 		})
