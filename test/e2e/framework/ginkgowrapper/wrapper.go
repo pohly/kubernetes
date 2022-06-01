@@ -19,14 +19,14 @@ limitations under the License.
 package ginkgowrapper
 
 import (
-	"bufio"
 	"bytes"
 	"regexp"
 	"runtime"
 	"runtime/debug"
-	"strings"
 
 	"github.com/onsi/ginkgo"
+
+	"k8s.io/kubernetes/test/e2e/framework/internal/log"
 )
 
 // FailurePanic is the value that will be panicked from Fail.
@@ -49,13 +49,16 @@ func Fail(message string, callerSkip ...int) {
 		skip += callerSkip[0]
 	}
 
+	stack := prunedStack(skip)
 	_, file, line, _ := runtime.Caller(skip)
 	fp := FailurePanic{
 		Message:        message,
 		Filename:       file,
 		Line:           line,
-		FullStackTrace: pruneStack(skip),
+		FullStackTrace: stack,
 	}
+
+	log.Msg("FAIL", "%s\n\nFull Stack Trace\n%s", message, stack)
 
 	defer func() {
 		e := recover()
@@ -64,33 +67,50 @@ func Fail(message string, callerSkip ...int) {
 		}
 	}()
 
-	ginkgo.Fail(message, skip)
+	ginkgo.Fail(log.NowStamp()+": "+message, skip)
 }
 
 // ginkgo adds a lot of test running infrastructure to the stack, so
 // we filter those out
-var stackSkipPattern = regexp.MustCompile(`onsi/ginkgo`)
+var codeFilterRE = regexp.MustCompile(`/github.com/onsi/ginkgo/`)
 
-func pruneStack(skip int) string {
-	skip += 2 // one for pruneStack and one for debug.Stack
-	stack := debug.Stack()
-	scanner := bufio.NewScanner(bytes.NewBuffer(stack))
-	var prunedStack []string
-
-	// skip the top of the stack
-	for i := 0; i < 2*skip+1; i++ {
-		scanner.Scan()
+// prunedStack is a wrapper around debug.Stack() that removes information
+// about the current goroutine and optionally skips some of the initial stack entries.
+// With skip == 0, the returned stack will start with the caller of PruneStack.
+// From the remaining entries it automatically filters out useless ones like
+// entries coming from Ginkgo.
+//
+// This is a modified copy of PruneStack in https://github.com/onsi/ginkgo/blob/f90f37d87fa6b1dd9625e2b1e83c23ffae3de228/internal/codelocation/code_location.go#L25:
+// - simplified API and thus renamed (calls debug.Stack() instead of taking a parameter)
+// - source code filtering updated to be specific to Kubernetes
+// - optimized to use bytes and in-place slice filtering from
+//   https://github.com/golang/go/wiki/SliceTricks#filter-in-place
+func prunedStack(skip int) string {
+	fullStackTrace := debug.Stack()
+	stack := bytes.Split(fullStackTrace, []byte("\n"))
+	// Ensure that the even entries are the method names and the
+	// the odd entries the source code information.
+	if len(stack) > 0 && bytes.HasPrefix(stack[0], []byte("goroutine ")) {
+		// Ignore "goroutine 29 [running]:" line.
+		stack = stack[1:]
 	}
-
-	for scanner.Scan() {
-		if stackSkipPattern.Match(scanner.Bytes()) {
-			scanner.Scan() // these come in pairs
-		} else {
-			prunedStack = append(prunedStack, scanner.Text())
-			scanner.Scan() // these come in pairs
-			prunedStack = append(prunedStack, scanner.Text())
+	// The "+2" is for skipping over:
+	// - runtime/debug.Stack()
+	// - PrunedStack()
+	skip += 2
+	if len(stack) > 2*skip {
+		stack = stack[2*skip:]
+	}
+	n := 0
+	for i := 0; i < len(stack)/2; i++ {
+		// We filter out based on the source code file name.
+		if !codeFilterRE.Match([]byte(stack[i*2+1])) {
+			stack[n] = stack[i*2]
+			stack[n+1] = stack[i*2+1]
+			n += 2
 		}
 	}
+	stack = stack[:n]
 
-	return strings.Join(prunedStack, "\n")
+	return string(bytes.Join(stack, []byte("\n")))
 }
