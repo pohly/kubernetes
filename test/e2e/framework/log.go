@@ -42,11 +42,12 @@ func Logf(format string, args ...interface{}) {
 	log("INFO", format, args...)
 }
 
-// Failf logs the fail info, including a stack trace starts at 2 levels above its caller
-// (for example, for call chain f -> g -> Failf("foo", ...) error would be logged for "f").
+// Failf logs the fail info, including a stack trace that starts with the direct caller.
+// Code that logs a fixed string should use Fail instead. To skip additional one additional
+// stack frame in a helper function, use Fail(fmt.Sprintf(...), 1) or Fail("some string", 1).
 func Failf(format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
-	skip := 2
+	skip := 1
 	log("FAIL", "%s\n\nFull Stack Trace\n%s", msg, PrunedStack(skip))
 	e2eginkgowrapper.Fail(nowStamp()+": "+msg, skip)
 	panic("unreachable")

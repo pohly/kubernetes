@@ -190,12 +190,16 @@ k8s.io/kubernetes/test/e2e/framework_test.runTests()
 FAIL: I'm failing.
 
 Full Stack Trace
+k8s.io/kubernetes/test/e2e/framework_test.glob..func1.2.1(...)
+	log_test.go:56
 k8s.io/kubernetes/test/e2e/framework_test.glob..func1.2()
 	log_test.go:57
 k8s.io/kubernetes/test/e2e/framework_test.runTests()
 	log_test.go:47` + commonOutput,
 			failure: "I'm failing.",
-			stack: `k8s.io/kubernetes/test/e2e/framework_test.glob..func1.2()
+			stack: `k8s.io/kubernetes/test/e2e/framework_test.glob..func1.2.1(...)
+	log_test.go:56
+k8s.io/kubernetes/test/e2e/framework_test.glob..func1.2()
 	log_test.go:57
 k8s.io/kubernetes/test/e2e/framework_test.runTests()
 	log_test.go:47
