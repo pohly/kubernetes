@@ -3343,7 +3343,7 @@ type PodSpec struct {
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=name
-	ResourceClaims []PodResourceClaim `json:"resourceClaims,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name" protobuf:"bytes,37,rep,name=resourceClaims"`
+	ResourceClaims []PodResourceClaim `json:"resourceClaims,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name" protobuf:"bytes,38,rep,name=resourceClaims"`
 }
 
 // OSName is the set of OS'es that can be used in OS.
