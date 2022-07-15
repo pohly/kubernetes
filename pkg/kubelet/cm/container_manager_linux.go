@@ -42,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	internalapi "k8s.io/cri-api/pkg/apis"
@@ -52,6 +53,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/dra"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager"
 	memorymanagerstate "k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
@@ -127,6 +129,8 @@ type containerManagerImpl struct {
 	memoryManager memorymanager.Manager
 	// Interface for Topology resource co-ordination
 	topologyManager topologymanager.Manager
+	// Interface for Dynamic Resource Allocation management.
+	draManager dra.Manager
 }
 
 type features struct {
@@ -194,7 +198,7 @@ func validateSystemRequirements(mountUtil mount.Interface) (features, error) {
 // TODO(vmarmol): Add limits to the system containers.
 // Takes the absolute name of the specified containers.
 // Empty container name disables use of the specified container.
-func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool, devicePluginEnabled bool, recorder record.EventRecorder) (ContainerManager, error) {
+func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool, devicePluginEnabled bool, recorder record.EventRecorder, kubeClient clientset.Interface) (ContainerManager, error) {
 	subsystems, err := GetCgroupSubsystems()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get mounted cgroup subsystems: %v", err)
@@ -307,6 +311,15 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	}
 	if err != nil {
 		return nil, err
+	}
+
+	// initialize DRA manager
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) {
+		klog.InfoS("Creating Dynamic Resource Allocation (DRA) manager")
+		cm.draManager, err = dra.NewManagerImpl(kubeClient)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Initialize CPU manager
@@ -647,6 +660,13 @@ func (cm *containerManagerImpl) GetPluginRegistrationHandler() cache.PluginHandl
 // TODO: move the GetResources logic to PodContainerManager.
 func (cm *containerManagerImpl) GetResources(pod *v1.Pod, container *v1.Container) (*kubecontainer.RunContainerOptions, error) {
 	opts := &kubecontainer.RunContainerOptions{}
+	if cm.draManager != nil {
+		resOpts, err := cm.draManager.PrepareResources(pod, container)
+		if err != nil {
+			return nil, err
+		}
+		opts.Annotations = append(opts.Annotations, resOpts.Annotations...)
+	}
 	// Allocate should already be called during predicateAdmitHandler.Admit(),
 	// just try to fetch device runtime information from cached state here
 	devOpts, err := cm.deviceManager.GetDeviceRunContainerOptions(pod, container)
@@ -676,13 +696,14 @@ func (cm *containerManagerImpl) GetAllocateResourcesPodAdmitHandler() lifecycle.
 	// work as we add more and more hint providers that the TopologyManager
 	// needs to call Allocate() on (that may not be directly intstantiated
 	// inside this component).
-	return &resourceAllocator{cm.cpuManager, cm.memoryManager, cm.deviceManager}
+	return &resourceAllocator{cm.cpuManager, cm.memoryManager, cm.deviceManager, cm.draManager}
 }
 
 type resourceAllocator struct {
 	cpuManager    cpumanager.Manager
 	memoryManager memorymanager.Manager
 	deviceManager devicemanager.Manager
+	draManager    dra.Manager
 }
 
 func (m *resourceAllocator) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
@@ -1013,4 +1034,8 @@ func containerMemoryFromBlock(blocks []memorymanagerstate.Block) []*podresources
 	}
 
 	return containerMemories
+}
+
+func (cm *containerManagerImpl) UnprepareResources(pod *v1.Pod) error {
+	return cm.draManager.UnprepareResources(pod)
 }
