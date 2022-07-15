@@ -254,3 +254,7 @@ func (cm *containerManagerImpl) GetAllocatableMemory() []*podresourcesapi.Contai
 func (cm *containerManagerImpl) GetNodeAllocatableAbsolute() v1.ResourceList {
 	return nil
 }
+
+func (cm *containerManagerImpl) UnprepareResources(*v1.Pod) error {
+	return nil
+}
