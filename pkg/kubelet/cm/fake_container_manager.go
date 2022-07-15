@@ -236,3 +236,7 @@ func (cm *FakeContainerManager) GetNodeAllocatableAbsolute() v1.ResourceList {
 	defer cm.Unlock()
 	return nil
 }
+
+func (cm *FakeContainerManager) UnprepareResources(*v1.Pod) error {
+	return nil
+}
