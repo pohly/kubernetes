@@ -146,12 +146,7 @@ func (m *ManagerImpl) prepareContainerResources(pod *v1.Pod, container *v1.Conta
 	// Process resources for each resource claim referenced by container
 	for _, containerClaim := range container.Resources.Claims {
 		for _, podResourceClaim := range pod.Spec.ResourceClaims {
-			containerClaimName := podResourceClaim.Name
-			if podResourceClaim.Claim.ResourceClaimName != nil {
-				containerClaimName = *podResourceClaim.Claim.ResourceClaimName
-			}
-
-			if containerClaim != containerClaimName {
+			if containerClaim != podResourceClaim.Name {
 				continue
 			}
 
@@ -199,7 +194,7 @@ func (m *ManagerImpl) prepareContainerResources(pod *v1.Pod, container *v1.Conta
 			m.podResources.insert(
 				pod.UID,
 				container.Name,
-				containerClaimName,
+				containerClaim,
 				&resource{
 					driverName:           driverName,
 					name:                 resourceName,
