@@ -1,15 +1,27 @@
+# Two pods, one shared, global claim
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: inline-claim-parameters
+  name: external-claim-parameters
   namespace: default
 data:
   a: b
 ---
 apiVersion: v1
+kind: ResourceClaim
+metadata:
+  name: external-claim
+spec:
+  resourceClassName: example
+  parameters:
+    apiVersion: v1
+    kind: ConfigMap
+    name: external-claim-parameters
+---
+apiVersion: v1
 kind: Pod
 metadata:
-  name: test-inline-claim
+  name: test-external-claim
 spec:
   restartPolicy: Never
   containers:
@@ -25,13 +37,4 @@ spec:
   resourceClaims:
   - name: resource
     claim:
-      template:
-        metadata:
-          labels:
-            app: inline-resource
-        spec:
-          resourceClassName: example
-          parameters:
-            apiVersion: v1
-            kind: ConfigMap
-            name: inline-claim-parameters
+      resourceClaimName: external-claim
