@@ -667,7 +667,11 @@ func (cm *containerManagerImpl) GetResources(pod *v1.Pod, container *v1.Containe
 	// Set container annotations from the CDI reconciler to
 	// trigger CDI injection
 	if cm.draManager != nil {
-		opts.Annotations = append(opts.Annotations, cm.draManager.GetCDIAnnotations(pod, container)...)
+		annotations, err := cm.draManager.GetCDIAnnotations(pod, container)
+		if err != nil {
+			return nil, err
+		}
+		opts.Annotations = append(opts.Annotations, annotations...)
 	}
 	// Allocate should already be called during predicateAdmitHandler.Admit(),
 	// just try to fetch device runtime information from cached state here
