@@ -46,7 +46,7 @@ type Manager interface {
 	// GetCDIAnnotations checks whether we have cached resource
 	// for the passed-in <pod, container> and returns its container annotations or
 	// empty map if resource is not cached
-	GetCDIAnnotations(pod *v1.Pod, container *v1.Container) []kubecontainer.Annotation
+	GetCDIAnnotations(pod *v1.Pod, container *v1.Container) ([]kubecontainer.Annotation, error)
 
 	// UnprepareResources calls NodeUnprepareResource GRPC from DRA plugin to unprepare pod resources
 	UnprepareResources(pod *v1.Pod) error
