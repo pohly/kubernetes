@@ -257,18 +257,17 @@ func (m *ManagerImpl) UpdatePodResources() {
 	m.podResources.delete(podsToBeRemoved.List())
 }
 
-func (m *ManagerImpl) GetCDIAnnotations(pod *v1.Pod, container *v1.Container) []kubecontainer.Annotation {
+func (m *ManagerImpl) GetCDIAnnotations(pod *v1.Pod, container *v1.Container) ([]kubecontainer.Annotation, error) {
 	annotations := []kubecontainer.Annotation{}
 	for _, claim := range container.Resources.Claims {
 		resource := m.podResources.get(pod.UID, container.Name, claim)
 		if resource == nil {
-			klog.V(3).Infof("unable to get resource for pod: %s, container: %s, claim: %s, pod resources: %+v", pod.Name, container.Name, claim, m.podResources)
-			continue
+			return nil, fmt.Errorf(fmt.Sprintf("unable to get resource for pod: %s, container: %s, claim: %s", pod.Name, container.Name, claim))
 		}
 		klog.V(3).Infof("GetCDIAnnotations: claim %s: add resource annotations: %+v", resource.annotations)
 		annotations = append(annotations, resource.annotations...)
 	}
-	return annotations
+	return annotations, nil
 }
 
 func (m *ManagerImpl) UnprepareResources(pod *v1.Pod) error {
