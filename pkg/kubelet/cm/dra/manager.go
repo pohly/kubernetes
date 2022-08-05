@@ -46,8 +46,8 @@ type ManagerImpl struct {
 	// Store of Topology Affinties that the Device Manager can query.
 	topologyAffinityStore topologymanager.Store
 
-	// podResources contains resources referenced by the pod
-	podResources *podResources
+	// resources contains resources referenced by pod containers
+	resources *claimedResources
 
 	// activePods is a method for listing active pods on the node
 	activePods ActivePodsFunc
@@ -82,7 +82,7 @@ func NewManagerImpl(topology []cadvisorapi.Node, topologyAffinityStore topologym
 	}
 
 	manager := &ManagerImpl{
-		podResources:          newPodResources(),
+		resources:             newClaimedResources(),
 		numaNodes:             numaNodes,
 		topologyAffinityStore: topologyAffinityStore,
 		kubeClient:            kubeClient,
@@ -144,14 +144,10 @@ func (m *ManagerImpl) prepareContainerResources(pod *v1.Pod, container *v1.Conta
 	podResourcesUpdated := false
 
 	// Process resources for each resource claim referenced by container
-	for _, containerClaim := range container.Resources.Claims {
+	for range container.Resources.Claims {
 		for _, podResourceClaim := range pod.Spec.ResourceClaims {
-			if containerClaim != podResourceClaim.Name {
-				continue
-			}
-
 			claimName := resourceclaim.Name(pod, &podResourceClaim)
-			klog.V(3).Infof("Processing resource claim %s, pod %s, container: %s", claimName, pod.Name, container.Name)
+			klog.V(3).Infof("Processing resource claim %s, pod %s", claimName, pod.Name)
 
 			// Update pod resources cache to garbage collect any stranded resources
 			// before calling resource plugin APIs.
@@ -160,8 +156,9 @@ func (m *ManagerImpl) prepareContainerResources(pod *v1.Pod, container *v1.Conta
 				podResourcesUpdated = true
 			}
 
-			if m.podResources.prepared(pod.UID, container.Name, claimName) {
-				// resource is already prepared, skipping
+			if resource := m.resources.get(claimName, pod.Namespace); resource != nil {
+				// resource is already prepared, add pod UID to it
+				m.resources.addPodUID(claimName, pod.Namespace, pod.UID)
 				continue
 			}
 
@@ -178,10 +175,9 @@ func (m *ManagerImpl) prepareContainerResources(pod *v1.Pod, container *v1.Conta
 				return fmt.Errorf("failed to get DRA Plugin client for plugin name %s, err=%+v", driverName, err)
 			}
 
-			resourceName := fmt.Sprintf("%s-%s", pod.UID, claimName)
-			response, err := client.NodePrepareResource(context.Background(), pod.Namespace, resourceClaim.UID, resourceName, resourceClaim.Status.Allocation.ResourceHandle)
+			response, err := client.NodePrepareResource(context.Background(), resourceClaim.Namespace, resourceClaim.UID, resourceClaim.Name, resourceClaim.Status.Allocation.ResourceHandle)
 			if err != nil {
-				return fmt.Errorf("NodePrepareResource failed, pod: %s, claim UID: %s, resource: %s, resource handle: %s, err: %+v", pod.Name, resourceClaim.UID, resourceName, resourceClaim.Status.Allocation.ResourceHandle, err)
+				return fmt.Errorf("NodePrepareResource failed, claim UID: %s, claim name: %s, resource handle: %s, err: %+v", resourceClaim.UID, resourceClaim.Name, resourceClaim.Status.Allocation.ResourceHandle, err)
 			}
 			klog.V(3).Infof("NodePrepareResource: response: %+v", response)
 
@@ -191,17 +187,17 @@ func (m *ManagerImpl) prepareContainerResources(pod *v1.Pod, container *v1.Conta
 			}
 
 			// Cache prepared resource
-			m.podResources.insert(
-				pod.UID,
-				container.Name,
-				containerClaim,
+			m.resources.add(
+				resourceClaim.Name,
+				resourceClaim.Namespace,
 				&resource{
-					driverName:           driverName,
-					name:                 resourceName,
-					claimUID:             resourceClaim.UID,
-					resourcePluginClient: client,
-					cdiDevice:            response.CdiDevice,
-					annotations:          annotations,
+					driverName:  driverName,
+					claimUID:    resourceClaim.UID,
+					claimName:   resourceClaim.Name,
+					namespace:   resourceClaim.Namespace,
+					podUIDs:     map[types.UID]bool{pod.UID: true},
+					cdiDevice:   response.CdiDevice,
+					annotations: annotations,
 				})
 		}
 	}
@@ -246,26 +242,29 @@ func (m *ManagerImpl) UpdatePodResources() {
 		activeAndAdmittedPods = append(activeAndAdmittedPods, m.pendingAdmissionPod)
 	}
 
-	podsToBeRemoved := m.podResources.pods()
+	podUIDs := []types.UID{}
 	for _, pod := range activeAndAdmittedPods {
-		podsToBeRemoved.Delete(string(pod.UID))
+		podUIDs = append(podUIDs, pod.UID)
 	}
-	if len(podsToBeRemoved) <= 0 {
-		return
-	}
-	klog.V(3).InfoS("Pods to be removed", "podUIDs", podsToBeRemoved.List())
-	m.podResources.delete(podsToBeRemoved.List())
+
+	m.resources.deletePodUIDs(podUIDs)
 }
 
 func (m *ManagerImpl) GetCDIAnnotations(pod *v1.Pod, container *v1.Container) ([]kubecontainer.Annotation, error) {
 	annotations := []kubecontainer.Annotation{}
-	for _, claim := range container.Resources.Claims {
-		resource := m.podResources.get(pod.UID, container.Name, claim)
-		if resource == nil {
-			return nil, fmt.Errorf(fmt.Sprintf("unable to get resource for pod: %s, container: %s, claim: %s", pod.Name, container.Name, claim))
+	for _, podResourceClaim := range pod.Spec.ResourceClaims {
+		claimName := resourceclaim.Name(pod, &podResourceClaim)
+		for _, claim := range container.Resources.Claims {
+			if podResourceClaim.Name != claim {
+				continue
+			}
+			resource := m.resources.get(claimName, pod.Namespace)
+			if resource == nil {
+				return nil, fmt.Errorf(fmt.Sprintf("unable to get resource for namespace: %s, claim: %s", pod.Namespace, claimName))
+			}
+			klog.V(3).Infof("GetCDIAnnotations: claim %s: add resource annotations: %+v", resource.annotations)
+			annotations = append(annotations, resource.annotations...)
 		}
-		klog.V(3).Infof("GetCDIAnnotations: claim %s: add resource annotations: %+v", resource.annotations)
-		annotations = append(annotations, resource.annotations...)
 	}
 	return annotations, nil
 }
@@ -274,23 +273,41 @@ func (m *ManagerImpl) UnprepareResources(pod *v1.Pod) error {
 	m.Lock()
 	defer m.Unlock()
 
-	// Call NodeUnprepareResource RPC for every pod resource
-	// TODO: call this asynchronously ?
-	for _, resource := range m.podResources.getPodResources(pod.UID) {
+	// Call NodeUnprepareResource RPC for every resource claim referenced by the pod
+	for _, podResourceClaim := range pod.Spec.ResourceClaims {
+		claimName := resourceclaim.Name(pod, &podResourceClaim)
+		resource := m.resources.get(claimName, pod.Namespace)
+		if resource == nil {
+			return fmt.Errorf("failed to get resource for namespace %s, claim %s", pod.Namespace, claimName)
+		}
+
+		if _, ok := resource.podUIDs[pod.UID]; !ok {
+			// skip calling NodeUnprepareResource if pod is not cached
+			continue
+		}
+
+		// Delete pod UID from the cache
+		m.resources.deletePodUIDs([]types.UID{pod.UID})
+
+		if len(resource.podUIDs) > 1 {
+			// skip calling NodeUnprepareResource if this is not the latest pod
+			// that uses the resource
+			continue
+		}
+
+		// Call NodeUnprepareResource only for the latest pod that refers the claim
 		client, err := dra.NewDRAPluginClient(resource.driverName)
 		if err != nil || client == nil {
 			return fmt.Errorf("failed to get DRA Plugin client for plugin name %s, err=%+v", resource.driverName, err)
 		}
-
-		response, err := client.NodeUnprepareResource(context.Background(), pod.Namespace, resource.claimUID, resource.name, resource.cdiDevice)
+		response, err := client.NodeUnprepareResource(context.Background(), resource.namespace, resource.claimUID, resource.claimName, resource.cdiDevice)
 		if err != nil {
-			return fmt.Errorf("NodeUnprepareResource failed, pod: %s, claim UID: %s, resource: %s, CDI devices: %s, err: %+v", pod.Name, resource.claimUID, resource.name, resource.cdiDevice, err)
+			return fmt.Errorf("NodeUnprepareResource failed, pod: %s, claim UID: %s, claim name: %s, CDI devices: %s, err: %+v", pod.Name, resource.claimUID, resource.claimName, resource.cdiDevice, err)
 		}
 		klog.V(3).Infof("NodeUnprepareResource: response: %+v", response)
+		// delete resource from the cache
+		m.resources.delete(resource.claimName, pod.Namespace)
 	}
-
-	// delete pod resources from the cache
-	m.podResources.delete([]string{string(pod.UID)})
 
 	return nil
 }
