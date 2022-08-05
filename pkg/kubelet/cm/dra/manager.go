@@ -178,10 +178,9 @@ func (m *ManagerImpl) prepareContainerResources(pod *v1.Pod, container *v1.Conta
 				return fmt.Errorf("failed to get DRA Plugin client for plugin name %s, err=%+v", driverName, err)
 			}
 
-			resourceName := fmt.Sprintf("%s-%s", pod.UID, claimName)
-			response, err := client.NodePrepareResource(context.Background(), pod.Namespace, resourceClaim.UID, resourceName, resourceClaim.Status.Allocation.ResourceHandle)
+			response, err := client.NodePrepareResource(context.Background(), pod.Namespace, resourceClaim.UID, resourceClaim.Name, resourceClaim.Status.Allocation.ResourceHandle)
 			if err != nil {
-				return fmt.Errorf("NodePrepareResource failed, pod: %s, claim UID: %s, resource: %s, resource handle: %s, err: %+v", pod.Name, resourceClaim.UID, resourceName, resourceClaim.Status.Allocation.ResourceHandle, err)
+				return fmt.Errorf("NodePrepareResource failed, pod: %s, claim UID: %s, claim name: %s, resource handle: %s, err: %+v", pod.Name, resourceClaim.UID, resourceClaim.Name, resourceClaim.Status.Allocation.ResourceHandle, err)
 			}
 			klog.V(3).Infof("NodePrepareResource: response: %+v", response)
 
@@ -197,8 +196,8 @@ func (m *ManagerImpl) prepareContainerResources(pod *v1.Pod, container *v1.Conta
 				containerClaim,
 				&resource{
 					driverName:           driverName,
-					name:                 resourceName,
 					claimUID:             resourceClaim.UID,
+					claimName:            resourceClaim.Name,
 					resourcePluginClient: client,
 					cdiDevice:            response.CdiDevice,
 					annotations:          annotations,
@@ -282,9 +281,9 @@ func (m *ManagerImpl) UnprepareResources(pod *v1.Pod) error {
 			return fmt.Errorf("failed to get DRA Plugin client for plugin name %s, err=%+v", resource.driverName, err)
 		}
 
-		response, err := client.NodeUnprepareResource(context.Background(), pod.Namespace, resource.claimUID, resource.name, resource.cdiDevice)
+		response, err := client.NodeUnprepareResource(context.Background(), pod.Namespace, resource.claimUID, resource.claimName, resource.cdiDevice)
 		if err != nil {
-			return fmt.Errorf("NodeUnprepareResource failed, pod: %s, claim UID: %s, resource: %s, CDI devices: %s, err: %+v", pod.Name, resource.claimUID, resource.name, resource.cdiDevice, err)
+			return fmt.Errorf("NodeUnprepareResource failed, pod: %s, claim UID: %s, claim name: %s, CDI devices: %s, err: %+v", pod.Name, resource.claimUID, resource.claimName, resource.cdiDevice, err)
 		}
 		klog.V(3).Infof("NodeUnprepareResource: response: %+v", response)
 	}

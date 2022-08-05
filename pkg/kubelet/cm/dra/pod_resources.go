@@ -31,11 +31,11 @@ type resource struct {
 	// name of the DRA driver
 	driverName string
 
-	// name is an unique resource name
-	name string
-
 	// claimUID is an UID of the resource claim
 	claimUID types.UID
+
+	// claimName is a name of the resource claim
+	claimName string
 
 	// resourcePluginClient is an instance of the GRPC DRA client
 	// that's used to query node resource plugin
