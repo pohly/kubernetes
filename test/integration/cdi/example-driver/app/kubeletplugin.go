@@ -26,6 +26,7 @@ import (
 	specs "github.com/container-orchestrated-devices/container-device-interface/specs-go"
 	"k8s.io/klog/v2"
 	drapbv1 "k8s.io/kubernetes/pkg/kubelet/apis/dra/v1alpha1"
+	"k8s.io/kubernetes/test/integration/cdi/example-driver/kubeletplugin"
 	plugin "k8s.io/kubernetes/test/integration/cdi/example-driver/kubeletplugin"
 )
 
@@ -35,117 +36,126 @@ const (
 )
 
 type examplePlugin struct {
-	cdiDir                 string
-	driverName             string
-	draAddress             string
-	pluginRegistrationPath string
+	logger klog.Logger
+	d      plugin.DRAPlugin
+
+	cdiDir     string
+	driverName string
 }
 
-// newExamplePlugin returns an initialized examplePlugin instance.
-func newExamplePlugin(cdiDir, driverName, draAddress, pluginRegistrationPath string) (*examplePlugin, error) {
-	return &examplePlugin{
-		cdiDir:                 cdiDir,
-		driverName:             driverName,
-		draAddress:             draAddress,
-		pluginRegistrationPath: pluginRegistrationPath,
-	}, nil
+var _ drapbv1.NodeServer = &examplePlugin{}
+
+// runPlugin sets up the plugin and waits for connections from kubelet.
+func runPlugin(logger klog.Logger, cdiDir, driverName, endpoint, draAddress, pluginRegistrationPath string) error {
+	plugin := examplePlugin{
+		logger:     logger,
+		cdiDir:     cdiDir,
+		driverName: driverName,
+	}
+	if err := plugin.start(driverName, endpoint, draAddress, pluginRegistrationPath); err != nil {
+		return fmt.Errorf("start example plugin: %v", err)
+	}
+	// TODO: graceful termination via signal. Needs to be implemented in the caller.
+	select {}
+	plugin.stop()
+	return nil
 }
 
-// getJsonFilePath returns the absolute path where json file is/should be.
-func (ex *examplePlugin) getJsonFilePath(claimUID string) string {
-	jsonfileName := fmt.Sprintf("%s-%s.json", ex.driverName, claimUID)
-	return filepath.Join(ex.cdiDir, jsonfileName)
+// getJSONFilePath returns the absolute path where CDI file is/should be.
+func (ex *examplePlugin) getJSONFilePath(claimUID string) string {
+	return filepath.Join(ex.cdiDir, fmt.Sprintf("%s-%s.json", ex.driverName, claimUID))
 }
 
-// startPlugin starts servers that are necessary for plugins and registers the plugin with kubelet.
-func (ex examplePlugin) startPlugin() error {
-	klog.Infof("Starting kubelet plugin")
-
-	// create CDI directory if not exists
+// start sets up the servers that are necessary for a DRA kubelet plugin.
+func (ex *examplePlugin) start(driverName, endpoint, draAddress, pluginRegistrationPath string) error {
+	// Ensure that directories exist, creating them if necessary. We want
+	// to know early if there is a setup problem that would prevent
+	// creating those directories.
 	if err := os.MkdirAll(ex.cdiDir, os.FileMode(0750)); err != nil {
-		return fmt.Errorf("failed to create directory: %v", err)
+		return fmt.Errorf("create CDI directory: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(endpoint), 0750); err != nil {
+		return fmt.Errorf("create socket directory: %v", err)
 	}
 
-	// create DRA driver socket directory if not exists.
-	if err := os.MkdirAll(filepath.Dir(ex.draAddress), 0750); err != nil {
-		return fmt.Errorf("failed to create DRA driver socket directory: %v", err)
+	d, err := kubeletplugin.Start(ex.logger, driverName, endpoint, draAddress, pluginRegistrationPath, ex)
+	if err != nil {
+		return fmt.Errorf("start kubelet plugin: %v", err)
 	}
-
-	// Run a grpc server for the driver, that listens on draAddress
-	if err := plugin.StartNonblockingGrpcServer(ex.draAddress, &ex); err != nil {
-		return fmt.Errorf("failed to start a nonblocking grpc server: %v", err)
-	}
-
-	// Run a registration server and registers plugin with kubelet
-	if err := plugin.StartRegistrar(ex.driverName, ex.draAddress, ex.pluginRegistrationPath); err != nil {
-		return fmt.Errorf("failed to start registrar: %v", err)
-	}
+	ex.d = d
 
 	return nil
-
 }
 
+// stop ensures that all servers are stopped and resources freed.
+func (ex *examplePlugin) stop() {
+	ex.d.Stop()
+}
+
+// NodePrepareResource ensures that the CDI file for the claim exists. It uses
+// a deterministic name to simplify NodeUnprepareResource (no need to remember
+// or discover the name) and idempotency (when called again, the file simply
+// gets written again).
 func (ex *examplePlugin) NodePrepareResource(ctx context.Context, req *drapbv1.NodePrepareResourceRequest) (*drapbv1.NodePrepareResourceResponse, error) {
-
+	logger := klog.FromContext(ctx)
 	kind := ex.driverName + "/" + deviceName
+	filePath := ex.getJSONFilePath(req.ClaimUid)
 
-	klog.Infof("NodePrepareResource is called: request: %+v", req)
-
-	klog.Infof("Creating CDI File")
-	// make resourceHandle in the form of map[string]string
-	var decodedResourceHandle map[string]string
-	if err := json.Unmarshal([]byte(req.ResourceHandle), &decodedResourceHandle); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal resourceHandle: %v", err)
+	// Determine environment variables.
+	var env map[string]string
+	if err := json.Unmarshal([]byte(req.ResourceHandle), &env); err != nil {
+		return nil, fmt.Errorf("unmarshal resource handle: %v", err)
 	}
 
-	// create ContainerEdits in device spec and ContainerEdits
+	// CDI wants env variables as set of strings.
 	envs := []string{}
-	for key, val := range decodedResourceHandle {
+	for key, val := range env {
 		envs = append(envs, key+"="+val)
 	}
-	// create spec
+
 	spec := specs.Spec{
 		Version: cdiVersion,
 		Kind:    kind,
-		Devices: []specs.Device{{
-			Name: deviceName,
-			ContainerEdits: specs.ContainerEdits{
-				Env: envs,
+		Devices: []specs.Device{
+			{
+				Name: deviceName,
+				ContainerEdits: specs.ContainerEdits{
+					Env: envs,
+				},
 			},
-		}},
-		ContainerEdits: specs.ContainerEdits{},
+		},
 	}
-	cdiSpec, err := cdiapi.NewSpec(&spec, ex.getJsonFilePath(req.ClaimUid), 1)
+	cdiSpec, err := cdiapi.NewSpec(&spec, filePath, 1)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create new spec: %v", err)
-	}
-	klog.V(5).InfoS("CDI spec is validated")
-
-	// create bytes from spec, which would be written into the json file
-	jsonBytes, err := json.Marshal(*cdiSpec)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal CDI spec: %v", err)
+		return nil, fmt.Errorf("create spec: %v", err)
 	}
 
-	// create json file
-	filePath := ex.getJsonFilePath(req.ClaimUid)
-	if err := os.WriteFile(filePath, jsonBytes, os.FileMode(0644)); err != nil {
+	buffer, err := json.Marshal(*cdiSpec)
+	if err != nil {
+		return nil, fmt.Errorf("marshal spec: %v", err)
+	}
+
+	if err := os.WriteFile(filePath, buffer, os.FileMode(0644)); err != nil {
 		return nil, fmt.Errorf("failed to write CDI file %v", err)
 	}
-	klog.Infof("CDI file is created at " + filePath)
 
 	dev := cdiSpec.GetDevice(deviceName).GetQualifiedName()
 	resp := &drapbv1.NodePrepareResourceResponse{CdiDevice: []string{dev}}
-	klog.Infof("NodePrepareResource is successfuly finished, response: %+v", resp)
+
+	logger.V(3).Info("CDI file created", "path", filePath, "device", dev)
 	return resp, nil
 }
 
+// NodeUnprepareResource removes the CDI file created by
+// NodePrepareResource. It's idempotent, therefore it is not an error when that
+// file is already gone.
 func (ex *examplePlugin) NodeUnprepareResource(ctx context.Context, req *drapbv1.NodeUnprepareResourceRequest) (*drapbv1.NodeUnprepareResourceResponse, error) {
-	klog.Infof("NodeUnprepareResource is called: request: %+v", req)
-	filePath := ex.getJsonFilePath(req.ClaimUid)
-	if err := os.Remove(filePath); err != nil {
+	logger := klog.FromContext(ctx)
+
+	filePath := ex.getJSONFilePath(req.ClaimUid)
+	if err := os.Remove(filePath); err != nil && !os.IsNotExist(err) {
 		return nil, fmt.Errorf("error removing CDI file: %v", err)
 	}
-	klog.Infof("CDI file at %s is removed" + filePath)
+	logger.V(3).Info("CDI file removed", "path", filePath)
 	return &drapbv1.NodeUnprepareResourceResponse{}, nil
 }

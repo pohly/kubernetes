@@ -14,102 +14,109 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package app does all of the work necessary to configure and run a
-// Kubernetes app process.
 package kubeletplugin
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
-	"strings"
 	"sync"
+	"sync/atomic"
 
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
-	drapbv1 "k8s.io/kubernetes/pkg/kubelet/apis/dra/v1alpha1"
 )
 
-// NonBlocking server
-type nonBlockingGRPCServer struct {
-	wg      sync.WaitGroup
-	server  *grpc.Server
-	cleanup func()
+type grpcServer struct {
+	logger    klog.Logger
+	wg        sync.WaitGroup
+	endpoint  string
+	server    *grpc.Server
+	requestID int64
 }
 
-func (s *nonBlockingGRPCServer) Start(endpoint string, ns drapbv1.NodeServer) {
+type registerService func(s *grpc.Server)
+
+// startGRPCServer sets up the GRPC server on a Unix domain socket and spawns a goroutine
+// which handles requests for arbitrary services.
+func startGRPCServer(logger klog.Logger, endpoint string, services ...registerService) (*grpcServer, error) {
+	s := &grpcServer{
+		logger:   logger,
+		endpoint: endpoint,
+	}
+
+	// Remove any (probably stale) existing socket.
+	if err := os.Remove(endpoint); err != nil && !os.IsNotExist(err) {
+		return nil, fmt.Errorf("remove Unix domain socket: %v", err)
+	}
+
+	// Now we can use the endpoint for listening.
+	listener, err := net.Listen("unix", endpoint)
+	if err != nil {
+		return nil, fmt.Errorf("listen on %q: %v", endpoint, err)
+	}
+
+	// Run a gRPC server. It will close the listening socket when
+	// shutting down, so we don't need to do that.
+	opts := []grpc.ServerOption{
+		grpc.UnaryInterceptor(s.interceptor),
+	}
+	s.server = grpc.NewServer(opts...)
+	for _, service := range services {
+		service(s.server)
+	}
 	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+		err := s.server.Serve(listener)
+		if err != nil {
+			logger.Error(err, "GRPC server failed")
+		} else {
+			logger.V(5).Info("GRPC server terminated gracefully")
+		}
+	}()
 
-	s.wg.Done()
-	go s.serve(endpoint, ns)
+	logger.Info("GRPC server started", "endpoint", endpoint)
+	return s, nil
 }
 
-func (s *nonBlockingGRPCServer) Wait() {
+// interceptor is called for each request. It creates a logger with a unique,
+// sequentially increasing request ID and adds that logger to the context. It
+// also logs request and response.
+func (s *grpcServer) interceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
+	requestID := atomic.AddInt64(&s.requestID, 1)
+	logger := klog.LoggerWithValues(s.logger, "requestID", requestID)
+	ctx = klog.NewContext(ctx, logger)
+	logger.V(5).Info("handling request", "request", req)
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Error(nil, "handling request panicked", "panic", r)
+			panic(r)
+		}
+	}()
+	resp, err = handler(ctx, req)
+	if err != nil {
+		logger.Error(err, "handling request failed", "request", req)
+	} else {
+		logger.V(5).Info("handling request succeeded", "response", resp)
+	}
+	return
+}
+
+// stop ensures that the server is not running anymore and cleans up all resources.
+// It is idempotent and may be called with a nil pointer.
+func (s *grpcServer) stop() {
+	if s == nil {
+		return
+	}
+	if s.server != nil {
+		s.server.Stop()
+	}
 	s.wg.Wait()
-}
-
-func (s *nonBlockingGRPCServer) serve(ep string, ns drapbv1.NodeServer) {
-	listener, cleanup, err := listen(ep)
-	if err != nil {
-		klog.Infof("Failed to listen: %v", err)
+	s.server = nil
+	if err := os.Remove(s.endpoint); err != nil && !os.IsNotExist(err) {
+		s.logger.Error(err, "remove Unix socket")
 	}
-
-	opts := []grpc.ServerOption{}
-	server := grpc.NewServer(opts...)
-	s.server = server
-	s.cleanup = cleanup
-
-	if ns != nil {
-		drapbv1.RegisterNodeServer(server, ns)
-	}
-
-	klog.Infof("Nonblocking grpc server started at %s\n", ep)
-	server.Serve(listener)
-}
-
-func parse(ep string) (string, string, error) {
-	if strings.HasPrefix(strings.ToLower(ep), "unix://") || strings.HasPrefix(strings.ToLower(ep), "tcp://") {
-		s := strings.SplitN(ep, "://", 2)
-		if s[1] != "" {
-			return s[0], s[1], nil
-		}
-		return "", "", fmt.Errorf("invalid endpoint: %v", ep)
-	}
-	// Assume everything else is a file path for a Unix Domain Socket.
-	return "unix", ep, nil
-}
-
-func listen(endpoint string) (net.Listener, func(), error) {
-	proto, addr, err := parse(endpoint)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	cleanup := func() {}
-	if proto == "unix" {
-		addr = "/" + addr
-		if err := os.Remove(addr); err != nil && !os.IsNotExist(err) { //nolint: vetshadow
-			return nil, nil, fmt.Errorf("%s: %q", addr, err)
-		}
-		cleanup = func() {
-			os.Remove(addr)
-		}
-	}
-
-	l, err := net.Listen(proto, addr)
-	return l, cleanup, err
-}
-
-func newNonBlockingGRPCServer() *nonBlockingGRPCServer {
-	return &nonBlockingGRPCServer{}
-}
-
-// StartNonblockingGrpcServer starts a grpc server for a driver, that listens on draAddress.
-func StartNonblockingGrpcServer(draAddress string, driver drapbv1.NodeServer) error {
-	klog.Infof("Starting nonblocking grpc server at %s\n", draAddress)
-	s := newNonBlockingGRPCServer()
-
-	s.Start(draAddress, driver)
-	s.Wait()
-	return nil
+	s.logger.Info("GRPC server stopped")
 }
