@@ -29,6 +29,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/container-orchestrated-devices/container-device-interface/pkg/cdi"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/cobra"
@@ -44,6 +45,8 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/term"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/cmd/kubelet/app/options"
+	"k8s.io/kubernetes/pkg/kubelet/cm/dra"
 	"k8s.io/kubernetes/test/integration/cdi/example-driver/leaderelection"
 )
 
@@ -77,6 +80,7 @@ func NewCommand() *cobra.Command {
 
 	fs = sharedFlagSets.FlagSet("CDI")
 	driverName := fs.String("drivername", "example-driver.cdi.k8s.io", "Resource driver name.")
+	cdiDir := fs.String("cdi-dir", cdi.DefaultDynamicDir, "CDI directory where the driver sockets and CDI files will be")
 
 	fs = sharedFlagSets.FlagSet("other")
 	featureGate := featuregate.NewFeatureGate()
@@ -244,13 +248,25 @@ func NewCommand() *cobra.Command {
 	}
 	cmd.AddCommand(controller)
 
+	// kubelet plugin
+	kubeletPluginFlagSets := cliflag.NamedFlagSets{}
+	fs = kubeletPluginFlagSets.FlagSet("kubelet plugin")
+
+	kubeletDir := fs.String("kubelet-dir", options.NewKubeletFlags().RootDirectory, "Path to the Kubelet directory.")
+	draAddress := fs.String("dra-address", path.Join(dra.DRACheckpointDir, *driverName, "dra.sock"), "Path to the DRA driver socket kubelet will use to issue CDI operations.")
+	pluginRegistrationPath := fs.String("plugin-registration-path", path.Join(*kubeletDir, "plugins_registry"), "Path to Kubernetes plugin registration socket.")
+
 	kubeletPlugin := &cobra.Command{
 		Use:   "kubelet-plugin",
 		Short: "run as kubelet plugin",
 		Long:  "cdi-example-driver kubelet-plugin runs as a device plugin for kubelet that supports dynamic resource allocation.",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return fmt.Errorf("%s: not implemented", cmd.Use)
+			plugin, err := newExamplePlugin(*cdiDir, *driverName, *draAddress, *pluginRegistrationPath)
+			if err != nil {
+				return err
+			}
+			return plugin.startPlugin()
 		},
 	}
 	cmd.AddCommand(kubeletPlugin)
