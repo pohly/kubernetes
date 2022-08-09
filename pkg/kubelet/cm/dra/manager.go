@@ -168,6 +168,11 @@ func (m *ManagerImpl) prepareContainerResources(pod *v1.Pod, container *v1.Conta
 				return fmt.Errorf("failed to fetch ResourceClaim %s referenced by pod %s: %+v", claimName, pod.Name, err)
 			}
 
+			// check if claim is reserved for this pod
+			if !resourceclaim.IsReservedForPod(pod, resourceClaim) {
+				return fmt.Errorf("claim %s is not reserved for the pod %s/%s", resourceClaim.Name, pod.Namespace, pod.Name)
+			}
+
 			// Call NodePrepareResource RPC
 			driverName := resourceClaim.Status.DriverName
 			client, err := dra.NewDRAPluginClient(driverName)
