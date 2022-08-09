@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"strings"
 
-	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
@@ -50,13 +49,13 @@ type parameters map[string]string
 
 var _ controller.Driver = exampleDriver{}
 
-func (d exampleDriver) GetClassParameters(ctx context.Context, class *corev1.ResourceClass) (interface{}, error) {
+func (d exampleDriver) GetClassParameters(ctx context.Context, class *v1.ResourceClass) (interface{}, error) {
 	// TODO: read config map, but from what namespace?!
 	var p parameters
 	return p, nil
 }
 
-func (d exampleDriver) GetClaimParameters(ctx context.Context, claim *corev1.ResourceClaim, class *corev1.ResourceClass, classParameters interface{}) (interface{}, error) {
+func (d exampleDriver) GetClaimParameters(ctx context.Context, claim *v1.ResourceClaim, class *v1.ResourceClass, classParameters interface{}) (interface{}, error) {
 	if claim.Spec.Parameters != nil {
 		if claim.Spec.Parameters.APIVersion != "v1" ||
 			claim.Spec.Parameters.Kind != "ConfigMap" {
@@ -76,8 +75,8 @@ func (d exampleDriver) readParametersFromConfigMap(ctx context.Context, namespac
 }
 
 // Allocate simply copies parameters as JSON map into ResourceHandle.
-func (d exampleDriver) Allocate(ctx context.Context, claim *corev1.ResourceClaim, claimParameters interface{}, class *corev1.ResourceClass, classParameters interface{}, selectedNode string) (*corev1.AllocationResult, error) {
-	allocation := &corev1.AllocationResult{
+func (d exampleDriver) Allocate(ctx context.Context, claim *v1.ResourceClaim, claimParameters interface{}, class *v1.ResourceClass, classParameters interface{}, selectedNode string) (*v1.AllocationResult, error) {
+	allocation := &v1.AllocationResult{
 		SharedResource: true,
 	}
 	p := parameters{}
@@ -91,11 +90,11 @@ func (d exampleDriver) Allocate(ctx context.Context, claim *corev1.ResourceClaim
 	return allocation, nil
 }
 
-func (d exampleDriver) StopAllocation(ctx context.Context, claim *corev1.ResourceClaim) error {
+func (d exampleDriver) StopAllocation(ctx context.Context, claim *v1.ResourceClaim) error {
 	return nil
 }
 
-func (d exampleDriver) Deallocate(ctx context.Context, claim *corev1.ResourceClaim) error {
+func (d exampleDriver) Deallocate(ctx context.Context, claim *v1.ResourceClaim) error {
 	return nil
 }
 
