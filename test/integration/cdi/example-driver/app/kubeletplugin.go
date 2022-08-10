@@ -30,11 +30,6 @@ import (
 	plugin "k8s.io/kubernetes/test/integration/cdi/example-driver/kubeletplugin"
 )
 
-const (
-	deviceName = "exampledevice"
-	cdiVersion = "0.2.0"
-)
-
 type examplePlugin struct {
 	logger klog.Logger
 	d      plugin.DRAPlugin
@@ -98,7 +93,8 @@ func (ex *examplePlugin) stop() {
 // gets written again).
 func (ex *examplePlugin) NodePrepareResource(ctx context.Context, req *drapbv1.NodePrepareResourceRequest) (*drapbv1.NodePrepareResourceResponse, error) {
 	logger := klog.FromContext(ctx)
-	kind := ex.driverName + "/" + deviceName
+	deviceName := "claim-" + req.ClaimUid
+	kind := ex.driverName + "/test"
 	filePath := ex.getJSONFilePath(req.ClaimUid)
 
 	// Determine environment variables.
@@ -114,8 +110,10 @@ func (ex *examplePlugin) NodePrepareResource(ctx context.Context, req *drapbv1.N
 	}
 
 	spec := specs.Spec{
-		Version: cdiVersion,
+		Version: "0.2.0",
 		Kind:    kind,
+		// At least one device is required and its entry must have more
+		// than just the name.
 		Devices: []specs.Device{
 			{
 				Name: deviceName,
