@@ -40,46 +40,36 @@ type examplePlugin struct {
 
 var _ drapbv1.NodeServer = &examplePlugin{}
 
-// runPlugin sets up the plugin and waits for connections from kubelet.
-func runPlugin(logger klog.Logger, cdiDir, driverName, endpoint, draAddress, pluginRegistrationPath string) error {
-	plugin := examplePlugin{
-		logger:     logger,
-		cdiDir:     cdiDir,
-		driverName: driverName,
-	}
-	if err := plugin.start(driverName, endpoint, draAddress, pluginRegistrationPath); err != nil {
-		return fmt.Errorf("start example plugin: %v", err)
-	}
-	// TODO: graceful termination via signal. Needs to be implemented in the caller.
-	select {}
-	plugin.stop()
-	return nil
-}
-
 // getJSONFilePath returns the absolute path where CDI file is/should be.
 func (ex *examplePlugin) getJSONFilePath(claimUID string) string {
 	return filepath.Join(ex.cdiDir, fmt.Sprintf("%s-%s.json", ex.driverName, claimUID))
 }
 
-// start sets up the servers that are necessary for a DRA kubelet plugin.
-func (ex *examplePlugin) start(driverName, endpoint, draAddress, pluginRegistrationPath string) error {
+// startPlugin sets up the servers that are necessary for a DRA kubelet plugin.
+func startPlugin(logger klog.Logger, cdiDir, driverName, endpoint, draAddress, pluginRegistrationPath string) (*examplePlugin, error) {
+	ex := &examplePlugin{
+		logger:     logger,
+		cdiDir:     cdiDir,
+		driverName: driverName,
+	}
+
 	// Ensure that directories exist, creating them if necessary. We want
 	// to know early if there is a setup problem that would prevent
 	// creating those directories.
 	if err := os.MkdirAll(ex.cdiDir, os.FileMode(0750)); err != nil {
-		return fmt.Errorf("create CDI directory: %v", err)
+		return nil, fmt.Errorf("create CDI directory: %v", err)
 	}
 	if err := os.MkdirAll(filepath.Dir(endpoint), 0750); err != nil {
-		return fmt.Errorf("create socket directory: %v", err)
+		return nil, fmt.Errorf("create socket directory: %v", err)
 	}
 
 	d, err := kubeletplugin.Start(ex.logger, driverName, endpoint, draAddress, pluginRegistrationPath, ex)
 	if err != nil {
-		return fmt.Errorf("start kubelet plugin: %v", err)
+		return nil, fmt.Errorf("start kubelet plugin: %v", err)
 	}
 	ex.d = d
 
-	return nil
+	return ex, nil
 }
 
 // stop ensures that all servers are stopped and resources freed.

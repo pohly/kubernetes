@@ -25,8 +25,10 @@ import (
 	"net/http"
 	"net/http/pprof"
 	"os"
+	"os/signal"
 	"path"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/container-orchestrated-devices/container-device-interface/pkg/cdi"
@@ -270,7 +272,20 @@ func NewCommand() *cobra.Command {
 		fs.AddFlagSet(f)
 	}
 	kubeletPlugin.RunE = func(cmd *cobra.Command, args []string) error {
-		return runPlugin(logger, *cdiDir, *driverName, *endpoint, *draAddress, *pluginRegistrationPath)
+		plugin, err := startPlugin(logger, *cdiDir, *driverName, *endpoint, *draAddress, *pluginRegistrationPath)
+		if err != nil {
+			return fmt.Errorf("start example plugin: %v", err)
+		}
+
+		// Handle graceful shutdown. We need to delete Unix domain
+		// sockets.
+		sigc := make(chan os.Signal, 1)
+		signal.Notify(sigc, os.Interrupt, syscall.SIGTERM)
+		logger.Info("Waiting for signal.")
+		sig := <-sigc
+		logger.Info("Received signal, shutting down.", "signal", sig)
+		plugin.stop()
+		return nil
 	}
 	cmd.AddCommand(kubeletPlugin)
 
