@@ -35,6 +35,7 @@ import (
 	"github.com/spf13/cobra"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -44,6 +45,7 @@ import (
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/term"
+	"k8s.io/component-helpers/cdi/validation"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/integration/cdi/example-driver/leaderelection"
 )
@@ -106,6 +108,10 @@ func NewCommand() *cobra.Command {
 		if kubeconfigEnv != "" {
 			klog.Infof("Found KUBECONFIG environment variable set, using that..")
 			*kubeconfig = kubeconfigEnv
+		}
+
+		if err := validation.ValidateDriverName(*driverName, field.NewPath("drivername")).ToAggregate(); err != nil {
+			return err
 		}
 
 		var err error
