@@ -267,7 +267,7 @@ func (m *ManagerImpl) GetCDIAnnotations(pod *v1.Pod, container *v1.Container) ([
 			if resource == nil {
 				return nil, fmt.Errorf(fmt.Sprintf("unable to get resource for namespace: %s, claim: %s", pod.Namespace, claimName))
 			}
-			klog.V(3).Infof("GetCDIAnnotations: claim %s: add resource annotations: %+v", resource.annotations)
+			klog.V(3).Infof("GetCDIAnnotations: claim %s: add resource annotations: %+v", claimName, resource.annotations)
 			annotations = append(annotations, resource.annotations...)
 		}
 	}
