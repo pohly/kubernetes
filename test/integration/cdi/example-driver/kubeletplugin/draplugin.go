@@ -29,6 +29,11 @@ type DRAPlugin interface {
 	// Stop ensures that all spawned goroutines are stopped and frees
 	// resources.
 	Stop()
+
+	// This unexported method ensures that we can modify the interface
+	// without causing an API break of the package
+	// (https://pkg.go.dev/golang.org/x/exp/apidiff#section-readme).
+	internal()
 }
 
 // draPlugin combines the kubelet registration service and the DRA node plugin
@@ -75,3 +80,5 @@ func (d *draPlugin) Stop() {
 	d.registrar.stop()
 	d.plugin.stop()
 }
+
+func (d *draPlugin) internal() {}
