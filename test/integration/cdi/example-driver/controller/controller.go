@@ -685,7 +685,11 @@ func (ctrl *controller) syncPodScheduling(ctx context.Context, podScheduling *co
 		i := findClaim(podScheduling.Status.Claims, delayed.PodClaimName)
 		if i < 0 {
 			// Add new entry.
-			podScheduling.Status.Claims = append(podScheduling.Status.Claims, corev1.ResourceClaimSchedulingStatus{PodResourceClaimName: delayed.PodClaimName})
+			podScheduling.Status.Claims = append(podScheduling.Status.Claims,
+				corev1.ResourceClaimSchedulingStatus{
+					PodResourceClaimName: delayed.PodClaimName,
+					UnsuitableNodes:      delayed.UnsuitableNodes,
+				})
 			modified = true
 		} else if stringsDiffer(podScheduling.Status.Claims[i].UnsuitableNodes, delayed.UnsuitableNodes) {
 			// Update existing entry.
