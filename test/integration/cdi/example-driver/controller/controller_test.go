@@ -392,7 +392,7 @@ func TestController(t *testing.T) {
 				case *corev1.PodScheduling:
 					podSchedulingInformer.Informer().GetStore().Add(obj)
 				default:
-					t.Fatalf("unknown initalObject type: %+v", obj)
+					t.Fatalf("unknown initialObject type: %+v", obj)
 				}
 			}
 

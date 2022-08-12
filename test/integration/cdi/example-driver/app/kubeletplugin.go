@@ -82,9 +82,6 @@ func (ex *examplePlugin) stop() {
 // gets written again).
 func (ex *examplePlugin) NodePrepareResource(ctx context.Context, req *drapbv1.NodePrepareResourceRequest) (*drapbv1.NodePrepareResourceResponse, error) {
 	logger := klog.FromContext(ctx)
-	deviceName := "claim-" + req.ClaimUid
-	kind := ex.driverName + "/test"
-	filePath := ex.getJSONFilePath(req.ClaimUid)
 
 	// Determine environment variables.
 	var env map[string]string
@@ -98,10 +95,11 @@ func (ex *examplePlugin) NodePrepareResource(ctx context.Context, req *drapbv1.N
 		envs = append(envs, key+"="+val)
 	}
 
+	deviceName := "claim-" + req.ClaimUid
 	spec := specs.Spec{
 		// TODO: clarify what version to put here (https://github.com/container-orchestrated-devices/container-device-interface/issues/60).
 		Version: "0.2.0",
-		Kind:    kind,
+		Kind:    ex.driverName + "/test",
 		// At least one device is required and its entry must have more
 		// than just the name.
 		Devices: []specs.Device{
@@ -113,6 +111,7 @@ func (ex *examplePlugin) NodePrepareResource(ctx context.Context, req *drapbv1.N
 			},
 		},
 	}
+	filePath := ex.getJSONFilePath(req.ClaimUid)
 	cdiSpec, err := cdiapi.NewSpec(&spec, filePath, 1)
 	if err != nil {
 		return nil, fmt.Errorf("create spec: %v", err)
