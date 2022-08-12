@@ -34,6 +34,7 @@ func ValidateDriverName(driverName string, fldPath *field.Path) field.ErrorList 
 		allErrs = append(allErrs, field.Required(fldPath, ""))
 	}
 
+	// TODO: should this length limit be documented with a constant in the core/v1 API?
 	if len(driverName) > 63 {
 		allErrs = append(allErrs, field.TooLong(fldPath, driverName, 63))
 	}
