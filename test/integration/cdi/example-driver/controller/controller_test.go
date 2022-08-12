@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/informers"
@@ -550,7 +549,7 @@ func (m mockDriver) Deallocate(ctx context.Context, claim *corev1.ResourceClaim)
 	return err
 }
 
-func (m mockDriver) UnsuitableNodes(ctx context.Context, pod *v1.Pod, claims []*ClaimAllocation, potentialNodes []string) error {
+func (m mockDriver) UnsuitableNodes(ctx context.Context, pod *corev1.Pod, claims []*ClaimAllocation, potentialNodes []string) error {
 	m.t.Logf("UnsuitableNodes(%s, %v, %v)", pod, claims, potentialNodes)
 	if len(m.unsuitableNodes) == 0 {
 		m.t.Fatal("unexpected UnsuitableNodes call")

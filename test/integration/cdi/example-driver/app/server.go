@@ -174,7 +174,7 @@ func NewCommand() *cobra.Command {
 
 			listener, err := net.Listen("tcp", *httpEndpoint)
 			if err != nil {
-				return fmt.Errorf("Listen on HTTP endpoint: %v", err)
+				return fmt.Errorf("listen on HTTP endpoint: %v", err)
 			}
 
 			go func() {
@@ -231,7 +231,7 @@ func NewCommand() *cobra.Command {
 		// exceeds the QPS+burst limits.
 		leClientset, err := kubernetes.NewForConfig(config)
 		if err != nil {
-			return fmt.Errorf("Failed to create leaderelection client: %v", err)
+			return fmt.Errorf("create leaderelection client: %v", err)
 		}
 
 		le := leaderelection.New(leClientset, lockName,

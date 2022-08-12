@@ -25,7 +25,6 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -99,7 +98,7 @@ func (d exampleDriver) Deallocate(ctx context.Context, claim *corev1.ResourceCla
 	return nil
 }
 
-func (d exampleDriver) UnsuitableNodes(ctx context.Context, pod *v1.Pod, claims []*controller.ClaimAllocation, potentialNodes []string) error {
+func (d exampleDriver) UnsuitableNodes(ctx context.Context, pod *corev1.Pod, claims []*controller.ClaimAllocation, potentialNodes []string) error {
 	// All nodes are suitable.
 	return nil
 }

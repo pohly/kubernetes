@@ -117,7 +117,7 @@ type Driver interface {
 	//
 	// The result of the check is in ClaimAllocation.UnsuitableNodes.
 	// An error indicates that the entire check must be repeated.
-	UnsuitableNodes(ctx context.Context, pod *v1.Pod, claims []*ClaimAllocation, potentialNodes []string) error
+	UnsuitableNodes(ctx context.Context, pod *corev1.Pod, claims []*ClaimAllocation, potentialNodes []string) error
 }
 
 // ClaimAllocation represents information about one particular
@@ -178,7 +178,7 @@ func New(
 	})
 	eventBroadcaster.StartRecordingToSink(&corev1types.EventSinkImpl{Interface: kubeClient.CoreV1().Events(v1.NamespaceAll)})
 	eventRecorder := eventBroadcaster.NewRecorder(scheme.Scheme,
-		v1.EventSource{Component: fmt.Sprintf("resource driver %s", name)})
+		corev1.EventSource{Component: fmt.Sprintf("resource driver %s", name)})
 
 	// The work queue contains either keys for claims or PodScheduling objects.
 	queue := workqueue.NewNamedRateLimitingQueue(
@@ -452,7 +452,7 @@ func (ctrl *controller) syncClaim(ctx context.Context, claim *corev1.ResourceCla
 		logger.V(5).Info("ResourceClaim is allocated")
 		return nil
 	}
-	if claim.Spec.AllocationMode != v1.AllocationModeImmediate {
+	if claim.Spec.AllocationMode != corev1.AllocationModeImmediate {
 		logger.V(5).Info("ResourceClaim waiting for first consumer")
 		return nil
 	}
@@ -719,7 +719,7 @@ func (claims claimAllocations) MarshalLog() interface{} {
 
 var _ logr.Marshaler = claimAllocations{}
 
-func findClaim(claims []v1.ResourceClaimSchedulingStatus, podClaimName string) int {
+func findClaim(claims []corev1.ResourceClaimSchedulingStatus, podClaimName string) int {
 	for i := range claims {
 		if claims[i].PodResourceClaimName == podClaimName {
 			return i
