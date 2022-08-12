@@ -27,12 +27,11 @@ import (
 	"k8s.io/klog/v2"
 	drapbv1 "k8s.io/kubernetes/pkg/kubelet/apis/dra/v1alpha1"
 	"k8s.io/kubernetes/test/integration/cdi/example-driver/kubeletplugin"
-	plugin "k8s.io/kubernetes/test/integration/cdi/example-driver/kubeletplugin"
 )
 
 type examplePlugin struct {
 	logger klog.Logger
-	d      plugin.DRAPlugin
+	d      kubeletplugin.DRAPlugin
 
 	cdiDir     string
 	driverName string
