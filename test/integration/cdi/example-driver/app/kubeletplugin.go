@@ -100,6 +100,7 @@ func (ex *examplePlugin) NodePrepareResource(ctx context.Context, req *drapbv1.N
 	}
 
 	spec := specs.Spec{
+		// TODO: clarify what version to put here (https://github.com/container-orchestrated-devices/container-device-interface/issues/60).
 		Version: "0.2.0",
 		Kind:    kind,
 		// At least one device is required and its entry must have more
@@ -123,6 +124,9 @@ func (ex *examplePlugin) NodePrepareResource(ctx context.Context, req *drapbv1.N
 		return nil, fmt.Errorf("marshal spec: %v", err)
 	}
 
+	// TODO: use a new cdi lib and its write interface once a decision
+	// about transient files has been reached (see
+	// https://github.com/container-orchestrated-devices/container-device-interface/pull/77)
 	if err := os.WriteFile(filePath, buffer, os.FileMode(0644)); err != nil {
 		return nil, fmt.Errorf("failed to write CDI file %v", err)
 	}
