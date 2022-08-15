@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pause-claim-parameters
+  namespace: default
+data:
+  a: b
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pause
+  labels:
+    name: pause
+spec:
+  containers:
+  - name: pause1
+    image: "k8s.gcr.io/pause:3.6"
+    resources:
+      claims:
+      - resource1
+  - name: pause2
+    image: "k8s.gcr.io/pause:3.6"
+    resources:
+      claims:
+      - resource2
+  resourceClaims:
+  - name: resource1
+    claim:
+      template:
+        metadata:
+          labels:
+            app: inline-resource
+        spec:
+          resourceClassName: example
+          parametersRef:
+            kind: ConfigMap
+            name: pause-claim-parameters
+  - name: resource2
+    claim:
+      template:
+        metadata:
+          labels:
+            app: inline-resource
+        spec:
+          resourceClassName: example
+          parametersRef:
+            kind: ConfigMap
+            name: pause-claim-parameters
