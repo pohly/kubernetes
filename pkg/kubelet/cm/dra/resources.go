@@ -21,6 +21,7 @@ import (
 	"sync"
 
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -41,8 +42,8 @@ type resource struct {
 	// namespace is a claim namespace
 	namespace string
 
-	// podUIDs is a map of pod UIDs that reference a resource
-	podUIDs map[types.UID]bool
+	// podUIDs is a set of pod UIDs that reference a resource
+	podUIDs sets.String
 
 	// cdiDevice is a list of CDI devices returned by the
 	// GRPC API call NodePrepareResource
@@ -57,14 +58,21 @@ func (res *resource) addPodUID(podUID types.UID) {
 	res.Lock()
 	defer res.Unlock()
 
-	res.podUIDs[podUID] = true
+	res.podUIDs.Insert(string(podUID))
+}
+
+func (res *resource) hasPodUID(podUID types.UID) bool {
+	res.Lock()
+	defer res.Unlock()
+
+	return res.podUIDs.Has(string(podUID))
 }
 
 func (res *resource) deletePodUID(podUID types.UID) {
 	res.Lock()
 	defer res.Unlock()
 
-	delete(res.podUIDs, podUID)
+	res.podUIDs.Delete(string(podUID))
 }
 
 // claimedResources is cache of processed resources keyed by namespace + claim name
