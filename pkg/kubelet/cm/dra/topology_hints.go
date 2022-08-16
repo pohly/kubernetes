@@ -31,7 +31,7 @@ func (m *ManagerImpl) GetTopologyHints(pod *v1.Pod, container *v1.Container) map
 
 	// Loop through all device resources and generate TopologyHints for them..
 	deviceHints := make(map[string][]topologymanager.TopologyHint)
-	for resourceObj, _ := range container.Resources.Limits {
+	for resourceObj := range container.Resources.Limits {
 		deviceHints[string(resourceObj)] = nil // resource doesn't have a topology preference
 	}
 
@@ -47,7 +47,7 @@ func (m *ManagerImpl) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymana
 
 	deviceHints := make(map[string][]topologymanager.TopologyHint)
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-		for resourceObj, _ := range container.Resources.Limits {
+		for resourceObj := range container.Resources.Limits {
 			deviceHints[string(resourceObj)] = nil // resource doesn't have a topology preference
 		}
 	}
