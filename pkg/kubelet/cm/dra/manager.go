@@ -141,20 +141,11 @@ func generateCDIAnnotation(claimUID types.UID, driverName string, cdiDevices []s
 // for each new resource requirement, processes their responses and updates the cached
 // containerResources on success.
 func (m *ManagerImpl) prepareContainerResources(pod *v1.Pod, container *v1.Container) error {
-	podResourcesUpdated := false
-
 	// Process resources for each resource claim referenced by container
 	for range container.Resources.Claims {
 		for _, podResourceClaim := range pod.Spec.ResourceClaims {
 			claimName := resourceclaim.Name(pod, &podResourceClaim)
 			klog.V(3).Infof("Processing resource claim %s, pod %s", claimName, pod.Name)
-
-			// Update pod resources cache to garbage collect any stranded resources
-			// before calling resource plugin APIs.
-			if !podResourcesUpdated {
-				m.UpdatePodResources()
-				podResourcesUpdated = true
-			}
 
 			if resource := m.resources.get(claimName, pod.Namespace); resource != nil {
 				// resource is already prepared, add pod UID to it
@@ -226,28 +217,6 @@ func (m *ManagerImpl) Allocate(pod *v1.Pod, container *v1.Container) error {
 		return err
 	}
 	return nil
-}
-
-// UpdateAllocatedDevices frees any Devices that are bound to terminated pods.
-func (m *ManagerImpl) UpdatePodResources() {
-	if !m.sourcesReady.AllReady() {
-		return
-	}
-
-	m.Lock()
-	defer m.Unlock()
-
-	activeAndAdmittedPods := m.activePods()
-	if m.pendingAdmissionPod != nil {
-		activeAndAdmittedPods = append(activeAndAdmittedPods, m.pendingAdmissionPod)
-	}
-
-	podUIDs := []types.UID{}
-	for _, pod := range activeAndAdmittedPods {
-		podUIDs = append(podUIDs, pod.UID)
-	}
-
-	m.resources.deletePodUIDs(podUIDs)
 }
 
 func (m *ManagerImpl) GetCDIAnnotations(pod *v1.Pod, container *v1.Container) ([]kubecontainer.Annotation, error) {
