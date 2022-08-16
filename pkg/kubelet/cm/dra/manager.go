@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/component-helpers/dra/resourceclaim"
 	"k8s.io/klog/v2"
@@ -186,7 +187,7 @@ func (m *ManagerImpl) prepareContainerResources(pod *v1.Pod, container *v1.Conta
 					claimUID:    resourceClaim.UID,
 					claimName:   resourceClaim.Name,
 					namespace:   resourceClaim.Namespace,
-					podUIDs:     map[types.UID]bool{pod.UID: true},
+					podUIDs:     sets.NewString(string(pod.UID)),
 					cdiDevice:   response.CdiDevice,
 					annotations: annotations,
 				})
@@ -250,7 +251,7 @@ func (m *ManagerImpl) UnprepareResources(pod *v1.Pod) error {
 			return fmt.Errorf("failed to get resource for namespace %s, claim %s", pod.Namespace, claimName)
 		}
 
-		if _, ok := resource.podUIDs[pod.UID]; !ok {
+		if !resource.hasPodUID(pod.UID) {
 			// skip calling NodeUnprepareResource if pod is not cached
 			continue
 		}
