@@ -30,36 +30,17 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/component-helpers/dra/resourceclaim"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	dra "k8s.io/kubernetes/pkg/kubelet/cm/dra/plugin"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
-	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
-// ManagerImpl is the structure in charge of managing Device Plugins.
+// ManagerImpl is the structure in charge of managing DRA resource Plugins.
 type ManagerImpl struct {
 	sync.Mutex
 
-	// List of NUMA Nodes available on the underlying machine
-	numaNodes []int
-
-	// Store of Topology Affinties that the Device Manager can query.
-	topologyAffinityStore topologymanager.Store
-
 	// resources contains resources referenced by pod containers
 	resources *claimedResources
-
-	// activePods is a method for listing active pods on the node
-	activePods ActivePodsFunc
-
-	// sourcesReady provides the readiness of kubelet configuration sources such as apiserver update readiness.
-	// We use it to determine when we can purge inactive pods from checkpointed state.
-	sourcesReady config.SourcesReady
-
-	// Checkpoint manager
-	checkpointdir     string
-	checkpointManager checkpointmanager.CheckpointManager
 
 	// pendingAdmissionPod contain the pod during the admission phase
 	pendingAdmissionPod *v1.Pod
@@ -68,48 +49,16 @@ type ManagerImpl struct {
 	kubeClient clientset.Interface
 }
 
-type sourcesReadyStub struct{}
-
-func (s *sourcesReadyStub) AddSource(source string) {}
-func (s *sourcesReadyStub) AllReady() bool          { return true }
-
 // NewManagerImpl creates a new manager.
 func NewManagerImpl(topology []cadvisorapi.Node, topologyAffinityStore topologymanager.Store, kubeClient clientset.Interface) (*ManagerImpl, error) {
 	klog.V(2).InfoS("Creating DRA manager")
 
-	var numaNodes []int
-	for _, node := range topology {
-		numaNodes = append(numaNodes, node.Id)
-	}
-
 	manager := &ManagerImpl{
-		resources:             newClaimedResources(),
-		numaNodes:             numaNodes,
-		topologyAffinityStore: topologyAffinityStore,
-		kubeClient:            kubeClient,
-	}
-
-	// The following structures are populated with real implementations in manager.Start()
-	// Before that, initializes them to perform no-op operations.
-	manager.activePods = func() []*v1.Pod { return []*v1.Pod{} }
-	manager.sourcesReady = &sourcesReadyStub{}
-
-	// Initialize checkpoint manager
-	var err error
-	manager.checkpointdir = DRACheckpointDir
-	manager.checkpointManager, err = checkpointmanager.NewCheckpointManager(manager.checkpointdir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize checkpoint manager: %v", err)
+		resources:  newClaimedResources(),
+		kubeClient: kubeClient,
 	}
 
 	return manager, nil
-}
-
-// Configure configures the DRA Manager and initializes
-// podResources cache from checkpointed state
-func (m *ManagerImpl) Configure(activePods ActivePodsFunc, sourcesReady config.SourcesReady) {
-	m.activePods = activePods
-	m.sourcesReady = sourcesReady
 }
 
 func (m *ManagerImpl) setPodPendingAdmission(pod *v1.Pod) {
@@ -197,7 +146,7 @@ func (m *ManagerImpl) prepareContainerResources(pod *v1.Pod, container *v1.Conta
 	return nil
 }
 
-// Allocate calls plugin NodePrepareResource from the registered device plugins.
+// Allocate calls plugin NodePrepareResource from the registered DRA resource plugins.
 func (m *ManagerImpl) Allocate(pod *v1.Pod, container *v1.Container) error {
 	// The pod is during the admission phase. We need to save the pod to avoid it
 	// being cleaned before the admission ended

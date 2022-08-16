@@ -29,28 +29,28 @@ func (m *ManagerImpl) GetTopologyHints(pod *v1.Pod, container *v1.Container) map
 	// being cleaned before the admission ended
 	m.setPodPendingAdmission(pod)
 
-	// Loop through all device resources and generate TopologyHints for them..
-	deviceHints := make(map[string][]topologymanager.TopologyHint)
+	// Loop through all container resources and generate TopologyHints for them
+	resourceHints := make(map[string][]topologymanager.TopologyHint)
 	for resourceObj := range container.Resources.Limits {
-		deviceHints[string(resourceObj)] = nil // resource doesn't have a topology preference
+		resourceHints[string(resourceObj)] = nil // resource doesn't have a topology preference
 	}
 
-	return deviceHints
+	return resourceHints
 }
 
 // GetPodTopologyHints implements the topologymanager.HintProvider Interface which
-// ensures the Device Manager is consulted when Topology Aware Hints for Pod are created.
+// ensures the DRA Manager is consulted when Topology Aware Hints for Pod are created.
 func (m *ManagerImpl) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint {
 	// The pod is during the admission phase. We need to save the pod to avoid it
 	// being cleaned before the admission ended
 	m.setPodPendingAdmission(pod)
 
-	deviceHints := make(map[string][]topologymanager.TopologyHint)
+	resourceHints := make(map[string][]topologymanager.TopologyHint)
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
 		for resourceObj := range container.Resources.Limits {
-			deviceHints[string(resourceObj)] = nil // resource doesn't have a topology preference
+			resourceHints[string(resourceObj)] = nil // resource doesn't have a topology preference
 		}
 	}
 
-	return deviceHints
+	return resourceHints
 }
