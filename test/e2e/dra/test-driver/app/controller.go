@@ -32,7 +32,7 @@ import (
 	"k8s.io/component-helpers/dra/controller"
 )
 
-func runController(ctx context.Context, clientset kubernetes.Interface, driverName string, workers int) {
+func RunController(ctx context.Context, clientset kubernetes.Interface, driverName string, workers int) {
 	driver := &exampleDriver{
 		clientset: clientset,
 	}

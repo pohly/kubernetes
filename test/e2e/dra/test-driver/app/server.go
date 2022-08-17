@@ -27,6 +27,7 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -46,6 +47,7 @@ import (
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/term"
+	"k8s.io/component-helpers/dra/kubeletplugin"
 	"k8s.io/component-helpers/dra/validation"
 	"k8s.io/component-helpers/leaderelection"
 	"k8s.io/klog/v2"
@@ -203,7 +205,7 @@ func NewCommand() *cobra.Command {
 
 	controller.RunE = func(cmd *cobra.Command, args []string) error {
 		run := func() {
-			runController(ctx, clientset, *driverName, *workers)
+			RunController(ctx, clientset, *driverName, *workers)
 		}
 
 		if !*enableLeaderElection {
@@ -260,7 +262,23 @@ func NewCommand() *cobra.Command {
 		fs.AddFlagSet(f)
 	}
 	kubeletPlugin.RunE = func(cmd *cobra.Command, args []string) error {
-		plugin, err := startPlugin(logger, *cdiDir, *driverName, *endpoint, *draAddress, *pluginRegistrationPath)
+		// Ensure that directories exist, creating them if necessary. We want
+		// to know early if there is a setup problem that would prevent
+		// creating those directories.
+		if err := os.MkdirAll(*cdiDir, os.FileMode(0750)); err != nil {
+			return fmt.Errorf("create CDI directory: %v", err)
+		}
+		if err := os.MkdirAll(filepath.Dir(*endpoint), 0750); err != nil {
+			return fmt.Errorf("create socket directory: %v", err)
+		}
+
+		driverEndpoint := kubeletplugin.Endpoint{
+			Address: *endpoint,
+		}
+		pluginRegistrationEndpoint := kubeletplugin.Endpoint{
+			Address: path.Join(*pluginRegistrationPath, *driverName+"-reg.sock"),
+		}
+		plugin, err := StartPlugin(logger, *cdiDir, *driverName, driverEndpoint, *draAddress, pluginRegistrationEndpoint, FileOperations{})
 		if err != nil {
 			return fmt.Errorf("start example plugin: %v", err)
 		}
@@ -272,7 +290,7 @@ func NewCommand() *cobra.Command {
 		logger.Info("Waiting for signal.")
 		sig := <-sigc
 		logger.Info("Received signal, shutting down.", "signal", sig)
-		plugin.stop()
+		plugin.Stop()
 		return nil
 	}
 	cmd.AddCommand(kubeletPlugin)

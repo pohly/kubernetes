@@ -29,40 +29,55 @@ import (
 	drapbv1 "k8s.io/kubelet/pkg/apis/dra/v1alpha1"
 )
 
-type examplePlugin struct {
-	logger klog.Logger
-	d      kubeletplugin.DRAPlugin
+type ExamplePlugin struct {
+	logger  klog.Logger
+	d       kubeletplugin.DRAPlugin
+	fileOps FileOperations
 
 	cdiDir     string
 	driverName string
 }
 
-var _ drapbv1.NodeServer = &examplePlugin{}
+var _ drapbv1.NodeServer = &ExamplePlugin{}
 
 // getJSONFilePath returns the absolute path where CDI file is/should be.
-func (ex *examplePlugin) getJSONFilePath(claimUID string) string {
+func (ex *ExamplePlugin) getJSONFilePath(claimUID string) string {
 	return filepath.Join(ex.cdiDir, fmt.Sprintf("%s-%s.json", ex.driverName, claimUID))
 }
 
-// startPlugin sets up the servers that are necessary for a DRA kubelet plugin.
-func startPlugin(logger klog.Logger, cdiDir, driverName, endpoint, draAddress, pluginRegistrationPath string) (*examplePlugin, error) {
-	ex := &examplePlugin{
+// FileOperations defines optional callbacks for handling CDI files.
+type FileOperations struct {
+	// Create must overwrite the file.
+	Create func(name string, content []byte) error
+
+	// Remove must remove the file. It must not return an error when the
+	// file does not exist.
+	Remove func(name string) error
+}
+
+// StartPlugin sets up the servers that are necessary for a DRA kubelet plugin.
+func StartPlugin(logger klog.Logger, cdiDir, driverName string, endpoint kubeletplugin.Endpoint, draAddress string, pluginRegistrationEndpoint kubeletplugin.Endpoint, fileOps FileOperations) (*ExamplePlugin, error) {
+	if fileOps.Create == nil {
+		fileOps.Create = func(name string, content []byte) error {
+			return os.WriteFile(name, content, os.FileMode(0644))
+		}
+	}
+	if fileOps.Remove == nil {
+		fileOps.Remove = func(name string) error {
+			if err := os.Remove(name); err != nil && !os.IsNotExist(err) {
+				return err
+			}
+			return nil
+		}
+	}
+	ex := &ExamplePlugin{
 		logger:     logger,
+		fileOps:    fileOps,
 		cdiDir:     cdiDir,
 		driverName: driverName,
 	}
 
-	// Ensure that directories exist, creating them if necessary. We want
-	// to know early if there is a setup problem that would prevent
-	// creating those directories.
-	if err := os.MkdirAll(ex.cdiDir, os.FileMode(0750)); err != nil {
-		return nil, fmt.Errorf("create CDI directory: %v", err)
-	}
-	if err := os.MkdirAll(filepath.Dir(endpoint), 0750); err != nil {
-		return nil, fmt.Errorf("create socket directory: %v", err)
-	}
-
-	d, err := kubeletplugin.Start(ex.logger, driverName, endpoint, draAddress, pluginRegistrationPath, ex)
+	d, err := kubeletplugin.Start(ex.logger, driverName, endpoint, draAddress, pluginRegistrationEndpoint, ex)
 	if err != nil {
 		return nil, fmt.Errorf("start kubelet plugin: %v", err)
 	}
@@ -72,15 +87,23 @@ func startPlugin(logger klog.Logger, cdiDir, driverName, endpoint, draAddress, p
 }
 
 // stop ensures that all servers are stopped and resources freed.
-func (ex *examplePlugin) stop() {
+func (ex *ExamplePlugin) Stop() {
 	ex.d.Stop()
+}
+
+func (ex *ExamplePlugin) IsRegistered() bool {
+	status := ex.d.RegistrationStatus()
+	if status == nil {
+		return false
+	}
+	return status.PluginRegistered
 }
 
 // NodePrepareResource ensures that the CDI file for the claim exists. It uses
 // a deterministic name to simplify NodeUnprepareResource (no need to remember
 // or discover the name) and idempotency (when called again, the file simply
 // gets written again).
-func (ex *examplePlugin) NodePrepareResource(ctx context.Context, req *drapbv1.NodePrepareResourceRequest) (*drapbv1.NodePrepareResourceResponse, error) {
+func (ex *ExamplePlugin) NodePrepareResource(ctx context.Context, req *drapbv1.NodePrepareResourceRequest) (*drapbv1.NodePrepareResourceResponse, error) {
 	logger := klog.FromContext(ctx)
 
 	// Determine environment variables.
@@ -125,7 +148,7 @@ func (ex *examplePlugin) NodePrepareResource(ctx context.Context, req *drapbv1.N
 	// TODO: use a new cdi lib and its write interface once a decision
 	// about transient files has been reached (see
 	// https://github.com/container-orchestrated-devices/container-device-interface/pull/77)
-	if err := os.WriteFile(filePath, buffer, os.FileMode(0644)); err != nil {
+	if err := ex.fileOps.Create(filePath, buffer); err != nil {
 		return nil, fmt.Errorf("failed to write CDI file %v", err)
 	}
 
@@ -139,11 +162,11 @@ func (ex *examplePlugin) NodePrepareResource(ctx context.Context, req *drapbv1.N
 // NodeUnprepareResource removes the CDI file created by
 // NodePrepareResource. It's idempotent, therefore it is not an error when that
 // file is already gone.
-func (ex *examplePlugin) NodeUnprepareResource(ctx context.Context, req *drapbv1.NodeUnprepareResourceRequest) (*drapbv1.NodeUnprepareResourceResponse, error) {
+func (ex *ExamplePlugin) NodeUnprepareResource(ctx context.Context, req *drapbv1.NodeUnprepareResourceRequest) (*drapbv1.NodeUnprepareResourceResponse, error) {
 	logger := klog.FromContext(ctx)
 
 	filePath := ex.getJSONFilePath(req.ClaimUid)
-	if err := os.Remove(filePath); err != nil && !os.IsNotExist(err) {
+	if err := ex.fileOps.Remove(filePath); err != nil {
 		return nil, fmt.Errorf("error removing CDI file: %v", err)
 	}
 	logger.V(3).Info("CDI file removed", "path", filePath)
