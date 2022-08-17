@@ -149,7 +149,7 @@ func (m *ManagerImpl) prepareContainerResources(pod *v1.Pod, container *v1.Conta
 
 			if resource := m.resources.get(claimName, pod.Namespace); resource != nil {
 				// resource is already prepared, add pod UID to it
-				m.resources.addPodUID(claimName, pod.Namespace, pod.UID)
+				resource.addPodUID(pod.UID)
 				continue
 			}
 
@@ -256,7 +256,7 @@ func (m *ManagerImpl) UnprepareResources(pod *v1.Pod) error {
 		}
 
 		// Delete pod UID from the cache
-		m.resources.deletePodUIDs([]types.UID{pod.UID})
+		resource.deletePodUID(pod.UID)
 
 		if len(resource.podUIDs) > 0 {
 			// skip calling NodeUnprepareResource if this is not the latest pod
