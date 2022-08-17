@@ -31,30 +31,46 @@ import (
 type grpcServer struct {
 	logger    klog.Logger
 	wg        sync.WaitGroup
-	endpoint  string
+	endpoint  Endpoint
 	server    *grpc.Server
 	requestID int64
 }
 
 type registerService func(s *grpc.Server)
 
+// Endpoint defines where to listen for incoming connections.
+//
+// If the listener is not set, a new listener for a Unix domain socket gets
+// created for the address. The listener will get closed.
+//
+// If the address is non-empty, then the socket will get removed when shutting
+// down, regardless of who created the listener.
+type Endpoint struct {
+	Address  string
+	Listener net.Listener
+}
+
 // startGRPCServer sets up the GRPC server on a Unix domain socket and spawns a goroutine
 // which handles requests for arbitrary services.
-func startGRPCServer(logger klog.Logger, endpoint string, services ...registerService) (*grpcServer, error) {
+func startGRPCServer(logger klog.Logger, endpoint Endpoint, services ...registerService) (*grpcServer, error) {
 	s := &grpcServer{
 		logger:   logger,
 		endpoint: endpoint,
 	}
 
-	// Remove any (probably stale) existing socket.
-	if err := os.Remove(endpoint); err != nil && !os.IsNotExist(err) {
-		return nil, fmt.Errorf("remove Unix domain socket: %v", err)
-	}
+	listener := endpoint.Listener
+	if listener == nil {
+		// Remove any (probably stale) existing socket.
+		if err := os.Remove(endpoint.Address); err != nil && !os.IsNotExist(err) {
+			return nil, fmt.Errorf("remove Unix domain socket: %v", err)
+		}
 
-	// Now we can use the endpoint for listening.
-	listener, err := net.Listen("unix", endpoint)
-	if err != nil {
-		return nil, fmt.Errorf("listen on %q: %v", endpoint, err)
+		// Now we can use the endpoint for listening.
+		l, err := net.Listen("unix", endpoint.Address)
+		if err != nil {
+			return nil, fmt.Errorf("listen on %q: %v", endpoint.Address, err)
+		}
+		listener = l
 	}
 
 	// Run a gRPC server. It will close the listening socket when
@@ -73,11 +89,11 @@ func startGRPCServer(logger klog.Logger, endpoint string, services ...registerSe
 		if err != nil {
 			logger.Error(err, "GRPC server failed")
 		} else {
-			logger.V(5).Info("GRPC server terminated gracefully")
+			logger.V(3).Info("GRPC server terminated gracefully")
 		}
 	}()
 
-	logger.Info("GRPC server started", "endpoint", endpoint)
+	logger.Info("GRPC server started")
 	return s, nil
 }
 
@@ -88,7 +104,7 @@ func (s *grpcServer) interceptor(ctx context.Context, req interface{}, info *grp
 	requestID := atomic.AddInt64(&s.requestID, 1)
 	logger := klog.LoggerWithValues(s.logger, "requestID", requestID)
 	ctx = klog.NewContext(ctx, logger)
-	logger.V(5).Info("handling request", "request", req)
+	logger.V(4).Info("handling request", "request", req)
 	defer func() {
 		if r := recover(); r != nil {
 			logger.Error(nil, "handling request panicked", "panic", r)
@@ -99,7 +115,7 @@ func (s *grpcServer) interceptor(ctx context.Context, req interface{}, info *grp
 	if err != nil {
 		logger.Error(err, "handling request failed", "request", req)
 	} else {
-		logger.V(5).Info("handling request succeeded", "response", resp)
+		logger.V(4).Info("handling request succeeded", "response", resp)
 	}
 	return
 }
@@ -115,8 +131,10 @@ func (s *grpcServer) stop() {
 	}
 	s.wg.Wait()
 	s.server = nil
-	if err := os.Remove(s.endpoint); err != nil && !os.IsNotExist(err) {
-		s.logger.Error(err, "remove Unix socket")
+	if s.endpoint.Address != "" {
+		if err := os.Remove(s.endpoint.Address); err != nil && !os.IsNotExist(err) {
+			s.logger.Error(err, "remove Unix socket")
+		}
 	}
-	s.logger.Info("GRPC server stopped")
+	s.logger.V(3).Info("GRPC server stopped")
 }
