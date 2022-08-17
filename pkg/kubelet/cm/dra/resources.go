@@ -27,6 +27,8 @@ import (
 // resource contains resource attributes required
 // to prepare and unprepare the resource
 type resource struct {
+	sync.Mutex
+
 	// name of the DRA driver
 	driverName string
 
@@ -49,6 +51,20 @@ type resource struct {
 	// annotations is a list of container annotations associated with
 	// a prepared resource
 	annotations []kubecontainer.Annotation
+}
+
+func (res *resource) addPodUID(podUID types.UID) {
+	res.Lock()
+	defer res.Unlock()
+
+	res.podUIDs[podUID] = true
+}
+
+func (res *resource) deletePodUID(podUID types.UID) {
+	res.Lock()
+	defer res.Unlock()
+
+	delete(res.podUIDs, podUID)
 }
 
 // claimedResources is cache of processed resources keyed by namespace + claim name
@@ -76,24 +92,6 @@ func (cres *claimedResources) add(claim, namespace string, res *resource) error 
 	return nil
 }
 
-func (cres *claimedResources) addPodUID(claimName, namespace string, podUID types.UID) error {
-	cres.Lock()
-	defer cres.Unlock()
-
-	resource := cres.resources[claimName+namespace]
-	if resource == nil {
-		return fmt.Errorf("claim %s, namespace %s is not cached", claimName, namespace)
-	}
-
-	if _, ok := resource.podUIDs[podUID]; ok {
-		return fmt.Errorf("pod uid %s is already cached for the claim %s, namespace %s", podUID, claimName, namespace)
-	}
-
-	resource.podUIDs[podUID] = true
-
-	return nil
-}
-
 func (cres *claimedResources) get(claimName, namespace string) *resource {
 	cres.RLock()
 	defer cres.RUnlock()
@@ -106,15 +104,4 @@ func (cres *claimedResources) delete(claimName, namespace string) {
 	defer cres.Unlock()
 
 	delete(cres.resources, claimName+namespace)
-}
-
-func (cres *claimedResources) deletePodUIDs(podUIDs []types.UID) {
-	cres.Lock()
-	defer cres.Unlock()
-
-	for _, resource := range cres.resources {
-		for _, podUID := range podUIDs {
-			delete(resource.podUIDs, podUID)
-		}
-	}
 }
