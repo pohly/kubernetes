@@ -18,7 +18,6 @@ package kubeletplugin
 
 import (
 	"fmt"
-	"path"
 
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
@@ -32,7 +31,7 @@ type nodeRegistrar struct {
 }
 
 // startRegistrar returns a running instance.
-func startRegistrar(logger klog.Logger, driverName string, endpoint string, pluginRegistrationPath string) (*nodeRegistrar, error) {
+func startRegistrar(logger klog.Logger, driverName string, endpoint string, pluginRegistrationEndpoint Endpoint) (*nodeRegistrar, error) {
 	n := &nodeRegistrar{
 		logger: logger,
 		registrationServer: registrationServer{
@@ -41,8 +40,7 @@ func startRegistrar(logger klog.Logger, driverName string, endpoint string, plug
 			supportedVersions: []string{"1.0.0"}, // TODO: is this correct?
 		},
 	}
-	socketPath := path.Join(pluginRegistrationPath, driverName+"-reg.sock")
-	s, err := startGRPCServer(logger, socketPath, func(grpcServer *grpc.Server) {
+	s, err := startGRPCServer(logger, pluginRegistrationEndpoint, func(grpcServer *grpc.Server) {
 		registerapi.RegisterRegistrationServer(grpcServer, n)
 	})
 	if err != nil {

@@ -23,12 +23,17 @@ import (
 	"k8s.io/klog/v2"
 
 	drapbv1 "k8s.io/kubelet/pkg/apis/dra/v1alpha1"
+	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 )
 
 type DRAPlugin interface {
 	// Stop ensures that all spawned goroutines are stopped and frees
 	// resources.
 	Stop()
+
+	// RegistrationStatus returns the result of registration, nil if none
+	// received yet.
+	RegistrationStatus() *registerapi.RegistrationStatus
 
 	// This unexported method ensures that we can modify the interface
 	// without causing an API break of the package
@@ -45,7 +50,7 @@ type draPlugin struct {
 
 // Start sets up two gRPC servers (one for registration, one for the DRA node
 // client).
-func Start(logger klog.Logger, driverName, endpoint, draAddress, pluginRegistrationPath string, nodeServer drapbv1.NodeServer) (result DRAPlugin, finalErr error) {
+func Start(logger klog.Logger, driverName string, endpoint Endpoint, draAddress string, pluginRegistrationEndpoint Endpoint, nodeServer drapbv1.NodeServer) (result DRAPlugin, finalErr error) {
 	d := &draPlugin{}
 
 	// Run the node plugin gRPC server first to ensure that it is ready.
@@ -64,7 +69,7 @@ func Start(logger klog.Logger, driverName, endpoint, draAddress, pluginRegistrat
 	}()
 
 	// Now make it available to kubelet.
-	registrar, err := startRegistrar(klog.LoggerWithName(logger, "registrar"), driverName, draAddress, pluginRegistrationPath)
+	registrar, err := startRegistrar(klog.LoggerWithName(logger, "registrar"), driverName, draAddress, pluginRegistrationEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("start registrar: %v", err)
 	}
@@ -79,6 +84,13 @@ func (d *draPlugin) Stop() {
 	}
 	d.registrar.stop()
 	d.plugin.stop()
+}
+
+func (d *draPlugin) RegistrationStatus() *registerapi.RegistrationStatus {
+	if d.registrar == nil {
+		return nil
+	}
+	return d.registrar.status
 }
 
 func (d *draPlugin) internal() {}

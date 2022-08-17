@@ -28,12 +28,13 @@ type registrationServer struct {
 	driverName        string
 	endpoint          string
 	supportedVersions []string
+	status            *registerapi.RegistrationStatus
 }
 
-var _ registerapi.RegistrationServer = registrationServer{}
+var _ registerapi.RegistrationServer = &registrationServer{}
 
 // GetInfo is the RPC invoked by plugin watcher.
-func (e registrationServer) GetInfo(ctx context.Context, req *registerapi.InfoRequest) (*registerapi.PluginInfo, error) {
+func (e *registrationServer) GetInfo(ctx context.Context, req *registerapi.InfoRequest) (*registerapi.PluginInfo, error) {
 	return &registerapi.PluginInfo{
 		Type:              registerapi.DRAPlugin,
 		Name:              e.driverName,
@@ -43,7 +44,8 @@ func (e registrationServer) GetInfo(ctx context.Context, req *registerapi.InfoRe
 }
 
 // NotifyRegistrationStatus is the RPC invoked by plugin watcher.
-func (e registrationServer) NotifyRegistrationStatus(ctx context.Context, status *registerapi.RegistrationStatus) (*registerapi.RegistrationStatusResponse, error) {
+func (e *registrationServer) NotifyRegistrationStatus(ctx context.Context, status *registerapi.RegistrationStatus) (*registerapi.RegistrationStatusResponse, error) {
+	e.status = status
 	if !status.PluginRegistered {
 		return nil, fmt.Errorf("failed registration process: %+v", status.Error)
 	}
