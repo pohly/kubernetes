@@ -164,6 +164,7 @@ func (d *Driver) SetUp() {
 					return d.removeFile(&pod, name)
 				},
 			},
+			kubeletplugin.GRPCVerbosity(0),
 			kubeletplugin.PluginListener(listen(ctx, d.f, pod.Name, "plugin", 9001)),
 			kubeletplugin.RegistrarListener(listen(ctx, d.f, pod.Name, "registrar", 9000)),
 			kubeletplugin.KubeletPluginSocketPath(draAddr),
