@@ -18,6 +18,8 @@ package kubeletplugin
 
 import (
 	"fmt"
+	"net"
+	"errors"
 
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
@@ -26,6 +28,8 @@ import (
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 )
 
+// DRAPlugin gets returned by Start and defines the public API of the generic
+// dynamic resource allocation plugin.
 type DRAPlugin interface {
 	// Stop ensures that all spawned goroutines are stopped and frees
 	// resources.
@@ -41,6 +45,95 @@ type DRAPlugin interface {
 	internal()
 }
 
+// Option implements the functional options pattern for Start.
+type Option func(o *options) error
+
+// DriverName defines the driver name for the dynamic resource allocation driver.
+// Must be set.
+func DriverName(driverName string) Option {
+	return func(o *options) error {
+		o.driverName = driverName
+		return nil
+	}
+}
+
+// Logger overrides the default klog.Background logger.
+func Logger(logger klog.Logger) Option {
+	return func(o *options) error {
+		o.logger = logger
+		return nil
+	}
+}
+
+// RegistrarSocketPath sets the file path for a Unix domain socket.
+// If RegistrarListener is not used, then Start will remove
+// a file at that path, should one exist, and creates a socket
+// itself. Otherwise it uses the provided listener and only
+// removes the socket at the specified path during shutdown.
+//
+// At least one of these two options is required.
+func RegistrarSocketPath(path string) Option {
+	return func(o *options) error {
+		o.pluginRegistrationEndpoint.path = path
+		return nil
+	}
+}
+
+// RegistrarListener sets an already created listener for the plugin
+// registrarion API. Can be combined with RegistrarSocketPath.
+//
+// At least one of these two options is required.
+func RegistrarListener(listener net.Listener) Option {
+	return func(o *options) error {
+		o.pluginRegistrationEndpoint.listener = listener
+		return nil
+	}
+}
+
+// PluginSocketPath sets the file path for a Unix domain socket.
+// If PluginListener is not used, then Start will remove
+// a file at that path, should one exist, and creates a socket
+// itself. Otherwise it uses the provided listener and only
+// removes the socket at the specified path during shutdown.
+//
+// At least one of these two options is required.
+func PluginSocketPath(path string) Option {
+	return func(o *options) error {
+		o.draEndpoint.path = path
+		return nil
+	}
+}
+
+// PluginListener sets an already created listener for the dynamic resource
+// allocation plugin API. Can be combined with PluginSocketPath.
+//
+// At least one of these two options is required.
+func PluginListener(listener net.Listener) Option {
+	return func(o *options) error {
+		o.draEndpoint.listener = listener
+		return nil
+	}
+}
+
+// KubeletPluginSocketPath defines how kubelet will connect to the dynamic
+// resource allocation plugin. This corresponds to PluginSocketPath, except
+// that PluginSocketPath defines the path in the filesystem of the caller and
+// KubeletPluginSocketPath in the filesystem of kubelet.
+func KubeletPluginSocketPath(path string) Option {
+	return func(o *options) error {
+		o.draAddress = path
+		return nil
+	}
+}
+
+type options struct {
+	logger klog.Logger
+	driverName string
+	draEndpoint endpoint
+	draAddress string
+	pluginRegistrationEndpoint endpoint
+}
+
 // draPlugin combines the kubelet registration service and the DRA node plugin
 // service.
 type draPlugin struct {
@@ -50,11 +143,34 @@ type draPlugin struct {
 
 // Start sets up two gRPC servers (one for registration, one for the DRA node
 // client).
-func Start(logger klog.Logger, driverName string, endpoint Endpoint, draAddress string, pluginRegistrationEndpoint Endpoint, nodeServer drapbv1.NodeServer) (result DRAPlugin, finalErr error) {
+func Start(nodeServer drapbv1.NodeServer, opts ...Option) (result DRAPlugin, finalErr error) {
 	d := &draPlugin{}
 
+	o := options{
+		logger: klog.Background(),
+	}
+	for _, option := range opts {
+		if err := option(&o); err != nil {
+			return nil, err
+		}
+	}
+
+	if o.driverName == "" {
+		return nil, errors.New("driver name must be set")
+	}
+	if o.draAddress == "" {
+		return nil, errors.New("DRA address must be set")
+	}
+	var emptyEndpoint endpoint
+	if o.draEndpoint == emptyEndpoint {
+		return nil, errors.New("a Unix domain socket path and/or listener must be set for the kubelet plugin")
+	}
+	if o.pluginRegistrationEndpoint == emptyEndpoint {
+		return nil, errors.New("a Unix domain socket path and/or listener must be set for the registrar")
+	}
+
 	// Run the node plugin gRPC server first to ensure that it is ready.
-	plugin, err := startGRPCServer(klog.LoggerWithName(logger, "dra"), endpoint, func(grpcServer *grpc.Server) {
+	plugin, err := startGRPCServer(klog.LoggerWithName(o.logger, "dra"), o.draEndpoint, func(grpcServer *grpc.Server) {
 		drapbv1.RegisterNodeServer(grpcServer, nodeServer)
 	})
 	if err != nil {
@@ -63,13 +179,17 @@ func Start(logger klog.Logger, driverName string, endpoint Endpoint, draAddress 
 	d.plugin = plugin
 	defer func() {
 		// Clean up if we didn't finish succcessfully.
+		if r := recover(); r != nil {
+			plugin.stop()
+			panic(r)
+		}
 		if finalErr != nil {
 			plugin.stop()
 		}
 	}()
 
 	// Now make it available to kubelet.
-	registrar, err := startRegistrar(klog.LoggerWithName(logger, "registrar"), driverName, draAddress, pluginRegistrationEndpoint)
+	registrar, err := startRegistrar(klog.LoggerWithName(o.logger, "registrar"), o.driverName, o.draAddress, o.pluginRegistrationEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("start registrar: %v", err)
 	}

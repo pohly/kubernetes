@@ -31,44 +31,45 @@ import (
 type grpcServer struct {
 	logger    klog.Logger
 	wg        sync.WaitGroup
-	endpoint  Endpoint
+	endpoint  endpoint
 	server    *grpc.Server
 	requestID int64
 }
 
 type registerService func(s *grpc.Server)
 
-// Endpoint defines where to listen for incoming connections.
+// endpoint defines where to listen for incoming connections.
+// The listener always gets closed when shutting down.
 //
 // If the listener is not set, a new listener for a Unix domain socket gets
-// created for the address. The listener will get closed.
+// created at the path.
 //
-// If the address is non-empty, then the socket will get removed when shutting
+// If the path is non-empty, then the socket will get removed when shutting
 // down, regardless of who created the listener.
-type Endpoint struct {
-	Address  string
-	Listener net.Listener
+type endpoint struct {
+	path  string
+	listener net.Listener
 }
 
 // startGRPCServer sets up the GRPC server on a Unix domain socket and spawns a goroutine
 // which handles requests for arbitrary services.
-func startGRPCServer(logger klog.Logger, endpoint Endpoint, services ...registerService) (*grpcServer, error) {
+func startGRPCServer(logger klog.Logger, endpoint endpoint, services ...registerService) (*grpcServer, error) {
 	s := &grpcServer{
 		logger:   logger,
 		endpoint: endpoint,
 	}
 
-	listener := endpoint.Listener
+	listener := endpoint.listener
 	if listener == nil {
 		// Remove any (probably stale) existing socket.
-		if err := os.Remove(endpoint.Address); err != nil && !os.IsNotExist(err) {
+		if err := os.Remove(endpoint.path); err != nil && !os.IsNotExist(err) {
 			return nil, fmt.Errorf("remove Unix domain socket: %v", err)
 		}
 
 		// Now we can use the endpoint for listening.
-		l, err := net.Listen("unix", endpoint.Address)
+		l, err := net.Listen("unix", endpoint.path)
 		if err != nil {
-			return nil, fmt.Errorf("listen on %q: %v", endpoint.Address, err)
+			return nil, fmt.Errorf("listen on %q: %v", endpoint.path, err)
 		}
 		listener = l
 	}
@@ -131,8 +132,8 @@ func (s *grpcServer) stop() {
 	}
 	s.wg.Wait()
 	s.server = nil
-	if s.endpoint.Address != "" {
-		if err := os.Remove(s.endpoint.Address); err != nil && !os.IsNotExist(err) {
+	if s.endpoint.path != "" {
+		if err := os.Remove(s.endpoint.path); err != nil && !os.IsNotExist(err) {
 			s.logger.Error(err, "remove Unix socket")
 		}
 	}

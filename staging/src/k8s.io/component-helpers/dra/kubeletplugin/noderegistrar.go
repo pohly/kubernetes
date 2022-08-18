@@ -31,7 +31,7 @@ type nodeRegistrar struct {
 }
 
 // startRegistrar returns a running instance.
-func startRegistrar(logger klog.Logger, driverName string, endpoint string, pluginRegistrationEndpoint Endpoint) (*nodeRegistrar, error) {
+func startRegistrar(logger klog.Logger, driverName string, endpoint string, pluginRegistrationEndpoint endpoint) (*nodeRegistrar, error) {
 	n := &nodeRegistrar{
 		logger: logger,
 		registrationServer: registrationServer{
