@@ -18,6 +18,7 @@ package dra
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -31,8 +32,14 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
+const (
+	// podStartTimeout is how long to wait for the pod to be started.
+	podStartTimeout = 5 * time.Minute
+)
+
 var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", func() {
 	f := framework.NewDefaultFramework("dra")
+	ctx := context.Background()
 
 	// The driver containers have to run with sufficient privileges to
 	// modify /var/lib/kubelet/plugins.
@@ -41,74 +48,58 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 	// Additional nesting is needed to ensure that the framework and driver
 	// instances get created and deleted in the right order (see
 	// https://github.com/onsi/ginkgo/issues/1022).
-	ginkgo.Context("", func() {
-		var (
-			ctx    = context.Background()
-			driver = NewDriver(f, 1, 1 /* nodes */) // All tests get their own driver instance.
-			b      = &builder{f: f, driver: driver}
-		)
+	ginkgo.Context("kubelet", func() {
+		var driver = NewDriver(f, 1, 1 /* nodes */) // All tests get their own driver instance.
 
 		ginkgo.Context("", func() {
-			ginkgo.BeforeEach(func() {
-				b.create(ctx, b.class())
+			var b = newBuilder(f, driver)
+
+			ginkgo.It("registers plugin", func() {
+				// If we got here, the driver is running.
 			})
 
-			ginkgo.AfterEach(func() {
-				err := f.ClientSet.CoreV1().ResourceClasses().Delete(ctx, b.className(), metav1.DeleteOptions{})
-				framework.ExpectNoError(err, "delete resource class")
+			ginkgo.It("supports simple pod", func() {
+				parameters := b.resourceClaimParameters()
+				pod := b.podInline()
+				b.create(ctx, parameters, pod)
 
-				// Before we allow the namespace and all objects in it
-				// do be deleted by the framework, we must ensure that
-				// test pods and the claims that they use are
-				// deleted. Otherwise the driver might get deleted
-				// first, in which case deleting the claims won't work
-				// anymore.
-				gomega.Eventually(func(g gomega.Gomega) {
-					pods, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(ctx, metav1.ListOptions{})
-					g.Expect(err).NotTo(gomega.HaveOccurred(), "list pods")
-					for _, pod := range pods.Items {
-						if pod.DeletionTimestamp != nil ||
-							pod.Labels["app.kubernetes.io/part-of"] == "dra-test-driver" {
-							continue
-						}
-						err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(ctx, pod.Name, metav1.DeleteOptions{})
-						g.Expect(err).NotTo(gomega.HaveOccurred(), "delete pod")
-					}
+				err := e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace)
+				framework.ExpectNoError(err, "start pod with inline resource claim")
 
-					claims, err := f.ClientSet.CoreV1().ResourceClaims(f.Namespace.Name).List(ctx, metav1.ListOptions{})
-					for _, claim := range claims.Items {
-						if claim.DeletionTimestamp != nil {
-							continue
-						}
-						err := f.ClientSet.CoreV1().ResourceClaims(f.Namespace.Name).Delete(ctx, claim.Name, metav1.DeleteOptions{})
-						g.Expect(err).NotTo(gomega.HaveOccurred(), "delete claim")
-					}
-
-					g.Expect(claims.Items).To(gomega.BeEmpty(), "all resource claims removed")
-				}).WithTimeout(5*time.Minute).WithPolling(time.Second).Should(gomega.Succeed(), "clean up")
+				log, err := e2epod.GetPodLogs(f.ClientSet, pod.Namespace, pod.Name, pod.Spec.Containers[0].Name)
+				var envStr string
+				for key, value := range b.resourceClaimParametersEnv() {
+					envStr = fmt.Sprintf("\nuser_%s=%s\n", key, value)
+					break
+				}
+				gomega.Expect(log).To(gomega.ContainSubstring(envStr), "container env variables")
 			})
 
-			ginkgo.Describe("kubelet", func() {
-				ginkgo.It("registers plugin", func() {
-					// If we got here, the driver is running.
-				})
+			ginkgo.It("must retry NodePrepareResource", func() {
+				// We have exactly one host.
+				m := MethodInstance{driver.Hostnames()[0], NodePrepareResourceMethod}
 
-				ginkgo.It("supports simple pod", func() {
-					parameters := b.resourceClaimParameters()
-					pod := b.podInline()
-					b.create(ctx, parameters, pod)
+				driver.Fail(m, true)
 
-					err := e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace)
-					framework.ExpectNoError(err, "start pod with inline resource claim")
-
-					log, err := e2epod.GetPodLogs(f.ClientSet, pod.Namespace, pod.Name, pod.Spec.Containers[0].Name)
-					var envStr string
-					for key, value := range b.resourceClaimParametersEnv() {
-						envStr = fmt.Sprintf("\nuser_%s=%s\n", key, value)
-						break
+				ginkgo.By("waiting for container startup to fail")
+				parameters := b.resourceClaimParameters()
+				pod := b.podInline()
+				b.create(ctx, parameters, pod)
+				gomega.Eventually(func() error {
+					if driver.CallCount(m) == 0 {
+						return errors.New("NodePrepareResource not called yet")
 					}
-					gomega.Expect(log).To(gomega.ContainSubstring(envStr), "container env variables")
-				})
+					return nil
+				}).WithTimeout(podStartTimeout).Should(gomega.Succeed())
+
+				ginkgo.By("allowing container startup to succeed")
+				callCount := driver.CallCount(m)
+				driver.Fail(m, false)
+				err := e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace)
+				framework.ExpectNoError(err, "start pod with inline resource claim")
+				if driver.CallCount(m) == callCount {
+					framework.Fail("NodePrepareResource should have been called again")
+				}
 			})
 		})
 	})
@@ -217,4 +208,54 @@ func (b *builder) create(ctx context.Context, objs ...interface{}) {
 		}
 		framework.ExpectNoErrorWithOffset(1, err, "create %T", obj)
 	}
+}
+
+func newBuilder(f *framework.Framework, driver *Driver) *builder {
+	b := &builder{f: f, driver: driver}
+
+	ginkgo.BeforeEach(b.setUp)
+	ginkgo.AfterEach(b.tearDown)
+
+	return b
+}
+
+func (b *builder) setUp() {
+	b.create(context.Background(), b.class())
+}
+
+func (b *builder) tearDown() {
+	ctx := context.Background()
+
+	err := b.f.ClientSet.CoreV1().ResourceClasses().Delete(ctx, b.className(), metav1.DeleteOptions{})
+	framework.ExpectNoError(err, "delete resource class")
+
+	// Before we allow the namespace and all objects in it
+	// do be deleted by the framework, we must ensure that
+	// test pods and the claims that they use are
+	// deleted. Otherwise the driver might get deleted
+	// first, in which case deleting the claims won't work
+	// anymore.
+	gomega.Eventually(func(g gomega.Gomega) {
+		pods, err := b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).List(ctx, metav1.ListOptions{})
+		g.Expect(err).NotTo(gomega.HaveOccurred(), "list pods")
+		for _, pod := range pods.Items {
+			if pod.DeletionTimestamp != nil ||
+				pod.Labels["app.kubernetes.io/part-of"] == "dra-test-driver" {
+				continue
+			}
+			err := b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).Delete(ctx, pod.Name, metav1.DeleteOptions{})
+			g.Expect(err).NotTo(gomega.HaveOccurred(), "delete pod")
+		}
+
+		claims, err := b.f.ClientSet.CoreV1().ResourceClaims(b.f.Namespace.Name).List(ctx, metav1.ListOptions{})
+		for _, claim := range claims.Items {
+			if claim.DeletionTimestamp != nil {
+				continue
+			}
+			err := b.f.ClientSet.CoreV1().ResourceClaims(b.f.Namespace.Name).Delete(ctx, claim.Name, metav1.DeleteOptions{})
+			g.Expect(err).NotTo(gomega.HaveOccurred(), "delete claim")
+		}
+
+		g.Expect(claims.Items).To(gomega.BeEmpty(), "all resource claims removed")
+	}).WithTimeout(5*time.Minute).WithPolling(time.Second).Should(gomega.Succeed(), "clean up")
 }

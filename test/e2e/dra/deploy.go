@@ -19,6 +19,7 @@ package dra
 import (
 	"bytes"
 	"context"
+	"errors"
 	"net"
 	"path"
 	"sort"
@@ -27,6 +28,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"google.golang.org/grpc"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -44,6 +46,11 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
+const (
+	NodePrepareResourceMethod   = "/v1alpha1.Node/NodePrepareResource"
+	NodeUnprepareResourceMethod = "/v1alpha1.Node/NodeUnprepareResource"
+)
+
 // NewDriver sets up controller (as client of the cluster) and
 // kubelet plugin (via proxy) before the test runs. It cleans
 // up after the test.
@@ -54,9 +61,11 @@ import (
 // that our AfterEach callback gets invoked.
 func NewDriver(f *framework.Framework, minNodes, maxNodes int) *Driver {
 	d := &Driver{
-		f:        f,
-		minNodes: minNodes,
-		maxNodes: maxNodes,
+		f:          f,
+		minNodes:   minNodes,
+		maxNodes:   maxNodes,
+		fail:       map[MethodInstance]bool{},
+		callCounts: map[MethodInstance]int64{},
 	}
 
 	ginkgo.BeforeEach(func() {
@@ -70,6 +79,11 @@ func NewDriver(f *framework.Framework, minNodes, maxNodes int) *Driver {
 	return d
 }
 
+type MethodInstance struct {
+	Hostname   string
+	FullMethod string
+}
+
 type Driver struct {
 	f                  *framework.Framework
 	ctx                context.Context
@@ -79,6 +93,10 @@ type Driver struct {
 
 	Name  string
 	Hosts map[string]*app.ExamplePlugin
+
+	mutex      sync.Mutex
+	fail       map[MethodInstance]bool
+	callCounts map[MethodInstance]int64
 }
 
 func (d *Driver) SetUp() {
@@ -154,6 +172,7 @@ func (d *Driver) SetUp() {
 
 	// Run registar and plugin for each of the pods.
 	for _, pod := range pods.Items {
+		hostname := pod.Spec.NodeName
 		logger := klog.Background().WithName("kubelet plugin").WithValues("node", pod.Spec.NodeName, "pod", klog.KObj(&pod))
 		plugin, err := app.StartPlugin(logger, "/cdi", d.Name,
 			app.FileOperations{
@@ -165,6 +184,9 @@ func (d *Driver) SetUp() {
 				},
 			},
 			kubeletplugin.GRPCVerbosity(0),
+			kubeletplugin.GRPCInterceptor(func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
+				return d.interceptor(hostname, ctx, req, info, handler)
+			}),
 			kubeletplugin.PluginListener(listen(ctx, d.f, pod.Name, "plugin", 9001)),
 			kubeletplugin.RegistrarListener(listen(ctx, d.f, pod.Name, "registrar", 9000)),
 			kubeletplugin.KubeletPluginSocketPath(draAddr),
@@ -174,7 +196,7 @@ func (d *Driver) SetUp() {
 			// Depends on cancel being called first.
 			plugin.Stop()
 		})
-		d.Hosts[pod.Spec.Hostname] = plugin
+		d.Hosts[hostname] = plugin
 	}
 
 	// Wait for registration.
@@ -226,4 +248,39 @@ func (d *Driver) TearDown() {
 	}
 	d.cleanup = nil
 	d.wg.Wait()
+}
+
+func (d *Driver) interceptor(hostname string, ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+
+	m := MethodInstance{hostname, info.FullMethod}
+	d.callCounts[m]++
+	if d.fail[m] {
+		return nil, errors.New("injected error")
+	}
+
+	return handler(ctx, req)
+}
+
+func (d *Driver) Fail(m MethodInstance, injectError bool) {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+
+	d.fail[m] = injectError
+}
+
+func (d *Driver) CallCount(m MethodInstance) int64 {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+
+	return d.callCounts[m]
+}
+
+func (d *Driver) Hostnames() (hostnames []string) {
+	for hostname := range d.Hosts {
+		hostnames = append(hostnames, hostname)
+	}
+	sort.Strings(hostnames)
+	return
 }
