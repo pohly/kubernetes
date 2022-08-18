@@ -19,6 +19,7 @@ package e2e
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"os"
 	"os/exec"
@@ -88,6 +89,16 @@ var _ = ginkgo.SynchronizedAfterSuite(func() {
 }, func() {
 	AfterSuiteActions()
 })
+
+func init() {
+	// e2e.test usually writes stdout and stderr to the same destination
+	// (file or console). Therefore it makes no sense to print log messages
+	// with severity error or higher to stdout and stderr (the default)
+	// because they would just be shown twice. Therefore the e2e.test binary
+	// overrides the klog default. Command line flags get parsed later and
+	// thus can still change this.
+	flag.Set("stderrthreshold", "10" /* higher than any of the severities -> none pass the threshold */)
+}
 
 // RunE2ETests checks configuration parameters (specified through flags) and then runs
 // E2E tests using the Ginkgo runner.
