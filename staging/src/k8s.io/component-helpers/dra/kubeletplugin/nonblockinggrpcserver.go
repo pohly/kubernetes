@@ -29,12 +29,12 @@ import (
 )
 
 type grpcServer struct {
-	logger    klog.Logger
+	logger        klog.Logger
 	grpcVerbosity int
-	wg        sync.WaitGroup
-	endpoint  endpoint
-	server    *grpc.Server
-	requestID int64
+	wg            sync.WaitGroup
+	endpoint      endpoint
+	server        *grpc.Server
+	requestID     int64
 }
 
 type registerService func(s *grpc.Server)
@@ -48,7 +48,7 @@ type registerService func(s *grpc.Server)
 // If the path is non-empty, then the socket will get removed when shutting
 // down, regardless of who created the listener.
 type endpoint struct {
-	path  string
+	path     string
 	listener net.Listener
 }
 
@@ -56,8 +56,8 @@ type endpoint struct {
 // which handles requests for arbitrary services.
 func startGRPCServer(logger klog.Logger, grpcVerbosity int, interceptor grpc.UnaryServerInterceptor, endpoint endpoint, services ...registerService) (*grpcServer, error) {
 	s := &grpcServer{
-		logger:   logger,
-		endpoint: endpoint,
+		logger:        logger,
+		endpoint:      endpoint,
 		grpcVerbosity: grpcVerbosity,
 	}
 
