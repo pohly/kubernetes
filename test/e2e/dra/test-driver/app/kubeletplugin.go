@@ -56,7 +56,7 @@ type FileOperations struct {
 }
 
 // StartPlugin sets up the servers that are necessary for a DRA kubelet plugin.
-func StartPlugin(logger klog.Logger, cdiDir, driverName string, endpoint kubeletplugin.Endpoint, draAddress string, pluginRegistrationEndpoint kubeletplugin.Endpoint, fileOps FileOperations) (*ExamplePlugin, error) {
+func StartPlugin(logger klog.Logger, cdiDir, driverName string, fileOps FileOperations, opts ...kubeletplugin.Option) (*ExamplePlugin, error) {
 	if fileOps.Create == nil {
 		fileOps.Create = func(name string, content []byte) error {
 			return os.WriteFile(name, content, os.FileMode(0644))
@@ -77,7 +77,11 @@ func StartPlugin(logger klog.Logger, cdiDir, driverName string, endpoint kubelet
 		driverName: driverName,
 	}
 
-	d, err := kubeletplugin.Start(ex.logger, driverName, endpoint, draAddress, pluginRegistrationEndpoint, ex)
+	opts = append(opts,
+		kubeletplugin.Logger(logger),
+		kubeletplugin.DriverName(driverName),
+	)
+	d, err := kubeletplugin.Start(ex, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("start kubelet plugin: %v", err)
 	}

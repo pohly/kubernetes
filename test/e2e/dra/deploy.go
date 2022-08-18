@@ -19,6 +19,7 @@ package dra
 import (
 	"bytes"
 	"context"
+	"net"
 	"path"
 	"sort"
 	"sync"
@@ -155,9 +156,6 @@ func (d *Driver) SetUp() {
 	for _, pod := range pods.Items {
 		logger := klog.Background().WithName("kubelet plugin").WithValues("node", pod.Spec.NodeName, "pod", klog.KObj(&pod))
 		plugin, err := app.StartPlugin(logger, "/cdi", d.Name,
-			listen(ctx, d.f, pod.Name, "plugin", 9001),
-			draAddr,
-			listen(ctx, d.f, pod.Name, "registrar", 9000),
 			app.FileOperations{
 				Create: func(name string, content []byte) error {
 					return d.createFile(&pod, name, content)
@@ -166,6 +164,9 @@ func (d *Driver) SetUp() {
 					return d.removeFile(&pod, name)
 				},
 			},
+			kubeletplugin.PluginListener(listen(ctx, d.f, pod.Name, "plugin", 9001)),
+			kubeletplugin.RegistrarListener(listen(ctx, d.f, pod.Name, "registrar", 9000)),
+			kubeletplugin.KubeletPluginSocketPath(draAddr),
 		)
 		framework.ExpectNoError(err, "start kubelet plugin for node %s", pod.Spec.NodeName)
 		d.cleanup = append(d.cleanup, func() {
@@ -206,7 +207,7 @@ func (d *Driver) podIO(pod *corev1.Pod) proxy.PodDirIO {
 	}
 }
 
-func listen(ctx context.Context, f *framework.Framework, podName, containerName string, port int) kubeletplugin.Endpoint {
+func listen(ctx context.Context, f *framework.Framework, podName, containerName string, port int) net.Listener {
 	addr := proxy.Addr{
 		Namespace:     f.Namespace.Name,
 		PodName:       podName,
@@ -215,7 +216,7 @@ func listen(ctx context.Context, f *framework.Framework, podName, containerName 
 	}
 	listener, err := proxy.Listen(ctx, f.ClientSet, f.ClientConfig(), addr)
 	framework.ExpectNoError(err, "listen for connections from %+v", addr)
-	return kubeletplugin.Endpoint{Listener: listener}
+	return listener
 }
 
 func (d *Driver) TearDown() {
