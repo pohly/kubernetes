@@ -54,7 +54,7 @@ type endpoint struct {
 
 // startGRPCServer sets up the GRPC server on a Unix domain socket and spawns a goroutine
 // which handles requests for arbitrary services.
-func startGRPCServer(logger klog.Logger, grpcVerbosity int, endpoint endpoint, services ...registerService) (*grpcServer, error) {
+func startGRPCServer(logger klog.Logger, grpcVerbosity int, interceptor grpc.UnaryServerInterceptor, endpoint endpoint, services ...registerService) (*grpcServer, error) {
 	s := &grpcServer{
 		logger:   logger,
 		endpoint: endpoint,
@@ -79,8 +79,15 @@ func startGRPCServer(logger klog.Logger, grpcVerbosity int, endpoint endpoint, s
 	// Run a gRPC server. It will close the listening socket when
 	// shutting down, so we don't need to do that.
 	var opts []grpc.ServerOption
+	var interceptors []grpc.UnaryServerInterceptor
 	if grpcVerbosity >= 0 {
-		opts = append(opts, grpc.UnaryInterceptor(s.interceptor))
+		interceptors = append(interceptors, s.interceptor)
+	}
+	if interceptor != nil {
+		interceptors = append(interceptors, interceptor)
+	}
+	if len(interceptors) >= 0 {
+		opts = append(opts, grpc.ChainUnaryInterceptor(interceptors...))
 	}
 	s.server = grpc.NewServer(opts...)
 	for _, service := range services {
@@ -111,7 +118,7 @@ func (s *grpcServer) interceptor(ctx context.Context, req interface{}, info *grp
 	logger.V(s.grpcVerbosity).Info("handling request", "request", req)
 	defer func() {
 		if r := recover(); r != nil {
-			logger.Error(nil, "handling request panicked", "panic", r)
+			logger.Error(nil, "handling request panicked", "panic", r, "request", req)
 			panic(r)
 		}
 	}()

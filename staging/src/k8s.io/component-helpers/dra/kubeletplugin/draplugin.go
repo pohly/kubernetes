@@ -17,9 +17,9 @@ limitations under the License.
 package kubeletplugin
 
 import (
+	"errors"
 	"fmt"
 	"net"
-	"errors"
 
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
@@ -135,13 +135,22 @@ func KubeletPluginSocketPath(path string) Option {
 	}
 }
 
+// GRPCInterceptor is called for each incoming gRPC method call.
+func GRPCInterceptor(interceptor grpc.UnaryServerInterceptor) Option {
+	return func(o *options) error {
+		o.interceptor = interceptor
+		return nil
+	}
+}
+
 type options struct {
-	logger klog.Logger
-	grpcVerbosity int
-	driverName string
-	draEndpoint endpoint
-	draAddress string
+	logger                     klog.Logger
+	grpcVerbosity              int
+	driverName                 string
+	draEndpoint                endpoint
+	draAddress                 string
 	pluginRegistrationEndpoint endpoint
+	interceptor                grpc.UnaryServerInterceptor
 }
 
 // draPlugin combines the kubelet registration service and the DRA node plugin
@@ -157,7 +166,7 @@ func Start(nodeServer drapbv1.NodeServer, opts ...Option) (result DRAPlugin, fin
 	d := &draPlugin{}
 
 	o := options{
-		logger: klog.Background(),
+		logger:        klog.Background(),
 		grpcVerbosity: 4,
 	}
 	for _, option := range opts {
@@ -181,7 +190,7 @@ func Start(nodeServer drapbv1.NodeServer, opts ...Option) (result DRAPlugin, fin
 	}
 
 	// Run the node plugin gRPC server first to ensure that it is ready.
-	plugin, err := startGRPCServer(klog.LoggerWithName(o.logger, "dra"), o.grpcVerbosity, o.draEndpoint, func(grpcServer *grpc.Server) {
+	plugin, err := startGRPCServer(klog.LoggerWithName(o.logger, "dra"), o.grpcVerbosity, o.interceptor, o.draEndpoint, func(grpcServer *grpc.Server) {
 		drapbv1.RegisterNodeServer(grpcServer, nodeServer)
 	})
 	if err != nil {
@@ -200,7 +209,7 @@ func Start(nodeServer drapbv1.NodeServer, opts ...Option) (result DRAPlugin, fin
 	}()
 
 	// Now make it available to kubelet.
-	registrar, err := startRegistrar(klog.LoggerWithName(o.logger, "registrar"), o.grpcVerbosity, o.driverName, o.draAddress, o.pluginRegistrationEndpoint)
+	registrar, err := startRegistrar(klog.LoggerWithName(o.logger, "registrar"), o.grpcVerbosity, o.interceptor, o.driverName, o.draAddress, o.pluginRegistrationEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("start registrar: %v", err)
 	}
