@@ -30,6 +30,7 @@ import (
 
 type grpcServer struct {
 	logger    klog.Logger
+	grpcVerbosity int
 	wg        sync.WaitGroup
 	endpoint  endpoint
 	server    *grpc.Server
@@ -53,10 +54,11 @@ type endpoint struct {
 
 // startGRPCServer sets up the GRPC server on a Unix domain socket and spawns a goroutine
 // which handles requests for arbitrary services.
-func startGRPCServer(logger klog.Logger, endpoint endpoint, services ...registerService) (*grpcServer, error) {
+func startGRPCServer(logger klog.Logger, grpcVerbosity int, endpoint endpoint, services ...registerService) (*grpcServer, error) {
 	s := &grpcServer{
 		logger:   logger,
 		endpoint: endpoint,
+		grpcVerbosity: grpcVerbosity,
 	}
 
 	listener := endpoint.listener
@@ -76,8 +78,9 @@ func startGRPCServer(logger klog.Logger, endpoint endpoint, services ...register
 
 	// Run a gRPC server. It will close the listening socket when
 	// shutting down, so we don't need to do that.
-	opts := []grpc.ServerOption{
-		grpc.UnaryInterceptor(s.interceptor),
+	var opts []grpc.ServerOption
+	if grpcVerbosity >= 0 {
+		opts = append(opts, grpc.UnaryInterceptor(s.interceptor))
 	}
 	s.server = grpc.NewServer(opts...)
 	for _, service := range services {
@@ -105,7 +108,7 @@ func (s *grpcServer) interceptor(ctx context.Context, req interface{}, info *grp
 	requestID := atomic.AddInt64(&s.requestID, 1)
 	logger := klog.LoggerWithValues(s.logger, "requestID", requestID)
 	ctx = klog.NewContext(ctx, logger)
-	logger.V(4).Info("handling request", "request", req)
+	logger.V(s.grpcVerbosity).Info("handling request", "request", req)
 	defer func() {
 		if r := recover(); r != nil {
 			logger.Error(nil, "handling request panicked", "panic", r)
@@ -116,7 +119,7 @@ func (s *grpcServer) interceptor(ctx context.Context, req interface{}, info *grp
 	if err != nil {
 		logger.Error(err, "handling request failed", "request", req)
 	} else {
-		logger.V(4).Info("handling request succeeded", "response", resp)
+		logger.V(s.grpcVerbosity).Info("handling request succeeded", "response", resp)
 	}
 	return
 }

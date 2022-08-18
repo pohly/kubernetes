@@ -65,6 +65,15 @@ func Logger(logger klog.Logger) Option {
 	}
 }
 
+// GRPCVerbosity sets the verbosity for logging gRPC calls. Default is 4. A negative
+// value disables logging.
+func GRPCVerbosity(level int) Option {
+	return func(o *options) error {
+		o.grpcVerbosity = level
+		return nil
+	}
+}
+
 // RegistrarSocketPath sets the file path for a Unix domain socket.
 // If RegistrarListener is not used, then Start will remove
 // a file at that path, should one exist, and creates a socket
@@ -128,6 +137,7 @@ func KubeletPluginSocketPath(path string) Option {
 
 type options struct {
 	logger klog.Logger
+	grpcVerbosity int
 	driverName string
 	draEndpoint endpoint
 	draAddress string
@@ -148,6 +158,7 @@ func Start(nodeServer drapbv1.NodeServer, opts ...Option) (result DRAPlugin, fin
 
 	o := options{
 		logger: klog.Background(),
+		grpcVerbosity: 4,
 	}
 	for _, option := range opts {
 		if err := option(&o); err != nil {
@@ -170,7 +181,7 @@ func Start(nodeServer drapbv1.NodeServer, opts ...Option) (result DRAPlugin, fin
 	}
 
 	// Run the node plugin gRPC server first to ensure that it is ready.
-	plugin, err := startGRPCServer(klog.LoggerWithName(o.logger, "dra"), o.draEndpoint, func(grpcServer *grpc.Server) {
+	plugin, err := startGRPCServer(klog.LoggerWithName(o.logger, "dra"), o.grpcVerbosity, o.draEndpoint, func(grpcServer *grpc.Server) {
 		drapbv1.RegisterNodeServer(grpcServer, nodeServer)
 	})
 	if err != nil {
@@ -189,7 +200,7 @@ func Start(nodeServer drapbv1.NodeServer, opts ...Option) (result DRAPlugin, fin
 	}()
 
 	// Now make it available to kubelet.
-	registrar, err := startRegistrar(klog.LoggerWithName(o.logger, "registrar"), o.driverName, o.draAddress, o.pluginRegistrationEndpoint)
+	registrar, err := startRegistrar(klog.LoggerWithName(o.logger, "registrar"), o.grpcVerbosity, o.driverName, o.draAddress, o.pluginRegistrationEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("start registrar: %v", err)
 	}
