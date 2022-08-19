@@ -44,6 +44,50 @@ kubelet<->dynamic resource allocation plugin interaction.
 
 `app` is the driver itself with a very simple implementation of the interfaces.
 
+## Deployment
+
+### `local-up-cluster.sh`
+
+To try out the feature, build Kubernetes, then in one console run:
+```console
+FEATURE_GATES=DynamicResourceAllocation=true KUBELET_RESOLV_CONF="/etc/resolv-9999.conf" DNS_ADDON="coredns" CGROUP_DRIVER=systemd CONTAINER_RUNTIME_ENDPOINT=unix:///var/run/crio/crio.sock LOG_LEVEL=6 ENABLE_CSI_SNAPSHOTTER=false API_SECURE_PORT=6444 ALLOW_PRIVILEGED=1 PATH=/nvme/gopath/src/k8s.io/kubernetes/third_party/etcd:$PATH ./hack/local-up-cluster.sh -O
+```
+
+In another:
+```console
+go run ./test/e2e/dra/test-driver --feature-gates ContextualLogging=true -v=5 controller
+```
+
+In yet another:
+```console
+sudo mkdir -p /var/run/cdi && sudo chmod a+rwx /var/run/cdi /var/lib/kubelet/plugins_registry
+go run ./test/e2e/dra/test-driver --feature-gates ContextualLogging=true -v=5 kubelet-plugin
+```
+
+And finally:
+```console
+$ kubectl create -f test/integration/cdi/example-driver/deploy/example/resourceclass.yaml
+resourceclass/example created
+$ kubectl create -f test/integration/cdi/example-driver/deploy/example/pod-inline.yaml
+configmap/pause-claim-parameters created
+pod/pause created
+
+$ kubectl get resourceclaims
+NAME             CLASSNAME   ALLOCATIONMODE         STATE                AGE
+pause-resource   example     WaitForFirstConsumer   allocated,reserved   19s
+
+$ kubectl get pods
+NAME    READY   STATUS    RESTARTS   AGE
+pause   1/1     Running   0          23s
+```
+
+There are also examples for other scenarios (multiple pods, multiple claims).
+
+### multi-node cluster
+
+At this point there are no container images that contain the test driver and
+therefore it cannot be deployed on "normal" clusters.
+
 ## Prior art
 
 Some of this code was derived from the
