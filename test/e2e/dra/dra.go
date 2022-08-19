@@ -176,7 +176,26 @@ func (b *builder) class() *corev1.ResourceClass {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: b.className(),
 		},
-		DriverName: b.driver.Name,
+		DriverName:    b.driver.Name,
+		SuitableNodes: b.nodeSelector(),
+	}
+}
+
+// nodeSelector returns a node selector that matches all nodes on which the
+// kubelet plugin was deployed.
+func (b *builder) nodeSelector() *corev1.NodeSelector {
+	return &corev1.NodeSelector{
+		NodeSelectorTerms: []corev1.NodeSelectorTerm{
+			{
+				MatchExpressions: []corev1.NodeSelectorRequirement{
+					{
+						Key:      "kubernetes.io/hostname",
+						Operator: corev1.NodeSelectorOpIn,
+						Values:   b.driver.Hostnames(),
+					},
+				},
+			},
+		},
 	}
 }
 
