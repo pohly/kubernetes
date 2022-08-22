@@ -126,13 +126,37 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 					framework.ExpectNoError(err, "start pod with shared resource claim")
 
 					log, err := e2epod.GetPodLogs(f.ClientSet, pod.Namespace, pod.Name, pod.Spec.Containers[0].Name)
-					framework.ExpectNoError(err, "get pod logs")
+					framework.ExpectNoError(err, "get container logs")
 					var envStr string
 					for key, value := range b.resourceClaimParametersEnv() {
 						envStr = fmt.Sprintf("\nuser_%s=%s\n", key, value)
 						break
 					}
 					gomega.Expect(log).To(gomega.ContainSubstring(envStr), "container env variables")
+				}
+			})
+
+			ginkgo.It("supports external claim referenced by multiple containers of multiple pods", func() {
+				parameters := b.resourceClaimParameters()
+				pod1 := b.podExternalMultiple()
+				pod2 := b.podExternalMultiple()
+				pod3 := b.podExternalMultiple()
+
+				b.create(ctx, parameters, b.externalClaim(), pod1, pod2, pod3)
+
+				for _, pod := range []*corev1.Pod{pod1, pod2, pod3} {
+					err := e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace)
+					framework.ExpectNoError(err, "start pod with shared resource claim")
+					for _, container := range pod.Spec.Containers {
+						log, err := e2epod.GetPodLogs(f.ClientSet, pod.Namespace, pod.Name, container.Name)
+						framework.ExpectNoError(err, "get container logs")
+						var envStr string
+						for key, value := range b.resourceClaimParametersEnv() {
+							envStr = fmt.Sprintf("\nuser_%s=%s\n", key, value)
+							break
+						}
+						gomega.Expect(log).To(gomega.ContainSubstring(envStr), "container env variables")
+					}
 				}
 			})
 
@@ -280,7 +304,7 @@ func (b *builder) podInlineMultiple() *corev1.Pod {
 	return pod
 }
 
-// podShared adds a pod that references external resource claim with default class name and parameters.
+// podExternal adds a pod that references external resource claim with default class name and parameters.
 func (b *builder) podExternal() *corev1.Pod {
 	pod := b.pod()
 	pod.Spec.Containers[0].Name = "with-resource"
@@ -295,6 +319,15 @@ func (b *builder) podExternal() *corev1.Pod {
 		},
 	}
 	pod.Spec.Containers[0].Resources.Claims = []string{podClaimName}
+	return pod
+}
+
+// podShared returns a pod with 3 containers that reference external resource claim with default class name and parameters.
+func (b *builder) podExternalMultiple() *corev1.Pod {
+	pod := b.podExternal()
+	pod.Spec.Containers = append(pod.Spec.Containers, *pod.Spec.Containers[0].DeepCopy(), *pod.Spec.Containers[0].DeepCopy())
+	pod.Spec.Containers[1].Name = pod.Spec.Containers[1].Name + "-1"
+	pod.Spec.Containers[2].Name = pod.Spec.Containers[1].Name + "-2"
 	return pod
 }
 
