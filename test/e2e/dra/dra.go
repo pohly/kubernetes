@@ -75,6 +75,26 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 				gomega.Expect(log).To(gomega.ContainSubstring(envStr), "container env variables")
 			})
 
+			ginkgo.It("supports inline claim referenced by multiple containers", func() {
+				parameters := b.resourceClaimParameters()
+				pod := b.podInlineMultiple()
+				b.create(ctx, parameters, pod)
+
+				err := e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace)
+				framework.ExpectNoError(err, "start pod with inline resource claim")
+
+				for _, container := range pod.Spec.Containers {
+					log, err := e2epod.GetPodLogs(f.ClientSet, pod.Namespace, pod.Name, container.Name)
+					framework.ExpectNoError(err, "get conateiner logs")
+					var envStr string
+					for key, value := range b.resourceClaimParametersEnv() {
+						envStr = fmt.Sprintf("\nuser_%s=%s\n", key, value)
+						break
+					}
+					gomega.Expect(log).To(gomega.ContainSubstring(envStr), "container env variables")
+				}
+			})
+
 			ginkgo.It("supports simple pod referencing external resource claim", func() {
 				parameters := b.resourceClaimParameters()
 				pod := b.podExternal()
@@ -248,6 +268,15 @@ func (b *builder) podInline() *corev1.Pod {
 			},
 		},
 	}
+	return pod
+}
+
+// podInlineMultiple returns a pod with inline resource claim referenced by 3 containers
+func (b *builder) podInlineMultiple() *corev1.Pod {
+	pod := b.podInline()
+	pod.Spec.Containers = append(pod.Spec.Containers, *pod.Spec.Containers[0].DeepCopy(), *pod.Spec.Containers[0].DeepCopy())
+	pod.Spec.Containers[1].Name = pod.Spec.Containers[1].Name + "-1"
+	pod.Spec.Containers[2].Name = pod.Spec.Containers[1].Name + "-2"
 	return pod
 }
 
