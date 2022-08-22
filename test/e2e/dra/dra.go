@@ -67,6 +67,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 				framework.ExpectNoError(err, "start pod with inline resource claim")
 
 				log, err := e2epod.GetPodLogs(f.ClientSet, pod.Namespace, pod.Name, pod.Spec.Containers[0].Name)
+				framework.ExpectNoError(err, "get pod logs")
 				var envStr string
 				for key, value := range b.resourceClaimParametersEnv() {
 					envStr = fmt.Sprintf("\nuser_%s=%s\n", key, value)
@@ -389,6 +390,7 @@ func (b *builder) tearDown() {
 		}
 
 		claims, err := b.f.ClientSet.CoreV1().ResourceClaims(b.f.Namespace.Name).List(ctx, metav1.ListOptions{})
+		framework.ExpectNoError(err, "get resource claims")
 		for _, claim := range claims.Items {
 			if claim.DeletionTimestamp != nil {
 				continue
