@@ -58,7 +58,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 				// If we got here, the driver is running.
 			})
 
-			ginkgo.It("supports simple pod", func() {
+			ginkgo.It("supports simple pod referencing inline resource claim", func() {
 				parameters := b.resourceClaimParameters()
 				pod := b.podInline()
 				b.create(ctx, parameters, pod)
@@ -73,6 +73,47 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 					break
 				}
 				gomega.Expect(log).To(gomega.ContainSubstring(envStr), "container env variables")
+			})
+
+			ginkgo.It("supports simple pod referencing external resource claim", func() {
+				parameters := b.resourceClaimParameters()
+				pod := b.podExternal()
+				b.create(ctx, parameters, b.externalClaim(), pod)
+
+				err := e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace)
+				framework.ExpectNoError(err, "start pod with external resource claim")
+
+				log, err := e2epod.GetPodLogs(f.ClientSet, pod.Namespace, pod.Name, pod.Spec.Containers[0].Name)
+				framework.ExpectNoError(err, "get pod logs")
+				var envStr string
+				for key, value := range b.resourceClaimParametersEnv() {
+					envStr = fmt.Sprintf("\nuser_%s=%s\n", key, value)
+					break
+				}
+				gomega.Expect(log).To(gomega.ContainSubstring(envStr), "container env variables")
+			})
+
+			ginkgo.It("supports external claim referenced by multiple pods", func() {
+				parameters := b.resourceClaimParameters()
+				pod1 := b.podExternal()
+				pod2 := b.podExternal()
+				pod3 := b.podExternal()
+
+				b.create(ctx, parameters, b.externalClaim(), pod1, pod2, pod3)
+
+				for _, pod := range []*corev1.Pod{pod1, pod2, pod3} {
+					err := e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace)
+					framework.ExpectNoError(err, "start pod with shared resource claim")
+
+					log, err := e2epod.GetPodLogs(f.ClientSet, pod.Namespace, pod.Name, pod.Spec.Containers[0].Name)
+					framework.ExpectNoError(err, "get pod logs")
+					var envStr string
+					for key, value := range b.resourceClaimParametersEnv() {
+						envStr = fmt.Sprintf("\nuser_%s=%s\n", key, value)
+						break
+					}
+					gomega.Expect(log).To(gomega.ContainSubstring(envStr), "container env variables")
+				}
 			})
 
 			ginkgo.It("must retry NodePrepareResource", func() {
@@ -128,6 +169,24 @@ func (b *builder) class() *corev1.ResourceClass {
 			Name: b.className(),
 		},
 		DriverName: b.driver.Name,
+	}
+}
+
+// externalClaim returns external resource claim
+// that test pods can reference
+func (b *builder) externalClaim() *corev1.ResourceClaim {
+	return &corev1.ResourceClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "external-claim",
+		},
+		Spec: corev1.ResourceClaimSpec{
+			ResourceClassName: b.className(),
+			Parameters: &corev1.ResourceClaimParametersReference{
+				APIVersion: "v1",
+				Kind:       "ConfigMap",
+				Name:       b.resourceClaimParametersName(),
+			},
+		},
 	}
 }
 
@@ -192,6 +251,24 @@ func (b *builder) podInline() *corev1.Pod {
 	return pod
 }
 
+// podShared adds a pod that references external resource claim with default class name and parameters.
+func (b *builder) podExternal() *corev1.Pod {
+	pod := b.pod()
+	pod.Spec.Containers[0].Name = "with-resource"
+	podClaimName := "resource-claim"
+	externalClaimName := "external-claim"
+	pod.Spec.ResourceClaims = []corev1.PodResourceClaim{
+		{
+			Name: podClaimName,
+			Claim: corev1.ClaimSource{
+				ResourceClaimName: &externalClaimName,
+			},
+		},
+	}
+	pod.Spec.Containers[0].Resources.Claims = []string{podClaimName}
+	return pod
+}
+
 // create takes a bunch of objects and calls their Create function.
 func (b *builder) create(ctx context.Context, objs ...interface{}) {
 	for _, obj := range objs {
@@ -203,6 +280,8 @@ func (b *builder) create(ctx context.Context, objs ...interface{}) {
 			_, err = b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
 		case *corev1.ConfigMap:
 			_, err = b.f.ClientSet.CoreV1().ConfigMaps(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
+		case *corev1.ResourceClaim:
+			_, err = b.f.ClientSet.CoreV1().ResourceClaims(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
 		default:
 			framework.Fail(fmt.Sprintf("internal error, unsupported type %T", obj), 1)
 		}
