@@ -27,6 +27,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -51,7 +52,15 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 	ginkgo.Context("kubelet", func() {
 		var driver = NewDriver(f, 1, 1 /* nodes */) // All tests get their own driver instance.
 
-		ginkgo.Context("", func() {
+		ginkgo.When(
+			"external claim is used in the 'wait for first consumer' allocation mode",
+			genExternalClaimTest(ctx, f, driver, corev1.AllocationModeWaitForFirstConsumer))
+
+		ginkgo.When(
+			"external claim is used in the 'immediate' allocation mode",
+			genExternalClaimTest(ctx, f, driver, corev1.AllocationModeImmediate))
+
+		ginkgo.When("internal claim is used", func() {
 			var b = newBuilder(f, driver)
 
 			ginkgo.It("registers plugin", func() {
@@ -62,105 +71,15 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 				parameters := b.resourceClaimParameters()
 				pod := b.podInline()
 				b.create(ctx, parameters, pod)
-
-				err := e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace)
-				framework.ExpectNoError(err, "start pod with inline resource claim")
-
-				log, err := e2epod.GetPodLogs(f.ClientSet, pod.Namespace, pod.Name, pod.Spec.Containers[0].Name)
-				framework.ExpectNoError(err, "get pod logs")
-				var envStr string
-				for key, value := range b.resourceClaimParametersEnv() {
-					envStr = fmt.Sprintf("\nuser_%s=%s\n", key, value)
-					break
-				}
-				gomega.Expect(log).To(gomega.ContainSubstring(envStr), "container env variables")
+				b.testPod(f.ClientSet, pod)
 			})
 
 			ginkgo.It("supports inline claim referenced by multiple containers", func() {
 				parameters := b.resourceClaimParameters()
 				pod := b.podInlineMultiple()
 				b.create(ctx, parameters, pod)
-
-				err := e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace)
-				framework.ExpectNoError(err, "start pod with inline resource claim")
-
-				for _, container := range pod.Spec.Containers {
-					log, err := e2epod.GetPodLogs(f.ClientSet, pod.Namespace, pod.Name, container.Name)
-					framework.ExpectNoError(err, "get conateiner logs")
-					var envStr string
-					for key, value := range b.resourceClaimParametersEnv() {
-						envStr = fmt.Sprintf("\nuser_%s=%s\n", key, value)
-						break
-					}
-					gomega.Expect(log).To(gomega.ContainSubstring(envStr), "container env variables")
-				}
+				b.testPod(f.ClientSet, pod)
 			})
-
-			ginkgo.It("supports simple pod referencing external resource claim", func() {
-				parameters := b.resourceClaimParameters()
-				pod := b.podExternal()
-				b.create(ctx, parameters, b.externalClaim(), pod)
-
-				err := e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace)
-				framework.ExpectNoError(err, "start pod with external resource claim")
-
-				log, err := e2epod.GetPodLogs(f.ClientSet, pod.Namespace, pod.Name, pod.Spec.Containers[0].Name)
-				framework.ExpectNoError(err, "get pod logs")
-				var envStr string
-				for key, value := range b.resourceClaimParametersEnv() {
-					envStr = fmt.Sprintf("\nuser_%s=%s\n", key, value)
-					break
-				}
-				gomega.Expect(log).To(gomega.ContainSubstring(envStr), "container env variables")
-			})
-
-			ginkgo.It("supports external claim referenced by multiple pods", func() {
-				parameters := b.resourceClaimParameters()
-				pod1 := b.podExternal()
-				pod2 := b.podExternal()
-				pod3 := b.podExternal()
-
-				b.create(ctx, parameters, b.externalClaim(), pod1, pod2, pod3)
-
-				for _, pod := range []*corev1.Pod{pod1, pod2, pod3} {
-					err := e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace)
-					framework.ExpectNoError(err, "start pod with shared resource claim")
-
-					log, err := e2epod.GetPodLogs(f.ClientSet, pod.Namespace, pod.Name, pod.Spec.Containers[0].Name)
-					framework.ExpectNoError(err, "get container logs")
-					var envStr string
-					for key, value := range b.resourceClaimParametersEnv() {
-						envStr = fmt.Sprintf("\nuser_%s=%s\n", key, value)
-						break
-					}
-					gomega.Expect(log).To(gomega.ContainSubstring(envStr), "container env variables")
-				}
-			})
-
-			ginkgo.It("supports external claim referenced by multiple containers of multiple pods", func() {
-				parameters := b.resourceClaimParameters()
-				pod1 := b.podExternalMultiple()
-				pod2 := b.podExternalMultiple()
-				pod3 := b.podExternalMultiple()
-
-				b.create(ctx, parameters, b.externalClaim(), pod1, pod2, pod3)
-
-				for _, pod := range []*corev1.Pod{pod1, pod2, pod3} {
-					err := e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace)
-					framework.ExpectNoError(err, "start pod with shared resource claim")
-					for _, container := range pod.Spec.Containers {
-						log, err := e2epod.GetPodLogs(f.ClientSet, pod.Namespace, pod.Name, container.Name)
-						framework.ExpectNoError(err, "get container logs")
-						var envStr string
-						for key, value := range b.resourceClaimParametersEnv() {
-							envStr = fmt.Sprintf("\nuser_%s=%s\n", key, value)
-							break
-						}
-						gomega.Expect(log).To(gomega.ContainSubstring(envStr), "container env variables")
-					}
-				}
-			})
-
 			ginkgo.It("must retry NodePrepareResource", func() {
 				// We have exactly one host.
 				m := MethodInstance{driver.Hostnames()[0], NodePrepareResourceMethod}
@@ -191,6 +110,49 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 	})
 })
 
+// getExternalClaimTest generates test function for the external claim for certain allocation mode
+func genExternalClaimTest(ctx context.Context, f *framework.Framework, driver *Driver, allocationMode corev1.AllocationMode) func() {
+	return func() {
+		var b = newBuilder(f, driver)
+
+		ginkgo.It("registers plugin", func() {
+			// If we got here, the driver is running.
+		})
+		ginkgo.It("supports simple pod referencing external resource claim", func() {
+			parameters := b.resourceClaimParameters()
+			pod := b.podExternal()
+			b.create(ctx, parameters, b.externalClaim(allocationMode), pod)
+			b.testPod(f.ClientSet, pod)
+		})
+
+		ginkgo.It("supports external claim referenced by multiple pods", func() {
+			parameters := b.resourceClaimParameters()
+			pod1 := b.podExternal()
+			pod2 := b.podExternal()
+			pod3 := b.podExternal()
+
+			b.create(ctx, parameters, b.externalClaim(allocationMode), pod1, pod2, pod3)
+
+			for _, pod := range []*corev1.Pod{pod1, pod2, pod3} {
+				b.testPod(f.ClientSet, pod)
+			}
+		})
+
+		ginkgo.It("supports external claim referenced by multiple containers of multiple pods", func() {
+			parameters := b.resourceClaimParameters()
+			pod1 := b.podExternalMultiple()
+			pod2 := b.podExternalMultiple()
+			pod3 := b.podExternalMultiple()
+
+			b.create(ctx, parameters, b.externalClaim(allocationMode), pod1, pod2, pod3)
+
+			for _, pod := range []*corev1.Pod{pod1, pod2, pod3} {
+				b.testPod(f.ClientSet, pod)
+			}
+		})
+	}
+}
+
 // builder contains a running counter to make objects unique within thir
 // namespace.
 type builder struct {
@@ -219,7 +181,7 @@ func (b *builder) class() *corev1.ResourceClass {
 
 // externalClaim returns external resource claim
 // that test pods can reference
-func (b *builder) externalClaim() *corev1.ResourceClaim {
+func (b *builder) externalClaim(allocationMode corev1.AllocationMode) *corev1.ResourceClaim {
 	return &corev1.ResourceClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "external-claim",
@@ -231,6 +193,7 @@ func (b *builder) externalClaim() *corev1.ResourceClaim {
 				Kind:       "ConfigMap",
 				Name:       b.resourceClaimParametersName(),
 			},
+			AllocationMode: allocationMode,
 		},
 	}
 }
@@ -349,6 +312,23 @@ func (b *builder) create(ctx context.Context, objs ...interface{}) {
 			framework.Fail(fmt.Sprintf("internal error, unsupported type %T", obj), 1)
 		}
 		framework.ExpectNoErrorWithOffset(1, err, "create %T", obj)
+	}
+}
+
+// testPod runs pod and checks if container logs contain expected environment variables
+func (b *builder) testPod(clientSet kubernetes.Interface, pod *corev1.Pod) {
+	err := e2epod.WaitForPodNameRunningInNamespace(clientSet, pod.Name, pod.Namespace)
+	framework.ExpectNoError(err, "start pod")
+
+	for _, container := range pod.Spec.Containers {
+		log, err := e2epod.GetPodLogs(clientSet, pod.Namespace, pod.Name, container.Name)
+		framework.ExpectNoError(err, "get logs")
+		var envStr string
+		for key, value := range b.resourceClaimParametersEnv() {
+			envStr = fmt.Sprintf("\nuser_%s=%s\n", key, value)
+			break
+		}
+		gomega.Expect(log).To(gomega.ContainSubstring(envStr), "container env variables")
 	}
 }
 
