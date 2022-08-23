@@ -60,12 +60,16 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 			"with immediate allocation",
 			genClaimTest(ctx, f, driver, corev1.AllocationModeImmediate))
 
-		ginkgo.When("driver fails", func() {
-			var b = newBuilder(f, driver)
+		ginkgo.When("new builder created", func() {
+			newBuilder(f, driver)
 
 			ginkgo.It("registers plugin", func() {
-				// If we got here, the driver is running.
+				ginkgo.By("the driver is running")
 			})
+		})
+
+		ginkgo.When("driver fails", func() {
+			b := newBuilder(f, driver)
 
 			ginkgo.It("must retry NodePrepareResource", func() {
 				// We have exactly one host.
@@ -102,11 +106,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 // getClaimTest generates test function for the claims in certain allocation mode
 func genClaimTest(ctx context.Context, f *framework.Framework, driver *Driver, allocationMode corev1.AllocationMode) func() {
 	return func() {
-		var b = newBuilder(f, driver)
-
-		ginkgo.It("registers plugin", func() {
-			// If we got here, the driver is running.
-		})
+		b := newBuilder(f, driver)
 
 		ginkgo.It("supports simple pod referencing inline resource claim", func() {
 			parameters := b.resourceClaimParameters()
