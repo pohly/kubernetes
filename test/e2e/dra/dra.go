@@ -76,7 +76,9 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 				ginkgo.By("waiting for container startup to fail")
 				parameters := b.resourceClaimParameters()
 				pod := b.podInline(corev1.AllocationModeWaitForFirstConsumer)
+
 				b.create(ctx, parameters, pod)
+
 				gomega.Eventually(func() error {
 					if driver.CallCount(m) == 0 {
 						return errors.New("NodePrepareResource not called yet")
@@ -109,21 +111,27 @@ func genClaimTest(ctx context.Context, f *framework.Framework, driver *Driver, a
 		ginkgo.It("supports simple pod referencing inline resource claim", func() {
 			parameters := b.resourceClaimParameters()
 			pod := b.podInline(allocationMode)
+
 			b.create(ctx, parameters, pod)
+
 			b.testPod(f.ClientSet, pod)
 		})
 
 		ginkgo.It("supports inline claim referenced by multiple containers", func() {
 			parameters := b.resourceClaimParameters()
 			pod := b.podInlineMultiple(allocationMode)
+
 			b.create(ctx, parameters, pod)
+
 			b.testPod(f.ClientSet, pod)
 		})
 
 		ginkgo.It("supports simple pod referencing external resource claim", func() {
 			parameters := b.resourceClaimParameters()
 			pod := b.podExternal()
+
 			b.create(ctx, parameters, b.externalClaim(allocationMode), pod)
+
 			b.testPod(f.ClientSet, pod)
 		})
 
