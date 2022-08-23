@@ -52,34 +52,21 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 	ginkgo.Context("kubelet", func() {
 		var driver = NewDriver(f, 1, 1 /* nodes */) // All tests get their own driver instance.
 
-		ginkgo.When(
-			"external claim is used in the 'wait for first consumer' allocation mode",
-			genExternalClaimTest(ctx, f, driver, corev1.AllocationModeWaitForFirstConsumer))
+		ginkgo.Context(
+			"with delayed allocation",
+			genClaimTest(ctx, f, driver, corev1.AllocationModeWaitForFirstConsumer))
 
-		ginkgo.When(
-			"external claim is used in the 'immediate' allocation mode",
-			genExternalClaimTest(ctx, f, driver, corev1.AllocationModeImmediate))
+		ginkgo.Context(
+			"with immediate allocation",
+			genClaimTest(ctx, f, driver, corev1.AllocationModeImmediate))
 
-		ginkgo.When("internal claim is used", func() {
+		ginkgo.When("driver fails", func() {
 			var b = newBuilder(f, driver)
 
 			ginkgo.It("registers plugin", func() {
 				// If we got here, the driver is running.
 			})
 
-			ginkgo.It("supports simple pod referencing inline resource claim", func() {
-				parameters := b.resourceClaimParameters()
-				pod := b.podInline()
-				b.create(ctx, parameters, pod)
-				b.testPod(f.ClientSet, pod)
-			})
-
-			ginkgo.It("supports inline claim referenced by multiple containers", func() {
-				parameters := b.resourceClaimParameters()
-				pod := b.podInlineMultiple()
-				b.create(ctx, parameters, pod)
-				b.testPod(f.ClientSet, pod)
-			})
 			ginkgo.It("must retry NodePrepareResource", func() {
 				// We have exactly one host.
 				m := MethodInstance{driver.Hostnames()[0], NodePrepareResourceMethod}
@@ -88,7 +75,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 
 				ginkgo.By("waiting for container startup to fail")
 				parameters := b.resourceClaimParameters()
-				pod := b.podInline()
+				pod := b.podInline(corev1.AllocationModeWaitForFirstConsumer)
 				b.create(ctx, parameters, pod)
 				gomega.Eventually(func() error {
 					if driver.CallCount(m) == 0 {
@@ -110,14 +97,29 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 	})
 })
 
-// getExternalClaimTest generates test function for the external claim for certain allocation mode
-func genExternalClaimTest(ctx context.Context, f *framework.Framework, driver *Driver, allocationMode corev1.AllocationMode) func() {
+// getClaimTest generates test function for the claims in certain allocation mode
+func genClaimTest(ctx context.Context, f *framework.Framework, driver *Driver, allocationMode corev1.AllocationMode) func() {
 	return func() {
 		var b = newBuilder(f, driver)
 
 		ginkgo.It("registers plugin", func() {
 			// If we got here, the driver is running.
 		})
+
+		ginkgo.It("supports simple pod referencing inline resource claim", func() {
+			parameters := b.resourceClaimParameters()
+			pod := b.podInline(allocationMode)
+			b.create(ctx, parameters, pod)
+			b.testPod(f.ClientSet, pod)
+		})
+
+		ginkgo.It("supports inline claim referenced by multiple containers", func() {
+			parameters := b.resourceClaimParameters()
+			pod := b.podInlineMultiple(allocationMode)
+			b.create(ctx, parameters, pod)
+			b.testPod(f.ClientSet, pod)
+		})
+
 		ginkgo.It("supports simple pod referencing external resource claim", func() {
 			parameters := b.resourceClaimParameters()
 			pod := b.podExternal()
@@ -234,7 +236,7 @@ func (b *builder) pod() *corev1.Pod {
 }
 
 // makePodInline adds an inline resource claim with default class name and parameters.
-func (b *builder) podInline() *corev1.Pod {
+func (b *builder) podInline(allocationMode corev1.AllocationMode) *corev1.Pod {
 	pod := b.pod()
 	pod.Spec.Containers[0].Name = "with-resource"
 	podClaimName := "my-inline-claim"
@@ -251,6 +253,7 @@ func (b *builder) podInline() *corev1.Pod {
 							Kind:       "ConfigMap",
 							Name:       b.resourceClaimParametersName(),
 						},
+						AllocationMode: allocationMode,
 					},
 				},
 			},
@@ -260,8 +263,8 @@ func (b *builder) podInline() *corev1.Pod {
 }
 
 // podInlineMultiple returns a pod with inline resource claim referenced by 3 containers
-func (b *builder) podInlineMultiple() *corev1.Pod {
-	pod := b.podInline()
+func (b *builder) podInlineMultiple(allocationMode corev1.AllocationMode) *corev1.Pod {
+	pod := b.podInline(allocationMode)
 	pod.Spec.Containers = append(pod.Spec.Containers, *pod.Spec.Containers[0].DeepCopy(), *pod.Spec.Containers[0].DeepCopy())
 	pod.Spec.Containers[1].Name = pod.Spec.Containers[1].Name + "-1"
 	pod.Spec.Containers[2].Name = pod.Spec.Containers[1].Name + "-2"
