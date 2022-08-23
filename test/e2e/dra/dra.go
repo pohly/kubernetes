@@ -28,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -307,9 +308,10 @@ func (b *builder) podExternalMultiple() *corev1.Pod {
 }
 
 // create takes a bunch of objects and calls their Create function.
-func (b *builder) create(ctx context.Context, objs ...interface{}) {
+func (b *builder) create(ctx context.Context, objs ...klog.KMetadata) {
 	for _, obj := range objs {
 		var err error
+		ginkgo.By(fmt.Sprintf("creating %T %s", obj, obj.GetName()))
 		switch obj := obj.(type) {
 		case *corev1.ResourceClass:
 			_, err = b.f.ClientSet.CoreV1().ResourceClasses().Create(ctx, obj, metav1.CreateOptions{})
@@ -376,6 +378,7 @@ func (b *builder) tearDown() {
 				pod.Labels["app.kubernetes.io/part-of"] == "dra-test-driver" {
 				continue
 			}
+			ginkgo.By(fmt.Sprintf("deleting %T %s", &pod, klog.KObj(&pod)))
 			err := b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).Delete(ctx, pod.Name, metav1.DeleteOptions{})
 			g.Expect(err).NotTo(gomega.HaveOccurred(), "delete pod")
 		}
@@ -386,6 +389,7 @@ func (b *builder) tearDown() {
 			if claim.DeletionTimestamp != nil {
 				continue
 			}
+			ginkgo.By(fmt.Sprintf("deleting %T %s", &claim, klog.KObj(&claim)))
 			err := b.f.ClientSet.CoreV1().ResourceClaims(b.f.Namespace.Name).Delete(ctx, claim.Name, metav1.DeleteOptions{})
 			g.Expect(err).NotTo(gomega.HaveOccurred(), "delete claim")
 		}
