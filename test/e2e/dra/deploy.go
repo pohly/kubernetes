@@ -54,11 +54,6 @@ const (
 // NewDriver sets up controller (as client of the cluster) and
 // kubelet plugin (via proxy) before the test runs. It cleans
 // up after the test.
-//
-// This must be called at least one level lower in the Gingko
-// hierarchy than the creationg of the framework instance,
-// otherwise f.ClientSet would already be cleared by the time
-// that our AfterEach callback gets invoked.
 func NewDriver(f *framework.Framework, minNodes, maxNodes int) *Driver {
 	d := &Driver{
 		f:          f,
@@ -70,12 +65,8 @@ func NewDriver(f *framework.Framework, minNodes, maxNodes int) *Driver {
 
 	ginkgo.BeforeEach(func() {
 		d.SetUp()
+		ginkgo.DeferCleanup(d.TearDown)
 	})
-
-	ginkgo.AfterEach(func() {
-		d.TearDown()
-	})
-
 	return d
 }
 
