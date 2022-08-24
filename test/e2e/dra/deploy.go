@@ -191,16 +191,18 @@ func (d *Driver) SetUp() {
 	}
 
 	// Wait for registration.
-	gomega.Eventually(func(g gomega.Gomega) {
-		var notRegistered []string
-		for hostname, plugin := range d.Hosts {
-			if !plugin.IsRegistered() {
-				notRegistered = append(notRegistered, hostname)
+	framework.By("wait for plugin registration", func() {
+		gomega.Eventually(func(g gomega.Gomega) {
+			var notRegistered []string
+			for hostname, plugin := range d.Hosts {
+				if !plugin.IsRegistered() {
+					notRegistered = append(notRegistered, hostname)
+				}
 			}
-		}
-		sort.Strings(notRegistered)
-		g.Expect(notRegistered).To(gomega.BeEmpty(), "hosts where the plugin has not been registered yet")
-	}).WithTimeout(time.Minute).WithPolling(time.Second).Should(gomega.Succeed())
+			sort.Strings(notRegistered)
+			g.Expect(notRegistered).To(gomega.BeEmpty(), "hosts where the plugin has not been registered yet")
+		}).WithTimeout(time.Minute).WithPolling(time.Second).Should(gomega.Succeed())
+	})
 }
 
 func (d *Driver) createFile(pod *corev1.Pod, name string, content []byte) error {
