@@ -47,110 +47,110 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 	// modify /var/lib/kubelet/plugins.
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
-	// Additional nesting is needed to ensure that the framework and driver
-	// instances get created and deleted in the right order (see
-	// https://github.com/onsi/ginkgo/issues/1022).
 	ginkgo.Context("kubelet", func() {
-		var driver = NewDriver(f, 1, 1 /* nodes */) // All tests get their own driver instance.
+		driver := NewDriver(f, 1, 1 /* nodes */) // All tests get their own driver instance.
+		b := newBuilder(f, driver)
 
 		ginkgo.It("registers plugin", func() {
 			ginkgo.By("the driver is running")
 		})
 
-		ginkgo.Context("", func() {
-			b := newBuilder(f, driver)
+		ginkgo.It("must retry NodePrepareResource", func() {
+			// We have exactly one host.
+			m := MethodInstance{driver.Hostnames()[0], NodePrepareResourceMethod}
 
-			// claimTests tries out several different combinations of pods with
-			// claims, both inline and external.
-			claimTests := func(allocationMode corev1.AllocationMode) {
-				ginkgo.It("supports simple pod referencing inline resource claim", func() {
-					parameters := b.resourceClaimParameters()
-					pod := b.podInline(allocationMode)
-					b.create(ctx, parameters, pod)
+			driver.Fail(m, true)
 
-					b.testPod(f.ClientSet, pod)
-				})
+			ginkgo.By("waiting for container startup to fail")
+			parameters := b.resourceClaimParameters()
+			pod := b.podInline(corev1.AllocationModeWaitForFirstConsumer)
 
-				ginkgo.It("supports inline claim referenced by multiple containers", func() {
-					parameters := b.resourceClaimParameters()
-					pod := b.podInlineMultiple(allocationMode)
-					b.create(ctx, parameters, pod)
+			b.create(ctx, parameters, pod)
 
-					b.testPod(f.ClientSet, pod)
-				})
+			gomega.Eventually(func() error {
+				if driver.CallCount(m) == 0 {
+					return errors.New("NodePrepareResource not called yet")
+				}
+				return nil
+			}).WithTimeout(podStartTimeout).Should(gomega.Succeed())
 
-				ginkgo.It("supports simple pod referencing external resource claim", func() {
-					parameters := b.resourceClaimParameters()
-					pod := b.podExternal()
-					b.create(ctx, parameters, b.externalClaim(allocationMode), pod)
-
-					b.testPod(f.ClientSet, pod)
-				})
-
-				ginkgo.It("supports external claim referenced by multiple pods", func() {
-					parameters := b.resourceClaimParameters()
-					pod1 := b.podExternal()
-					pod2 := b.podExternal()
-					pod3 := b.podExternal()
-					claim := b.externalClaim(allocationMode)
-					b.create(ctx, parameters, claim, pod1, pod2, pod3)
-
-					for _, pod := range []*corev1.Pod{pod1, pod2, pod3} {
-						b.testPod(f.ClientSet, pod)
-					}
-				})
-
-				ginkgo.It("supports external claim referenced by multiple containers of multiple pods", func() {
-					parameters := b.resourceClaimParameters()
-					pod1 := b.podExternalMultiple()
-					pod2 := b.podExternalMultiple()
-					pod3 := b.podExternalMultiple()
-					claim := b.externalClaim(allocationMode)
-					b.create(ctx, parameters, claim, pod1, pod2, pod3)
-
-					for _, pod := range []*corev1.Pod{pod1, pod2, pod3} {
-						b.testPod(f.ClientSet, pod)
-					}
-				})
+			ginkgo.By("allowing container startup to succeed")
+			callCount := driver.CallCount(m)
+			driver.Fail(m, false)
+			err := e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace)
+			framework.ExpectNoError(err, "start pod with inline resource claim")
+			if driver.CallCount(m) == callCount {
+				framework.Fail("NodePrepareResource should have been called again")
 			}
+		})
+	})
 
-			ginkgo.Context("with delayed allocation", func() {
-				claimTests(corev1.AllocationModeWaitForFirstConsumer)
-			})
+	ginkgo.Context("cluster", func() {
+		driver := NewDriver(f, 1, 4 /* nodes */)
+		b := newBuilder(f, driver)
 
-			ginkgo.Context("with immediate allocation", func() {
-				claimTests(corev1.AllocationModeImmediate)
-			})
-
-			ginkgo.It("must retry NodePrepareResource", func() {
-				// We have exactly one host.
-				m := MethodInstance{driver.Hostnames()[0], NodePrepareResourceMethod}
-
-				driver.Fail(m, true)
-
-				ginkgo.By("waiting for container startup to fail")
+		// claimTests tries out several different combinations of pods with
+		// claims, both inline and external.
+		claimTests := func(allocationMode corev1.AllocationMode) {
+			ginkgo.It("supports simple pod referencing inline resource claim", func() {
 				parameters := b.resourceClaimParameters()
-				pod := b.podInline(corev1.AllocationModeWaitForFirstConsumer)
-
+				pod := b.podInline(allocationMode)
 				b.create(ctx, parameters, pod)
 
-				gomega.Eventually(func() error {
-					if driver.CallCount(m) == 0 {
-						return errors.New("NodePrepareResource not called yet")
-					}
-					return nil
-				}).WithTimeout(podStartTimeout).Should(gomega.Succeed())
+				b.testPod(f.ClientSet, pod)
+			})
 
-				ginkgo.By("allowing container startup to succeed")
-				callCount := driver.CallCount(m)
-				driver.Fail(m, false)
-				err := e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace)
-				framework.ExpectNoError(err, "start pod with inline resource claim")
-				if driver.CallCount(m) == callCount {
-					framework.Fail("NodePrepareResource should have been called again")
+			ginkgo.It("supports inline claim referenced by multiple containers", func() {
+				parameters := b.resourceClaimParameters()
+				pod := b.podInlineMultiple(allocationMode)
+				b.create(ctx, parameters, pod)
+
+				b.testPod(f.ClientSet, pod)
+			})
+
+			ginkgo.It("supports simple pod referencing external resource claim", func() {
+				parameters := b.resourceClaimParameters()
+				pod := b.podExternal()
+				b.create(ctx, parameters, b.externalClaim(allocationMode), pod)
+
+				b.testPod(f.ClientSet, pod)
+			})
+
+			ginkgo.It("supports external claim referenced by multiple pods", func() {
+				parameters := b.resourceClaimParameters()
+				pod1 := b.podExternal()
+				pod2 := b.podExternal()
+				pod3 := b.podExternal()
+				claim := b.externalClaim(allocationMode)
+				b.create(ctx, parameters, claim, pod1, pod2, pod3)
+
+				for _, pod := range []*corev1.Pod{pod1, pod2, pod3} {
+					b.testPod(f.ClientSet, pod)
 				}
 			})
+
+			ginkgo.It("supports external claim referenced by multiple containers of multiple pods", func() {
+				parameters := b.resourceClaimParameters()
+				pod1 := b.podExternalMultiple()
+				pod2 := b.podExternalMultiple()
+				pod3 := b.podExternalMultiple()
+				claim := b.externalClaim(allocationMode)
+				b.create(ctx, parameters, claim, pod1, pod2, pod3)
+
+				for _, pod := range []*corev1.Pod{pod1, pod2, pod3} {
+					b.testPod(f.ClientSet, pod)
+				}
+			})
+		}
+
+		ginkgo.Context("with delayed allocation", func() {
+			claimTests(corev1.AllocationModeWaitForFirstConsumer)
 		})
+
+		ginkgo.Context("with immediate allocation", func() {
+			claimTests(corev1.AllocationModeImmediate)
+		})
+
 	})
 })
 
@@ -358,13 +358,13 @@ func newBuilder(f *framework.Framework, driver *Driver) *builder {
 	b := &builder{f: f, driver: driver}
 
 	ginkgo.BeforeEach(b.setUp)
-	ginkgo.AfterEach(b.tearDown)
 
 	return b
 }
 
 func (b *builder) setUp() {
 	b.create(context.Background(), b.class())
+	ginkgo.DeferCleanup(b.tearDown)
 }
 
 func (b *builder) tearDown() {
