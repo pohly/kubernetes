@@ -384,7 +384,7 @@ func (b *builder) tearDown() {
 	// first, in which case deleting the claims won't work
 	// anymore.
 	framework.By("delete pods and claims", func() {
-		gomega.Eventually(func(g gomega.Gomega) {
+		framework.SucceedEventually(func(g gomega.Gomega) {
 			pods, err := b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).List(ctx, metav1.ListOptions{})
 			g.Expect(err).NotTo(gomega.HaveOccurred(), "list pods")
 			for _, pod := range pods.Items {
@@ -409,6 +409,6 @@ func (b *builder) tearDown() {
 			}
 
 			g.Expect(claims.Items).To(gomega.BeEmpty(), "all resource claims removed")
-		}).WithTimeout(5*time.Minute).WithPolling(time.Second).Should(gomega.Succeed(), "clean up")
+		}, []interface{}{"delete pods and claims"}, 5*time.Minute, time.Second)
 	})
 }
