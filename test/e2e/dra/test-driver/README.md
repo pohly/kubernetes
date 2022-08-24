@@ -48,9 +48,14 @@ kubelet<->dynamic resource allocation plugin interaction.
 
 ### `local-up-cluster.sh`
 
+etcd is required to be in your PATH, install it by calling
+```console
+./hack/install_etcd.sh
+```
+
 To try out the feature, build Kubernetes, then in one console run:
 ```console
-FEATURE_GATES=DynamicResourceAllocation=true KUBELET_RESOLV_CONF="/etc/resolv-9999.conf" DNS_ADDON="coredns" CGROUP_DRIVER=systemd CONTAINER_RUNTIME_ENDPOINT=unix:///var/run/crio/crio.sock LOG_LEVEL=6 ENABLE_CSI_SNAPSHOTTER=false API_SECURE_PORT=6444 ALLOW_PRIVILEGED=1 PATH=/nvme/gopath/src/k8s.io/kubernetes/third_party/etcd:$PATH ./hack/local-up-cluster.sh -O
+FEATURE_GATES=DynamicResourceAllocation=true KUBELET_RESOLV_CONF="/var/run/systemd/resolve/resolv.conf" CGROUP_DRIVER=systemd CONTAINER_RUNTIME_ENDPOINT=unix:///var/run/crio/crio.sock LOG_LEVEL=6 API_SECURE_PORT=6444 ALLOW_PRIVILEGED=1 PATH="$(pwd)/third_party/etcd:$PATH" ./hack/local-up-cluster.sh -O
 ```
 
 In another:
@@ -66,9 +71,9 @@ go run ./test/e2e/dra/test-driver --feature-gates ContextualLogging=true -v=5 ku
 
 And finally:
 ```console
-$ kubectl create -f test/integration/cdi/example-driver/deploy/example/resourceclass.yaml
+$ kubectl create -f test/e2e/dra/test-driver/deploy/example/resourceclass.yaml
 resourceclass/example created
-$ kubectl create -f test/integration/cdi/example-driver/deploy/example/pod-inline.yaml
+$ kubectl create -f test/e2e/dra/test-driver/deploy/example/pod-inline.yaml
 configmap/pause-claim-parameters created
 pod/pause created
 
