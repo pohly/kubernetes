@@ -149,8 +149,10 @@ func NewFrameworkWithCustomTimeouts(baseName string, timeouts *TimeoutContext) *
 	return f
 }
 
-// NewDefaultFramework makes a new framework and sets up a BeforeEach/AfterEach for
-// you (you can write additional before/after each functions).
+// NewDefaultFramework makes a new framework and sets up a BeforeEach which
+// initializes the framework instance. It cleans up with a DeferCleanup,
+// which runs last, so a AfterEach in the test still has a valid framework
+// instance.
 func NewDefaultFramework(baseName string) *Framework {
 	options := Options{
 		ClientQPS:   20,
@@ -184,13 +186,17 @@ func NewFramework(baseName string, options Options, client clientset.Interface) 
 	})
 
 	ginkgo.BeforeEach(f.BeforeEach)
-	ginkgo.AfterEach(f.AfterEach)
 
 	return f
 }
 
 // BeforeEach gets a client and makes a namespace.
 func (f *Framework) BeforeEach() {
+	// DeferCleanup, in constrast to AfterEach, triggers execution in
+	// first-in-last-out order. This ensures that the framework instance
+	// remains valid as long as possible.
+	ginkgo.DeferCleanup(f.AfterEach)
+
 	f.beforeEachStarted = true
 
 	// The fact that we need this feels like a bug in ginkgo.
