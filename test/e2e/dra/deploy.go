@@ -192,7 +192,7 @@ func (d *Driver) SetUp() {
 
 	// Wait for registration.
 	framework.By("wait for plugin registration", func() {
-		gomega.Eventually(func(g gomega.Gomega) {
+		framework.SucceedEventually(func(g gomega.Gomega) {
 			var notRegistered []string
 			for hostname, plugin := range d.Hosts {
 				if !plugin.IsRegistered() {
@@ -201,7 +201,7 @@ func (d *Driver) SetUp() {
 			}
 			sort.Strings(notRegistered)
 			g.Expect(notRegistered).To(gomega.BeEmpty(), "hosts where the plugin has not been registered yet")
-		}).WithTimeout(time.Minute).WithPolling(time.Second).Should(gomega.Succeed())
+		}, []interface{}{"wait for plugin registration"}, time.Minute, time.Second)
 	})
 }
 
