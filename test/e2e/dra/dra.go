@@ -68,12 +68,14 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 
 			b.create(ctx, parameters, pod)
 
-			gomega.Eventually(func() error {
-				if driver.CallCount(m) == 0 {
-					return errors.New("NodePrepareResource not called yet")
-				}
-				return nil
-			}).WithTimeout(podStartTimeout).Should(gomega.Succeed())
+			framework.By("wait for NodePrepareResource call", func() {
+				gomega.Eventually(func() error {
+					if driver.CallCount(m) == 0 {
+						return errors.New("NodePrepareResource not called yet")
+					}
+					return nil
+				}).WithTimeout(podStartTimeout).Should(gomega.Succeed())
+			})
 
 			ginkgo.By("allowing container startup to succeed")
 			callCount := driver.CallCount(m)
@@ -320,21 +322,22 @@ func (b *builder) podExternalMultiple() *corev1.Pod {
 // create takes a bunch of objects and calls their Create function.
 func (b *builder) create(ctx context.Context, objs ...klog.KMetadata) {
 	for _, obj := range objs {
-		var err error
-		ginkgo.By(fmt.Sprintf("creating %T %s", obj, obj.GetName()))
-		switch obj := obj.(type) {
-		case *corev1.ResourceClass:
-			_, err = b.f.ClientSet.CoreV1().ResourceClasses().Create(ctx, obj, metav1.CreateOptions{})
-		case *corev1.Pod:
-			_, err = b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
-		case *corev1.ConfigMap:
-			_, err = b.f.ClientSet.CoreV1().ConfigMaps(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
-		case *corev1.ResourceClaim:
-			_, err = b.f.ClientSet.CoreV1().ResourceClaims(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
-		default:
-			framework.Fail(fmt.Sprintf("internal error, unsupported type %T", obj), 1)
-		}
-		framework.ExpectNoErrorWithOffset(1, err, "create %T", obj)
+		ginkgo.By(fmt.Sprintf("creating %T %s", obj, obj.GetName()), func() {
+			var err error
+			switch obj := obj.(type) {
+			case *corev1.ResourceClass:
+				_, err = b.f.ClientSet.CoreV1().ResourceClasses().Create(ctx, obj, metav1.CreateOptions{})
+			case *corev1.Pod:
+				_, err = b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
+			case *corev1.ConfigMap:
+				_, err = b.f.ClientSet.CoreV1().ConfigMaps(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
+			case *corev1.ResourceClaim:
+				_, err = b.f.ClientSet.CoreV1().ResourceClaims(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
+			default:
+				framework.Fail(fmt.Sprintf("internal error, unsupported type %T", obj), 1)
+			}
+			framework.ExpectNoErrorWithOffset(1, err, "create %T", obj)
+		})
 	}
 }
 
@@ -380,30 +383,32 @@ func (b *builder) tearDown() {
 	// deleted. Otherwise the driver might get deleted
 	// first, in which case deleting the claims won't work
 	// anymore.
-	gomega.Eventually(func(g gomega.Gomega) {
-		pods, err := b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).List(ctx, metav1.ListOptions{})
-		g.Expect(err).NotTo(gomega.HaveOccurred(), "list pods")
-		for _, pod := range pods.Items {
-			if pod.DeletionTimestamp != nil ||
-				pod.Labels["app.kubernetes.io/part-of"] == "dra-test-driver" {
-				continue
+	framework.By("delete pods and claims", func() {
+		gomega.Eventually(func(g gomega.Gomega) {
+			pods, err := b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).List(ctx, metav1.ListOptions{})
+			g.Expect(err).NotTo(gomega.HaveOccurred(), "list pods")
+			for _, pod := range pods.Items {
+				if pod.DeletionTimestamp != nil ||
+					pod.Labels["app.kubernetes.io/part-of"] == "dra-test-driver" {
+					continue
+				}
+				ginkgo.By(fmt.Sprintf("deleting %T %s", &pod, klog.KObj(&pod)))
+				err := b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).Delete(ctx, pod.Name, metav1.DeleteOptions{})
+				g.Expect(err).NotTo(gomega.HaveOccurred(), "delete pod")
 			}
-			ginkgo.By(fmt.Sprintf("deleting %T %s", &pod, klog.KObj(&pod)))
-			err := b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).Delete(ctx, pod.Name, metav1.DeleteOptions{})
-			g.Expect(err).NotTo(gomega.HaveOccurred(), "delete pod")
-		}
 
-		claims, err := b.f.ClientSet.CoreV1().ResourceClaims(b.f.Namespace.Name).List(ctx, metav1.ListOptions{})
-		framework.ExpectNoError(err, "get resource claims")
-		for _, claim := range claims.Items {
-			if claim.DeletionTimestamp != nil {
-				continue
+			claims, err := b.f.ClientSet.CoreV1().ResourceClaims(b.f.Namespace.Name).List(ctx, metav1.ListOptions{})
+			framework.ExpectNoError(err, "get resource claims")
+			for _, claim := range claims.Items {
+				if claim.DeletionTimestamp != nil {
+					continue
+				}
+				ginkgo.By(fmt.Sprintf("deleting %T %s", &claim, klog.KObj(&claim)))
+				err := b.f.ClientSet.CoreV1().ResourceClaims(b.f.Namespace.Name).Delete(ctx, claim.Name, metav1.DeleteOptions{})
+				g.Expect(err).NotTo(gomega.HaveOccurred(), "delete claim")
 			}
-			ginkgo.By(fmt.Sprintf("deleting %T %s", &claim, klog.KObj(&claim)))
-			err := b.f.ClientSet.CoreV1().ResourceClaims(b.f.Namespace.Name).Delete(ctx, claim.Name, metav1.DeleteOptions{})
-			g.Expect(err).NotTo(gomega.HaveOccurred(), "delete claim")
-		}
 
-		g.Expect(claims.Items).To(gomega.BeEmpty(), "all resource claims removed")
-	}).WithTimeout(5*time.Minute).WithPolling(time.Second).Should(gomega.Succeed(), "clean up")
+			g.Expect(claims.Items).To(gomega.BeEmpty(), "all resource claims removed")
+		}).WithTimeout(5*time.Minute).WithPolling(time.Second).Should(gomega.Succeed(), "clean up")
+	})
 }
