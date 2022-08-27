@@ -56,7 +56,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 		})
 
 		// This test does not pass at the moment because kubelet doesn't retry.
-		ginkgo.PIt("must retry NodePrepareResource", func() {
+		ginkgo.It("must retry NodePrepareResource", func() {
 			// We have exactly one host.
 			m := MethodInstance{driver.Hostnames()[0], NodePrepareResourceMethod}
 
