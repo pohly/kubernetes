@@ -146,30 +146,16 @@ func (m *ManagerImpl) prepareContainerResources(pod *v1.Pod, container *v1.Conta
 	return nil
 }
 
-// Allocate calls plugin NodePrepareResource from the registered DRA resource plugins.
+// Empty method to satisfy HintProvider interface
 func (m *ManagerImpl) Allocate(pod *v1.Pod, container *v1.Container) error {
-	// The pod is during the admission phase. We need to save the pod to avoid it
-	// being cleaned before the admission ended
-	m.setPodPendingAdmission(pod)
-
-	// Prepare resources for init containers first as we know the caller always loops
-	// through init containers before looping through app containers. Should the caller
-	// ever change those semantics, this logic will need to be amended.
-	for _, initContainer := range pod.Spec.InitContainers {
-		if container.Name == initContainer.Name {
-			if err := m.prepareContainerResources(pod, container); err != nil {
-				return err
-			}
-			return nil
-		}
-	}
-	if err := m.prepareContainerResources(pod, container); err != nil {
-		return err
-	}
 	return nil
 }
 
-func (m *ManagerImpl) GetCDIAnnotations(pod *v1.Pod, container *v1.Container) ([]kubecontainer.Annotation, error) {
+// PrepareResources calls plugin NodePrepareResource from the registered DRA resource plugins.
+func (m *ManagerImpl) PrepareResources(pod *v1.Pod, container *v1.Container) (*DRAContainerInfo, error) {
+	if err := m.prepareContainerResources(pod, container); err != nil {
+		return nil, err
+	}
 	annotations := []kubecontainer.Annotation{}
 	for _, podResourceClaim := range pod.Spec.ResourceClaims {
 		claimName := resourceclaim.Name(pod, &podResourceClaim)
@@ -181,11 +167,11 @@ func (m *ManagerImpl) GetCDIAnnotations(pod *v1.Pod, container *v1.Container) ([
 			if resource == nil {
 				return nil, fmt.Errorf(fmt.Sprintf("unable to get resource for namespace: %s, claim: %s", pod.Namespace, claimName))
 			}
-			klog.V(3).Infof("GetCDIAnnotations: claim %s: add resource annotations: %+v", resource.annotations)
+			klog.V(3).Infof("claim %s: add resource annotations: %+v", resource.annotations)
 			annotations = append(annotations, resource.annotations...)
 		}
 	}
-	return annotations, nil
+	return &DRAContainerInfo{Annotations: annotations}, nil
 }
 
 func (m *ManagerImpl) UnprepareResources(pod *v1.Pod) error {

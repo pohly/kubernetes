@@ -660,14 +660,12 @@ func (cm *containerManagerImpl) GetPluginRegistrationHandler() cache.PluginHandl
 // TODO: move the GetResources logic to PodContainerManager.
 func (cm *containerManagerImpl) GetResources(pod *v1.Pod, container *v1.Container) (*kubecontainer.RunContainerOptions, error) {
 	opts := &kubecontainer.RunContainerOptions{}
-	// Set container annotations from the CDI reconciler to
-	// trigger CDI injection
 	if cm.draManager != nil {
-		annotations, err := cm.draManager.GetCDIAnnotations(pod, container)
+		resOpts, err := cm.draManager.PrepareResources(pod, container)
 		if err != nil {
 			return nil, err
 		}
-		opts.Annotations = append(opts.Annotations, annotations...)
+		opts.Annotations = append(opts.Annotations, resOpts.Annotations...)
 	}
 	// Allocate should already be called during predicateAdmitHandler.Admit(),
 	// just try to fetch device runtime information from cached state here
@@ -726,13 +724,6 @@ func (m *resourceAllocator) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle
 
 		if m.memoryManager != nil {
 			err = m.memoryManager.Allocate(pod, &container)
-			if err != nil {
-				return admission.GetPodAdmitResult(err)
-			}
-		}
-
-		if m.draManager != nil {
-			err = m.draManager.Allocate(pod, &container)
 			if err != nil {
 				return admission.GetPodAdmitResult(err)
 			}

@@ -26,9 +26,12 @@ type ActivePodsFunc func() []*v1.Pod
 
 // Manager manages all the DRA resource plugins running on a node.
 type Manager interface {
-	// Allocate prepares and assigns resources to a container in a pod. From
-	// the requested resources, Allocate will communicate with the
-	// DRA resource plugin to prepare resources.
+	// PrepareResources prepares resources for a container in a pod.
+	// It communicates with the DRA resource plugin to prepare resources and
+	// returns resource info to trigger CDI injection on the runtime side.
+	PrepareResources(pod *v1.Pod, container *v1.Container) (*DRAContainerInfo, error)
+
+	// Allocate method is defined to satisfy HintProvider interface
 	Allocate(pod *v1.Pod, container *v1.Container) error
 
 	// TopologyManager HintProvider provider indicates the DRA Manager implements the Topology Manager Interface
@@ -39,13 +42,14 @@ type Manager interface {
 	// and is consulted to make Topology aware resource alignments per Pod
 	GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint
 
-	// GetCDIAnnotations checks whether we have cached resource
-	// for the passed-in <pod, container> and returns its container annotations or
-	// empty map if resource is not cached
-	GetCDIAnnotations(pod *v1.Pod, container *v1.Container) ([]kubecontainer.Annotation, error)
-
 	// UnprepareResources calls NodeUnprepareResource GRPC from DRA plugin to unprepare pod resources
 	UnprepareResources(pod *v1.Pod) error
 }
 
 const DRACheckpointDir = "/var/lib/kubelet/dra-plugins"
+
+// DRAContainerInfo contains information required by runtime to consume prepared resources.
+type DRAContainerInfo struct {
+	// The Annotations for the container
+	Annotations []kubecontainer.Annotation
+}
