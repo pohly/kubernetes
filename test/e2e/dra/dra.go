@@ -249,7 +249,8 @@ func (b *builder) resourceClaimParameters() *corev1.ConfigMap {
 // makePod returns a simple pod with no resource claims.
 // The pod prints its env and waits.
 func (b *builder) pod() *corev1.Pod {
-	pod := e2epod.MakePod(b.f.Namespace.Name, nil, nil, false, "env && sleep 100000")
+	pod := e2epod.MakePod(b.f.Namespace.Name, nil, nil, false, "env")
+	pod.Spec.RestartPolicy = corev1.RestartPolicyNever
 	pod.ObjectMeta.GenerateName = ""
 	b.podCounter++
 	pod.ObjectMeta.Name = fmt.Sprintf("tester-%d", b.podCounter)
@@ -343,7 +344,7 @@ func (b *builder) create(ctx context.Context, objs ...klog.KMetadata) {
 
 // testPod runs pod and checks if container logs contain expected environment variables
 func (b *builder) testPod(clientSet kubernetes.Interface, pod *corev1.Pod) {
-	err := e2epod.WaitForPodNameRunningInNamespace(clientSet, pod.Name, pod.Namespace)
+	err := e2epod.WaitForPodSuccessInNamespace(clientSet, pod.Name, pod.Namespace)
 	framework.ExpectNoError(err, "start pod")
 
 	for _, container := range pod.Spec.Containers {
