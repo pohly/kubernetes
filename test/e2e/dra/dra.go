@@ -386,6 +386,7 @@ func (b *builder) tearDown() {
 	framework.By("delete pods and claims", func() {
 		framework.SucceedEventually(func(g gomega.Gomega) {
 			pods, err := b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).List(ctx, metav1.ListOptions{})
+			var testPods []corev1.Pod
 			g.Expect(err).NotTo(gomega.HaveOccurred(), "list pods")
 			for _, pod := range pods.Items {
 				if pod.DeletionTimestamp != nil ||
@@ -395,7 +396,9 @@ func (b *builder) tearDown() {
 				ginkgo.By(fmt.Sprintf("deleting %T %s", &pod, klog.KObj(&pod)))
 				err := b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).Delete(ctx, pod.Name, metav1.DeleteOptions{})
 				g.Expect(err).NotTo(gomega.HaveOccurred(), "delete pod")
+				testPods = append(testPods, pod)
 			}
+			g.Expect(testPods).To(gomega.BeEmpty(), "all pods removed")
 
 			claims, err := b.f.ClientSet.CoreV1().ResourceClaims(b.f.Namespace.Name).List(ctx, metav1.ListOptions{})
 			framework.ExpectNoError(err, "get resource claims")
