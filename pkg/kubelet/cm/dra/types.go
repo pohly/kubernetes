@@ -21,9 +21,6 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
-// ActivePodsFunc is a function that returns a list of pods to reconcile.
-type ActivePodsFunc func() []*v1.Pod
-
 // Manager manages all the DRA resource plugins running on a node.
 type Manager interface {
 	// Allocate prepares and assigns resources to a container in a pod. From
@@ -47,5 +44,3 @@ type Manager interface {
 	// UnprepareResources calls NodeUnprepareResource GRPC from DRA plugin to unprepare pod resources
 	UnprepareResources(pod *v1.Pod) error
 }
-
-const DRACheckpointDir = "/var/lib/kubelet/dra-plugins"
