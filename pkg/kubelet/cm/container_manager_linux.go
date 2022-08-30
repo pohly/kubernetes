@@ -317,11 +317,10 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	// initialize DRA manager
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) {
 		klog.InfoS("Creating Dynamic Resource Allocation (DRA) manager")
-		cm.draManager, err = dra.NewManagerImpl(machineInfo.Topology, cm.topologyManager, kubeClient)
+		cm.draManager, err = dra.NewManagerImpl(kubeClient)
 		if err != nil {
 			return nil, err
 		}
-		cm.topologyManager.AddHintProvider(cm.draManager)
 	}
 
 	// Initialize CPU manager

@@ -17,7 +17,6 @@ package dra
 
 import (
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -30,17 +29,6 @@ type Manager interface {
 	// It communicates with the DRA resource plugin to prepare resources and
 	// returns resource info to trigger CDI injection on the runtime side.
 	PrepareResources(pod *v1.Pod, container *v1.Container) (*DRAContainerInfo, error)
-
-	// Allocate method is defined to satisfy HintProvider interface
-	Allocate(pod *v1.Pod, container *v1.Container) error
-
-	// TopologyManager HintProvider provider indicates the DRA Manager implements the Topology Manager Interface
-	// and is consulted to make Topology aware resource alignments
-	GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint
-
-	// TopologyManager HintProvider provider indicates the DRA Manager implements the Topology Manager Interface
-	// and is consulted to make Topology aware resource alignments per Pod
-	GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint
 
 	// UnprepareResources calls NodeUnprepareResource GRPC from DRA plugin to unprepare pod resources
 	UnprepareResources(pod *v1.Pod) error
