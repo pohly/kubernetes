@@ -31,30 +31,27 @@ type Plugin struct {
 
 // PluginsStore holds a list of DRA Plugins
 type PluginsStore struct {
-	store
+	store map[string]*Plugin
 	sync.RWMutex
 }
 
-type store map[string]Plugin
-
 // Get lets you retrieve a DRA Plugin by name.
 // This method is protected by a mutex.
-func (s *PluginsStore) Get(pluginName string) (Plugin, bool) {
+func (s *PluginsStore) Get(pluginName string) *Plugin {
 	s.RLock()
 	defer s.RUnlock()
 
-	plugin, ok := s.store[pluginName]
-	return plugin, ok
+	return s.store[pluginName]
 }
 
 // Set lets you save a DRA Plugin to the list and give it a specific name.
 // This method is protected by a mutex.
-func (s *PluginsStore) Set(pluginName string, plugin Plugin) {
+func (s *PluginsStore) Set(pluginName string, plugin *Plugin) {
 	s.Lock()
 	defer s.Unlock()
 
 	if s.store == nil {
-		s.store = store{}
+		s.store = make(map[string]*Plugin)
 	}
 
 	s.store[pluginName] = plugin
@@ -75,5 +72,5 @@ func (s *PluginsStore) Clear() {
 	s.Lock()
 	defer s.Unlock()
 
-	s.store = store{}
+	s.store = make(map[string]*Plugin)
 }
