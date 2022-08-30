@@ -22,7 +22,6 @@ import (
 	"sync"
 
 	"github.com/container-orchestrated-devices/container-device-interface/pkg/cdi"
-	cadvisorapi "github.com/google/cadvisor/info/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -31,7 +30,6 @@ import (
 	"k8s.io/component-helpers/dra/resourceclaim"
 	"k8s.io/klog/v2"
 	dra "k8s.io/kubernetes/pkg/kubelet/cm/dra/plugin"
-	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -42,15 +40,12 @@ type ManagerImpl struct {
 	// resources contains resources referenced by pod containers
 	resources *claimedResources
 
-	// pendingAdmissionPod contain the pod during the admission phase
-	pendingAdmissionPod *v1.Pod
-
 	// KubeClient reference
 	kubeClient clientset.Interface
 }
 
 // NewManagerImpl creates a new manager.
-func NewManagerImpl(topology []cadvisorapi.Node, topologyAffinityStore topologymanager.Store, kubeClient clientset.Interface) (*ManagerImpl, error) {
+func NewManagerImpl(kubeClient clientset.Interface) (*ManagerImpl, error) {
 	klog.V(2).InfoS("Creating DRA manager")
 
 	manager := &ManagerImpl{
@@ -59,13 +54,6 @@ func NewManagerImpl(topology []cadvisorapi.Node, topologyAffinityStore topologym
 	}
 
 	return manager, nil
-}
-
-func (m *ManagerImpl) setPodPendingAdmission(pod *v1.Pod) {
-	m.Lock()
-	defer m.Unlock()
-
-	m.pendingAdmissionPod = pod
 }
 
 // Generate container annotations using CDI UpdateAnnotations API
@@ -143,11 +131,6 @@ func (m *ManagerImpl) prepareContainerResources(pod *v1.Pod, container *v1.Conta
 		}
 	}
 
-	return nil
-}
-
-// Empty method to satisfy HintProvider interface
-func (m *ManagerImpl) Allocate(pod *v1.Pod, container *v1.Container) error {
 	return nil
 }
 
