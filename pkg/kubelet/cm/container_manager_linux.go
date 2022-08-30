@@ -1045,6 +1045,6 @@ func containerMemoryFromBlock(blocks []memorymanagerstate.Block) []*podresources
 	return containerMemories
 }
 
-func (cm *containerManagerImpl) UnprepareResources(pod *v1.Pod) error {
+func (cm *containerManagerImpl) UnprepareDynamicResources(pod *v1.Pod) error {
 	return cm.draManager.UnprepareResources(pod)
 }

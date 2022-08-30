@@ -154,7 +154,7 @@ func (cm *containerManagerStub) GetNodeAllocatableAbsolute() v1.ResourceList {
 	return nil
 }
 
-func (cm *containerManagerStub) UnprepareResources(*v1.Pod) error {
+func (cm *containerManagerStub) UnprepareDynamicResources(*v1.Pod) error {
 	return nil
 }
 

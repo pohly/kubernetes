@@ -237,6 +237,6 @@ func (cm *FakeContainerManager) GetNodeAllocatableAbsolute() v1.ResourceList {
 	return nil
 }
 
-func (cm *FakeContainerManager) UnprepareResources(*v1.Pod) error {
+func (cm *FakeContainerManager) UnprepareDynamicResources(*v1.Pod) error {
 	return nil
 }

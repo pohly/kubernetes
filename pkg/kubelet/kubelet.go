@@ -1877,7 +1877,7 @@ func (kl *Kubelet) syncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus
 	// NOTE: resources must be unprepared BEFORE pod status is changed on the API server
 	// to avoid raice conditions with the resource deallocation code in kubernetes core
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) {
-		if err := kl.containerManager.UnprepareResources(pod); err != nil {
+		if err := kl.containerManager.UnprepareDynamicResources(pod); err != nil {
 			return err
 		}
 	}
