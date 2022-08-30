@@ -54,7 +54,7 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 
 	// Storing endpoint of newly registered DRA Plugin into the map, where plugin name will be the key
 	// all other DRA components will be able to get the actual socket of DRA plugins by its name.
-	draPlugins.Set(pluginName, Plugin{
+	draPlugins.Set(pluginName, &Plugin{
 		endpoint:                endpoint,
 		highestSupportedVersion: highestSupportedVersion,
 	})
@@ -111,8 +111,8 @@ func (h *RegistrationHandler) validateVersions(callerName, pluginName string, en
 		return nil, errors.New(log("%s for DRA driver %q failed. None of the versions specified %q are supported. err=%v", callerName, pluginName, versions, err))
 	}
 
-	existingDriver, driverExists := draPlugins.Get(pluginName)
-	if driverExists {
+	existingDriver := draPlugins.Get(pluginName)
+	if existingDriver != nil {
 		if !existingDriver.highestSupportedVersion.LessThan(newDriverHighestVersion) {
 			return nil, errors.New(log("%s for DRA driver %q failed. Another driver with the same name is already registered with a higher supported version: %q", callerName, pluginName, existingDriver.highestSupportedVersion))
 		}

@@ -104,8 +104,8 @@ func NewDRAPluginClient(pluginName string) (DRAClient, error) {
 		return nil, fmt.Errorf("plugin name is empty")
 	}
 
-	existingDriver, driverExists := draPlugins.Get(string(pluginName))
-	if !driverExists {
+	existingDriver := draPlugins.Get(pluginName)
+	if existingDriver == nil {
 		return nil, fmt.Errorf("plugin name %s not found in the list of registered DRA plugins", pluginName)
 	}
 
