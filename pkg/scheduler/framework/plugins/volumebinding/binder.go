@@ -37,6 +37,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-helpers/storage/ephemeral"
 	"k8s.io/component-helpers/storage/volume"
 	csitrans "k8s.io/csi-translation-lib"
@@ -224,8 +225,8 @@ func NewVolumeBinder(
 	podInformer coreinformers.PodInformer,
 	nodeInformer coreinformers.NodeInformer,
 	csiNodeInformer storageinformers.CSINodeInformer,
-	pvcInformer coreinformers.PersistentVolumeClaimInformer,
-	pvInformer coreinformers.PersistentVolumeInformer,
+	pvcInformer cache.AssumeCacheInformer,
+	pvInformer cache.AssumeCacheInformer,
 	storageClassInformer storageinformers.StorageClassInformer,
 	capacityCheck CapacityCheck,
 	bindTimeout time.Duration) SchedulerVolumeBinder {
@@ -235,8 +236,8 @@ func NewVolumeBinder(
 		classLister:   storageClassInformer.Lister(),
 		nodeLister:    nodeInformer.Lister(),
 		csiNodeLister: csiNodeInformer.Lister(),
-		pvcCache:      NewPVCAssumeCache(pvcInformer.Informer()),
-		pvCache:       NewPVAssumeCache(pvInformer.Informer()),
+		pvcCache:      NewPVCAssumeCache(pvcInformer),
+		pvCache:       NewPVAssumeCache(pvInformer),
 		bindTimeout:   bindTimeout,
 		translator:    csitrans.New(),
 	}
@@ -577,12 +578,12 @@ func (b *volumeBinder) checkBindings(pod *v1.Pod, bindings []*BindingInfo, claim
 	}
 
 	for _, binding := range bindings {
-		pv, err := b.pvCache.GetAPIPV(binding.pv.Name)
+		pv, err := b.pvCache.GetAPIObj(binding.pv.Name)
 		if err != nil {
 			return false, fmt.Errorf("failed to check binding: %w", err)
 		}
 
-		pvc, err := b.pvcCache.GetAPIPVC(getPVCName(binding.pvc))
+		pvc, err := b.pvcCache.GetAPIObj(getPVCName(binding.pvc))
 		if err != nil {
 			return false, fmt.Errorf("failed to check binding: %w", err)
 		}
@@ -615,7 +616,7 @@ func (b *volumeBinder) checkBindings(pod *v1.Pod, bindings []*BindingInfo, claim
 	}
 
 	for _, claim := range claimsToProvision {
-		pvc, err := b.pvcCache.GetAPIPVC(getPVCName(claim))
+		pvc, err := b.pvcCache.GetAPIObj(getPVCName(claim))
 		if err != nil {
 			return false, fmt.Errorf("failed to check provisioning pvc: %w", err)
 		}
@@ -640,9 +641,9 @@ func (b *volumeBinder) checkBindings(pod *v1.Pod, bindings []*BindingInfo, claim
 
 		// If the PVC is bound to a PV, check its node affinity
 		if pvc.Spec.VolumeName != "" {
-			pv, err := b.pvCache.GetAPIPV(pvc.Spec.VolumeName)
+			pv, err := b.pvCache.GetAPIObj(pvc.Spec.VolumeName)
 			if err != nil {
-				if _, ok := err.(*errNotFound); ok {
+				if apierrors.IsNotFound(err) {
 					// We tolerate NotFound error here, because PV is possibly
 					// not found because of API delay, we can check next time.
 					// And if PV does not exist because it's deleted, PVC will
@@ -706,7 +707,7 @@ func (b *volumeBinder) isPVCBound(namespace, pvcName string) (bool, *v1.Persiste
 		},
 	}
 	pvcKey := getPVCName(claim)
-	pvc, err := b.pvcCache.GetPVC(pvcKey)
+	pvc, err := b.pvcCache.Get(pvcKey)
 	if err != nil || pvc == nil {
 		return false, nil, fmt.Errorf("error getting PVC %q: %v", pvcKey, err)
 	}
@@ -784,9 +785,9 @@ func (b *volumeBinder) checkBoundClaims(claims []*v1.PersistentVolumeClaim, node
 
 	for _, pvc := range claims {
 		pvName := pvc.Spec.VolumeName
-		pv, err := b.pvCache.GetPV(pvName)
+		pv, err := b.pvCache.Get(pvName)
 		if err != nil {
-			if _, ok := err.(*errNotFound); ok {
+			if apierrors.IsNotFound(err) {
 				err = nil
 			}
 			return true, false, err

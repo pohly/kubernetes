@@ -132,8 +132,8 @@ type testEnv struct {
 	internalPodInformer     coreinformers.PodInformer
 	internalNodeInformer    coreinformers.NodeInformer
 	internalCSINodeInformer storageinformers.CSINodeInformer
-	internalPVCache         *assumeCache
-	internalPVCCache        *assumeCache
+	internalPVInformer      *fakeAssumeCacheInformer
+	internalPVCInformer     *fakeAssumeCacheInformer
 
 	// For CSIStorageCapacity feature testing:
 	internalCSIDriverInformer          storageinformers.CSIDriverInformer
@@ -158,7 +158,8 @@ func newTestBinder(t *testing.T, stopCh <-chan struct{}) *testEnv {
 	podInformer := informerFactory.Core().V1().Pods()
 	nodeInformer := informerFactory.Core().V1().Nodes()
 	csiNodeInformer := informerFactory.Storage().V1().CSINodes()
-	pvcInformer := informerFactory.Core().V1().PersistentVolumeClaims()
+	pvInformer := &fakeAssumeCacheInformer{realInformer: informerFactory.Core().V1().PersistentVolumes().Informer()}
+	pvcInformer := &fakeAssumeCacheInformer{realInformer: informerFactory.Core().V1().PersistentVolumeClaims().Informer()}
 	classInformer := informerFactory.Storage().V1().StorageClasses()
 	csiDriverInformer := informerFactory.Storage().V1().CSIDrivers()
 	csiStorageCapacityInformer := informerFactory.Storage().V1().CSIStorageCapacities()
@@ -172,7 +173,7 @@ func newTestBinder(t *testing.T, stopCh <-chan struct{}) *testEnv {
 		nodeInformer,
 		csiNodeInformer,
 		pvcInformer,
-		informerFactory.Core().V1().PersistentVolumes(),
+		pvInformer,
 		classInformer,
 		capacityCheck,
 		10*time.Second)
@@ -250,18 +251,6 @@ func newTestBinder(t *testing.T, stopCh <-chan struct{}) *testEnv {
 		t.Fatalf("Failed to convert to internal binder")
 	}
 
-	pvCache := internalBinder.pvCache
-	internalPVCache, ok := pvCache.(*pvAssumeCache).AssumeCache.(*assumeCache)
-	if !ok {
-		t.Fatalf("Failed to convert to internal PV cache")
-	}
-
-	pvcCache := internalBinder.pvcCache
-	internalPVCCache, ok := pvcCache.(*pvcAssumeCache).AssumeCache.(*assumeCache)
-	if !ok {
-		t.Fatalf("Failed to convert to internal PVC cache")
-	}
-
 	return &testEnv{
 		client:                  client,
 		reactor:                 reactor,
@@ -270,8 +259,8 @@ func newTestBinder(t *testing.T, stopCh <-chan struct{}) *testEnv {
 		internalPodInformer:     podInformer,
 		internalNodeInformer:    nodeInformer,
 		internalCSINodeInformer: csiNodeInformer,
-		internalPVCache:         internalPVCache,
-		internalPVCCache:        internalPVCCache,
+		internalPVInformer:      pvInformer,
+		internalPVCInformer:     pvcInformer,
 
 		internalCSIDriverInformer:          csiDriverInformer,
 		internalCSIStorageCapacityInformer: csiStorageCapacityInformer,
@@ -305,9 +294,8 @@ func (env *testEnv) addCSIStorageCapacities(capacities []*storagev1.CSIStorageCa
 }
 
 func (env *testEnv) initClaims(cachedPVCs []*v1.PersistentVolumeClaim, apiPVCs []*v1.PersistentVolumeClaim) {
-	internalPVCCache := env.internalPVCCache
 	for _, pvc := range cachedPVCs {
-		internalPVCCache.add(pvc)
+		env.internalPVCInformer.add(pvc)
 		if apiPVCs == nil {
 			env.reactor.AddClaim(pvc)
 		}
@@ -318,9 +306,8 @@ func (env *testEnv) initClaims(cachedPVCs []*v1.PersistentVolumeClaim, apiPVCs [
 }
 
 func (env *testEnv) initVolumes(cachedPVs []*v1.PersistentVolume, apiPVs []*v1.PersistentVolume) {
-	internalPVCache := env.internalPVCache
 	for _, pv := range cachedPVs {
-		internalPVCache.add(pv)
+		env.internalPVInformer.add(pv)
 		if apiPVs == nil {
 			env.reactor.AddVolume(pv)
 		}
@@ -341,13 +328,9 @@ func (env *testEnv) updateVolumes(ctx context.Context, pvs []*v1.PersistentVolum
 	}
 	return wait.Poll(100*time.Millisecond, 3*time.Second, func() (bool, error) {
 		for _, pv := range pvs {
-			obj, err := env.internalPVCache.GetAPIObj(pv.Name)
-			if obj == nil || err != nil {
+			pvInCache, err := env.internalBinder.pvCache.GetAPIObj(pv.Name)
+			if pvInCache == nil || err != nil {
 				return false, nil
-			}
-			pvInCache, ok := obj.(*v1.PersistentVolume)
-			if !ok {
-				return false, fmt.Errorf("PV %s invalid object", pvInCache.Name)
 			}
 			if versioner.CompareResourceVersion(pvInCache, pv) != 0 {
 				return false, nil
@@ -367,13 +350,9 @@ func (env *testEnv) updateClaims(ctx context.Context, pvcs []*v1.PersistentVolum
 	}
 	return wait.Poll(100*time.Millisecond, 3*time.Second, func() (bool, error) {
 		for _, pvc := range pvcs {
-			obj, err := env.internalPVCCache.GetAPIObj(getPVCName(pvc))
-			if obj == nil || err != nil {
+			pvcInCache, err := env.internalBinder.pvcCache.GetAPIObj(getPVCName(pvc))
+			if pvcInCache == nil || err != nil {
 				return false, nil
-			}
-			pvcInCache, ok := obj.(*v1.PersistentVolumeClaim)
-			if !ok {
-				return false, fmt.Errorf("PVC %s invalid object", pvcInCache.Name)
 			}
 			if versioner.CompareResourceVersion(pvcInCache, pvc) != 0 {
 				return false, nil
@@ -385,13 +364,13 @@ func (env *testEnv) updateClaims(ctx context.Context, pvcs []*v1.PersistentVolum
 
 func (env *testEnv) deleteVolumes(pvs []*v1.PersistentVolume) {
 	for _, pv := range pvs {
-		env.internalPVCache.delete(pv)
+		env.internalPVInformer.delete(pv)
 	}
 }
 
 func (env *testEnv) deleteClaims(pvcs []*v1.PersistentVolumeClaim) {
 	for _, pvc := range pvcs {
-		env.internalPVCCache.delete(pvc)
+		env.internalPVCInformer.delete(pvc)
 	}
 }
 
@@ -463,7 +442,7 @@ func (env *testEnv) validateAssume(t *testing.T, pod *v1.Pod, bindings []*Bindin
 	// Check pv cache
 	pvCache := env.internalBinder.pvCache
 	for _, b := range bindings {
-		pv, err := pvCache.GetPV(b.pv.Name)
+		pv, err := pvCache.Get(b.pv.Name)
 		if err != nil {
 			t.Errorf("GetPV %q returned error: %v", b.pv.Name, err)
 			continue
@@ -484,7 +463,7 @@ func (env *testEnv) validateAssume(t *testing.T, pod *v1.Pod, bindings []*Bindin
 	pvcCache := env.internalBinder.pvcCache
 	for _, p := range provisionings {
 		pvcKey := getPVCName(p)
-		pvc, err := pvcCache.GetPVC(pvcKey)
+		pvc, err := pvcCache.Get(pvcKey)
 		if err != nil {
 			t.Errorf("GetPVC %q returned error: %v", pvcKey, err)
 			continue
@@ -499,8 +478,8 @@ func (env *testEnv) validateCacheRestored(t *testing.T, pod *v1.Pod, bindings []
 	// All PVs have been unmodified in cache
 	pvCache := env.internalBinder.pvCache
 	for _, b := range bindings {
-		pv, _ := pvCache.GetPV(b.pv.Name)
-		apiPV, _ := pvCache.GetAPIPV(b.pv.Name)
+		pv, _ := pvCache.Get(b.pv.Name)
+		apiPV, _ := pvCache.GetAPIObj(b.pv.Name)
 		// PV could be nil if it's missing from cache
 		if pv != nil && pv != apiPV {
 			t.Errorf("PV %q was modified in cache", b.pv.Name)
@@ -511,7 +490,7 @@ func (env *testEnv) validateCacheRestored(t *testing.T, pod *v1.Pod, bindings []
 	pvcCache := env.internalBinder.pvcCache
 	for _, p := range provisionings {
 		pvcKey := getPVCName(p)
-		pvc, err := pvcCache.GetPVC(pvcKey)
+		pvc, err := pvcCache.Get(pvcKey)
 		if err != nil {
 			t.Errorf("GetPVC %q returned error: %v", pvcKey, err)
 			continue
@@ -531,7 +510,7 @@ func (env *testEnv) validateBind(
 	// Check pv cache
 	pvCache := env.internalBinder.pvCache
 	for _, pv := range expectedPVs {
-		cachedPV, err := pvCache.GetPV(pv.Name)
+		cachedPV, err := pvCache.Get(pv.Name)
 		if err != nil {
 			t.Errorf("GetPV %q returned error: %v", pv.Name, err)
 		}
@@ -558,7 +537,7 @@ func (env *testEnv) validateProvision(
 	// Check pvc cache
 	pvcCache := env.internalBinder.pvcCache
 	for _, pvc := range expectedPVCs {
-		cachedPVC, err := pvcCache.GetPVC(getPVCName(pvc))
+		cachedPVC, err := pvcCache.Get(getPVCName(pvc))
 		if err != nil {
 			t.Errorf("GetPVC %q returned error: %v", getPVCName(pvc), err)
 		}

@@ -23,7 +23,52 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/component-helpers/storage/volume"
+	"k8s.io/client-go/tools/cache"
 )
+
+// fakeAssumeCacheInformer wraps a cache.AssumeCacheInformer and makes it possible
+// to add/update/delete objects directly.
+type fakeAssumeCacheInformer struct {
+	realInformer cache.AssumeCacheInformer
+	eventHandlers []cache.ResourceEventHandler
+}
+
+func (fi *fakeAssumeCacheInformer) AddEventHandler(handler cache.ResourceEventHandler) {
+	if fi.realInformer != nil {
+		fi.realInformer.AddEventHandler(handler)
+	}
+	fi.eventHandlers = append(fi.eventHandlers, handler)
+}
+
+func (fi *fakeAssumeCacheInformer) add(obj interface{}) {
+	for _, handler := range fi.eventHandlers {
+		handler.OnAdd(obj)
+	}
+}
+
+func (fi *fakeAssumeCacheInformer) update(oldObj, newObj interface{}) {
+	for _, handler := range fi.eventHandlers {
+		handler.OnUpdate(oldObj, newObj)
+	}
+}
+
+func (fi *fakeAssumeCacheInformer) delete(obj interface{}) {
+	for _, handler := range fi.eventHandlers {
+		handler.OnDelete(obj)
+	}
+}
+
+func newTestPVAssumeCache() (PVAssumeCache, *fakeAssumeCacheInformer) {
+	internalCache := &fakeAssumeCacheInformer{}
+	cache := NewPVAssumeCache(internalCache)
+	return cache, internalCache
+}
+
+func newTestPVCAssumeCache() (PVCAssumeCache, *fakeAssumeCacheInformer) {
+	internalCache := &fakeAssumeCacheInformer{}
+	cache := NewPVCAssumeCache(internalCache)
+	return cache, internalCache
+}
 
 func verifyListPVs(t *testing.T, cache PVAssumeCache, expectedPVs map[string]*v1.PersistentVolume, storageClassName string) {
 	pvList := cache.ListPVs(storageClassName)
@@ -42,7 +87,7 @@ func verifyListPVs(t *testing.T, cache PVAssumeCache, expectedPVs map[string]*v1
 }
 
 func verifyPV(cache PVAssumeCache, name string, expectedPV *v1.PersistentVolume) error {
-	pv, err := cache.GetPV(name)
+	pv, err := cache.Get(name)
 	if err != nil {
 		return err
 	}
@@ -96,11 +141,7 @@ func TestAssumePV(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
-		cache := NewPVAssumeCache(nil)
-		internalCache, ok := cache.(*pvAssumeCache).AssumeCache.(*assumeCache)
-		if !ok {
-			t.Fatalf("Failed to get internal cache")
-		}
+		cache, internalCache := newTestPVAssumeCache()
 
 		// Add oldPV to cache
 		internalCache.add(scenario.oldPV)
@@ -130,11 +171,7 @@ func TestAssumePV(t *testing.T) {
 }
 
 func TestRestorePV(t *testing.T) {
-	cache := NewPVAssumeCache(nil)
-	internalCache, ok := cache.(*pvAssumeCache).AssumeCache.(*assumeCache)
-	if !ok {
-		t.Fatalf("Failed to get internal cache")
-	}
+	cache, internalCache := newTestPVAssumeCache()
 
 	oldPV := makePV("pv1", "").withVersion("5").PersistentVolume
 	newPV := makePV("pv1", "").withVersion("5").PersistentVolume
@@ -170,14 +207,10 @@ func TestRestorePV(t *testing.T) {
 }
 
 func TestBasicPVCache(t *testing.T) {
-	cache := NewPVAssumeCache(nil)
-	internalCache, ok := cache.(*pvAssumeCache).AssumeCache.(*assumeCache)
-	if !ok {
-		t.Fatalf("Failed to get internal cache")
-	}
+	cache, internalCache := newTestPVAssumeCache()
 
 	// Get object that doesn't exist
-	pv, err := cache.GetPV("nothere")
+	pv, err := cache.Get("nothere")
 	if err == nil {
 		t.Errorf("GetPV() returned unexpected success")
 	}
@@ -214,11 +247,7 @@ func TestBasicPVCache(t *testing.T) {
 }
 
 func TestPVCacheWithStorageClasses(t *testing.T) {
-	cache := NewPVAssumeCache(nil)
-	internalCache, ok := cache.(*pvAssumeCache).AssumeCache.(*assumeCache)
-	if !ok {
-		t.Fatalf("Failed to get internal cache")
-	}
+	cache, internalCache := newTestPVAssumeCache()
 
 	// Add a bunch of PVs
 	pvs1 := map[string]*v1.PersistentVolume{}
@@ -260,11 +289,7 @@ func TestPVCacheWithStorageClasses(t *testing.T) {
 }
 
 func TestAssumeUpdatePVCache(t *testing.T) {
-	cache := NewPVAssumeCache(nil)
-	internalCache, ok := cache.(*pvAssumeCache).AssumeCache.(*assumeCache)
-	if !ok {
-		t.Fatalf("Failed to get internal cache")
-	}
+	cache, internalCache := newTestPVAssumeCache()
 
 	pvName := "test-pv0"
 
@@ -304,7 +329,7 @@ func makeClaim(name, version, namespace string) *v1.PersistentVolumeClaim {
 }
 
 func verifyPVC(cache PVCAssumeCache, pvcKey string, expectedPVC *v1.PersistentVolumeClaim) error {
-	pvc, err := cache.GetPVC(pvcKey)
+	pvc, err := cache.Get(pvcKey)
 	if err != nil {
 		return err
 	}
@@ -353,11 +378,7 @@ func TestAssumePVC(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
-		cache := NewPVCAssumeCache(nil)
-		internalCache, ok := cache.(*pvcAssumeCache).AssumeCache.(*assumeCache)
-		if !ok {
-			t.Fatalf("Failed to get internal cache")
-		}
+		cache, internalCache := newTestPVCAssumeCache()
 
 		// Add oldPVC to cache
 		internalCache.add(scenario.oldPVC)
@@ -387,11 +408,7 @@ func TestAssumePVC(t *testing.T) {
 }
 
 func TestRestorePVC(t *testing.T) {
-	cache := NewPVCAssumeCache(nil)
-	internalCache, ok := cache.(*pvcAssumeCache).AssumeCache.(*assumeCache)
-	if !ok {
-		t.Fatalf("Failed to get internal cache")
-	}
+	cache, internalCache := newTestPVCAssumeCache()
 
 	oldPVC := makeClaim("pvc1", "5", "ns1")
 	newPVC := makeClaim("pvc1", "5", "ns1")
@@ -427,11 +444,7 @@ func TestRestorePVC(t *testing.T) {
 }
 
 func TestAssumeUpdatePVCCache(t *testing.T) {
-	cache := NewPVCAssumeCache(nil)
-	internalCache, ok := cache.(*pvcAssumeCache).AssumeCache.(*assumeCache)
-	if !ok {
-		t.Fatalf("Failed to get internal cache")
-	}
+	cache, internalCache := newTestPVCAssumeCache()
 
 	pvcName := "test-pvc0"
 	pvcNamespace := "test-ns"
