@@ -61,8 +61,8 @@ func pvStorageClassIndexFunc(obj interface{}) ([]string, error) {
 	return []string{""}, fmt.Errorf("object is not a persistentVolume: %v", obj)
 }
 
-func newPVAssumeCache(logger klog.Logger) pvAssumeCache {
-	return pvAssumeCache{NewAssumeCache[*persistentVolume](logger, nil, "persistentVolume", "storageclass", pvStorageClassIndexFunc)}
+func newPVAssumeCache(logger klog.Logger, informer AssumeCacheInformer) pvAssumeCache {
+	return pvAssumeCache{NewAssumeCache[*persistentVolume](logger, informer, "persistentVolume", "storageclass", pvStorageClassIndexFunc)}
 }
 
 func verifyListPVs(t *testing.T, cache pvAssumeCache, expectedPVs map[string]*persistentVolume, storageClassName string) {
@@ -138,7 +138,7 @@ func TestAssumePV(t *testing.T) {
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
-			cache := newPVAssumeCache(logger)
+			cache := newPVAssumeCache(logger, nil)
 			internalCache, ok := cache.AssumeCache.(*assumeCache[*persistentVolume])
 			if !ok {
 				t.Fatalf("Failed to get internal cache")
@@ -173,7 +173,7 @@ func TestAssumePV(t *testing.T) {
 
 func TestRestorePV(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
-	cache := newPVAssumeCache(logger)
+	cache := newPVAssumeCache(logger, nil)
 	internalCache, ok := cache.AssumeCache.(*assumeCache[*persistentVolume])
 	if !ok {
 		t.Fatalf("Failed to get internal cache")
@@ -214,7 +214,7 @@ func TestRestorePV(t *testing.T) {
 
 func TestBasicPVCache(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
-	cache := newPVAssumeCache(logger)
+	cache := newPVAssumeCache(logger, nil)
 	internalCache, ok := cache.AssumeCache.(*assumeCache[*persistentVolume])
 	if !ok {
 		t.Fatalf("Failed to get internal cache")
@@ -262,7 +262,7 @@ func TestBasicPVCache(t *testing.T) {
 
 func TestPVCacheWithStorageClasses(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
-	cache := newPVAssumeCache(logger)
+	cache := newPVAssumeCache(logger, nil)
 	internalCache, ok := cache.AssumeCache.(*assumeCache[*persistentVolume])
 	if !ok {
 		t.Fatalf("Failed to get internal cache")
@@ -309,7 +309,7 @@ func TestPVCacheWithStorageClasses(t *testing.T) {
 
 func TestAssumeUpdatePVCache(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
-	cache := newPVAssumeCache(logger)
+	cache := newPVAssumeCache(logger, nil)
 	internalCache, ok := cache.AssumeCache.(*assumeCache[*persistentVolume])
 	if !ok {
 		t.Fatalf("Failed to get internal cache")
@@ -338,5 +338,80 @@ func TestAssumeUpdatePVCache(t *testing.T) {
 	internalCache.add(pv)
 	if err := verifyPV(cache, pvName, &newPV); err != nil {
 		t.Fatalf("failed to get PV after old PV added: %v", err)
+	}
+}
+
+type fakeAssumeCacheInformer struct {
+	eventHandlers []ResourceEventHandler
+}
+
+func (fi *fakeAssumeCacheInformer) AddEventHandler(handler ResourceEventHandler) {
+	fi.eventHandlers = append(fi.eventHandlers, handler)
+}
+
+func (fi *fakeAssumeCacheInformer) add(obj interface{}) {
+	for _, handler := range fi.eventHandlers {
+		handler.OnAdd(obj)
+	}
+}
+
+func (fi *fakeAssumeCacheInformer) update(oldObj, newObj interface{}) {
+	for _, handler := range fi.eventHandlers {
+		handler.OnUpdate(oldObj, newObj)
+	}
+}
+
+func (fi *fakeAssumeCacheInformer) delete(obj interface{}) {
+	for _, handler := range fi.eventHandlers {
+		handler.OnDelete(obj)
+	}
+}
+
+func TestAssumeEventHandler(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	informer := &fakeAssumeCacheInformer{}
+	cache := newPVAssumeCache(logger, informer)
+
+	pv := makePV("test-pv0", "", "1")
+	pvUpdate := makePV("test-pv0", "test-claim", "2")
+
+	counts := map[string]int{}
+	cache.AddEventHandler(
+		ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				counts["added"]++
+
+				if p, ok := obj.(*persistentVolume); !ok || p != pv {
+					t.Errorf("Expected %v, got %v", pv, obj)
+				}
+			},
+			UpdateFunc: func(oldObj, newObj interface{}) {
+				counts["updated"]++
+
+				if p, ok := oldObj.(*persistentVolume); !ok || p != pv {
+					t.Errorf("Expected %v, got %v", pv, oldObj)
+				}
+				if p, ok := newObj.(*persistentVolume); !ok || p != pvUpdate {
+					t.Errorf("Expected %v, got %v", pv, newObj)
+				}
+
+			},
+			DeleteFunc: func(obj interface{}) {
+				counts["deleted"]++
+
+				if p, ok := obj.(*persistentVolume); !ok || p != pvUpdate {
+					t.Errorf("Expected %v, got %v", pv, obj)
+				}
+			},
+		},
+	)
+
+	informer.add(pv)
+	informer.update(pv, pvUpdate)
+	informer.delete(pvUpdate)
+	for name, count := range counts {
+		if count != 1 {
+			t.Errorf("Expected 1 %s event, got %d", name, count)
+		}
 	}
 }
