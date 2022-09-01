@@ -105,7 +105,7 @@ func (d *Driver) SetUp() {
 	d.wg.Add(1)
 	go func() {
 		defer d.wg.Done()
-		app.RunController(d.ctx, d.f.ClientSet, d.Name, 1 /* workers */)
+		app.RunController(d.ctx, d.f.ClientSet, d.Name, 5 /* workers */)
 	}()
 
 	// The kubelet plugin is harder. We deploy the builtin manifest
