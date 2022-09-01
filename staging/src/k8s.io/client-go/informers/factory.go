@@ -64,6 +64,9 @@ type sharedInformerFactory struct {
 	// startedInformers is used for tracking which informers have been started.
 	// This allows Start() to be called multiple times safely.
 	startedInformers map[reflect.Type]bool
+
+	// wg keeps track of how many informers are running.
+	wg sync.WaitGroup
 }
 
 // WithCustomResyncConfig sets a custom resync period for the specified informer types.
@@ -131,10 +134,19 @@ func (f *sharedInformerFactory) Start(stopCh <-chan struct{}) {
 
 	for informerType, informer := range f.informers {
 		if !f.startedInformers[informerType] {
-			go informer.Run(stopCh)
+			f.wg.Add(1)
+			informer := informer
+			go func() {
+				defer f.wg.Done()
+				informer.Run(stopCh)
+			}()
 			f.startedInformers[informerType] = true
 		}
 	}
+}
+
+func (f *sharedInformerFactory) WaitForShutdown() {
+	f.wg.Wait()
 }
 
 // WaitForCacheSync waits for all started informers' cache were synced.

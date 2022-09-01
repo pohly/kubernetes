@@ -32,7 +32,14 @@ type NewInformerFunc func(kubernetes.Interface, time.Duration) cache.SharedIndex
 
 // SharedInformerFactory a small interface to allow for adding an informer without an import cycle
 type SharedInformerFactory interface {
+	// Start runs all currently created informers. May be called more than once.
+	// Informers keep running until the stop channel is ready.
 	Start(stopCh <-chan struct{})
+
+	// WaitForShutdown blocks until all started informers have stopped running.
+	// May be called even when Start was not called.
+	WaitForShutdown()
+
 	InformerFor(obj runtime.Object, newFunc NewInformerFunc) cache.SharedIndexInformer
 }
 
