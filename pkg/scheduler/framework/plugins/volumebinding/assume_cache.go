@@ -22,6 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/cache"
 	storagehelpers "k8s.io/component-helpers/storage/volume"
+	"k8s.io/klog/v2"
 )
 
 // PVAssumeCache is a AssumeCache for PersistentVolume objects
@@ -43,8 +44,8 @@ func pvStorageClassIndexFunc(obj interface{}) ([]string, error) {
 }
 
 // NewPVAssumeCache creates a PV assume cache.
-func NewPVAssumeCache(informer cache.AssumeCacheInformer) PVAssumeCache {
-	return pvAssumeCache{cache.NewAssumeCache[*v1.PersistentVolume](informer, "v1.PersistentVolume", "storageclass", pvStorageClassIndexFunc)}
+func NewPVAssumeCache(logger klog.Logger, informer cache.AssumeCacheInformer) PVAssumeCache {
+	return pvAssumeCache{cache.NewAssumeCache[*v1.PersistentVolume](logger, informer, "v1.PersistentVolume", "storageclass", pvStorageClassIndexFunc)}
 }
 
 func (c pvAssumeCache) ListPVs(storageClassName string) []*v1.PersistentVolume {
@@ -59,6 +60,6 @@ func (c pvAssumeCache) ListPVs(storageClassName string) []*v1.PersistentVolume {
 type PVCAssumeCache cache.AssumeCache[*v1.PersistentVolumeClaim]
 
 // NewPVCAssumeCache creates a PVC assume cache.
-func NewPVCAssumeCache(informer cache.AssumeCacheInformer) PVCAssumeCache {
-	return cache.NewAssumeCache[*v1.PersistentVolumeClaim](informer, "v1.PersistentVolumeClaim", "", nil)
+func NewPVCAssumeCache(logger klog.Logger, informer cache.AssumeCacheInformer) PVCAssumeCache {
+	return cache.NewAssumeCache[*v1.PersistentVolumeClaim](logger, informer, "v1.PersistentVolumeClaim", "", nil)
 }

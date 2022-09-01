@@ -377,14 +377,14 @@ func (env *testEnv) deleteClaims(pvcs []*v1.PersistentVolumeClaim) {
 func (env *testEnv) assumeVolumes(t *testing.T, node string, pod *v1.Pod, bindings []*BindingInfo, provisionings []*v1.PersistentVolumeClaim) {
 	pvCache := env.internalBinder.pvCache
 	for _, binding := range bindings {
-		if err := pvCache.Assume(binding.pv); err != nil {
+		if err := pvCache.Assume(klog.TODO(), binding.pv); err != nil {
 			t.Fatalf("error: %v", err)
 		}
 	}
 
 	pvcCache := env.internalBinder.pvcCache
 	for _, pvc := range provisionings {
-		if err := pvcCache.Assume(pvc); err != nil {
+		if err := pvcCache.Assume(klog.TODO(), pvc); err != nil {
 			t.Fatalf("error: %v", err)
 		}
 	}

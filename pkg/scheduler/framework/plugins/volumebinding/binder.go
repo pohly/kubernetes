@@ -230,14 +230,15 @@ func NewVolumeBinder(
 	storageClassInformer storageinformers.StorageClassInformer,
 	capacityCheck CapacityCheck,
 	bindTimeout time.Duration) SchedulerVolumeBinder {
+	logger := klog.TODO()
 	b := &volumeBinder{
 		kubeClient:    kubeClient,
 		podLister:     podInformer.Lister(),
 		classLister:   storageClassInformer.Lister(),
 		nodeLister:    nodeInformer.Lister(),
 		csiNodeLister: csiNodeInformer.Lister(),
-		pvcCache:      NewPVCAssumeCache(pvcInformer),
-		pvCache:       NewPVAssumeCache(pvInformer),
+		pvcCache:      NewPVCAssumeCache(logger, pvcInformer),
+		pvCache:       NewPVAssumeCache(logger, pvInformer),
 		bindTimeout:   bindTimeout,
 		translator:    csitrans.New(),
 	}
@@ -393,7 +394,7 @@ func (b *volumeBinder) AssumePodVolumes(assumedPod *v1.Pod, nodeName string, pod
 		}
 		// TODO: can we assume every time?
 		if dirty {
-			err = b.pvCache.Assume(newPV)
+			err = b.pvCache.Assume(klog.TODO(), newPV)
 			if err != nil {
 				b.revertAssumedPVs(newBindings)
 				return false, err
@@ -409,7 +410,7 @@ func (b *volumeBinder) AssumePodVolumes(assumedPod *v1.Pod, nodeName string, pod
 		// modify these, therefore create a copy.
 		claimClone := claim.DeepCopy()
 		metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, volume.AnnSelectedNode, nodeName)
-		err = b.pvcCache.Assume(claimClone)
+		err = b.pvcCache.Assume(klog.TODO(), claimClone)
 		if err != nil {
 			b.revertAssumedPVs(newBindings)
 			b.revertAssumedPVCs(newProvisionedPVCs)
@@ -901,13 +902,13 @@ func (b *volumeBinder) checkVolumeProvisions(pod *v1.Pod, claimsToProvision []*v
 
 func (b *volumeBinder) revertAssumedPVs(bindings []*BindingInfo) {
 	for _, BindingInfo := range bindings {
-		b.pvCache.Restore(BindingInfo.pv.Name)
+		b.pvCache.Restore(klog.TODO(), BindingInfo.pv.Name)
 	}
 }
 
 func (b *volumeBinder) revertAssumedPVCs(claims []*v1.PersistentVolumeClaim) {
 	for _, claim := range claims {
-		b.pvcCache.Restore(getPVCName(claim))
+		b.pvcCache.Restore(klog.TODO(), getPVCName(claim))
 	}
 }
 

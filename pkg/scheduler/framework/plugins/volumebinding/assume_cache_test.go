@@ -22,14 +22,16 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/component-helpers/storage/volume"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/component-helpers/storage/volume"
+	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 )
 
 // fakeAssumeCacheInformer wraps a cache.AssumeCacheInformer and makes it possible
 // to add/update/delete objects directly.
 type fakeAssumeCacheInformer struct {
-	realInformer cache.AssumeCacheInformer
+	realInformer  cache.AssumeCacheInformer
 	eventHandlers []cache.ResourceEventHandler
 }
 
@@ -58,15 +60,15 @@ func (fi *fakeAssumeCacheInformer) delete(obj interface{}) {
 	}
 }
 
-func newTestPVAssumeCache() (PVAssumeCache, *fakeAssumeCacheInformer) {
+func newTestPVAssumeCache(logger klog.Logger) (PVAssumeCache, *fakeAssumeCacheInformer) {
 	internalCache := &fakeAssumeCacheInformer{}
-	cache := NewPVAssumeCache(internalCache)
+	cache := NewPVAssumeCache(logger, internalCache)
 	return cache, internalCache
 }
 
-func newTestPVCAssumeCache() (PVCAssumeCache, *fakeAssumeCacheInformer) {
+func newTestPVCAssumeCache(logger klog.Logger) (PVCAssumeCache, *fakeAssumeCacheInformer) {
 	internalCache := &fakeAssumeCacheInformer{}
-	cache := NewPVCAssumeCache(internalCache)
+	cache := NewPVCAssumeCache(logger, internalCache)
 	return cache, internalCache
 }
 
@@ -141,43 +143,46 @@ func TestAssumePV(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
-		cache, internalCache := newTestPVAssumeCache()
+		t.Run(name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			cache, internalCache := newTestPVAssumeCache(logger)
 
-		// Add oldPV to cache
-		internalCache.add(scenario.oldPV)
-		if err := verifyPV(cache, scenario.oldPV.Name, scenario.oldPV); err != nil {
-			t.Errorf("Failed to GetPV() after initial update: %v", err)
-			continue
-		}
+			// Add oldPV to cache
+			internalCache.add(scenario.oldPV)
+			if err := verifyPV(cache, scenario.oldPV.Name, scenario.oldPV); err != nil {
+				t.Fatalf("Failed to GetPV() after initial update: %v", err)
+			}
 
-		// Assume newPV
-		err := cache.Assume(scenario.newPV)
-		if scenario.shouldSucceed && err != nil {
-			t.Errorf("Test %q failed: Assume() returned error %v", name, err)
-		}
-		if !scenario.shouldSucceed && err == nil {
-			t.Errorf("Test %q failed: Assume() returned success but expected error", name)
-		}
+			// Assume newPV
+			err := cache.Assume(logger, scenario.newPV)
+			if scenario.shouldSucceed && err != nil {
+				t.Errorf("Assume() returned error %v", err)
+			}
+			if !scenario.shouldSucceed && err == nil {
+				t.Errorf("Assume() returned success but expected error")
+			}
 
-		// Check that GetPV returns correct PV
-		expectedPV := scenario.newPV
-		if !scenario.shouldSucceed {
-			expectedPV = scenario.oldPV
-		}
-		if err := verifyPV(cache, scenario.oldPV.Name, expectedPV); err != nil {
-			t.Errorf("Failed to GetPV() after initial update: %v", err)
-		}
+			// Check that GetPV returns correct PV
+			expectedPV := scenario.newPV
+			if !scenario.shouldSucceed {
+				expectedPV = scenario.oldPV
+			}
+			if err := verifyPV(cache, scenario.oldPV.Name, expectedPV); err != nil {
+				t.Errorf("Failed to GetPV() after initial update: %v", err)
+			}
+		})
 	}
 }
 
 func TestRestorePV(t *testing.T) {
-	cache, internalCache := newTestPVAssumeCache()
+	logger, _ := ktesting.NewTestContext(t)
+	cache, internalCache := newTestPVAssumeCache(logger)
 
 	oldPV := makePV("pv1", "").withVersion("5").PersistentVolume
 	newPV := makePV("pv1", "").withVersion("5").PersistentVolume
 
 	// Restore PV that doesn't exist
-	cache.Restore("nothing")
+	cache.Restore(logger, "nothing")
 
 	// Add oldPV to cache
 	internalCache.add(oldPV)
@@ -186,13 +191,13 @@ func TestRestorePV(t *testing.T) {
 	}
 
 	// Restore PV
-	cache.Restore(oldPV.Name)
+	cache.Restore(logger, oldPV.Name)
 	if err := verifyPV(cache, oldPV.Name, oldPV); err != nil {
 		t.Fatalf("Failed to GetPV() after initial restore: %v", err)
 	}
 
 	// Assume newPV
-	if err := cache.Assume(newPV); err != nil {
+	if err := cache.Assume(logger, newPV); err != nil {
 		t.Fatalf("Assume() returned error %v", err)
 	}
 	if err := verifyPV(cache, oldPV.Name, newPV); err != nil {
@@ -200,14 +205,15 @@ func TestRestorePV(t *testing.T) {
 	}
 
 	// Restore PV
-	cache.Restore(oldPV.Name)
+	cache.Restore(logger, oldPV.Name)
 	if err := verifyPV(cache, oldPV.Name, oldPV); err != nil {
 		t.Fatalf("Failed to GetPV() after restore: %v", err)
 	}
 }
 
 func TestBasicPVCache(t *testing.T) {
-	cache, internalCache := newTestPVAssumeCache()
+	logger, _ := ktesting.NewTestContext(t)
+	cache, internalCache := newTestPVAssumeCache(logger)
 
 	// Get object that doesn't exist
 	pv, err := cache.Get("nothere")
@@ -247,7 +253,8 @@ func TestBasicPVCache(t *testing.T) {
 }
 
 func TestPVCacheWithStorageClasses(t *testing.T) {
-	cache, internalCache := newTestPVAssumeCache()
+	logger, _ := ktesting.NewTestContext(t)
+	cache, internalCache := newTestPVAssumeCache(logger)
 
 	// Add a bunch of PVs
 	pvs1 := map[string]*v1.PersistentVolume{}
@@ -289,7 +296,8 @@ func TestPVCacheWithStorageClasses(t *testing.T) {
 }
 
 func TestAssumeUpdatePVCache(t *testing.T) {
-	cache, internalCache := newTestPVAssumeCache()
+	logger, _ := ktesting.NewTestContext(t)
+	cache, internalCache := newTestPVAssumeCache(logger)
 
 	pvName := "test-pv0"
 
@@ -303,7 +311,7 @@ func TestAssumeUpdatePVCache(t *testing.T) {
 	// Assume PV
 	newPV := pv.DeepCopy()
 	newPV.Spec.ClaimRef = &v1.ObjectReference{Name: "test-claim"}
-	if err := cache.Assume(newPV); err != nil {
+	if err := cache.Assume(logger, newPV); err != nil {
 		t.Fatalf("failed to assume PV: %v", err)
 	}
 	if err := verifyPV(cache, pvName, newPV); err != nil {
@@ -378,43 +386,46 @@ func TestAssumePVC(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
-		cache, internalCache := newTestPVCAssumeCache()
+		t.Run(name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			cache, internalCache := newTestPVCAssumeCache(logger)
 
-		// Add oldPVC to cache
-		internalCache.add(scenario.oldPVC)
-		if err := verifyPVC(cache, getPVCName(scenario.oldPVC), scenario.oldPVC); err != nil {
-			t.Errorf("Failed to GetPVC() after initial update: %v", err)
-			continue
-		}
+			// Add oldPVC to cache
+			internalCache.add(scenario.oldPVC)
+			if err := verifyPVC(cache, getPVCName(scenario.oldPVC), scenario.oldPVC); err != nil {
+				t.Fatalf("Failed to GetPVC() after initial update: %v", err)
+			}
 
-		// Assume newPVC
-		err := cache.Assume(scenario.newPVC)
-		if scenario.shouldSucceed && err != nil {
-			t.Errorf("Test %q failed: Assume() returned error %v", name, err)
-		}
-		if !scenario.shouldSucceed && err == nil {
-			t.Errorf("Test %q failed: Assume() returned success but expected error", name)
-		}
+			// Assume newPVC
+			err := cache.Assume(logger, scenario.newPVC)
+			if scenario.shouldSucceed && err != nil {
+				t.Errorf("Assume() returned error %v", err)
+			}
+			if !scenario.shouldSucceed && err == nil {
+				t.Errorf("Assume() returned success but expected error")
+			}
 
-		// Check that GetPVC returns correct PVC
-		expectedPV := scenario.newPVC
-		if !scenario.shouldSucceed {
-			expectedPV = scenario.oldPVC
-		}
-		if err := verifyPVC(cache, getPVCName(scenario.oldPVC), expectedPV); err != nil {
-			t.Errorf("Failed to GetPVC() after initial update: %v", err)
-		}
+			// Check that GetPVC returns correct PVC
+			expectedPV := scenario.newPVC
+			if !scenario.shouldSucceed {
+				expectedPV = scenario.oldPVC
+			}
+			if err := verifyPVC(cache, getPVCName(scenario.oldPVC), expectedPV); err != nil {
+				t.Errorf("Failed to GetPVC() after initial update: %v", err)
+			}
+		})
 	}
 }
 
 func TestRestorePVC(t *testing.T) {
-	cache, internalCache := newTestPVCAssumeCache()
+	logger, _ := ktesting.NewTestContext(t)
+	cache, internalCache := newTestPVCAssumeCache(logger)
 
 	oldPVC := makeClaim("pvc1", "5", "ns1")
 	newPVC := makeClaim("pvc1", "5", "ns1")
 
 	// Restore PVC that doesn't exist
-	cache.Restore("nothing")
+	cache.Restore(logger, "nothing")
 
 	// Add oldPVC to cache
 	internalCache.add(oldPVC)
@@ -423,13 +434,13 @@ func TestRestorePVC(t *testing.T) {
 	}
 
 	// Restore PVC
-	cache.Restore(getPVCName(oldPVC))
+	cache.Restore(logger, getPVCName(oldPVC))
 	if err := verifyPVC(cache, getPVCName(oldPVC), oldPVC); err != nil {
 		t.Fatalf("Failed to GetPVC() after initial restore: %v", err)
 	}
 
 	// Assume newPVC
-	if err := cache.Assume(newPVC); err != nil {
+	if err := cache.Assume(logger, newPVC); err != nil {
 		t.Fatalf("Assume() returned error %v", err)
 	}
 	if err := verifyPVC(cache, getPVCName(oldPVC), newPVC); err != nil {
@@ -437,14 +448,15 @@ func TestRestorePVC(t *testing.T) {
 	}
 
 	// Restore PVC
-	cache.Restore(getPVCName(oldPVC))
+	cache.Restore(logger, getPVCName(oldPVC))
 	if err := verifyPVC(cache, getPVCName(oldPVC), oldPVC); err != nil {
 		t.Fatalf("Failed to GetPVC() after restore: %v", err)
 	}
 }
 
 func TestAssumeUpdatePVCCache(t *testing.T) {
-	cache, internalCache := newTestPVCAssumeCache()
+	logger, _ := ktesting.NewTestContext(t)
+	cache, internalCache := newTestPVCAssumeCache(logger)
 
 	pvcName := "test-pvc0"
 	pvcNamespace := "test-ns"
@@ -459,7 +471,7 @@ func TestAssumeUpdatePVCCache(t *testing.T) {
 	// Assume PVC
 	newPVC := pvc.DeepCopy()
 	newPVC.Annotations[volume.AnnSelectedNode] = "test-node"
-	if err := cache.Assume(newPVC); err != nil {
+	if err := cache.Assume(logger, newPVC); err != nil {
 		t.Fatalf("failed to assume PVC: %v", err)
 	}
 	if err := verifyPVC(cache, getPVCName(pvc), newPVC); err != nil {
