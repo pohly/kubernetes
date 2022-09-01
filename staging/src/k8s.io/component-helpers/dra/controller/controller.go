@@ -40,6 +40,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	dracache "k8s.io/component-helpers/dra/cache"
 	"k8s.io/component-helpers/dra/resourceclaim"
 	"k8s.io/klog/v2"
 )
@@ -137,7 +138,7 @@ type controller struct {
 	eventRecorder       record.EventRecorder
 	rcLister            corev1listers.ResourceClassLister
 	rcSynced            cache.InformerSynced
-	claimLister         corev1listers.ResourceClaimLister
+	claimCache          dracache.AssumeCache[*v1.ResourceClaim]
 	podSchedulingLister corev1listers.PodSchedulingLister
 	claimSynced         cache.InformerSynced
 	podSchedulingSynced cache.InformerSynced
@@ -176,6 +177,15 @@ func New(
 	queue := workqueue.NewNamedRateLimitingQueue(
 		workqueue.DefaultControllerRateLimiter(), fmt.Sprintf("%s-queue", name))
 
+	// The assume cache acts as proxy for the informer cache and after an
+	// update made by the controller returns a more recent copy until the
+	// informer catches up.
+	//
+	// Below we monitor events in the assume cache instead of the informer
+	// to avoid a race (work queue reacts to an informer cache before the
+	// assume cache itself has).
+	claimCache := dracache.NewAssumeCache[*v1.ResourceClaim](klog.LoggerWithName(logger, "assume cache"), claimInformer.Informer(), "resourceclaims", "", nil /* no index key and function */)
+
 	ctrl := &controller{
 		ctx:                 ctx,
 		logger:              logger,
@@ -185,7 +195,7 @@ func New(
 		kubeClient:          kubeClient,
 		rcLister:            rcInformer.Lister(),
 		rcSynced:            rcInformer.Informer().HasSynced,
-		claimLister:         claimInformer.Lister(),
+		claimCache:          claimCache,
 		claimSynced:         claimInformer.Informer().HasSynced,
 		podSchedulingLister: podSchedulingInformer.Lister(),
 		podSchedulingSynced: podSchedulingInformer.Informer().HasSynced,
@@ -196,11 +206,11 @@ func New(
 	loggerV6 := logger.V(6)
 	if loggerV6.Enabled() {
 		resourceClaimLogger := klog.LoggerWithValues(loggerV6, "type", "ResourceClaim")
-		_, _ = claimInformer.Informer().AddEventHandler(resourceEventHandlerFuncs(&resourceClaimLogger, ctrl))
+		claimCache.AddEventHandler(resourceEventHandlerFuncs(&resourceClaimLogger, ctrl))
 		podSchedulingLogger := klog.LoggerWithValues(loggerV6, "type", "PodScheduling")
 		_, _ = podSchedulingInformer.Informer().AddEventHandler(resourceEventHandlerFuncs(&podSchedulingLogger, ctrl))
 	} else {
-		_, _ = claimInformer.Informer().AddEventHandler(resourceEventHandlerFuncs(nil, ctrl))
+		claimCache.AddEventHandler(resourceEventHandlerFuncs(nil, ctrl))
 		_, _ = podSchedulingInformer.Informer().AddEventHandler(resourceEventHandlerFuncs(nil, ctrl))
 	}
 
@@ -353,7 +363,7 @@ func (ctrl *controller) syncKey(ctx context.Context, key string) (obj runtime.Ob
 
 	switch prefix {
 	case claimKeyPrefix:
-		claim, err := ctrl.claimLister.ResourceClaims(namespace).Get(name)
+		claim, err := ctrl.claimCache.Get(object)
 		if err != nil {
 			if k8serrors.IsNotFound(err) {
 				klog.FromContext(ctx).V(5).Info("ResourceClaim was deleted, no need to process it")
@@ -400,6 +410,7 @@ func (ctrl *controller) syncClaim(ctx context.Context, claim *v1.ResourceClaim) 
 		hasFinalizer := ctrl.hasFinalizer(claim)
 		logger.V(5).Info("ResourceClaim ready for deallocation", "deallocationRequested", claim.Status.DeallocationRequested, "deletionTimestamp", claim.DeletionTimestamp, "allocated", claim.Status.Allocation != nil, "hasFinalizer", hasFinalizer)
 		if hasFinalizer {
+			oldClaim := claim
 			claim = claim.DeepCopy()
 			if claim.Status.Allocation != nil {
 				// Allocation was completed. Deallocate before proceeding.
@@ -413,6 +424,7 @@ func (ctrl *controller) syncClaim(ctx context.Context, claim *v1.ResourceClaim) 
 				if err != nil {
 					return fmt.Errorf("remove allocation: %v", err)
 				}
+				ctrl.assumeClaim(logger, oldClaim, claim)
 			} else {
 				// Ensure that there is no on-going allocation.
 				if err := ctrl.driver.Deallocate(ctx, claim); err != nil {
@@ -423,16 +435,21 @@ func (ctrl *controller) syncClaim(ctx context.Context, claim *v1.ResourceClaim) 
 			if claim.Status.DeallocationRequested {
 				// Still need to remove it.
 				claim.Status.DeallocationRequested = false
+				oldClaim = claim
 				claim, err = ctrl.kubeClient.CoreV1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
 				if err != nil {
 					return fmt.Errorf("remove deallocation: %v", err)
 				}
+				ctrl.assumeClaim(logger, oldClaim, claim)
 			}
 
 			claim.Finalizers = ctrl.removeFinalizer(claim.Finalizers)
-			if _, err := ctrl.kubeClient.CoreV1().ResourceClaims(claim.Namespace).Update(ctx, claim, metav1.UpdateOptions{}); err != nil {
+			oldClaim = claim
+			claim, err = ctrl.kubeClient.CoreV1().ResourceClaims(claim.Namespace).Update(ctx, claim, metav1.UpdateOptions{})
+			if err != nil {
 				return fmt.Errorf("remove finalizer: %v", err)
 			}
+			ctrl.assumeClaim(logger, oldClaim, claim)
 		}
 
 		// Nothing further to do. The apiserver should remove it shortly.
@@ -510,10 +527,12 @@ func (ctrl *controller) allocateClaim(ctx context.Context,
 		logger.V(5).Info("Adding finalizer")
 		claim.Finalizers = append(claim.Finalizers, ctrl.finalizer)
 		var err error
+		oldClaim := claim
 		claim, err = ctrl.kubeClient.CoreV1().ResourceClaims(claim.Namespace).Update(ctx, claim, metav1.UpdateOptions{})
 		if err != nil {
 			return fmt.Errorf("add finalizer: %v", err)
 		}
+		ctrl.assumeClaim(logger, oldClaim, claim)
 	}
 
 	logger.V(5).Info("Allocating")
@@ -527,15 +546,19 @@ func (ctrl *controller) allocateClaim(ctx context.Context,
 		claim.Status.ReservedFor = append(claim.Status.ReservedFor, *selectedUser)
 	}
 	logger.V(6).Info("Updating claim after allocation", "claim", claim)
-	if _, err := ctrl.kubeClient.CoreV1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{}); err != nil {
+	oldClaim := claim
+	claim, err = ctrl.kubeClient.CoreV1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
+	if err != nil {
 		return fmt.Errorf("add allocation: %v", err)
 	}
+	ctrl.assumeClaim(logger, oldClaim, claim)
 	return nil
 }
 
 func (ctrl *controller) checkPodClaim(ctx context.Context, pod *v1.Pod, podClaim v1.PodResourceClaim) (*ClaimAllocation, error) {
 	claimName := resourceclaim.Name(pod, &podClaim)
-	claim, err := ctrl.claimLister.ResourceClaims(pod.Namespace).Get(claimName)
+	key := pod.Namespace + "/" + claimName
+	claim, err := ctrl.claimCache.Get(key)
 	if err != nil {
 		return nil, err
 	}
@@ -699,6 +722,12 @@ func (ctrl *controller) syncPodScheduling(ctx context.Context, podScheduling *v1
 	// We must keep the object in our queue and keep updating the
 	// UnsuitableNodes fields.
 	return errPeriodic
+}
+
+func (ctrl *controller) assumeClaim(logger klog.Logger, oldClaim, newClaim *v1.ResourceClaim) {
+	if err := ctrl.claimCache.Assume(logger, oldClaim, newClaim); err != nil {
+		logger.Error(err, "Store updated claim in local cache")
+	}
 }
 
 type claimAllocations []*ClaimAllocation
