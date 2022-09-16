@@ -268,8 +268,7 @@ func WaitForPodCondition(c clientset.Interface, ns, podName, conditionDesc strin
 			}
 			return true, err
 		} else if err != nil {
-			// TODO(#109732): stop polling and return the error in this case.
-			e2elog.Logf("Error evaluating pod condition %s: %v", conditionDesc, err)
+			return false, fmt.Errorf("evaluating pod condition %s: %v", conditionDesc, err)
 		}
 		return false, nil
 	})
