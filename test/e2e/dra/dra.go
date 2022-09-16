@@ -86,6 +86,32 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 				framework.Fail("NodePrepareResource should have been called again")
 			}
 		})
+
+		ginkgo.It("must call NodePrepareResource and NodeUnprepareResource once for the same claim", func() {
+			prepareResourceMethod := MethodInstance{driver.Hostnames()[0], NodePrepareResourceMethod}
+			prepareResourceCount := driver.CallCount(prepareResourceMethod)
+			unprepareResourceMethod := MethodInstance{driver.Hostnames()[0], NodeUnprepareResourceMethod}
+			unprepareResourceCount := driver.CallCount(unprepareResourceMethod)
+
+			parameters := b.resourceClaimParameters()
+			claim := b.externalClaim(corev1.AllocationModeWaitForFirstConsumer)
+			pods := []*corev1.Pod{b.podExternalMultiple(), b.podExternalMultiple(), b.podExternalMultiple()}
+			b.create(ctx, parameters, claim, pods[0], pods[1], pods[2])
+
+			threeSeconds := int64(3)
+			for _, pod := range pods {
+				b.testPod(f.ClientSet, pod)
+
+				// Terminate test pod to ensure calling NodeUnprepareResource
+				b.f.PodClient().Update(pod.Name, func(pod *corev1.Pod) {
+					pod.Spec.ActiveDeadlineSeconds = &threeSeconds
+				})
+				err := e2epod.WaitForPodTerminatedInNamespace(b.f.ClientSet, pod.Name, "DeadlineExceeded", b.f.Namespace.Name)
+				framework.ExpectNoError(err, "failed to terminate pod %s", pod.Name)
+			}
+			framework.ExpectEqual(driver.CallCount(prepareResourceMethod), prepareResourceCount+1)
+			framework.ExpectEqual(driver.CallCount(unprepareResourceMethod), unprepareResourceCount+1)
+		})
 	})
 
 	ginkgo.Context("cluster", func() {
