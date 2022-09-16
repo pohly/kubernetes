@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 
 	cdiapi "github.com/container-orchestrated-devices/container-device-interface/pkg/cdi"
 	specs "github.com/container-orchestrated-devices/container-device-interface/specs-go"
@@ -36,6 +37,18 @@ type ExamplePlugin struct {
 
 	cdiDir     string
 	driverName string
+	nodeName   string
+
+	mutex    sync.Mutex
+	prepared map[ClaimID]bool
+}
+
+// ClaimID contains both claim name and UID to simplify debugging. The
+// namespace is not included because it is random in E2E tests and the UID is
+// sufficient to make the ClaimID unique.
+type ClaimID struct {
+	Name string
+	UID  string
 }
 
 var _ drapbv1.NodeServer = &ExamplePlugin{}
@@ -56,7 +69,7 @@ type FileOperations struct {
 }
 
 // StartPlugin sets up the servers that are necessary for a DRA kubelet plugin.
-func StartPlugin(logger klog.Logger, cdiDir, driverName string, fileOps FileOperations, opts ...kubeletplugin.Option) (*ExamplePlugin, error) {
+func StartPlugin(logger klog.Logger, cdiDir, driverName string, nodeName string, fileOps FileOperations, opts ...kubeletplugin.Option) (*ExamplePlugin, error) {
 	if fileOps.Create == nil {
 		fileOps.Create = func(name string, content []byte) error {
 			return os.WriteFile(name, content, os.FileMode(0644))
@@ -75,6 +88,8 @@ func StartPlugin(logger klog.Logger, cdiDir, driverName string, fileOps FileOper
 		fileOps:    fileOps,
 		cdiDir:     cdiDir,
 		driverName: driverName,
+		nodeName:   nodeName,
+		prepared:   make(map[ClaimID]bool),
 	}
 
 	opts = append(opts,
@@ -111,14 +126,19 @@ func (ex *ExamplePlugin) NodePrepareResource(ctx context.Context, req *drapbv1.N
 	logger := klog.FromContext(ctx)
 
 	// Determine environment variables.
-	var env map[string]string
-	if err := json.Unmarshal([]byte(req.ResourceHandle), &env); err != nil {
+	var p parameters
+	if err := json.Unmarshal([]byte(req.ResourceHandle), &p); err != nil {
 		return nil, fmt.Errorf("unmarshal resource handle: %v", err)
+	}
+
+	// Sanity check scheduling.
+	if p.NodeName != "" && ex.nodeName != "" && p.NodeName != ex.nodeName {
+		return nil, fmt.Errorf("claim was allocated for %q, cannot be prepared on %q", p.NodeName, ex.nodeName)
 	}
 
 	// CDI wants env variables as set of strings.
 	envs := []string{}
-	for key, val := range env {
+	for key, val := range p.EnvVars {
 		envs = append(envs, key+"="+val)
 	}
 
@@ -159,6 +179,10 @@ func (ex *ExamplePlugin) NodePrepareResource(ctx context.Context, req *drapbv1.N
 	dev := cdiSpec.GetDevice(deviceName).GetQualifiedName()
 	resp := &drapbv1.NodePrepareResourceResponse{CdiDevice: []string{dev}}
 
+	ex.mutex.Lock()
+	defer ex.mutex.Unlock()
+	ex.prepared[ClaimID{Name: req.ClaimName, UID: req.ClaimUid}] = true
+
 	logger.V(3).Info("CDI file created", "path", filePath, "device", dev)
 	return resp, nil
 }
@@ -174,5 +198,20 @@ func (ex *ExamplePlugin) NodeUnprepareResource(ctx context.Context, req *drapbv1
 		return nil, fmt.Errorf("error removing CDI file: %v", err)
 	}
 	logger.V(3).Info("CDI file removed", "path", filePath)
+
+	ex.mutex.Lock()
+	defer ex.mutex.Unlock()
+	delete(ex.prepared, ClaimID{Name: req.ClaimName, UID: req.ClaimUid})
+
 	return &drapbv1.NodeUnprepareResourceResponse{}, nil
+}
+
+func (ex *ExamplePlugin) GetPreparedResources() []ClaimID {
+	ex.mutex.Lock()
+	defer ex.mutex.Unlock()
+	var prepared []ClaimID
+	for claimID := range ex.prepared {
+		prepared = append(prepared, claimID)
+	}
+	return prepared
 }

@@ -51,20 +51,49 @@ const (
 	NodeUnprepareResourceMethod = "/v1alpha1.Node/NodeUnprepareResource"
 )
 
+type Nodes struct {
+	NodeNames []string
+}
+
+// NewNodes selects nodes to run the test on.
+func NewNodes(f *framework.Framework, minNodes, maxNodes int) *Nodes {
+	nodes := &Nodes{}
+	ginkgo.BeforeEach(func() {
+		ginkgo.By("selecting nodes")
+		// The kubelet plugin is harder. We deploy the builtin manifest
+		// after patching in the driver name and all nodes on which we
+		// want the plugin to run.
+		//
+		// Only a subset of the nodes are picked to avoid causing
+		// unnecessary load on a big cluster.
+		nodeList, err := e2enode.GetBoundedReadySchedulableNodes(f.ClientSet, maxNodes)
+		framework.ExpectNoError(err, "get nodes")
+		numNodes := int32(len(nodeList.Items))
+		if int(numNodes) < minNodes {
+			e2eskipper.Skipf("%d ready nodes required, only have %d", numNodes, minNodes)
+		}
+		nodes.NodeNames = nil
+		for _, node := range nodeList.Items {
+			nodes.NodeNames = append(nodes.NodeNames, node.Name)
+		}
+		framework.Logf("testing on nodes %v", nodes.NodeNames)
+	})
+	return nodes
+}
+
 // NewDriver sets up controller (as client of the cluster) and
 // kubelet plugin (via proxy) before the test runs. It cleans
 // up after the test.
-func NewDriver(f *framework.Framework, minNodes, maxNodes int) *Driver {
+func NewDriver(f *framework.Framework, nodes *Nodes, configureResources func() app.Resources) *Driver {
 	d := &Driver{
 		f:          f,
-		minNodes:   minNodes,
-		maxNodes:   maxNodes,
 		fail:       map[MethodInstance]bool{},
 		callCounts: map[MethodInstance]int64{},
 	}
 
 	ginkgo.BeforeEach(func() {
-		d.SetUp()
+		resources := configureResources()
+		d.SetUp(nodes, resources)
 		ginkgo.DeferCleanup(d.TearDown)
 	})
 	return d
@@ -90,7 +119,8 @@ type Driver struct {
 	callCounts map[MethodInstance]int64
 }
 
-func (d *Driver) SetUp() {
+func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
+	ginkgo.By("deploying driver")
 	d.Hosts = map[string]*app.ExamplePlugin{}
 	d.Name = d.f.UniqueName + ".k8s.io"
 
@@ -105,21 +135,8 @@ func (d *Driver) SetUp() {
 	d.wg.Add(1)
 	go func() {
 		defer d.wg.Done()
-		app.RunController(d.ctx, d.f.ClientSet, d.Name, 5 /* workers */)
+		app.RunController(d.ctx, d.f.ClientSet, d.Name, 5 /* workers */, resources)
 	}()
-
-	// The kubelet plugin is harder. We deploy the builtin manifest
-	// after patching in the driver name and all nodes on which we
-	// want the plugin to run.
-	//
-	// Only a subset of the nodes are picked to avoid causing
-	// unnecessary load on a big cluster.
-	nodes, err := e2enode.GetBoundedReadySchedulableNodes(d.f.ClientSet, d.maxNodes)
-	framework.ExpectNoError(err, "get nodes")
-	numNodes := int32(len(nodes.Items))
-	if int(numNodes) < d.minNodes {
-		e2eskipper.Skipf("%d ready nodes required, only have %d", numNodes, d.minNodes)
-	}
 
 	manifests := []string{
 		// The code below matches the content of this manifest (ports,
@@ -129,6 +146,7 @@ func (d *Driver) SetUp() {
 	instanceKey := "app.kubernetes.io/instance"
 	rsName := ""
 	draAddr := path.Join(framework.TestContext.KubeletRootDir, "plugins", d.Name+".sock")
+	numNodes := int32(len(nodes.NodeNames))
 	undeploy, err := utils.CreateFromManifests(d.f, d.f.Namespace, func(item interface{}) error {
 		switch item := item.(type) {
 		case *appsv1.ReplicaSet:
@@ -165,7 +183,7 @@ func (d *Driver) SetUp() {
 	for _, pod := range pods.Items {
 		hostname := pod.Spec.NodeName
 		logger := klog.Background().WithName("kubelet plugin").WithValues("node", pod.Spec.NodeName, "pod", klog.KObj(&pod))
-		plugin, err := app.StartPlugin(logger, "/cdi", d.Name,
+		plugin, err := app.StartPlugin(logger, "/cdi", d.Name, hostname,
 			app.FileOperations{
 				Create: func(name string, content []byte) error {
 					return d.createFile(&pod, name, content)

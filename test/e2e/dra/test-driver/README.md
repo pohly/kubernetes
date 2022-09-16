@@ -13,15 +13,20 @@ also run as a Kubernetes client outside of a cluster. The same works for the
 kubelet plugin when using port forwarding. This is how it is used during
 testing.
 
-The actual functionality is initially very limited. Resources are unlimited, so
-all ResourceClaims can be allocated. Valid parameters are key/value string
-pairs stored in a ConfigMap.
-
+Valid parameters are key/value string pairs stored in a ConfigMap.
 Those get copied into the ResourceClaimStatus with "user_" and "admin_" as
 prefix, depending on whether they came from the ResourceClaim or ResourceClass.
 They get stored in the `ResourceHandle` field as JSON map by the controller.
 The kubelet plugin then sets these attributes as environment variables in each
 container that uses the resource.
+
+Resource availability is configurable and can simulate different scenarios:
+
+- Network-attached resources, available on all nodes where the node driver runs, or
+  host-local resources, available only on the node whether they were allocated.
+- Shared or unshared allocations.
+- Unlimited or limited resources. The limit is a simple number of allocations
+  per cluster or node.
 
 While the functionality itself is very limited, the code strives to showcase
 best practices and supports metrics, leader election, and the same logging

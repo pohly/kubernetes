@@ -26,9 +26,11 @@ import (
 	"github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/test/e2e/dra/test-driver/app"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -39,6 +41,12 @@ const (
 	podStartTimeout = 5 * time.Minute
 )
 
+func networkResources() app.Resources {
+	return app.Resources{
+		Shared: true,
+	}
+}
+
 var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", func() {
 	f := framework.NewDefaultFramework("dra")
 	ctx := context.Background()
@@ -48,7 +56,8 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Context("kubelet", func() {
-		driver := NewDriver(f, 1, 1 /* nodes */) // All tests get their own driver instance.
+		nodes := NewNodes(f, 1, 1)
+		driver := NewDriver(f, nodes, networkResources) // All tests get their own driver instance.
 		b := newBuilder(f, driver)
 
 		ginkgo.It("registers plugin", func() {
@@ -89,7 +98,8 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 	})
 
 	ginkgo.Context("cluster", func() {
-		driver := NewDriver(f, 1, 4 /* nodes */)
+		nodes := NewNodes(f, 1, 4)
+		driver := NewDriver(f, nodes, networkResources)
 		b := newBuilder(f, driver)
 
 		// claimTests tries out several different combinations of pods with
@@ -153,7 +163,109 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 		ginkgo.Context("with immediate allocation", func() {
 			claimTests(corev1.AllocationModeImmediate)
 		})
+	})
 
+	ginkgo.Context("multiple nodes", func() {
+		nodes := NewNodes(f, 2, 8)
+		ginkgo.Context("with network-attached resources", func() {
+			driver := NewDriver(f, nodes, networkResources)
+			b := newBuilder(f, driver)
+
+			ginkgo.It("schedules onto different nodes", func() {
+				parameters := b.resourceClaimParameters()
+				label := "app.kubernetes.io/instance"
+				instance := f.UniqueName + "-test-app"
+				antiAffinity := &corev1.Affinity{
+					PodAntiAffinity: &corev1.PodAntiAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
+							{
+								TopologyKey: "kubernetes.io/hostname",
+								LabelSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										label: instance,
+									},
+								},
+							},
+						},
+					},
+				}
+				createPod := func() *corev1.Pod {
+					pod := b.podExternal()
+					pod.Labels[label] = instance
+					pod.Spec.Affinity = antiAffinity
+					return pod
+				}
+				pod1 := createPod()
+				pod2 := createPod()
+				claim := b.externalClaim(corev1.AllocationModeWaitForFirstConsumer)
+				b.create(ctx, parameters, claim, pod1, pod2)
+
+				for _, pod := range []*corev1.Pod{pod1, pod2} {
+					err := e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod)
+					framework.ExpectNoError(err, "start pod")
+				}
+			})
+		})
+
+		ginkgo.Context("with node-local resources", func() {
+			driver := NewDriver(f, nodes, func() app.Resources {
+				return app.Resources{
+					NodeLocal:      true,
+					MaxAllocations: 1,
+					Nodes:          nodes.NodeNames,
+				}
+			})
+			b := newBuilder(f, driver)
+
+			tests := func(allocationMode corev1.AllocationMode) {
+				ginkgo.It("uses all resources", func() {
+					var objs = []klog.KMetadata{
+						b.resourceClaimParameters(),
+					}
+					var pods []*corev1.Pod
+					for i := 0; i < len(nodes.NodeNames); i++ {
+						pod := b.podInline(allocationMode)
+						pods = append(pods, pod)
+						objs = append(objs, pod)
+					}
+					b.create(ctx, objs...)
+
+					for _, pod := range pods {
+						err := e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod)
+						framework.ExpectNoError(err, "start pod")
+					}
+
+					// The pods all should run on different
+					// nodes because the maximum number of
+					// claims per node was limited to 1 for
+					// this test.
+					//
+					// We cannot know for sure why the pods
+					// ran on two different nodes (could
+					// also be a coincidence) but if they
+					// don't cover all nodes, then we have
+					// a problem.
+					used := make(map[string]*corev1.Pod)
+					for _, pod := range pods {
+						pod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+						framework.ExpectNoError(err, "get pod")
+						nodeName := pod.Spec.NodeName
+						if other, ok := used[nodeName]; ok {
+							framework.Failf("Pod %s got started on the same node %s as pod %s although claim allocation should have been limited to one claim per node.", pod.Name, nodeName, other.Name)
+						}
+						used[nodeName] = pod
+					}
+				})
+			}
+
+			ginkgo.Context("with delayed allocation", func() {
+				tests(corev1.AllocationModeWaitForFirstConsumer)
+			})
+
+			ginkgo.Context("with immediate allocation", func() {
+				tests(corev1.AllocationModeImmediate)
+			})
+		})
 	})
 })
 
@@ -250,6 +362,7 @@ func (b *builder) resourceClaimParameters() *corev1.ConfigMap {
 // The pod prints its env and waits.
 func (b *builder) pod() *corev1.Pod {
 	pod := e2epod.MakePod(b.f.Namespace.Name, nil, nil, false, "env && sleep 100000")
+	pod.Labels = make(map[string]string)
 	pod.Spec.RestartPolicy = corev1.RestartPolicyNever
 	// Let kubelet kill the pods quickly. Setting
 	// TerminationGracePeriodSeconds to zero would bypass kubelet
@@ -395,41 +508,51 @@ func (b *builder) tearDown() {
 	err := b.f.ClientSet.CoreV1().ResourceClasses().Delete(ctx, b.className(), metav1.DeleteOptions{})
 	framework.ExpectNoError(err, "delete resource class")
 
-	// Before we allow the namespace and all objects in it
-	// do be deleted by the framework, we must ensure that
-	// test pods and the claims that they use are
-	// deleted. Otherwise the driver might get deleted
-	// first, in which case deleting the claims won't work
-	// anymore.
-	framework.By("delete pods and claims", func() {
-		framework.SucceedEventually(func(g gomega.Gomega) {
-			pods, err := b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).List(ctx, metav1.ListOptions{})
-			var testPods []corev1.Pod
-			g.Expect(err).NotTo(gomega.HaveOccurred(), "list pods")
-			for _, pod := range pods.Items {
-				if pod.DeletionTimestamp != nil ||
-					pod.Labels["app.kubernetes.io/part-of"] == "dra-test-driver" {
-					continue
-				}
-				ginkgo.By(fmt.Sprintf("deleting %T %s", &pod, klog.KObj(&pod)))
-				err := b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).Delete(ctx, pod.Name, metav1.DeleteOptions{})
-				g.Expect(err).NotTo(gomega.HaveOccurred(), "delete pod")
-				testPods = append(testPods, pod)
-			}
-			g.Expect(testPods).To(gomega.BeEmpty(), "all pods removed")
+	// Before we allow the namespace and all objects in it do be deleted by
+	// the framework, we must ensure that test pods and the claims that
+	// they use are deleted. Otherwise the driver might get deleted first,
+	// in which case deleting the claims won't work anymore.
+	ginkgo.By("delete pods and claims")
+	pods, err := b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).List(ctx, metav1.ListOptions{})
+	var testPods []corev1.Pod
+	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "list pods")
+	for _, pod := range pods.Items {
+		if pod.DeletionTimestamp != nil ||
+			pod.Labels["app.kubernetes.io/part-of"] == "dra-test-driver" {
+			continue
+		}
+		ginkgo.By(fmt.Sprintf("deleting %T %s", &pod, klog.KObj(&pod)))
+		err := b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).Delete(ctx, pod.Name, metav1.DeleteOptions{})
+		if !apierrors.IsNotFound(err) {
+			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "delete pod")
+		}
+		testPods = append(testPods, pod)
+	}
 
-			claims, err := b.f.ClientSet.CoreV1().ResourceClaims(b.f.Namespace.Name).List(ctx, metav1.ListOptions{})
-			framework.ExpectNoError(err, "get resource claims")
-			for _, claim := range claims.Items {
-				if claim.DeletionTimestamp != nil {
-					continue
-				}
-				ginkgo.By(fmt.Sprintf("deleting %T %s", &claim, klog.KObj(&claim)))
-				err := b.f.ClientSet.CoreV1().ResourceClaims(b.f.Namespace.Name).Delete(ctx, claim.Name, metav1.DeleteOptions{})
-				g.Expect(err).NotTo(gomega.HaveOccurred(), "delete claim")
-			}
+	claims, err := b.f.ClientSet.CoreV1().ResourceClaims(b.f.Namespace.Name).List(ctx, metav1.ListOptions{})
+	framework.ExpectNoError(err, "get resource claims")
+	for _, claim := range claims.Items {
+		if claim.DeletionTimestamp != nil {
+			continue
+		}
+		ginkgo.By(fmt.Sprintf("deleting %T %s", &claim, klog.KObj(&claim)))
+		err := b.f.ClientSet.CoreV1().ResourceClaims(b.f.Namespace.Name).Delete(ctx, claim.Name, metav1.DeleteOptions{})
+		if !apierrors.IsNotFound(err) {
+			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "delete claim")
+		}
+	}
 
-			g.Expect(claims.Items).To(gomega.BeEmpty(), "all resource claims removed")
-		}, []interface{}{"delete pods and claims"}, 5*time.Minute, time.Second)
-	})
+	for host, plugin := range b.driver.Hosts {
+		ginkgo.By(fmt.Sprintf("waiting for resources on %s to be unprepared", host))
+		gomega.Eventually(plugin.GetPreparedResources).WithTimeout(time.Minute).Should(gomega.BeEmpty(), "prepared claims on host %s", host)
+	}
+
+	ginkgo.By("waiting for claims to be deallocated and deleted")
+	gomega.Eventually(func() ([]corev1.ResourceClaim, error) {
+		claims, err := b.f.ClientSet.CoreV1().ResourceClaims(b.f.Namespace.Name).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			return nil, err
+		}
+		return claims.Items, nil
+	}).WithTimeout(time.Minute).Should(gomega.BeEmpty(), "claims in the namespaces")
 }

@@ -20,6 +20,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -198,14 +199,28 @@ func NewCommand() *cobra.Command {
 		"Duration, in seconds, that the acting leader will retry refreshing leadership before giving up.")
 	leaderElectionRetryPeriod := fs.Duration("leader-election-retry-period", 5*time.Second,
 		"Duration, in seconds, the LeaderElector clients should wait between tries of actions.")
+	resourceConfig := fs.String("resource-config", "", "A JSON file containing a Resources struct. Defaults are unshared, network-attached resources.")
 	fs = controller.Flags()
 	for _, f := range controllerFlagSets.FlagSets {
 		fs.AddFlagSet(f)
 	}
 
 	controller.RunE = func(cmd *cobra.Command, args []string) error {
+		resources := Resources{}
+		if *resourceConfig != "" {
+			file, err := os.Open(*resourceConfig)
+			if err != nil {
+				return fmt.Errorf("open resource config: %v", err)
+			}
+			decoder := json.NewDecoder(file)
+			decoder.DisallowUnknownFields()
+			if err := decoder.Decode(&resources); err != nil {
+				return fmt.Errorf("parse resource config %q: %v", err)
+			}
+		}
+
 		run := func() {
-			RunController(ctx, clientset, *driverName, *workers)
+			RunController(ctx, clientset, *driverName, *workers, resources)
 		}
 
 		if !*enableLeaderElection {
@@ -272,7 +287,7 @@ func NewCommand() *cobra.Command {
 			return fmt.Errorf("create socket directory: %v", err)
 		}
 
-		plugin, err := StartPlugin(logger, *cdiDir, *driverName, FileOperations{},
+		plugin, err := StartPlugin(logger, *cdiDir, *driverName, "", FileOperations{},
 			kubeletplugin.PluginSocketPath(*endpoint),
 			kubeletplugin.RegistrarSocketPath(path.Join(*pluginRegistrationPath, *driverName+"-reg.sock")),
 			kubeletplugin.KubeletPluginSocketPath(*draAddress),
