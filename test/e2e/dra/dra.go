@@ -391,13 +391,14 @@ func (b *builder) tearDown() {
 			pods, err := b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).List(ctx, metav1.ListOptions{})
 			var testPods []corev1.Pod
 			g.Expect(err).NotTo(gomega.HaveOccurred(), "list pods")
+			oneSecond := int64(1)
 			for _, pod := range pods.Items {
 				if pod.DeletionTimestamp != nil ||
 					pod.Labels["app.kubernetes.io/part-of"] == "dra-test-driver" {
 					continue
 				}
 				ginkgo.By(fmt.Sprintf("deleting %T %s", &pod, klog.KObj(&pod)))
-				err := b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).Delete(ctx, pod.Name, metav1.DeleteOptions{})
+				err := b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).Delete(ctx, pod.Name, metav1.DeleteOptions{GracePeriodSeconds: &oneSecond})
 				g.Expect(err).NotTo(gomega.HaveOccurred(), "delete pod")
 				testPods = append(testPods, pod)
 			}
