@@ -425,6 +425,9 @@ func (pl *dynamicResources) Filter(ctx context.Context, cs *framework.CycleState
 	if len(unavailableClaims) > 0 {
 		state.mutex.Lock()
 		defer state.mutex.Unlock()
+		if state.unavailableClaims == nil {
+			state.unavailableClaims = sets.NewInt()
+		}
 		state.unavailableClaims.Insert(unavailableClaims...)
 		return statusUnschedulable(logger, "resourceclaim not available on the node", "pod", klog.KObj(pod))
 	}
