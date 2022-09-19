@@ -251,8 +251,21 @@ func (b *builder) resourceClaimParameters() *corev1.ConfigMap {
 func (b *builder) pod() *corev1.Pod {
 	pod := e2epod.MakePod(b.f.Namespace.Name, nil, nil, false, "env && sleep 100000")
 	pod.Spec.RestartPolicy = corev1.RestartPolicyNever
-	var zero int64
-	pod.Spec.TerminationGracePeriodSeconds = &zero
+	// Let kubelet kill the pods quickly. Setting
+	// TerminationGracePeriodSeconds to zero would bypass kubelet
+	// completely because then the apiserver enables a force-delete even
+	// when DeleteOptions for the pod don't ask for it (see
+	// https://github.com/kubernetes/kubernetes/blob/0f582f7c3f504e807550310d00f130cb5c18c0c3/pkg/registry/core/pod/strategy.go#L151-L171).
+	//
+	// We don't do that because it breaks tracking of claim usage: the
+	// kube-controller-manager assumes that kubelet is done with the pod
+	// once it got removed or has a grace period of 0. Setting the grace
+	// period to zero directly in DeletionOptions or indirectly through
+	// TerminationGracePeriodSeconds causes the controller to remove
+	// the pod from ReservedFor before it actually has stopped on
+	// the node.
+	one := int64(1)
+	pod.Spec.TerminationGracePeriodSeconds = &one
 	pod.ObjectMeta.GenerateName = ""
 	b.podCounter++
 	pod.ObjectMeta.Name = fmt.Sprintf("tester-%d", b.podCounter)
