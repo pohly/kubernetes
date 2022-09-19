@@ -383,6 +383,8 @@ func newBuilder(f *framework.Framework, driver *Driver) *builder {
 }
 
 func (b *builder) setUp() {
+	b.podCounter = 0
+	b.resourceClaimParametersCounter = 0
 	b.create(context.Background(), b.class())
 	ginkgo.DeferCleanup(b.tearDown)
 }
