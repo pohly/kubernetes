@@ -25,6 +25,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
@@ -199,7 +200,7 @@ func newGrpcConn(addr draAddr) (*grpc.ClientConn, error) {
 
 	return grpc.Dial(
 		string(addr),
-		grpc.WithInsecure(),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithContextDialer(func(ctx context.Context, target string) (net.Conn, error) {
 			return (&net.Dialer{}).DialContext(ctx, network, target)
 		}),
