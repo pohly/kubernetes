@@ -42,7 +42,7 @@ var PluginHandler = &RegistrationHandler{}
 
 // RegisterPlugin is called when a plugin can be registered
 func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string, versions []string) error {
-	klog.Infof(log("Register new plugin with name: %s at endpoint: %s", pluginName, endpoint))
+	klog.InfoS("Register new DRA plugin", "name", pluginName, "endpoint", endpoint)
 
 	highestSupportedVersion, err := h.validateVersions("RegisterPlugin", pluginName, endpoint, versions)
 	if err != nil {
@@ -126,17 +126,16 @@ func unregisterPlugin(pluginName string) error {
 // DeRegisterPlugin is called when a plugin removed its socket, signaling
 // it is no longer available
 func (h *RegistrationHandler) DeRegisterPlugin(pluginName string) {
-	klog.Info(log("registrationHandler.DeRegisterPlugin request for plugin %s", pluginName))
+	klog.InfoS("DeRegister DRA plugin", "name", pluginName)
 	if err := unregisterPlugin(pluginName); err != nil {
-		klog.Error(log("registrationHandler.DeRegisterPlugin failed: %v", err))
+		klog.ErrorS(err, "DeRegisterPlugin failed")
 	}
 }
 
 // ValidatePlugin is called by kubelet's plugin watcher upon detection
 // of a new registration socket opened by DRA plugin.
 func (h *RegistrationHandler) ValidatePlugin(pluginName string, endpoint string, versions []string) error {
-	klog.Infof(log("Trying to validate a new DRA plugin with name: %s endpoint: %s versions: %s",
-		pluginName, endpoint, strings.Join(versions, ",")))
+	klog.InfoS("Validate DRA plugin", "name", pluginName, "endpoint", endpoint, "versions", strings.Join(versions, ","))
 
 	_, err := h.validateVersions("ValidatePlugin", pluginName, endpoint, versions)
 	if err != nil {

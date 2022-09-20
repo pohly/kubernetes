@@ -83,7 +83,7 @@ func (m *ManagerImpl) prepareContainerResources(pod *v1.Pod, container *v1.Conta
 	for range container.Resources.Claims {
 		for _, podResourceClaim := range pod.Spec.ResourceClaims {
 			claimName := resourceclaim.Name(pod, &podResourceClaim)
-			klog.V(3).Infof("Processing resource claim %s, pod %s", claimName, pod.Name)
+			klog.V(3).InfoS("Processing resource", "claim", claimName, "pod", pod.Name)
 
 			if resource := m.resources.get(claimName, pod.Namespace); resource != nil {
 				// resource is already prepared, add pod UID to it
@@ -108,7 +108,7 @@ func (m *ManagerImpl) prepareContainerResources(pod *v1.Pod, container *v1.Conta
 			if err != nil {
 				return fmt.Errorf("NodePrepareResource failed, claim UID: %s, claim name: %s, resource handle: %s, err: %+v", resourceClaim.UID, resourceClaim.Name, resourceClaim.Status.Allocation.ResourceHandle, err)
 			}
-			klog.V(3).Infof("NodePrepareResource: response: %+v", response)
+			klog.V(3).InfoS("NodePrepareResource succeded", "response", response)
 
 			annotations, err := generateCDIAnnotation(resourceClaim.UID, driverName, response.CdiDevice)
 			if err != nil {
@@ -153,7 +153,7 @@ func (m *ManagerImpl) PrepareResources(pod *v1.Pod, container *v1.Container) (*D
 			if resource == nil {
 				return nil, fmt.Errorf(fmt.Sprintf("unable to get resource for namespace: %s, claim: %s", pod.Namespace, claimName))
 			}
-			klog.V(3).Infof("claim %s: add resource annotations: %+v", resource.annotations)
+			klog.V(3).InfoS("add resource annotations", "claim", claimName, "annotations", resource.annotations)
 			annotations = append(annotations, resource.annotations...)
 		}
 	}
@@ -195,7 +195,7 @@ func (m *ManagerImpl) UnprepareResources(pod *v1.Pod) error {
 		if err != nil {
 			return fmt.Errorf("NodeUnprepareResource failed, pod: %s, claim UID: %s, claim name: %s, CDI devices: %s, err: %+v", pod.Name, resource.claimUID, resource.claimName, resource.cdiDevice, err)
 		}
-		klog.V(3).Infof("NodeUnprepareResource: response: %+v", response)
+		klog.V(3).InfoS("NodeUnprepareResource succeded", "response", response)
 		// delete resource from the cache
 		m.resources.delete(resource.claimName, pod.Namespace)
 	}
