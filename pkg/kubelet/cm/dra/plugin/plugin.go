@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/klog/v2"
@@ -29,8 +28,6 @@ import (
 const (
 	// DRAPluginName is the name of the in-tree DRA Plugin
 	DRAPluginName = "kubernetes.io/dra"
-
-	resourceTimeout = 2 * time.Minute
 )
 
 // draPlugins map keep track of all registered DRA plugins on the node and their
