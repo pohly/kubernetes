@@ -116,7 +116,7 @@ func (m *ManagerImpl) prepareContainerResources(pod *v1.Pod, container *v1.Conta
 			}
 
 			// Cache prepared resource
-			m.resources.add(
+			err = m.resources.add(
 				resourceClaim.Name,
 				resourceClaim.Namespace,
 				&resource{
@@ -128,6 +128,9 @@ func (m *ManagerImpl) prepareContainerResources(pod *v1.Pod, container *v1.Conta
 					cdiDevice:   response.CdiDevice,
 					annotations: annotations,
 				})
+			if err != nil {
+				return fmt.Errorf("failed to cache prepared resource, claim: %s(%s), err: %+v", resourceClaim.Name, resourceClaim.UID, err)
+			}
 		}
 	}
 
