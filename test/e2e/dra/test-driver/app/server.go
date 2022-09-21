@@ -220,7 +220,8 @@ func NewCommand() *cobra.Command {
 		}
 
 		run := func() {
-			RunController(ctx, clientset, *driverName, *workers, resources)
+			controller := NewController(clientset, *driverName, resources)
+			controller.Run(ctx, *workers)
 		}
 
 		if !*enableLeaderElection {

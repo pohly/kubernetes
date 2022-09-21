@@ -110,8 +110,9 @@ type Driver struct {
 	cleanup []func() // executed first-in-first-out
 	wg      sync.WaitGroup
 
-	Name  string
-	Hosts map[string]*app.ExamplePlugin
+	Controller *app.ExampleController
+	Name       string
+	Hosts      map[string]*app.ExamplePlugin
 
 	mutex      sync.Mutex
 	fail       map[MethodInstance]bool
@@ -131,10 +132,11 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 	// would be slightly nicer if we had a way to wait for all goroutines, but
 	// SharedInformerFactory has no API for that. At least we can wait
 	// for our own goroutine to stop once the context gets cancelled.
+	d.Controller = app.NewController(d.f.ClientSet, d.Name, resources)
 	d.wg.Add(1)
 	go func() {
 		defer d.wg.Done()
-		app.RunController(d.ctx, d.f.ClientSet, d.Name, 5 /* workers */, resources)
+		d.Controller.Run(d.ctx, 5 /* workers */)
 	}()
 
 	manifests := []string{
