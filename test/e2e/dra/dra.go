@@ -376,6 +376,45 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 			})
 		})
 	})
+
+	ginkgo.Context("multiple drivers", func() {
+		nodes := NewNodes(f, 1, 4)
+		driver1 := NewDriver(f, nodes, func() app.Resources {
+			return app.Resources{
+				NodeLocal:      true,
+				MaxAllocations: 1,
+				Nodes:          nodes.NodeNames,
+			}
+		})
+		b1 := newBuilder(f, driver1)
+		driver2 := NewDriver(f, nodes, func() app.Resources {
+			return app.Resources{
+				NodeLocal:      true,
+				MaxAllocations: 1,
+				Nodes:          nodes.NodeNames,
+			}
+		})
+		driver2.NameSuffix = "-other"
+		b2 := newBuilder(f, driver2)
+
+		ginkgo.It("work", func() {
+			parameters1 := b1.resourceClaimParameters()
+			parameters2 := b2.resourceClaimParameters()
+			claim1 := b1.externalClaim(v1.AllocationModeWaitForFirstConsumer)
+			claim2 := b2.externalClaim(v1.AllocationModeWaitForFirstConsumer)
+			pod := b1.podExternal()
+			pod.Spec.ResourceClaims = append(pod.Spec.ResourceClaims,
+				v1.PodResourceClaim{
+					Name: "claim2",
+					Claim: v1.ClaimSource{
+						ResourceClaimName: &claim2.Name,
+					},
+				},
+			)
+			b1.create(ctx, parameters1, parameters2, claim1, claim2, pod)
+			b1.testPod(f.ClientSet, pod)
+		})
+	})
 })
 
 // builder contains a running counter to make objects unique within thir
@@ -391,7 +430,7 @@ type builder struct {
 
 // className returns the default resource class name.
 func (b *builder) className() string {
-	return b.f.UniqueName + "-class"
+	return b.f.UniqueName + b.driver.NameSuffix + "-class"
 }
 
 // class returns the resource class that the builder's other objects
@@ -428,7 +467,7 @@ func (b *builder) nodeSelector() *v1.NodeSelector {
 // that test pods can reference
 func (b *builder) externalClaim(allocationMode v1.AllocationMode) *v1.ResourceClaim {
 	b.claimCounter++
-	name := "external-claim" // This is what podExternal expects.
+	name := "external-claim" + b.driver.NameSuffix // This is what podExternal expects.
 	if b.claimCounter > 1 {
 		name += fmt.Sprintf("-%d", b.claimCounter)
 	}
@@ -451,7 +490,7 @@ func (b *builder) externalClaim(allocationMode v1.AllocationMode) *v1.ResourceCl
 // resourceClaimParametersName returns the current ConfigMap name for resource
 // claim parameters.
 func (b *builder) resourceClaimParametersName() string {
-	return fmt.Sprintf("resource-claim-parameters-%d", b.resourceClaimParametersCounter)
+	return fmt.Sprintf("resource-claim-parameters%s-%d", b.driver.NameSuffix, b.resourceClaimParametersCounter)
 }
 
 // resourceClaimParametersEnv returns the default env variables.
@@ -496,7 +535,7 @@ func (b *builder) pod() *v1.Pod {
 	pod.Spec.TerminationGracePeriodSeconds = &one
 	pod.ObjectMeta.GenerateName = ""
 	b.podCounter++
-	pod.ObjectMeta.Name = fmt.Sprintf("tester-%d", b.podCounter)
+	pod.ObjectMeta.Name = fmt.Sprintf("tester%s-%d", b.driver.NameSuffix, b.podCounter)
 	return pod
 }
 
@@ -541,7 +580,7 @@ func (b *builder) podExternal() *v1.Pod {
 	pod := b.pod()
 	pod.Spec.Containers[0].Name = "with-resource"
 	podClaimName := "resource-claim"
-	externalClaimName := "external-claim"
+	externalClaimName := "external-claim" + b.driver.NameSuffix
 	pod.Spec.ResourceClaims = []v1.PodResourceClaim{
 		{
 			Name: podClaimName,

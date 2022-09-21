@@ -110,6 +110,7 @@ type Driver struct {
 	cleanup []func() // executed first-in-first-out
 	wg      sync.WaitGroup
 
+	NameSuffix string
 	Controller *app.ExampleController
 	Name       string
 	Hosts      map[string]*app.ExamplePlugin
@@ -122,9 +123,14 @@ type Driver struct {
 func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 	ginkgo.By("deploying driver")
 	d.Hosts = map[string]*app.ExamplePlugin{}
-	d.Name = d.f.UniqueName + ".k8s.io"
+	d.Name = d.f.UniqueName + d.NameSuffix + ".k8s.io"
 
 	ctx, cancel := context.WithCancel(context.Background())
+	if d.NameSuffix != "" {
+		logger := klog.FromContext(ctx)
+		logger = klog.LoggerWithName(logger, "instance"+d.NameSuffix)
+		ctx = klog.NewContext(ctx, logger)
+	}
 	d.ctx = ctx
 	d.cleanup = append(d.cleanup, cancel)
 
@@ -151,6 +157,7 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 	undeploy, err := utils.CreateFromManifests(d.f, d.f.Namespace, func(item interface{}) error {
 		switch item := item.(type) {
 		case *appsv1.ReplicaSet:
+			item.Name += d.NameSuffix
 			rsName = item.Name
 			item.Spec.Replicas = &numNodes
 			item.Spec.Selector.MatchLabels[instanceKey] = d.Name
