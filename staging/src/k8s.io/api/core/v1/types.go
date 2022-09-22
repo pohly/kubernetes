@@ -7055,11 +7055,12 @@ type ResourceClass struct {
 	// (acme.example.com).
 	DriverName string `json:"driverName,omitempty" protobuf:"bytes,2,opt,name=driverName"`
 
-	// Parameters holds arbitrary values that will be available to the
-	// driver when allocating a resource that uses this class. The driver
-	// will be able to distinguish between parameters stored here and and
-	// those stored in ResourceClaimSpec. These parameters here can only be
-	// set by cluster administrators.
+	// Parameters references an arbitrary separate object that may hold
+	// parameters that will be used by the driver when allocating a
+	// resource that uses this class. The driver will be able to
+	// distinguish between parameters stored here and and those stored in
+	// ResourceClaimSpec. These parameters here can only be set by cluster
+	// administrators.
 	Parameters *ResourceClassParametersReference `json:"parameters,omitempty" protobuf:"bytes,3,opt,name=parameters"`
 
 	// Only nodes matching the selector will be considered by the scheduler
@@ -7085,8 +7086,7 @@ type ResourceClassList struct {
 }
 
 // ResourceClassParametersReference contains enough information to let you
-// locate the parameters for a ResourceClass. The object must be
-// cluster-scoped.
+// locate the parameters for a ResourceClass.
 type ResourceClassParametersReference struct {
 	// APIVersion is the group and version for the resource being referenced or
 	// just the version for the core API.
@@ -7096,6 +7096,10 @@ type ResourceClassParametersReference struct {
 	Kind string `json:"kind" protobuf:"bytes,2,name=kind"`
 	// Name is the name of resource being referenced.
 	Name string `json:"name" protobuf:"bytes,3,name=name"`
+	// Namespace that contains the referenced resource. Must be empty
+	// for cluster-scoped resources and non-empty for namespaced
+	// resources.
+	Namespace string `json:"namespace" protobuf:"bytes,4,name=namespace"`
 }
 
 // ResourceClaimParametersReference contains enough information to let you
