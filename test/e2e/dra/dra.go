@@ -65,7 +65,6 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 			ginkgo.By("the driver is running")
 		})
 
-		// This test does not pass at the moment because kubelet doesn't retry.
 		ginkgo.It("must retry NodePrepareResource", func() {
 			// We have exactly one host.
 			m := MethodInstance{driver.Hostnames()[0], NodePrepareResourceMethod}
@@ -94,6 +93,21 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 			if driver.CallCount(m) == callCount {
 				framework.Fail("NodePrepareResource should have been called again")
 			}
+		})
+
+		ginkgo.It("must reject pods which are not authorized to use a claim", func() {
+			parameters := b.resourceClaimParameters()
+			claim := b.externalClaim(v1.AllocationModeImmediate)
+			pod := b.podExternal()
+
+			// This bypasses scheduling and therefore the pod gets
+			// to run on the node although it never gets added to
+			// the `ReservedFor` field of the claim.
+			pod.Spec.NodeName = nodes.NodeNames[0]
+
+			b.create(ctx, parameters, claim, pod)
+			err := e2epod.WaitForPodFailedReason(f.ClientSet, pod, "xyz", time.Minute)
+			framework.ExpectNoError(err, "pod should have failed")
 		})
 	})
 
