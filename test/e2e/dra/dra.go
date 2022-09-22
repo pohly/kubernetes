@@ -73,7 +73,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 			driver.Fail(m, true)
 
 			ginkgo.By("waiting for container startup to fail")
-			parameters := b.resourceClaimParameters()
+			parameters := b.parameters()
 			pod := b.podInline(v1.AllocationModeWaitForFirstConsumer)
 
 			b.create(ctx, parameters, pod)
@@ -97,6 +97,25 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 		})
 	})
 
+	ginkgo.Context("driver", func() {
+		nodes := NewNodes(f, 1, 1)
+		driver := NewDriver(f, nodes, networkResources) // All tests get their own driver instance.
+		b := newBuilder(f, driver)
+		// We need the parameters name *before* creating it.
+		b.parametersCounter = 1
+		b.classParametersName = b.parametersName()
+
+		ginkgo.It("supports claim and class parameters", func() {
+			classParameters := b.parameters("x", "y")
+			claimParameters := b.parameters()
+			pod := b.podInline(v1.AllocationModeWaitForFirstConsumer)
+
+			b.create(ctx, classParameters, claimParameters, pod)
+
+			b.testPod(f.ClientSet, pod, "user_a", "b", "admin_x", "y")
+		})
+	})
+
 	ginkgo.Context("cluster", func() {
 		nodes := NewNodes(f, 1, 4)
 		driver := NewDriver(f, nodes, networkResources)
@@ -106,7 +125,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 		// claims, both inline and external.
 		claimTests := func(allocationMode v1.AllocationMode) {
 			ginkgo.It("supports simple pod referencing inline resource claim", func() {
-				parameters := b.resourceClaimParameters()
+				parameters := b.parameters()
 				pod := b.podInline(allocationMode)
 				b.create(ctx, parameters, pod)
 
@@ -114,7 +133,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 			})
 
 			ginkgo.It("supports inline claim referenced by multiple containers", func() {
-				parameters := b.resourceClaimParameters()
+				parameters := b.parameters()
 				pod := b.podInlineMultiple(allocationMode)
 				b.create(ctx, parameters, pod)
 
@@ -122,7 +141,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 			})
 
 			ginkgo.It("supports simple pod referencing external resource claim", func() {
-				parameters := b.resourceClaimParameters()
+				parameters := b.parameters()
 				pod := b.podExternal()
 				b.create(ctx, parameters, b.externalClaim(allocationMode), pod)
 
@@ -130,7 +149,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 			})
 
 			ginkgo.It("supports external claim referenced by multiple pods", func() {
-				parameters := b.resourceClaimParameters()
+				parameters := b.parameters()
 				pod1 := b.podExternal()
 				pod2 := b.podExternal()
 				pod3 := b.podExternal()
@@ -143,7 +162,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 			})
 
 			ginkgo.It("supports external claim referenced by multiple containers of multiple pods", func() {
-				parameters := b.resourceClaimParameters()
+				parameters := b.parameters()
 				pod1 := b.podExternalMultiple()
 				pod2 := b.podExternalMultiple()
 				pod3 := b.podExternalMultiple()
@@ -172,7 +191,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 			b := newBuilder(f, driver)
 
 			ginkgo.It("schedules onto different nodes", func() {
-				parameters := b.resourceClaimParameters()
+				parameters := b.parameters()
 				label := "app.kubernetes.io/instance"
 				instance := f.UniqueName + "-test-app"
 				antiAffinity := &v1.Affinity{
@@ -220,7 +239,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 			tests := func(allocationMode v1.AllocationMode) {
 				ginkgo.It("uses all resources", func() {
 					var objs = []klog.KMetadata{
-						b.resourceClaimParameters(),
+						b.parameters(),
 					}
 					var pods []*v1.Pod
 					for i := 0; i < len(nodes.NodeNames); i++ {
@@ -296,7 +315,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 
-				parameters := b.resourceClaimParameters()
+				parameters := b.parameters()
 				claim1 := b.externalClaim(v1.AllocationModeWaitForFirstConsumer)
 				claim2 := b.externalClaim(v1.AllocationModeWaitForFirstConsumer)
 				pod1 := b.podExternal()
@@ -398,8 +417,8 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 		b2 := newBuilder(f, driver2)
 
 		ginkgo.It("work", func() {
-			parameters1 := b1.resourceClaimParameters()
-			parameters2 := b2.resourceClaimParameters()
+			parameters1 := b1.parameters()
+			parameters2 := b2.parameters()
 			claim1 := b1.externalClaim(v1.AllocationModeWaitForFirstConsumer)
 			claim2 := b2.externalClaim(v1.AllocationModeWaitForFirstConsumer)
 			pod := b1.podExternal()
@@ -423,9 +442,11 @@ type builder struct {
 	f      *framework.Framework
 	driver *Driver
 
-	podCounter                     int
-	resourceClaimParametersCounter int
-	claimCounter                   int
+	podCounter        int
+	parametersCounter int
+	claimCounter      int
+
+	classParametersName string
 }
 
 // className returns the default resource class name.
@@ -436,13 +457,22 @@ func (b *builder) className() string {
 // class returns the resource class that the builder's other objects
 // reference.
 func (b *builder) class() *v1.ResourceClass {
-	return &v1.ResourceClass{
+	class := &v1.ResourceClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: b.className(),
 		},
 		DriverName:    b.driver.Name,
 		SuitableNodes: b.nodeSelector(),
 	}
+	if b.classParametersName != "" {
+		class.Parameters = &v1.ResourceClassParametersReference{
+			APIVersion: "v1",
+			Kind:       "ConfigMap",
+			Name:       b.classParametersName,
+			Namespace:  b.f.Namespace.Name,
+		}
+	}
+	return class
 }
 
 // nodeSelector returns a node selector that matches all nodes on which the
@@ -480,35 +510,42 @@ func (b *builder) externalClaim(allocationMode v1.AllocationMode) *v1.ResourceCl
 			Parameters: &v1.ResourceClaimParametersReference{
 				APIVersion: "v1",
 				Kind:       "ConfigMap",
-				Name:       b.resourceClaimParametersName(),
+				Name:       b.parametersName(),
 			},
 			AllocationMode: allocationMode,
 		},
 	}
 }
 
-// resourceClaimParametersName returns the current ConfigMap name for resource
-// claim parameters.
-func (b *builder) resourceClaimParametersName() string {
-	return fmt.Sprintf("resource-claim-parameters%s-%d", b.driver.NameSuffix, b.resourceClaimParametersCounter)
+// parametersName returns the current ConfigMap name for resource
+// claim or class parameters.
+func (b *builder) parametersName() string {
+	return fmt.Sprintf("parameters%s-%d", b.driver.NameSuffix, b.parametersCounter)
 }
 
-// resourceClaimParametersEnv returns the default env variables.
-func (b *builder) resourceClaimParametersEnv() map[string]string {
+// parametersEnv returns the default env variables.
+func (b *builder) parametersEnv() map[string]string {
 	return map[string]string{
 		"a": "b",
 	}
 }
 
-// resourceClaimParameters returns a config map with the default env variables.
-func (b *builder) resourceClaimParameters() *v1.ConfigMap {
-	b.resourceClaimParametersCounter++
+// parameters returns a config map with the default env variables.
+func (b *builder) parameters(kv ...string) *v1.ConfigMap {
+	b.parametersCounter++
+	data := map[string]string{}
+	for i := 0; i < len(kv); i += 2 {
+		data[kv[i]] = kv[i+1]
+	}
+	if len(data) == 0 {
+		data = b.parametersEnv()
+	}
 	return &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: b.f.Namespace.Name,
-			Name:      b.resourceClaimParametersName(),
+			Name:      b.parametersName(),
 		},
-		Data: b.resourceClaimParametersEnv(),
+		Data: data,
 	}
 }
 
@@ -555,7 +592,7 @@ func (b *builder) podInline(allocationMode v1.AllocationMode) *v1.Pod {
 						Parameters: &v1.ResourceClaimParametersReference{
 							APIVersion: "v1",
 							Kind:       "ConfigMap",
-							Name:       b.resourceClaimParametersName(),
+							Name:       b.parametersName(),
 						},
 						AllocationMode: allocationMode,
 					},
@@ -625,19 +662,24 @@ func (b *builder) create(ctx context.Context, objs ...klog.KMetadata) {
 }
 
 // testPod runs pod and checks if container logs contain expected environment variables
-func (b *builder) testPod(clientSet kubernetes.Interface, pod *v1.Pod) {
+func (b *builder) testPod(clientSet kubernetes.Interface, pod *v1.Pod, env ...string) {
 	err := e2epod.WaitForPodRunningInNamespace(clientSet, pod)
 	framework.ExpectNoError(err, "start pod")
 
 	for _, container := range pod.Spec.Containers {
 		log, err := e2epod.GetPodLogs(clientSet, pod.Namespace, pod.Name, container.Name)
 		framework.ExpectNoError(err, "get logs")
-		var envStr string
-		for key, value := range b.resourceClaimParametersEnv() {
-			envStr = fmt.Sprintf("\nuser_%s=%s\n", key, value)
-			break
+		if len(env) == 0 {
+			for key, value := range b.parametersEnv() {
+				envStr := fmt.Sprintf("\nuser_%s=%s\n", key, value)
+				gomega.Expect(log).To(gomega.ContainSubstring(envStr), "container env variables")
+			}
+		} else {
+			for i := 0; i < len(env); i += 2 {
+				envStr := fmt.Sprintf("\n%s=%s\n", env[i], env[i+1])
+				gomega.Expect(log).To(gomega.ContainSubstring(envStr), "container env variables")
+			}
 		}
-		gomega.Expect(log).To(gomega.ContainSubstring(envStr), "container env variables")
 	}
 }
 
@@ -651,7 +693,7 @@ func newBuilder(f *framework.Framework, driver *Driver) *builder {
 
 func (b *builder) setUp() {
 	b.podCounter = 0
-	b.resourceClaimParametersCounter = 0
+	b.parametersCounter = 0
 	b.claimCounter = 0
 	b.create(context.Background(), b.class())
 	ginkgo.DeferCleanup(b.tearDown)

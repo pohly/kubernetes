@@ -124,9 +124,14 @@ func (c *ExampleController) GetNumDeallocations() int64 {
 }
 
 func (c *ExampleController) GetClassParameters(ctx context.Context, class *v1.ResourceClass) (interface{}, error) {
-	// TODO: read config map, but from what namespace?!
-	var env map[string]string
-	return env, nil
+	if class.Parameters != nil {
+		if class.Parameters.APIVersion != "v1" ||
+			class.Parameters.Kind != "ConfigMap" {
+			return nil, fmt.Errorf("class parameters are only supported in APIVersion v1, Kind ConfigMap, got: %v", class.Parameters)
+		}
+		return c.readParametersFromConfigMap(ctx, class.Parameters.Namespace, class.Parameters.Name)
+	}
+	return nil, nil
 }
 
 func (c *ExampleController) GetClaimParameters(ctx context.Context, claim *v1.ResourceClaim, class *v1.ResourceClass, classParameters interface{}) (interface{}, error) {
@@ -210,8 +215,8 @@ func (c *ExampleController) allocate(ctx context.Context, claim *v1.ResourceClai
 		EnvVars:  make(map[string]string),
 		NodeName: node,
 	}
-	toEnvVars("user", claimParameters.(map[string]string), p.EnvVars)
-	toEnvVars("admin", classParameters.(map[string]string), p.EnvVars)
+	toEnvVars("user", claimParameters, p.EnvVars)
+	toEnvVars("admin", classParameters, p.EnvVars)
 	data, err := json.Marshal(p)
 	if err != nil {
 		return nil, fmt.Errorf("encode parameters: %v", err)
@@ -304,8 +309,13 @@ func (c *ExampleController) UnsuitableNodes(ctx context.Context, pod *v1.Pod, cl
 	return nil
 }
 
-func toEnvVars(what string, from, to map[string]string) {
-	for key, value := range from {
+func toEnvVars(what string, from interface{}, to map[string]string) {
+	if from == nil {
+		return
+	}
+
+	env := from.(map[string]string)
+	for key, value := range env {
 		to[what+"_"+strings.ToLower(key)] = value
 	}
 }
