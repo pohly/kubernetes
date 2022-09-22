@@ -37,6 +37,7 @@ parameters:
   apiVersion: apiVersionValue
   kind: kindValue
   name: nameValue
+  namespace: namespaceValue
 suitableNodes:
   nodeSelectorTerms:
   - matchExpressions:

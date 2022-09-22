@@ -7511,6 +7511,7 @@ func autoConvert_v1_ResourceClassParametersReference_To_core_ResourceClassParame
 	out.APIVersion = in.APIVersion
 	out.Kind = in.Kind
 	out.Name = in.Name
+	out.Namespace = in.Namespace
 	return nil
 }
 
@@ -7523,6 +7524,7 @@ func autoConvert_core_ResourceClassParametersReference_To_v1_ResourceClassParame
 	out.APIVersion = in.APIVersion
 	out.Kind = in.Kind
 	out.Name = in.Name
+	out.Namespace = in.Namespace
 	return nil
 }
 

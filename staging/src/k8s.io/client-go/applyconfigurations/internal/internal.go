@@ -6501,6 +6501,10 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    - name: namespace
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.core.v1.ResourceFieldSelector
   map:
     fields:

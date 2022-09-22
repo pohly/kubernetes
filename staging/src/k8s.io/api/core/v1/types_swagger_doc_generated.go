@@ -2108,7 +2108,7 @@ var map_ResourceClass = map[string]string{
 	"":              "ResourceClass is used by administrators to influence how resources are allocated.",
 	"metadata":      "More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"driverName":    "DriverName determines which resource driver is to be used for allocation of a ResourceClaim that uses this class.\n\nResource drivers have a unique name in reverse domain order (acme.example.com).",
-	"parameters":    "Parameters holds arbitrary values that will be available to the driver when allocating a resource that uses this class. The driver will be able to distinguish between parameters stored here and and those stored in ResourceClaimSpec. These parameters here can only be set by cluster administrators.",
+	"parameters":    "Parameters references an arbitrary separate object that may hold parameters that will be used by the driver when allocating a resource that uses this class. The driver will be able to distinguish between parameters stored here and and those stored in ResourceClaimSpec. These parameters here can only be set by cluster administrators.",
 	"suitableNodes": "Only nodes matching the selector will be considered by the scheduler when trying to find a Node that fits a Pod when that Pod uses a ResourceClaim that has not been allocated yet.\n\nSetting this field is optional. If nil, all nodes are candidates.",
 }
 
@@ -2127,10 +2127,11 @@ func (ResourceClassList) SwaggerDoc() map[string]string {
 }
 
 var map_ResourceClassParametersReference = map[string]string{
-	"":           "ResourceClassParametersReference contains enough information to let you locate the parameters for a ResourceClass. The object must be cluster-scoped.",
+	"":           "ResourceClassParametersReference contains enough information to let you locate the parameters for a ResourceClass.",
 	"apiVersion": "APIVersion is the group and version for the resource being referenced or just the version for the core API.",
 	"kind":       "Kind is the type of resource being referenced. This is the same value as in the parameter object's metadata.",
 	"name":       "Name is the name of resource being referenced.",
+	"namespace":  "Namespace that contains the referenced resource. Must be empty for cluster-scoped resources and non-empty for namespaced resources.",
 }
 
 func (ResourceClassParametersReference) SwaggerDoc() map[string]string {

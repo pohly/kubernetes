@@ -47,7 +47,8 @@
   "parameters": {
     "apiVersion": "apiVersionValue",
     "kind": "kindValue",
-    "name": "nameValue"
+    "name": "nameValue",
+    "namespace": "namespaceValue"
   },
   "suitableNodes": {
     "nodeSelectorTerms": [

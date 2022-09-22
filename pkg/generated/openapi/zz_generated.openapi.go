@@ -24342,7 +24342,7 @@ func schema_k8sio_api_core_v1_ResourceClass(ref common.ReferenceCallback) common
 					},
 					"parameters": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Parameters holds arbitrary values that will be available to the driver when allocating a resource that uses this class. The driver will be able to distinguish between parameters stored here and and those stored in ResourceClaimSpec. These parameters here can only be set by cluster administrators.",
+							Description: "Parameters references an arbitrary separate object that may hold parameters that will be used by the driver when allocating a resource that uses this class. The driver will be able to distinguish between parameters stored here and and those stored in ResourceClaimSpec. These parameters here can only be set by cluster administrators.",
 							Ref:         ref("k8s.io/api/core/v1.ResourceClassParametersReference"),
 						},
 					},
@@ -24415,7 +24415,7 @@ func schema_k8sio_api_core_v1_ResourceClassParametersReference(ref common.Refere
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "ResourceClassParametersReference contains enough information to let you locate the parameters for a ResourceClass. The object must be cluster-scoped.",
+				Description: "ResourceClassParametersReference contains enough information to let you locate the parameters for a ResourceClass.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"apiVersion": {
@@ -24442,8 +24442,16 @@ func schema_k8sio_api_core_v1_ResourceClassParametersReference(ref common.Refere
 							Format:      "",
 						},
 					},
+					"namespace": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Namespace that contains the referenced resource. Must be empty for cluster-scoped resources and non-empty for namespaced resources.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
-				Required: []string{"apiVersion", "kind", "name"},
+				Required: []string{"apiVersion", "kind", "name", "namespace"},
 			},
 		},
 	}

@@ -6460,7 +6460,7 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.ResourceClassParametersReference"
               }
             ],
-            "description": "Parameters holds arbitrary values that will be available to the driver when allocating a resource that uses this class. The driver will be able to distinguish between parameters stored here and and those stored in ResourceClaimSpec. These parameters here can only be set by cluster administrators."
+            "description": "Parameters references an arbitrary separate object that may hold parameters that will be used by the driver when allocating a resource that uses this class. The driver will be able to distinguish between parameters stored here and and those stored in ResourceClaimSpec. These parameters here can only be set by cluster administrators."
           },
           "suitableNodes": {
             "allOf": [
@@ -6526,7 +6526,7 @@
         ]
       },
       "io.k8s.api.core.v1.ResourceClassParametersReference": {
-        "description": "ResourceClassParametersReference contains enough information to let you locate the parameters for a ResourceClass. The object must be cluster-scoped.",
+        "description": "ResourceClassParametersReference contains enough information to let you locate the parameters for a ResourceClass.",
         "properties": {
           "apiVersion": {
             "default": "",
@@ -6542,12 +6542,18 @@
             "default": "",
             "description": "Name is the name of resource being referenced.",
             "type": "string"
+          },
+          "namespace": {
+            "default": "",
+            "description": "Namespace that contains the referenced resource. Must be empty for cluster-scoped resources and non-empty for namespaced resources.",
+            "type": "string"
           }
         },
         "required": [
           "apiVersion",
           "kind",
-          "name"
+          "name",
+          "namespace"
         ],
         "type": "object"
       },

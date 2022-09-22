@@ -4706,11 +4706,12 @@ message ResourceClass {
   // (acme.example.com).
   optional string driverName = 2;
 
-  // Parameters holds arbitrary values that will be available to the
-  // driver when allocating a resource that uses this class. The driver
-  // will be able to distinguish between parameters stored here and and
-  // those stored in ResourceClaimSpec. These parameters here can only be
-  // set by cluster administrators.
+  // Parameters references an arbitrary separate object that may hold
+  // parameters that will be used by the driver when allocating a
+  // resource that uses this class. The driver will be able to
+  // distinguish between parameters stored here and and those stored in
+  // ResourceClaimSpec. These parameters here can only be set by cluster
+  // administrators.
   optional ResourceClassParametersReference parameters = 3;
 
   // Only nodes matching the selector will be considered by the scheduler
@@ -4732,8 +4733,7 @@ message ResourceClassList {
 }
 
 // ResourceClassParametersReference contains enough information to let you
-// locate the parameters for a ResourceClass. The object must be
-// cluster-scoped.
+// locate the parameters for a ResourceClass.
 message ResourceClassParametersReference {
   // APIVersion is the group and version for the resource being referenced or
   // just the version for the core API.
@@ -4745,6 +4745,11 @@ message ResourceClassParametersReference {
 
   // Name is the name of resource being referenced.
   optional string name = 3;
+
+  // Namespace that contains the referenced resource. Must be empty
+  // for cluster-scoped resources and non-empty for namespaced
+  // resources.
+  optional string namespace = 4;
 }
 
 // ResourceFieldSelector represents container resources (cpu, memory) and their output format

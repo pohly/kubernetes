@@ -24,6 +24,7 @@ type ResourceClassParametersReferenceApplyConfiguration struct {
 	APIVersion *string `json:"apiVersion,omitempty"`
 	Kind       *string `json:"kind,omitempty"`
 	Name       *string `json:"name,omitempty"`
+	Namespace  *string `json:"namespace,omitempty"`
 }
 
 // ResourceClassParametersReferenceApplyConfiguration constructs an declarative configuration of the ResourceClassParametersReference type for use with
@@ -53,5 +54,13 @@ func (b *ResourceClassParametersReferenceApplyConfiguration) WithKind(value stri
 // If called multiple times, the Name field is set to the value of the last call.
 func (b *ResourceClassParametersReferenceApplyConfiguration) WithName(value string) *ResourceClassParametersReferenceApplyConfiguration {
 	b.Name = &value
+	return b
+}
+
+// WithNamespace sets the Namespace field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Namespace field is set to the value of the last call.
+func (b *ResourceClassParametersReferenceApplyConfiguration) WithNamespace(value string) *ResourceClassParametersReferenceApplyConfiguration {
+	b.Namespace = &value
 	return b
 }
