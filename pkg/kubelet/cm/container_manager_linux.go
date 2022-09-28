@@ -686,48 +686,63 @@ func (cm *containerManagerImpl) UpdatePluginResources(node *schedulerframework.N
 	return cm.deviceManager.UpdatePluginResources(node, attrs)
 }
 
-func (cm *containerManagerImpl) GetAllocateResourcesPodAdmitHandler() lifecycle.PodAdmitHandler {
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.TopologyManager) {
-		return cm.topologyManager
-	}
+func (cm *containerManagerImpl) GetPodAdmitHandler() lifecycle.PodAdmitHandler {
 	// TODO: we need to think about a better way to do this. This will work for
 	// now so long as we have only the cpuManager and deviceManager relying on
 	// allocations here. However, going forward it is not generalized enough to
 	// work as we add more and more hint providers that the TopologyManager
 	// needs to call Allocate() on (that may not be directly intstantiated
 	// inside this component).
-	return &resourceAllocator{cm.cpuManager, cm.memoryManager, cm.deviceManager, cm.draManager}
+	return &podAdmitHandler{cm.topologyManager, cm.cpuManager, cm.memoryManager, cm.deviceManager, cm.draManager}
 }
 
-type resourceAllocator struct {
-	cpuManager    cpumanager.Manager
-	memoryManager memorymanager.Manager
-	deviceManager devicemanager.Manager
-	draManager    dra.Manager
+type podAdmitHandler struct {
+	topologyManager topologymanager.Manager
+	cpuManager      cpumanager.Manager
+	memoryManager   memorymanager.Manager
+	deviceManager   devicemanager.Manager
+	draManager      dra.Manager
 }
 
-func (m *resourceAllocator) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+func (m *podAdmitHandler) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	pod := attrs.Pod
 
-	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-		err := m.deviceManager.Allocate(pod, &container)
-		if err != nil {
-			return admission.GetPodAdmitResult(err)
+	// If topology manager is enabled it works as an admit handler for all its hint providers:
+	// device manager, cpu manager and memory manager
+	// It doesn't call draManager.Admit as DRA manager is not a hint provider,
+	// so it should be called separately (see below)
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.TopologyManager) {
+		if result := m.topologyManager.Admit(attrs); !result.Admit {
+			return result
 		}
-
-		if m.cpuManager != nil {
-			err = m.cpuManager.Allocate(pod, &container)
+	} else {
+		for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
+			err := m.deviceManager.Allocate(pod, &container)
 			if err != nil {
 				return admission.GetPodAdmitResult(err)
 			}
-		}
 
-		if m.memoryManager != nil {
-			err = m.memoryManager.Allocate(pod, &container)
-			if err != nil {
-				return admission.GetPodAdmitResult(err)
+			if m.cpuManager != nil {
+				err = m.cpuManager.Allocate(pod, &container)
+				if err != nil {
+					return admission.GetPodAdmitResult(err)
+				}
+			}
+
+			if m.memoryManager != nil {
+				err = m.memoryManager.Allocate(pod, &container)
+				if err != nil {
+					return admission.GetPodAdmitResult(err)
+				}
 			}
 		}
+	}
+
+	// draManager.Admit has to be called independenty as DRA Manager
+	// is not a topology hint provider and topology manager does not
+	// handle admissions for it
+	if m.draManager != nil {
+		return admission.GetPodAdmitResult(m.draManager.Admit(pod))
 	}
 
 	return admission.GetPodAdmitResult(nil)

@@ -228,7 +228,7 @@ func (cm *containerManagerImpl) ShouldResetExtendedResourceCapacity() bool {
 	return cm.deviceManager.ShouldResetExtendedResourceCapacity()
 }
 
-func (cm *containerManagerImpl) GetAllocateResourcesPodAdmitHandler() lifecycle.PodAdmitHandler {
+func (cm *containerManagerImpl) GetPodAdmitHandler() lifecycle.PodAdmitHandler {
 	return &noopWindowsResourceAllocator{}
 }
 

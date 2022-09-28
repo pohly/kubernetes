@@ -191,7 +191,7 @@ func (cm *FakeContainerManager) ShouldResetExtendedResourceCapacity() bool {
 	return cm.shouldResetExtendedResourceCapacity
 }
 
-func (cm *FakeContainerManager) GetAllocateResourcesPodAdmitHandler() lifecycle.PodAdmitHandler {
+func (cm *FakeContainerManager) GetPodAdmitHandler() lifecycle.PodAdmitHandler {
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "GetAllocateResourcesPodAdmitHandler")

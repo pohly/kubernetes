@@ -56,6 +56,31 @@ func NewManagerImpl(kubeClient clientset.Interface) (*ManagerImpl, error) {
 	return manager, nil
 }
 
+// Admit checks if pod is in the list of users for the claim
+func (m *ManagerImpl) Admit(pod *v1.Pod) error {
+	for _, podResourceClaim := range pod.Spec.ResourceClaims {
+		claimName := resourceclaim.Name(pod, &podResourceClaim)
+		klog.V(3).InfoS("Check if pod can be admited", "pod", pod.Name, "claim", claimName)
+		// Query claim object from the API server
+		resourceClaim, err := m.kubeClient.CoreV1().ResourceClaims(pod.Namespace).Get(context.TODO(), claimName, metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to fetch ResourceClaim %s referenced by pod %s: %+v", claimName, pod.Name, err)
+		}
+		// Check if pod is in the ReservedFor for the claim
+		found := false
+		for _, user := range resourceClaim.Status.ReservedFor {
+			if user.UID == pod.UID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("pod %s(%s) is not allowed to use resource claim %s(%s)", pod.Name, pod.UID, podResourceClaim.Name, resourceClaim.UID)
+		}
+	}
+	return nil
+}
+
 // Generate container annotations using CDI UpdateAnnotations API
 func generateCDIAnnotation(claimUID types.UID, driverName string, cdiDevices []string) ([]kubecontainer.Annotation, error) {
 	const maxKeyLen = 63 // max length of the CDI annotation key

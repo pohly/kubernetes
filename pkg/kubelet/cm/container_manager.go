@@ -109,8 +109,9 @@ type ContainerManager interface {
 	// due to node recreation.
 	ShouldResetExtendedResourceCapacity() bool
 
-	// GetAllocateResourcesPodAdmitHandler returns an instance of a PodAdmitHandler responsible for allocating pod resources.
-	GetAllocateResourcesPodAdmitHandler() lifecycle.PodAdmitHandler
+	// GetPodAdmitHandler returns an instance of a PodAdmitHandler responcible for checking
+	// if pod can be admitted
+	GetPodAdmitHandler() lifecycle.PodAdmitHandler
 
 	// GetNodeAllocatableAbsolute returns the absolute value of Node Allocatable which is primarily useful for enforcement.
 	GetNodeAllocatableAbsolute() v1.ResourceList

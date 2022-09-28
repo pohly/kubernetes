@@ -23,6 +23,9 @@ import (
 
 // Manager manages all the DRA resource plugins running on a node.
 type Manager interface {
+	// Admit checks if a pod can be admitted
+	Admit(pod *v1.Pod) error
+
 	// PrepareResources prepares resources for a container in a pod.
 	// It communicates with the DRA resource plugin to prepare resources and
 	// returns resource info to trigger CDI injection on the runtime side.
