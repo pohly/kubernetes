@@ -178,6 +178,7 @@ func (c *ExampleController) allocate(ctx context.Context, claim *v1.ResourceClai
 		// driver would have to do that.
 		logger.Info("already allocated")
 	} else {
+		logger.Info("starting", "selectedNode", selectedNode)
 		if c.resources.NodeLocal {
 			node = selectedNode
 			if node == "" {
@@ -196,6 +197,7 @@ func (c *ExampleController) allocate(ctx context.Context, claim *v1.ResourceClai
 				// Pick randomly. We could also prefer the one with the least
 				// number of allocations (even spreading) or the most (packing).
 				node = viableNodes[rand.Intn(len(viableNodes))]
+				logger.Info("picked a node ourselves", "selectedNode", selectedNode)
 			} else if c.resources.MaxAllocations > 0 &&
 				c.countAllocations(node) >= c.resources.MaxAllocations {
 				return nil, fmt.Errorf("resources exhausted on node %q", node)
@@ -222,7 +224,13 @@ func (c *ExampleController) allocate(ctx context.Context, claim *v1.ResourceClai
 		return nil, fmt.Errorf("encode parameters: %v", err)
 	}
 	allocation.ResourceHandle = string(data)
+	var nodes []string
 	if node != "" {
+		nodes = append(nodes, node)
+	} else {
+		nodes = c.resources.Nodes
+	}
+	if len(nodes) > 0 {
 		allocation.AvailableOnNodes = &v1.NodeSelector{
 			NodeSelectorTerms: []v1.NodeSelectorTerm{
 				{
@@ -230,9 +238,7 @@ func (c *ExampleController) allocate(ctx context.Context, claim *v1.ResourceClai
 						{
 							Key:      "kubernetes.io/hostname",
 							Operator: v1.NodeSelectorOpIn,
-							Values: []string{
-								node,
-							},
+							Values:   nodes,
 						},
 					},
 				},
