@@ -68,7 +68,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 		// This test does not pass at the moment because kubelet doesn't retry.
 		ginkgo.It("must retry NodePrepareResource", func() {
 			// We have exactly one host.
-			m := MethodInstance{driver.Hostnames()[0], NodePrepareResourceMethod}
+			m := MethodInstance{driver.Nodenames()[0], NodePrepareResourceMethod}
 
 			driver.Fail(m, true)
 
@@ -484,7 +484,7 @@ func (b *builder) nodeSelector() *v1.NodeSelector {
 					{
 						Key:      "kubernetes.io/hostname",
 						Operator: v1.NodeSelectorOpIn,
-						Values:   b.driver.Hostnames(),
+						Values:   b.driver.Nodenames(),
 					},
 				},
 			},
@@ -736,7 +736,7 @@ func (b *builder) tearDown() {
 		}
 	}
 
-	for host, plugin := range b.driver.Hosts {
+	for host, plugin := range b.driver.Nodes {
 		ginkgo.By(fmt.Sprintf("waiting for resources on %s to be unprepared", host))
 		gomega.Eventually(plugin.GetPreparedResources).WithTimeout(time.Minute).Should(gomega.BeEmpty(), "prepared claims on host %s", host)
 	}

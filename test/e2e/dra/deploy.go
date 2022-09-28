@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"path"
 	"sort"
@@ -93,6 +94,11 @@ func NewDriver(f *framework.Framework, nodes *Nodes, configureResources func() a
 
 	ginkgo.BeforeEach(func() {
 		resources := configureResources()
+		if len(resources.Nodes) == 0 {
+			// This always has to be set because the driver might
+			// not run on all nodes.
+			resources.Nodes = nodes.NodeNames
+		}
 		d.SetUp(nodes, resources)
 		ginkgo.DeferCleanup(d.TearDown)
 	})
@@ -100,7 +106,7 @@ func NewDriver(f *framework.Framework, nodes *Nodes, configureResources func() a
 }
 
 type MethodInstance struct {
-	Hostname   string
+	Nodename   string
 	FullMethod string
 }
 
@@ -113,7 +119,7 @@ type Driver struct {
 	NameSuffix string
 	Controller *app.ExampleController
 	Name       string
-	Hosts      map[string]*app.ExamplePlugin
+	Nodes      map[string]*app.ExamplePlugin
 
 	mutex      sync.Mutex
 	fail       map[MethodInstance]bool
@@ -121,8 +127,8 @@ type Driver struct {
 }
 
 func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
-	ginkgo.By("deploying driver")
-	d.Hosts = map[string]*app.ExamplePlugin{}
+	ginkgo.By(fmt.Sprintf("deploying driver on nodes %v", nodes.NodeNames))
+	d.Nodes = map[string]*app.ExamplePlugin{}
 	d.Name = d.f.UniqueName + d.NameSuffix + ".k8s.io"
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -204,20 +210,25 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 
 	// Run registar and plugin for each of the pods.
 	for _, pod := range pods.Items {
-		hostname := pod.Spec.NodeName
+		// Need a local variable, not the loop variable, for the anonymous
+		// callback functions below.
+		pod := pod
+		nodename := pod.Spec.NodeName
 		logger := klog.LoggerWithValues(klog.LoggerWithName(klog.Background(), "kubelet plugin"), "node", pod.Spec.NodeName, "pod", klog.KObj(&pod))
-		plugin, err := app.StartPlugin(logger, "/cdi", d.Name, hostname,
+		plugin, err := app.StartPlugin(logger, "/cdi", d.Name, nodename,
 			app.FileOperations{
 				Create: func(name string, content []byte) error {
+					ginkgo.By(fmt.Sprintf("creating CDI file %s on node %s", name, nodename))
 					return d.createFile(&pod, name, content)
 				},
 				Remove: func(name string) error {
+					ginkgo.By(fmt.Sprintf("deleting CDI file %s on node %s", name, nodename))
 					return d.removeFile(&pod, name)
 				},
 			},
 			kubeletplugin.GRPCVerbosity(0),
 			kubeletplugin.GRPCInterceptor(func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
-				return d.interceptor(hostname, ctx, req, info, handler)
+				return d.interceptor(nodename, ctx, req, info, handler)
 			}),
 			kubeletplugin.PluginListener(listen(ctx, d.f, pod.Name, "plugin", 9001)),
 			kubeletplugin.RegistrarListener(listen(ctx, d.f, pod.Name, "registrar", 9000)),
@@ -228,16 +239,16 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 			// Depends on cancel being called first.
 			plugin.Stop()
 		})
-		d.Hosts[hostname] = plugin
+		d.Nodes[nodename] = plugin
 	}
 
 	// Wait for registration.
 	ginkgo.By("wait for plugin registration")
 	gomega.Eventually(func() []string {
 		var notRegistered []string
-		for hostname, plugin := range d.Hosts {
+		for nodename, plugin := range d.Nodes {
 			if !plugin.IsRegistered() {
-				notRegistered = append(notRegistered, hostname)
+				notRegistered = append(notRegistered, nodename)
 			}
 		}
 		sort.Strings(notRegistered)
@@ -283,11 +294,11 @@ func (d *Driver) TearDown() {
 	d.wg.Wait()
 }
 
-func (d *Driver) interceptor(hostname string, ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
+func (d *Driver) interceptor(nodename string, ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
-	m := MethodInstance{hostname, info.FullMethod}
+	m := MethodInstance{nodename, info.FullMethod}
 	d.callCounts[m]++
 	if d.fail[m] {
 		return nil, errors.New("injected error")
@@ -310,10 +321,10 @@ func (d *Driver) CallCount(m MethodInstance) int64 {
 	return d.callCounts[m]
 }
 
-func (d *Driver) Hostnames() (hostnames []string) {
-	for hostname := range d.Hosts {
-		hostnames = append(hostnames, hostname)
+func (d *Driver) Nodenames() (nodenames []string) {
+	for nodename := range d.Nodes {
+		nodenames = append(nodenames, nodename)
 	}
-	sort.Strings(hostnames)
+	sort.Strings(nodenames)
 	return
 }
