@@ -95,6 +95,29 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 				framework.Fail("NodePrepareResource should have been called again")
 			}
 		})
+		ginkgo.It("must not run a pod if a claim is not reserved for it", func() {
+			parameters := b.parameters()
+			claim := b.externalClaim(v1.AllocationModeImmediate)
+			pod := b.podExternal()
+
+			// This bypasses scheduling and therefore the pod gets
+			// to run on the node although it never gets added to
+			// the `ReservedFor` field of the claim.
+			pod.Spec.NodeName = nodes.NodeNames[0]
+
+			b.create(ctx, parameters, claim, pod)
+
+			gomega.Consistently(func() error {
+				testPod, err := b.f.ClientSet.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
+				if err != nil {
+					return fmt.Errorf("expected the test pod %s to exist: %v", pod.Name, err)
+				}
+				if testPod.Status.Phase != v1.PodPending {
+					return fmt.Errorf("pod %s: unexpected status %s, expected status: %s", pod.Name, testPod.Status.Phase, v1.PodPending)
+				}
+				return nil
+			}, 20*time.Second, 200*time.Millisecond).Should(gomega.BeNil())
+		})
 	})
 
 	ginkgo.Context("driver", func() {
