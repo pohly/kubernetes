@@ -258,7 +258,14 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 
 func (d *Driver) createFile(pod *v1.Pod, name string, content []byte) error {
 	buffer := bytes.NewBuffer(content)
-	return d.podIO(pod).CreateFile(name, buffer)
+	// Writing the content can be slow. Better create a temporary file and
+	// move it to the final destination once it is complete.
+	tmpName := name + ".tmp"
+	if err := d.podIO(pod).CreateFile(tmpName, buffer); err != nil {
+		_ = d.podIO(pod).RemoveAll(tmpName)
+		return err
+	}
+	return d.podIO(pod).Rename(tmpName, name)
 }
 
 func (d *Driver) removeFile(pod *v1.Pod, name string) error {
