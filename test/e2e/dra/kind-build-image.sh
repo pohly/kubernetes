@@ -31,7 +31,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-kind build node-image --image "$tag"
+kind build node-image --image "$tag" "$(pwd)"
 curl -L --silent https://github.com/kind-ci/containerd-nightlies/releases/download/$containerd/$containerd-linux-amd64.tar.gz | tar -C "$tmpdir" -vzxf -
 curl -L --silent https://github.com/kind-ci/containerd-nightlies/releases/download/$containerd/runc.amd64 >"$tmpdir/runc"
 
