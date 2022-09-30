@@ -218,7 +218,7 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 		plugin, err := app.StartPlugin(logger, "/cdi", d.Name, nodename,
 			app.FileOperations{
 				Create: func(name string, content []byte) error {
-					ginkgo.By(fmt.Sprintf("creating CDI file %s on node %s", name, nodename))
+					ginkgo.By(fmt.Sprintf("creating CDI file %s on node %s:\n%s", name, nodename, string(content)))
 					return d.createFile(&pod, name, content)
 				},
 				Remove: func(name string) error {

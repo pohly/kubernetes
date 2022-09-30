@@ -29,6 +29,7 @@ import (
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
 	"k8s.io/klog/v2"
 	drapbv1 "k8s.io/kubelet/pkg/apis/dra/v1alpha1"
+	"sigs.k8s.io/yaml"
 )
 
 type ExamplePlugin struct {
@@ -54,9 +55,9 @@ type ClaimID struct {
 
 var _ drapbv1.NodeServer = &ExamplePlugin{}
 
-// getJSONFilePath returns the absolute path where CDI file is/should be.
-func (ex *ExamplePlugin) getJSONFilePath(claimUID string) string {
-	return filepath.Join(ex.cdiDir, fmt.Sprintf("%s-%s.json", ex.driverName, claimUID))
+// getYAMLFilePath returns the absolute path where CDI file is/should be.
+func (ex *ExamplePlugin) getYAMLFilePath(claimUID string) string {
+	return filepath.Join(ex.cdiDir, fmt.Sprintf("%s-%s.yaml", ex.driverName, claimUID))
 }
 
 // FileOperations defines optional callbacks for handling CDI files.
@@ -159,13 +160,13 @@ func (ex *ExamplePlugin) NodePrepareResource(ctx context.Context, req *drapbv1.N
 			},
 		},
 	}
-	filePath := ex.getJSONFilePath(req.ClaimUid)
+	filePath := ex.getYAMLFilePath(req.ClaimUid)
 	cdiSpec, err := cdiapi.NewSpec(&spec, filePath, 1)
 	if err != nil {
 		return nil, fmt.Errorf("create spec: %v", err)
 	}
 
-	buffer, err := json.Marshal(*cdiSpec)
+	buffer, err := yaml.Marshal(*cdiSpec)
 	if err != nil {
 		return nil, fmt.Errorf("marshal spec: %v", err)
 	}
@@ -194,7 +195,7 @@ func (ex *ExamplePlugin) NodePrepareResource(ctx context.Context, req *drapbv1.N
 func (ex *ExamplePlugin) NodeUnprepareResource(ctx context.Context, req *drapbv1.NodeUnprepareResourceRequest) (*drapbv1.NodeUnprepareResourceResponse, error) {
 	logger := klog.FromContext(ctx)
 
-	filePath := ex.getJSONFilePath(req.ClaimUid)
+	filePath := ex.getYAMLFilePath(req.ClaimUid)
 	if err := ex.fileOps.Remove(filePath); err != nil {
 		return nil, fmt.Errorf("error removing CDI file: %v", err)
 	}
