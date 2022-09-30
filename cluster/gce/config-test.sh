@@ -126,6 +126,7 @@ export MASTER_EXTRA_METADATA=${KUBE_MASTER_EXTRA_METADATA:-${KUBE_EXTRA_METADATA
 # MASTER_EXTRA_METADATA is the extra instance metadata on node instance separated by commas.
 export NODE_EXTRA_METADATA=${KUBE_NODE_EXTRA_METADATA:-${KUBE_EXTRA_METADATA:-}}
 
+USER=${USER:-$(id -nu)}
 NETWORK=${KUBE_GCE_NETWORK:-e2e-test-${USER}}
 if [[ "${CREATE_CUSTOM_NETWORK}" = true ]]; then
   SUBNETWORK=${SUBNETWORK:-${NETWORK}-custom-subnet}
