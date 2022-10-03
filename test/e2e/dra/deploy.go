@@ -273,11 +273,13 @@ func (d *Driver) removeFile(pod *v1.Pod, name string) error {
 }
 
 func (d *Driver) podIO(pod *v1.Pod) proxy.PodDirIO {
+	logger := klog.Background()
 	return proxy.PodDirIO{
 		F:             d.f,
 		Namespace:     pod.Namespace,
 		PodName:       pod.Name,
 		ContainerName: "plugin",
+		Logger:        &logger,
 	}
 }
 
