@@ -11,6 +11,9 @@ nodes:
     controllerManager:
         extraArgs:
           v: "5"
+    kubelet:
+        extraArgs:
+          v: "5"
 - role: worker
 - role: worker
 featureGates:
