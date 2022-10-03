@@ -11,10 +11,24 @@ nodes:
     controllerManager:
         extraArgs:
           v: "5"
-    kubelet:
-        extraArgs:
-          v: "5"
+  - |
+    kind: InitConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        v: "5"
 - role: worker
+  kubeadmConfigPatches:
+  - |
+    kind: JoinConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        v: "5"
 - role: worker
+  kubeadmConfigPatches:
+  - |
+    kind: JoinConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        v: "5"
 featureGates:
   DynamicResourceAllocation: true
