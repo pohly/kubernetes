@@ -147,6 +147,7 @@ type NodeConfig struct {
 	EnforceCPULimits                        bool
 	CPUCFSQuotaPeriod                       time.Duration
 	ExperimentalTopologyManagerPolicy       string
+	ExperimentalDRAManagerReconcilePeriod   time.Duration
 }
 
 type NodeAllocatableConfig struct {

@@ -316,7 +316,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	// initialize DRA manager
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) {
 		klog.InfoS("Creating Dynamic Resource Allocation (DRA) manager")
-		cm.draManager, err = dra.NewManagerImpl(kubeClient)
+		cm.draManager, err = dra.NewManagerImpl(kubeClient, nodeConfig.ExperimentalDRAManagerReconcilePeriod)
 		if err != nil {
 			return nil, err
 		}
@@ -648,6 +648,13 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 	// Starts device manager.
 	if err := cm.deviceManager.Start(devicemanager.ActivePodsFunc(activePods), sourcesReady); err != nil {
 		return err
+	}
+
+	// Initializes DRA manager
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) {
+		if err := cm.draManager.Start(dra.ActivePodsFunc(activePods)); err != nil {
+			return err
+		}
 	}
 
 	return nil

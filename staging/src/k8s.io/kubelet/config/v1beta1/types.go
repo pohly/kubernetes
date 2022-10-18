@@ -797,6 +797,12 @@ type KubeletConfiguration struct {
 	// Default: true
 	// +optional
 	LocalStorageCapacityIsolation *bool `json:"localStorageCapacityIsolation,omitempty"`
+
+	// DRAManagerReconcilePeriod is the reconciliation period for the DRA Manager.
+	// Requires the DynamicResourceAllocation feature gate to be enabled.
+	// Default: "10s"
+	// +optional
+	DRAManagerReconcilePeriod metav1.Duration `json:"draManagerReconcilePeriod,omitempty"`
 }
 
 type KubeletAuthorizationMode string

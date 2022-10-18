@@ -20,18 +20,23 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/container-orchestrated-devices/container-device-interface/pkg/cdi"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
 	dra "k8s.io/kubernetes/pkg/kubelet/cm/dra/plugin"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
+
+// ActivePodsFunc is a function that returns a list of pods to reconcile.
+type ActivePodsFunc func() []*v1.Pod
 
 // ManagerImpl is the structure in charge of managing DRA resource Plugins.
 type ManagerImpl struct {
@@ -42,18 +47,70 @@ type ManagerImpl struct {
 
 	// KubeClient reference
 	kubeClient clientset.Interface
+
+	// activePods is a method for listing active pods on the node
+	// so the NodeUnprepareResource API can be properly called
+	// for the forcibly deleted pods (with a grace period 0)
+	activePods ActivePodsFunc
+
+	// reconcilePeriod is the duration between calls to reconcileState.
+	reconcilePeriod time.Duration
 }
 
 // NewManagerImpl creates a new manager.
-func NewManagerImpl(kubeClient clientset.Interface) (*ManagerImpl, error) {
+func NewManagerImpl(kubeClient clientset.Interface, reconcilePeriod time.Duration) (*ManagerImpl, error) {
 	klog.V(2).InfoS("Creating DRA manager")
 
 	manager := &ManagerImpl{
-		resources:  newClaimedResources(),
-		kubeClient: kubeClient,
+		resources:       newClaimedResources(),
+		kubeClient:      kubeClient,
+		reconcilePeriod: reconcilePeriod,
 	}
 
+	// The activePods field is populated with real implementations in manager.Init()
+	// Before that, initializes it to perform no-op operation.
+	manager.activePods = func() []*v1.Pod { return []*v1.Pod{} }
+
 	return manager, nil
+}
+
+// Start populates activePods field with a real implementation
+// and starts reconciler function
+func (m *ManagerImpl) Start(activePods ActivePodsFunc) error {
+	m.activePods = activePods
+
+	// Periodically call m.reconcileState() to continue to keep the DRA
+	// resource cache up to date.
+	go wait.Until(func() { m.reconcileState() }, m.reconcilePeriod, wait.NeverStop)
+
+	return nil
+}
+
+// reconcileState finds inactive pods that are still in the DRA Manager cache
+// and un-prepares resources for them
+func (m *ManagerImpl) reconcileState() {
+	activePods := m.activePods()
+	inactivePodUIDs := m.resources.allPodUIDs()
+	for _, pod := range activePods {
+		inactivePodUIDs.Delete(string(pod.UID))
+	}
+	if len(inactivePodUIDs) <= 0 {
+		return
+	}
+
+	klog.V(3).InfoS("Inactive pod UIDs", "podUIDs", inactivePodUIDs)
+
+	for _, res := range m.resources.resources {
+		for _, podUID := range inactivePodUIDs.List() {
+			if res.hasPodUID(podUID) {
+				klog.V(3).InfoS("Calling UnprepareResource", "pod UID", podUID, "claim name", res.claimName)
+				if err := m.unprepareResource(res, podUID); err != nil {
+					klog.V(3).InfoS("UnprepareResource failed", "pod UID", podUID, "claim name", res.claimName, "error", err)
+					continue
+				}
+			}
+		}
+	}
 }
 
 // Generate container annotations using CDI UpdateAnnotations API
@@ -87,7 +144,7 @@ func (m *ManagerImpl) prepareContainerResources(pod *v1.Pod, container *v1.Conta
 
 			if resource := m.resources.get(claimName, pod.Namespace); resource != nil {
 				// resource is already prepared, add pod UID to it
-				resource.addPodUID(pod.UID)
+				resource.addPodUID(string(pod.UID))
 				continue
 			}
 
@@ -166,44 +223,47 @@ func (m *ManagerImpl) PrepareResources(pod *v1.Pod, container *v1.Container) (*D
 }
 
 func (m *ManagerImpl) UnprepareResources(pod *v1.Pod) error {
-	m.Lock()
-	defer m.Unlock()
-
 	// Call NodeUnprepareResource RPC for every resource claim referenced by the pod
 	for _, podResourceClaim := range pod.Spec.ResourceClaims {
 		claimName := resourceclaim.Name(pod, &podResourceClaim)
-		resource := m.resources.get(claimName, pod.Namespace)
-		if resource == nil {
+		res := m.resources.get(claimName, pod.Namespace)
+		if res == nil {
 			return fmt.Errorf("failed to get resource for namespace %s, claim %s", pod.Namespace, claimName)
 		}
 
-		if !resource.hasPodUID(pod.UID) {
+		if !res.hasPodUID(string(pod.UID)) {
 			// skip calling NodeUnprepareResource if pod is not cached
 			continue
 		}
 
-		// Delete pod UID from the cache
-		resource.deletePodUID(pod.UID)
-
-		if len(resource.podUIDs) > 0 {
-			// skip calling NodeUnprepareResource if this is not the latest pod
-			// that uses the resource
-			continue
+		if err := m.unprepareResource(res, string(pod.UID)); err != nil {
+			return err
 		}
-
-		// Call NodeUnprepareResource only for the latest pod that refers the claim
-		client, err := dra.NewDRAPluginClient(resource.driverName)
-		if err != nil || client == nil {
-			return fmt.Errorf("failed to get DRA Plugin client for plugin name %s, err=%+v", resource.driverName, err)
-		}
-		response, err := client.NodeUnprepareResource(context.Background(), resource.namespace, resource.claimUID, resource.claimName, resource.cdiDevice)
-		if err != nil {
-			return fmt.Errorf("NodeUnprepareResource failed, pod: %s, claim UID: %s, claim name: %s, CDI devices: %s, err: %+v", pod.Name, resource.claimUID, resource.claimName, resource.cdiDevice, err)
-		}
-		klog.V(3).InfoS("NodeUnprepareResource succeeded", "response", response)
-		// delete resource from the cache
-		m.resources.delete(resource.claimName, pod.Namespace)
 	}
 
+	return nil
+}
+
+func (m *ManagerImpl) unprepareResource(res *resource, podUID string) error {
+	// Delete pod UID from the cache
+	res.deletePodUID(podUID)
+
+	if len(res.podUIDs) <= 0 {
+		// Call NodeUnprepareResource only for the latest pod that refers the claim
+		client, err := dra.NewDRAPluginClient(res.driverName)
+		if err != nil || client == nil {
+			return fmt.Errorf("failed to get DRA Plugin client for plugin name %s, err=%+v", res.driverName, err)
+		}
+		response, err := client.NodeUnprepareResource(context.Background(), res.namespace, res.claimUID, res.claimName, res.cdiDevice)
+		if err != nil {
+			return fmt.Errorf("NodeUnprepareResource failed, podUID: %s, claim UID: %s, claim name: %s, CDI devices: %s, err: %+v", podUID, res.claimUID, res.claimName, res.cdiDevice, err)
+		}
+		klog.V(3).InfoS("NodeUnprepareResource succeeded", "response", response)
+
+		// delete resource from the cache
+		m.Lock()
+		m.resources.delete(res.claimName, res.namespace)
+		m.Unlock()
+	}
 	return nil
 }

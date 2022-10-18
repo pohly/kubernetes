@@ -122,6 +122,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				MemoryThrottlingFactor:        utilpointer.Float64Ptr(DefaultMemoryThrottlingFactor),
 				RegisterNode:                  utilpointer.BoolPtr(true),
 				LocalStorageCapacityIsolation: utilpointer.BoolPtr(true),
+				DRAManagerReconcilePeriod:     metav1.Duration{Duration: 10 * time.Second},
 			},
 		},
 		{
@@ -247,6 +248,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				MemoryThrottlingFactor:          utilpointer.Float64(0),
 				RegisterNode:                    utilpointer.BoolPtr(false),
 				LocalStorageCapacityIsolation:   utilpointer.BoolPtr(false),
+				DRAManagerReconcilePeriod:       zeroDuration,
 			},
 			&v1beta1.KubeletConfiguration{
 				EnableServer:       utilpointer.BoolPtr(false),
@@ -343,6 +345,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				MemoryThrottlingFactor:        utilpointer.Float64(0),
 				RegisterNode:                  utilpointer.BoolPtr(false),
 				LocalStorageCapacityIsolation: utilpointer.BoolPtr(false),
+				DRAManagerReconcilePeriod:     metav1.Duration{Duration: 10 * time.Second},
 			},
 		},
 		{
@@ -490,6 +493,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				MemoryThrottlingFactor:        utilpointer.Float64(1),
 				RegisterNode:                  utilpointer.BoolPtr(true),
 				LocalStorageCapacityIsolation: utilpointer.BoolPtr(true),
+				DRAManagerReconcilePeriod:     metav1.Duration{Duration: 60 * time.Second},
 			},
 			&v1beta1.KubeletConfiguration{
 				EnableServer:       utilpointer.BoolPtr(true),
@@ -634,6 +638,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				MemoryThrottlingFactor:        utilpointer.Float64(1),
 				RegisterNode:                  utilpointer.BoolPtr(true),
 				LocalStorageCapacityIsolation: utilpointer.BoolPtr(true),
+				DRAManagerReconcilePeriod:     metav1.Duration{Duration: 60 * time.Second},
 			},
 		},
 		{
@@ -721,6 +726,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				MemoryThrottlingFactor:        utilpointer.Float64Ptr(DefaultMemoryThrottlingFactor),
 				RegisterNode:                  utilpointer.BoolPtr(true),
 				LocalStorageCapacityIsolation: utilpointer.BoolPtr(true),
+				DRAManagerReconcilePeriod:     metav1.Duration{Duration: 10 * time.Second},
 			},
 		},
 	}

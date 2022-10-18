@@ -267,4 +267,8 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.LocalStorageCapacityIsolation == nil {
 		obj.LocalStorageCapacityIsolation = utilpointer.BoolPtr(true)
 	}
+	if obj.DRAManagerReconcilePeriod == zeroDuration {
+		// Keep the same as default NodeStatusUpdateFrequency
+		obj.DRAManagerReconcilePeriod = metav1.Duration{Duration: 10 * time.Second}
+	}
 }

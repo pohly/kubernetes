@@ -57040,6 +57040,12 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Format:      "",
 						},
 					},
+					"draManagerReconcilePeriod": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DRAManagerReconcilePeriod is the reconciliation period for the DRA Manager. Requires the DynamicResourceAllocation feature gate to be enabled. Default: \"10s\"",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
+						},
+					},
 				},
 			},
 		},

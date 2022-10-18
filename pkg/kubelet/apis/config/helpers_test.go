@@ -283,5 +283,6 @@ var (
 		"Tracing.Endpoint",
 		"Tracing.SamplingRatePerMillion",
 		"LocalStorageCapacityIsolation",
+		"DRAManagerReconcilePeriod.Duration",
 	)
 )

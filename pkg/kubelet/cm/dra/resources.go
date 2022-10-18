@@ -54,25 +54,25 @@ type resource struct {
 	annotations []kubecontainer.Annotation
 }
 
-func (res *resource) addPodUID(podUID types.UID) {
+func (res *resource) addPodUID(podUID string) {
 	res.Lock()
 	defer res.Unlock()
 
-	res.podUIDs.Insert(string(podUID))
+	res.podUIDs.Insert(podUID)
 }
 
-func (res *resource) hasPodUID(podUID types.UID) bool {
+func (res *resource) hasPodUID(podUID string) bool {
 	res.Lock()
 	defer res.Unlock()
 
-	return res.podUIDs.Has(string(podUID))
+	return res.podUIDs.Has(podUID)
 }
 
-func (res *resource) deletePodUID(podUID types.UID) {
+func (res *resource) deletePodUID(podUID string) {
 	res.Lock()
 	defer res.Unlock()
 
-	res.podUIDs.Delete(string(podUID))
+	res.podUIDs.Delete(podUID)
 }
 
 // claimedResources is cache of processed resources keyed by namespace + claim name
@@ -112,4 +112,17 @@ func (cres *claimedResources) delete(claimName, namespace string) {
 	defer cres.Unlock()
 
 	delete(cres.resources, claimName+namespace)
+}
+
+func (cres *claimedResources) allPodUIDs() sets.String {
+	cres.RLock()
+	defer cres.RUnlock()
+
+	result := sets.String{}
+	for _, res := range cres.resources {
+		for podUID := range res.podUIDs {
+			result.Insert(podUID)
+		}
+	}
+	return result
 }

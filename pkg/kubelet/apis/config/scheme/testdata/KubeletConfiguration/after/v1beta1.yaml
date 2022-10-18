@@ -88,3 +88,4 @@ topologyManagerPolicy: none
 topologyManagerScope: container
 volumePluginDir: /usr/libexec/kubernetes/kubelet-plugins/volume/exec/
 volumeStatsAggPeriod: 1m0s
+draManagerReconcilePeriod: 10s

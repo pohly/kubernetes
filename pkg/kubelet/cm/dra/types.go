@@ -23,6 +23,10 @@ import (
 
 // Manager manages all the DRA resource plugins running on a node.
 type Manager interface {
+	// Start initializes DRA manager
+	// and starts reconciler
+	Start(activePods ActivePodsFunc) error
+
 	// PrepareResources prepares resources for a container in a pod.
 	// It communicates with the DRA resource plugin to prepare resources and
 	// returns resource info to trigger CDI injection on the runtime side.

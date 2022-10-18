@@ -313,6 +313,7 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		*out = new(apiv1.TracingConfiguration)
 		(*in).DeepCopyInto(*out)
 	}
+	out.DRAManagerReconcilePeriod = in.DRAManagerReconcilePeriod
 	return
 }
 

@@ -457,6 +457,7 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		*out = new(bool)
 		**out = **in
 	}
+	out.DRAManagerReconcilePeriod = in.DRAManagerReconcilePeriod
 	return
 }
 

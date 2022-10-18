@@ -460,6 +460,10 @@ type KubeletConfiguration struct {
 	// disabled. Once disabled, user should not set request/limit for container's ephemeral storage, or sizeLimit for emptyDir.
 	// +optional
 	LocalStorageCapacityIsolation bool
+
+	// DRA Manager reconciliation period.
+	// Requires the DynamicResourceAllocation feature gate to be enabled.
+	DRAManagerReconcilePeriod metav1.Duration
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet
