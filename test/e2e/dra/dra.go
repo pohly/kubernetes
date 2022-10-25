@@ -118,6 +118,28 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 				return nil
 			}, 20*time.Second, 200*time.Millisecond).Should(gomega.BeNil())
 		})
+		ginkgo.It("must unprepare resources for force-deleted pod", func() {
+			parameters := b.parameters()
+			claim := b.externalClaim(v1.AllocationModeImmediate)
+			pod := b.podExternal()
+			zero := int64(0)
+			pod.Spec.TerminationGracePeriodSeconds = &zero
+
+			b.create(ctx, parameters, claim, pod)
+
+			b.testPod(f.ClientSet, pod)
+
+			ginkgo.By(fmt.Sprintf("force delete test pod %s", pod.Name))
+			err := b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).Delete(ctx, pod.Name, metav1.DeleteOptions{GracePeriodSeconds: &zero})
+			if !apierrors.IsNotFound(err) {
+				framework.ExpectNoError(err, "force delete test pod")
+			}
+
+			for host, plugin := range b.driver.Nodes {
+				ginkgo.By(fmt.Sprintf("waiting for resources on %s to be unprepared", host))
+				gomega.Eventually(plugin.GetPreparedResources).WithTimeout(time.Minute).Should(gomega.BeEmpty(), "prepared claims on host %s", host)
+			}
+		})
 	})
 
 	ginkgo.Context("driver", func() {
