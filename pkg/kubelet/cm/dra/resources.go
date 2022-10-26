@@ -26,7 +26,7 @@ import (
 )
 
 // resource contains resource attributes required
-// to prepare and unprepare the resource
+// to prepare and unprepare the resource.
 type resource struct {
 	sync.Mutex
 
@@ -75,13 +75,13 @@ func (res *resource) deletePodUID(podUID types.UID) {
 	res.podUIDs.Delete(string(podUID))
 }
 
-// claimedResources is cache of processed resources keyed by namespace + claim name
+// claimedResources is a cache of processed resources keyed by namespace + claim name.
 type claimedResources struct {
 	sync.RWMutex
 	resources map[string]*resource
 }
 
-// newClaimedResources is a function that returns object of podResources
+// newClaimedResources is a function that returns object of podResources.
 func newClaimedResources() *claimedResources {
 	return &claimedResources{
 		resources: make(map[string]*resource),
@@ -96,7 +96,9 @@ func (cres *claimedResources) add(claim, namespace string, res *resource) error 
 	if _, ok := cres.resources[key]; ok {
 		return fmt.Errorf("claim %s, namespace %s already cached", claim, namespace)
 	}
+
 	cres.resources[claim+namespace] = res
+
 	return nil
 }
 

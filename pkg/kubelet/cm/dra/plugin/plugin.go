@@ -26,21 +26,20 @@ import (
 )
 
 const (
-	// DRAPluginName is the name of the in-tree DRA Plugin
+	// DRAPluginName is the name of the in-tree DRA Plugin.
 	DRAPluginName = "kubernetes.io/dra"
 )
 
-// draPlugins map keep track of all registered DRA plugins on the node and their
-// corresponding sockets
+// draPlugins map keeps track of all registered DRA plugins on the node
+// and their corresponding sockets.
 var draPlugins = &PluginsStore{}
 
 // RegistrationHandler is the handler which is fed to the pluginwatcher API.
-type RegistrationHandler struct {
-}
+type RegistrationHandler struct{}
 
 var PluginHandler = &RegistrationHandler{}
 
-// RegisterPlugin is called when a plugin can be registered
+// RegisterPlugin is called when a plugin can be registered.
 func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string, versions []string) error {
 	klog.InfoS("Register new DRA plugin", "name", pluginName, "endpoint", endpoint)
 
@@ -59,41 +58,42 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 	return nil
 }
 
-// Return the highest supported version
+// Return the highest supported version.
 func highestSupportedVersion(versions []string) (*utilversion.Version, error) {
 	if len(versions) == 0 {
 		return nil, errors.New(log("DRA driver reporting empty array for supported versions"))
 	}
 
 	var highestSupportedVersion *utilversion.Version
+
 	var theErr error
+
 	for i := len(versions) - 1; i >= 0; i-- {
 		currentHighestVer, err := utilversion.ParseGeneric(versions[i])
 		if err != nil {
 			theErr = err
+
 			continue
 		}
-		if currentHighestVer.Major() > 1 {
-			// CSI currently only has version 0.x and 1.x (see https://github.com/container-storage-interface/spec/releases).
-			// Therefore any driver claiming version 2.x+ is ignored as an unsupported versions.
-			// Future 1.x versions of CSI are supposed to be backwards compatible so this version of Kubernetes will work with any 1.x driver
-			// (or 0.x), but it may not work with 2.x drivers (because 2.x does not have to be backwards compatible with 1.x).
+
+		if currentHighestVer.Major() > 0 {
+			// DRA currently only has version 0.x
 			continue
 		}
+
 		if highestSupportedVersion == nil || highestSupportedVersion.LessThan(currentHighestVer) {
 			highestSupportedVersion = currentHighestVer
 		}
 	}
 
 	if highestSupportedVersion == nil {
-		return nil, fmt.Errorf("could not find a highest supported version from versions (%v) reported by this driver: %v", versions, theErr)
+		return nil, fmt.Errorf("could not find a highest supported version from versions (%v) reported by this driver: %w", versions, theErr)
 	}
 
-	if highestSupportedVersion.Major() != 1 {
-		// CSI v0.x is no longer supported as of Kubernetes v1.17 in
-		// accordance with deprecation policy set out in Kubernetes v1.13
-		return nil, fmt.Errorf("highest supported version reported by driver is %v, must be v1.x", highestSupportedVersion)
+	if highestSupportedVersion.Major() != 0 {
+		return nil, fmt.Errorf("highest supported version reported by driver is %v, must be v0.x", highestSupportedVersion)
 	}
+
 	return highestSupportedVersion, nil
 }
 
@@ -118,18 +118,15 @@ func (h *RegistrationHandler) validateVersions(callerName, pluginName string, en
 	return newDriverHighestVersion, nil
 }
 
-func unregisterPlugin(pluginName string) error {
+func unregisterPlugin(pluginName string) {
 	draPlugins.Delete(pluginName)
-	return nil
 }
 
-// DeRegisterPlugin is called when a plugin removed its socket, signaling
-// it is no longer available
+// DeRegisterPlugin is called when a plugin has removed its socket,
+// signaling it is no longer available.
 func (h *RegistrationHandler) DeRegisterPlugin(pluginName string) {
 	klog.InfoS("DeRegister DRA plugin", "name", pluginName)
-	if err := unregisterPlugin(pluginName); err != nil {
-		klog.ErrorS(err, "DeRegisterPlugin failed")
-	}
+	unregisterPlugin(pluginName)
 }
 
 // ValidatePlugin is called by kubelet's plugin watcher upon detection
@@ -139,13 +136,13 @@ func (h *RegistrationHandler) ValidatePlugin(pluginName string, endpoint string,
 
 	_, err := h.validateVersions("ValidatePlugin", pluginName, endpoint, versions)
 	if err != nil {
-		return fmt.Errorf("validation failed for DRA plugin %s at endpoint %s: %v", pluginName, endpoint, err)
+		return fmt.Errorf("validation failed for DRA plugin %s at endpoint %s: %w", pluginName, endpoint, err)
 	}
 
 	return err
 }
 
-// log prepends log string with `kubernetes.io/dra`
+// log prepends log string with `kubernetes.io/dra`.
 func log(msg string, parts ...interface{}) string {
 	return fmt.Sprintf(fmt.Sprintf("%s: %s", DRAPluginName, msg), parts...)
 }

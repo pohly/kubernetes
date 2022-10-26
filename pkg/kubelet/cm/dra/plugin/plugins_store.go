@@ -22,14 +22,14 @@ import (
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 )
 
-// Plugin is a description of a DRA Plugin, defined by an enpoint and the
-// highest DRA version supported
+// Plugin is a description of a DRA Plugin, defined by an endpoint
+// and the highest DRA version supported.
 type Plugin struct {
 	endpoint                string
 	highestSupportedVersion *utilversion.Version
 }
 
-// PluginsStore holds a list of DRA Plugins
+// PluginsStore holds a list of DRA Plugins.
 type PluginsStore struct {
 	store map[string]*Plugin
 	sync.RWMutex
