@@ -33,7 +33,7 @@ import (
 	drapbv1 "k8s.io/kubelet/pkg/apis/dra/v1alpha1"
 )
 
-type DRAClient interface {
+type Client interface {
 	NodePrepareResource(
 		ctx context.Context,
 		namespace string,
@@ -51,17 +51,17 @@ type DRAClient interface {
 	) (*drapbv1.NodeUnprepareResourceResponse, error)
 }
 
-// Strongly typed address
+// Strongly typed address.
 type draAddr string
 
-// draPluginClient encapsulates all dra plugin methods
+// draPluginClient encapsulates all dra plugin methods.
 type draPluginClient struct {
 	pluginName          string
 	addr                draAddr
 	nodeV1ClientCreator nodeV1ClientCreator
 }
 
-var _ DRAClient = &draPluginClient{}
+var _ Client = &draPluginClient{}
 
 type nodeV1ClientCreator func(addr draAddr) (
 	nodeClient drapbv1.NodeClient,
@@ -79,7 +79,7 @@ func (err *UncertainProgressError) Error() string {
 	return err.msg
 }
 
-// NewUncertainProgressError creates an instance of UncertainProgressError type
+// NewUncertainProgressError creates an instance of UncertainProgressError type.
 func NewUncertainProgressError(msg string) *UncertainProgressError {
 	return &UncertainProgressError{msg: msg}
 }
@@ -91,16 +91,16 @@ func NewUncertainProgressError(msg string) *UncertainProgressError {
 // newCsiDriverClient.
 func newV1NodeClient(addr draAddr) (nodeClient drapbv1.NodeClient, closer io.Closer, err error) {
 	var conn *grpc.ClientConn
+
 	conn, err = newGrpcConn(addr)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	nodeClient = drapbv1.NewNodeClient(conn)
-	return nodeClient, conn, nil
+	return drapbv1.NewNodeClient(conn), conn, nil
 }
 
-func NewDRAPluginClient(pluginName string) (DRAClient, error) {
+func NewDRAPluginClient(pluginName string) (Client, error) {
 	if pluginName == "" {
 		return nil, fmt.Errorf("plugin name is empty")
 	}
@@ -110,11 +110,10 @@ func NewDRAPluginClient(pluginName string) (DRAClient, error) {
 		return nil, fmt.Errorf("plugin name %s not found in the list of registered DRA plugins", pluginName)
 	}
 
-	nodeV1ClientCreator := newV1NodeClient
 	return &draPluginClient{
 		pluginName:          pluginName,
 		addr:                draAddr(existingDriver.endpoint),
-		nodeV1ClientCreator: nodeV1ClientCreator,
+		nodeV1ClientCreator: newV1NodeClient,
 	}, nil
 }
 
@@ -145,7 +144,7 @@ func (r *draPluginClient) NodePrepareResource(
 	req := &drapbv1.NodePrepareResourceRequest{
 		Namespace:      namespace,
 		ClaimUid:       string(claimUID),
-		ClaimName:      string(claimName),
+		ClaimName:      claimName,
 		ResourceHandle: resourceHandle,
 	}
 
@@ -153,6 +152,7 @@ func (r *draPluginClient) NodePrepareResource(
 	if err != nil && !isFinalError(err) {
 		return nil, NewUncertainProgressError(err.Error())
 	}
+
 	return response, err
 }
 
@@ -169,6 +169,7 @@ func (r *draPluginClient) NodeUnprepareResource(
 		"claim UID", claimUID,
 		"claim name", claimName,
 		"cdi devices", cdiDevices)
+
 	if r.nodeV1ClientCreator == nil {
 		return nil, errors.New("nodeV1ClientCreate is nil")
 	}
@@ -182,7 +183,7 @@ func (r *draPluginClient) NodeUnprepareResource(
 	req := &drapbv1.NodeUnprepareResourceRequest{
 		Namespace: namespace,
 		ClaimUid:  string(claimUID),
-		ClaimName: string(claimName),
+		ClaimName: claimName,
 		CdiDevice: cdiDevices,
 	}
 
@@ -208,14 +209,15 @@ func newGrpcConn(addr draAddr) (*grpc.ClientConn, error) {
 }
 
 func isFinalError(err error) bool {
-	st, ok := status.FromError(err)
+	stat, ok := status.FromError(err)
 	if !ok {
 		// This is not gRPC error. The operation must have failed before gRPC
 		// method was called, otherwise we would get gRPC error.
 		// We don't know if any previous volume operation is in progress, be on the safe side.
 		return false
 	}
-	switch st.Code() {
+
+	switch stat.Code() {
 	case codes.Canceled, // gRPC: Client Application cancelled the request
 		codes.DeadlineExceeded,  // gRPC: Timeout
 		codes.Unavailable,       // gRPC: Server shutting down, TCP connection broken - previous volume operation may be still in progress.
