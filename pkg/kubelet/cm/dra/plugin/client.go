@@ -181,10 +181,10 @@ func (r *draPluginClient) NodeUnprepareResource(
 	defer closer.Close()
 
 	req := &drapbv1.NodeUnprepareResourceRequest{
-		Namespace: namespace,
-		ClaimUid:  string(claimUID),
-		ClaimName: claimName,
-		CdiDevice: cdiDevices,
+		Namespace:  namespace,
+		ClaimUid:   string(claimUID),
+		ClaimName:  claimName,
+		CdiDevices: cdiDevices,
 	}
 
 	response, err := nodeClient.NodeUnprepareResource(ctx, req)

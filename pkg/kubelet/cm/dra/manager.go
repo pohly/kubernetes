@@ -19,7 +19,6 @@ package dra
 import (
 	"context"
 	"fmt"
-	"sync"
 
 	"github.com/container-orchestrated-devices/container-device-interface/pkg/cdi"
 	v1 "k8s.io/api/core/v1"
@@ -35,10 +34,8 @@ import (
 
 // ManagerImpl is the structure in charge of managing DRA resource Plugins.
 type ManagerImpl struct {
-	sync.Mutex
-
-	// resources contains resources referenced by pod containers
-	resources *claimedResources
+	// cache contains cached claim info
+	cache *claimInfoCache
 
 	// KubeClient reference
 	kubeClient clientset.Interface
@@ -49,7 +46,7 @@ func NewManagerImpl(kubeClient clientset.Interface) (*ManagerImpl, error) {
 	klog.V(2).InfoS("Creating DRA manager")
 
 	manager := &ManagerImpl{
-		resources:  newClaimedResources(),
+		cache:      newClaimInfoCache(),
 		kubeClient: kubeClient,
 	}
 
@@ -57,20 +54,12 @@ func NewManagerImpl(kubeClient clientset.Interface) (*ManagerImpl, error) {
 }
 
 // Generate container annotations using CDI UpdateAnnotations API.
-func generateCDIAnnotation(
+func generateCDIAnnotations(
 	claimUID types.UID,
 	driverName string,
 	cdiDevices []string,
 ) ([]kubecontainer.Annotation, error) {
-	const maxKeyLen = 63 // max length of the CDI annotation key
-
-	deviceID := string(claimUID)
-
-	if len(deviceID) > maxKeyLen-len(driverName)-1 {
-		deviceID = deviceID[:maxKeyLen-len(driverName)-1]
-	}
-
-	annotations, err := cdi.UpdateAnnotations(map[string]string{}, driverName, deviceID, cdiDevices)
+	annotations, err := cdi.UpdateAnnotations(map[string]string{}, driverName, string(claimUID), cdiDevices)
 	if err != nil {
 		return nil, fmt.Errorf("can't generate CDI annotations: %+v", err)
 	}
@@ -84,8 +73,8 @@ func generateCDIAnnotation(
 }
 
 // prepareContainerResources attempts to prepare all of required resource
-// plugin resources for the input container, issues an NodePrepareResource rpc request
-// for each new resource requirement, processes their responses and updates the cached
+// plugin resources for the input container, issue an NodePrepareResource rpc request
+// for each new resource requirement, process their responses and update the cached
 // containerResources on success.
 func (m *ManagerImpl) prepareContainerResources(pod *v1.Pod, container *v1.Container) error {
 	// Process resources for each resource claim referenced by container
@@ -94,9 +83,9 @@ func (m *ManagerImpl) prepareContainerResources(pod *v1.Pod, container *v1.Conta
 			claimName := resourceclaim.Name(pod, &podResourceClaim)
 			klog.V(3).InfoS("Processing resource", "claim", claimName, "pod", pod.Name)
 
-			if resource := m.resources.get(claimName, pod.Namespace); resource != nil {
+			if claimInfo := m.cache.get(claimName, pod.Namespace); claimInfo != nil {
 				// resource is already prepared, add pod UID to it
-				resource.addPodUID(pod.UID)
+				claimInfo.addPodReference(pod.UID)
 
 				continue
 			}
@@ -137,22 +126,22 @@ func (m *ManagerImpl) prepareContainerResources(pod *v1.Pod, container *v1.Conta
 
 			klog.V(3).InfoS("NodePrepareResource succeeded", "response", response)
 
-			annotations, err := generateCDIAnnotation(resourceClaim.UID, driverName, response.CdiDevice)
+			annotations, err := generateCDIAnnotations(resourceClaim.UID, driverName, response.CdiDevices)
 			if err != nil {
 				return fmt.Errorf("failed to generate container annotations, err: %+v", err)
 			}
 
 			// Cache prepared resource
-			err = m.resources.add(
+			err = m.cache.add(
 				resourceClaim.Name,
 				resourceClaim.Namespace,
-				&resource{
+				&claimInfo{
 					driverName:  driverName,
 					claimUID:    resourceClaim.UID,
 					claimName:   resourceClaim.Name,
 					namespace:   resourceClaim.Namespace,
 					podUIDs:     sets.New(string(pod.UID)),
-					cdiDevice:   response.CdiDevice,
+					cdiDevices:  response.CdiDevices,
 					annotations: annotations,
 				})
 			if err != nil {
@@ -169,12 +158,9 @@ func (m *ManagerImpl) prepareContainerResources(pod *v1.Pod, container *v1.Conta
 	return nil
 }
 
-// PrepareResources calls plugin NodePrepareResource from the registered DRA resource plugins.
-func (m *ManagerImpl) PrepareResources(pod *v1.Pod, container *v1.Container) (*ContainerInfo, error) {
-	if err := m.prepareContainerResources(pod, container); err != nil {
-		return nil, err
-	}
-
+// getContainerInfo gets a container info from the claimInfo cache.
+// This information is used by the caller to update a container config.
+func (m *ManagerImpl) getContainerInfo(pod *v1.Pod, container *v1.Container) (*ContainerInfo, error) {
 	annotations := []kubecontainer.Annotation{}
 
 	for _, podResourceClaim := range pod.Spec.ResourceClaims {
@@ -185,70 +171,76 @@ func (m *ManagerImpl) PrepareResources(pod *v1.Pod, container *v1.Container) (*C
 				continue
 			}
 
-			resource := m.resources.get(claimName, pod.Namespace)
-			if resource == nil {
+			claimInfo := m.cache.get(claimName, pod.Namespace)
+			if claimInfo == nil {
 				return nil, fmt.Errorf("unable to get resource for namespace: %s, claim: %s", pod.Namespace, claimName)
 			}
 
-			klog.V(3).InfoS("add resource annotations", "claim", claimName, "annotations", resource.annotations)
-			annotations = append(annotations, resource.annotations...)
+			klog.V(3).InfoS("add resource annotations", "claim", claimName, "annotations", claimInfo.annotations)
+			annotations = append(annotations, claimInfo.annotations...)
 		}
 	}
 
 	return &ContainerInfo{Annotations: annotations}, nil
 }
 
-func (m *ManagerImpl) UnprepareResources(pod *v1.Pod) error {
-	m.Lock()
-	defer m.Unlock()
+// PrepareResources calls plugin NodePrepareResource from the registered DRA resource plugins.
+func (m *ManagerImpl) PrepareResources(pod *v1.Pod, container *v1.Container) (*ContainerInfo, error) {
+	if err := m.prepareContainerResources(pod, container); err != nil {
+		return nil, err
+	}
 
+	return m.getContainerInfo(pod, container)
+}
+
+func (m *ManagerImpl) UnprepareResources(pod *v1.Pod) error {
 	// Call NodeUnprepareResource RPC for every resource claim referenced by the pod
 	for _, podResourceClaim := range pod.Spec.ResourceClaims {
 		claimName := resourceclaim.Name(pod, &podResourceClaim)
+		claimInfo := m.cache.get(claimName, pod.Namespace)
 
-		resource := m.resources.get(claimName, pod.Namespace)
-		if resource == nil {
-			return fmt.Errorf("failed to get resource for namespace %s, claim %s", pod.Namespace, claimName)
+		// Skip calling NodeUnprepareResource if claim info is not cached
+		if claimInfo == nil {
+			continue
 		}
 
-		if !resource.hasPodUID(pod.UID) {
-			// skip calling NodeUnprepareResource if pod is not cached
+		// Skip calling NodeUnprepareResource if pod is not cached
+		if !claimInfo.referencedByPod(pod.UID) {
 			continue
 		}
 
 		// Delete pod UID from the cache
-		resource.deletePodUID(pod.UID)
+		claimInfo.deletePodReference(pod.UID)
 
-		if len(resource.podUIDs) > 0 {
-			// skip calling NodeUnprepareResource if this is not the latest pod
-			// that uses the resource
+		// Skip calling NodeUnprepareResource if other pods are still referencing it
+		if len(claimInfo.podUIDs) > 0 {
 			continue
 		}
 
-		// Call NodeUnprepareResource only for the latest pod that refers the claim
-		client, err := dra.NewDRAPluginClient(resource.driverName)
+		// Call NodeUnprepareResource only for the last pod that references the claim
+		client, err := dra.NewDRAPluginClient(claimInfo.driverName)
 		if err != nil || client == nil {
-			return fmt.Errorf("failed to get DRA Plugin client for plugin name %s, err=%+v", resource.driverName, err)
+			return fmt.Errorf("failed to get DRA Plugin client for plugin name %s, err=%+v", claimInfo.driverName, err)
 		}
 
 		response, err := client.NodeUnprepareResource(
 			context.Background(),
-			resource.namespace,
-			resource.claimUID,
-			resource.claimName,
-			resource.cdiDevice)
+			claimInfo.namespace,
+			claimInfo.claimUID,
+			claimInfo.claimName,
+			claimInfo.cdiDevices)
 		if err != nil {
 			return fmt.Errorf(
 				"NodeUnprepareResource failed, pod: %s, claim UID: %s, claim name: %s, CDI devices: %s, err: %+v",
 				pod.Name,
-				resource.claimUID,
-				resource.claimName,
-				resource.cdiDevice, err)
+				claimInfo.claimUID,
+				claimInfo.claimName,
+				claimInfo.cdiDevices, err)
 		}
 
 		klog.V(3).InfoS("NodeUnprepareResource succeeded", "response", response)
 		// delete resource from the cache
-		m.resources.delete(resource.claimName, pod.Namespace)
+		m.cache.delete(claimInfo.claimName, pod.Namespace)
 	}
 
 	return nil

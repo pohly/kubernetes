@@ -1419,12 +1419,12 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 	kl.containerLogManager.Start()
 	// Adding Registration Callback function for CSI Driver
 	kl.pluginManager.AddHandler(pluginwatcherapi.CSIPlugin, plugincache.PluginHandler(csi.PluginHandler))
-	// Adding Registration Callback function for Device Manager
-	kl.pluginManager.AddHandler(pluginwatcherapi.DevicePlugin, kl.containerManager.GetPluginRegistrationHandler())
 	// Adding Registration Callback function for DRA Plugin
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 		kl.pluginManager.AddHandler(pluginwatcherapi.DRAPlugin, plugincache.PluginHandler(draplugin.PluginHandler))
 	}
+	// Adding Registration Callback function for Device Manager
+	kl.pluginManager.AddHandler(pluginwatcherapi.DevicePlugin, kl.containerManager.GetPluginRegistrationHandler())
 
 	// Start the plugin manager
 	klog.V(4).InfoS("Starting plugin manager")
@@ -1888,7 +1888,7 @@ func (kl *Kubelet) syncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus
 	apiPodStatus := kl.generateAPIPodStatus(pod, podStatus)
 
 	// NOTE: resources must be unprepared BEFORE pod status is changed on the API server
-	// to avoid raice conditions with the resource deallocation code in kubernetes core
+	// to avoid race conditions with the resource deallocation code in kubernetes core
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 		if err := kl.containerManager.UnprepareResources(pod); err != nil {
 			return err

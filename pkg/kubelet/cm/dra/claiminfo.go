@@ -25,10 +25,10 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
-// resource contains resource attributes required
-// to prepare and unprepare the resource.
-type resource struct {
-	sync.Mutex
+// claimInfo holds information required
+// to prepare and unprepare a resource claim.
+type claimInfo struct {
+	sync.RWMutex
 
 	// name of the DRA driver
 	driverName string
@@ -45,73 +45,73 @@ type resource struct {
 	// podUIDs is a set of pod UIDs that reference a resource
 	podUIDs sets.Set[string]
 
-	// cdiDevice is a list of CDI devices returned by the
+	// cdiDevices is a list of CDI devices returned by the
 	// GRPC API call NodePrepareResource
-	cdiDevice []string
+	cdiDevices []string
 
 	// annotations is a list of container annotations associated with
 	// a prepared resource
 	annotations []kubecontainer.Annotation
 }
 
-func (res *resource) addPodUID(podUID types.UID) {
+func (res *claimInfo) addPodReference(podUID types.UID) {
 	res.Lock()
 	defer res.Unlock()
 
 	res.podUIDs.Insert(string(podUID))
 }
 
-func (res *resource) hasPodUID(podUID types.UID) bool {
-	res.Lock()
-	defer res.Unlock()
+func (res *claimInfo) referencedByPod(podUID types.UID) bool {
+	res.RLock()
+	defer res.RUnlock()
 
 	return res.podUIDs.Has(string(podUID))
 }
 
-func (res *resource) deletePodUID(podUID types.UID) {
+func (res *claimInfo) deletePodReference(podUID types.UID) {
 	res.Lock()
 	defer res.Unlock()
 
 	res.podUIDs.Delete(string(podUID))
 }
 
-// claimedResources is a cache of processed resources keyed by namespace + claim name.
-type claimedResources struct {
+// claimInfoCache is a cache of processed resource claims keyed by namespace + claim name.
+type claimInfoCache struct {
 	sync.RWMutex
-	resources map[string]*resource
+	claimInfo map[string]*claimInfo
 }
 
-// newClaimedResources is a function that returns object of podResources.
-func newClaimedResources() *claimedResources {
-	return &claimedResources{
-		resources: make(map[string]*resource),
+// newClaimInfoCache is a function that returns an instance of the claimInfoCache.
+func newClaimInfoCache() *claimInfoCache {
+	return &claimInfoCache{
+		claimInfo: make(map[string]*claimInfo),
 	}
 }
 
-func (cres *claimedResources) add(claim, namespace string, res *resource) error {
-	cres.Lock()
-	defer cres.Unlock()
+func (cache *claimInfoCache) add(claim, namespace string, res *claimInfo) error {
+	cache.Lock()
+	defer cache.Unlock()
 
 	key := claim + namespace
-	if _, ok := cres.resources[key]; ok {
+	if _, ok := cache.claimInfo[key]; ok {
 		return fmt.Errorf("claim %s, namespace %s already cached", claim, namespace)
 	}
 
-	cres.resources[claim+namespace] = res
+	cache.claimInfo[claim+namespace] = res
 
 	return nil
 }
 
-func (cres *claimedResources) get(claimName, namespace string) *resource {
-	cres.RLock()
-	defer cres.RUnlock()
+func (cache *claimInfoCache) get(claimName, namespace string) *claimInfo {
+	cache.RLock()
+	defer cache.RUnlock()
 
-	return cres.resources[claimName+namespace]
+	return cache.claimInfo[claimName+namespace]
 }
 
-func (cres *claimedResources) delete(claimName, namespace string) {
-	cres.Lock()
-	defer cres.Unlock()
+func (cache *claimInfoCache) delete(claimName, namespace string) {
+	cache.Lock()
+	defer cache.Unlock()
 
-	delete(cres.resources, claimName+namespace)
+	delete(cache.claimInfo, claimName+namespace)
 }

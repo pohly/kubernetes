@@ -58,7 +58,7 @@ message NodePrepareResourceResponse {
     // These are the additional devices that kubelet must
     // make available via the container runtime. A resource
     // may have zero or more devices.
-    repeated string cdi_device = 1;
+    repeated string cdi_devices = 1;
 }
 
 message NodeUnprepareResourceRequest {
@@ -73,7 +73,7 @@ message NodeUnprepareResourceRequest {
     string claim_name = 3;
     // List of fully qualified CDI device names
     // Kubelet plugin returns them in the NodePrepareResourceResponse
-    repeated string cdi_device = 4;
+    repeated string cdi_devices = 4;
 }
 
 message NodeUnprepareResourceResponse {
