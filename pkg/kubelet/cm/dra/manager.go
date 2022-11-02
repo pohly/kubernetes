@@ -76,8 +76,8 @@ func generateCDIAnnotations(
 }
 
 // prepareContainerResources attempts to prepare all of required resource
-// plugin resources for the input container, issues an NodePrepareResource rpc request
-// for each new resource requirement, processes their responses and updates the cached
+// plugin resources for the input container, issue an NodePrepareResource rpc request
+// for each new resource requirement, process their responses and update the cached
 // containerResources on success.
 func (m *ManagerImpl) prepareContainerResources(pod *v1.Pod, container *v1.Container) error {
 	// Process resources for each resource claim referenced by container
@@ -211,13 +211,12 @@ func (m *ManagerImpl) UnprepareResources(pod *v1.Pod) error {
 		// Delete pod UID from the cache
 		resource.deletePodUID(pod.UID)
 
+		// Skip calling NodeUnprepareResource if other pods are still referencing it
 		if len(resource.podUIDs) > 0 {
-			// skip calling NodeUnprepareResource if this is not the latest pod
-			// that uses the resource
 			continue
 		}
 
-		// Call NodeUnprepareResource only for the latest pod that refers the claim
+		// Call NodeUnprepareResource only for the last pod that references the claim
 		client, err := dra.NewDRAPluginClient(resource.driverName)
 		if err != nil || client == nil {
 			return fmt.Errorf("failed to get DRA Plugin client for plugin name %s, err=%+v", resource.driverName, err)

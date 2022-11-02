@@ -25,14 +25,14 @@ import (
 type Manager interface {
 	// PrepareResources prepares resources for a container in a pod.
 	// It communicates with the DRA resource plugin to prepare resources and
-	// returns resource info to trigger CDI injection on the runtime side.
+	// returns resource info to trigger CDI injection by the runtime.
 	PrepareResources(pod *v1.Pod, container *v1.Container) (*ContainerInfo, error)
 
 	// UnprepareResources calls NodeUnprepareResource GRPC from DRA plugin to unprepare pod resources
 	UnprepareResources(pod *v1.Pod) error
 }
 
-// ContainerInfo contains information required by runtime to consume prepared resources.
+// ContainerInfo contains information required by the runtime to consume prepared resources.
 type ContainerInfo struct {
 	// The Annotations for the container
 	Annotations []kubecontainer.Annotation
