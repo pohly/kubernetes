@@ -1986,69 +1986,117 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 		}
 	}
 
-	podInfo := []struct {
+	noPod := func() *api.Pod {
+		return nil
+	}
+
+	testcases := []struct {
 		description string
-		hasClaims   bool
-		pod         func() *api.Pod
+		enabled     bool
+		oldPod      func() *api.Pod
+		newPod      func() *api.Pod
+		wantPod     func() *api.Pod
 	}{
 		{
-			description: "with claims",
-			hasClaims:   true,
-			pod:         podWithClaims,
+			description: "old with claims / new with claims / disabled",
+			oldPod:      podWithClaims,
+			newPod:      podWithClaims,
+			wantPod:     podWithClaims,
 		},
 		{
-			description: "without claims",
-			hasClaims:   false,
-			pod:         podWithoutClaims,
+			description: "old without claims / new with claims / disabled",
+			oldPod:      podWithoutClaims,
+			newPod:      podWithClaims,
+			wantPod:     podWithoutClaims,
 		},
 		{
-			description: "without old pod",
-			pod:         func() *api.Pod { return nil },
+			description: "no old pod/ new with claims / disabled",
+			oldPod:      noPod,
+			newPod:      podWithClaims,
+			wantPod:     podWithoutClaims,
+		},
+
+		{
+			description: "old with claims / new without claims / disabled",
+			oldPod:      podWithClaims,
+			newPod:      podWithoutClaims,
+			wantPod:     podWithoutClaims,
+		},
+		{
+			description: "old without claims / new without claims / disabled",
+			oldPod:      podWithoutClaims,
+			newPod:      podWithoutClaims,
+			wantPod:     podWithoutClaims,
+		},
+		{
+			description: "no old pod/ new without claims / disabled",
+			oldPod:      noPod,
+			newPod:      podWithoutClaims,
+			wantPod:     podWithoutClaims,
+		},
+
+		{
+			description: "old with claims / new with claims / enabled",
+			enabled:     true,
+			oldPod:      podWithClaims,
+			newPod:      podWithClaims,
+			wantPod:     podWithClaims,
+		},
+		{
+			description: "old without claims / new with claims / enabled",
+			enabled:     true,
+			oldPod:      podWithoutClaims,
+			newPod:      podWithClaims,
+			wantPod:     podWithClaims,
+		},
+		{
+			description: "no old pod/ new with claims / enabled",
+			enabled:     true,
+			oldPod:      noPod,
+			newPod:      podWithClaims,
+			wantPod:     podWithClaims,
+		},
+
+		{
+			description: "old with claims / new without claims / enabled",
+			enabled:     true,
+			oldPod:      podWithClaims,
+			newPod:      podWithoutClaims,
+			wantPod:     podWithoutClaims,
+		},
+		{
+			description: "old without claims / new without claims / enabled",
+			enabled:     true,
+			oldPod:      podWithoutClaims,
+			newPod:      podWithoutClaims,
+			wantPod:     podWithoutClaims,
+		},
+		{
+			description: "no old pod/ new without claims / enabled",
+			enabled:     true,
+			oldPod:      noPod,
+			newPod:      podWithoutClaims,
+			wantPod:     podWithoutClaims,
 		},
 	}
 
-	for _, enabled := range []bool{true, false} {
-		for _, oldPodInfo := range podInfo {
-			for _, newPodInfo := range podInfo {
-				oldPodHasClaims, oldPod := oldPodInfo.hasClaims, oldPodInfo.pod()
-				newPodHasClaims, newPod := newPodInfo.hasClaims, newPodInfo.pod()
-				if newPod == nil {
-					continue
-				}
+	for _, tc := range testcases {
+		t.Run(tc.description, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, tc.enabled)()
 
-				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, enabled)()
+			oldPod := tc.oldPod()
+			newPod := tc.newPod()
+			wantPod := tc.wantPod()
+			DropDisabledPodFields(newPod, oldPod)
 
-					DropDisabledPodFields(newPod, oldPod)
-
-					// old pod should never be changed
-					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
-						t.Errorf("old pod changed: %v", cmp.Diff(oldPod, oldPodInfo.pod()))
-					}
-
-					switch {
-					case enabled || oldPodHasClaims:
-						// new pod should not be changed if the feature is enabled, or if the old pod had claims
-						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
-						}
-					case newPodHasClaims:
-						// new pod should be changed
-						if reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod was not changed")
-						}
-						// new pod should not have claims
-						if exp := podWithoutClaims(); !reflect.DeepEqual(newPod, exp) {
-							t.Errorf("new pod had claims: %v", cmp.Diff(newPod, exp))
-						}
-					default:
-						// new pod should not need to be changed
-						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
-						}
-					}
-				})
+			// old pod should never be changed
+			if diff := cmp.Diff(oldPod, tc.oldPod()); diff != "" {
+				t.Errorf("old pod changed: %s", diff)
 			}
-		}
+
+			if diff := cmp.Diff(wantPod, newPod); diff != "" {
+				t.Errorf("new pod changed (- want, + got): %s", diff)
+			}
+		})
 	}
 }
