@@ -663,7 +663,7 @@ func (cm *containerManagerImpl) GetPluginRegistrationHandler() cache.PluginHandl
 func (cm *containerManagerImpl) GetResources(pod *v1.Pod, container *v1.Container) (*kubecontainer.RunContainerOptions, error) {
 	opts := &kubecontainer.RunContainerOptions{}
 	if cm.draManager != nil {
-		resOpts, err := cm.draManager.PrepareResources(pod, container)
+		resOpts, err := cm.PrepareResources(pod, container)
 		if err != nil {
 			return nil, err
 		}
@@ -1036,6 +1036,10 @@ func containerMemoryFromBlock(blocks []memorymanagerstate.Block) []*podresources
 	}
 
 	return containerMemories
+}
+
+func (cm *containerManagerImpl) PrepareResources(pod *v1.Pod, container *v1.Container) (*dra.ContainerInfo, error) {
+	return cm.draManager.PrepareResources(pod, container)
 }
 
 func (cm *containerManagerImpl) UnprepareResources(pod *v1.Pod) error {
