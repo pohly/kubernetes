@@ -62,15 +62,7 @@ func generateCDIAnnotation(
 	driverName string,
 	cdiDevices []string,
 ) ([]kubecontainer.Annotation, error) {
-	const maxKeyLen = 63 // max length of the CDI annotation key
-
-	deviceID := string(claimUID)
-
-	if len(deviceID) > maxKeyLen-len(driverName)-1 {
-		deviceID = deviceID[:maxKeyLen-len(driverName)-1]
-	}
-
-	annotations, err := cdi.UpdateAnnotations(map[string]string{}, driverName, deviceID, cdiDevices)
+	annotations, err := cdi.UpdateAnnotations(map[string]string{}, driverName, string(claimUID), cdiDevices)
 	if err != nil {
 		return nil, fmt.Errorf("can't generate CDI annotations: %+v", err)
 	}
