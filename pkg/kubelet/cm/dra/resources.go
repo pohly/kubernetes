@@ -75,43 +75,43 @@ func (res *resource) deletePodUID(podUID types.UID) {
 	res.podUIDs.Delete(string(podUID))
 }
 
-// claimedResources is a cache of processed resources keyed by namespace + claim name.
-type claimedResources struct {
+// claimInfoCache is a cache of processed resources keyed by namespace + claim name.
+type claimInfoCache struct {
 	sync.RWMutex
 	resources map[string]*resource
 }
 
-// newClaimedResources is a function that returns object of podResources.
-func newClaimedResources() *claimedResources {
-	return &claimedResources{
+// newClaimInfoCache is a function that returns an instance of the claimInfoCache.
+func newClaimInfoCache() *claimInfoCache {
+	return &claimInfoCache{
 		resources: make(map[string]*resource),
 	}
 }
 
-func (cres *claimedResources) add(claim, namespace string, res *resource) error {
-	cres.Lock()
-	defer cres.Unlock()
+func (cache *claimInfoCache) add(claim, namespace string, res *resource) error {
+	cache.Lock()
+	defer cache.Unlock()
 
 	key := claim + namespace
-	if _, ok := cres.resources[key]; ok {
+	if _, ok := cache.resources[key]; ok {
 		return fmt.Errorf("claim %s, namespace %s already cached", claim, namespace)
 	}
 
-	cres.resources[claim+namespace] = res
+	cache.resources[claim+namespace] = res
 
 	return nil
 }
 
-func (cres *claimedResources) get(claimName, namespace string) *resource {
-	cres.RLock()
-	defer cres.RUnlock()
+func (cache *claimInfoCache) get(claimName, namespace string) *resource {
+	cache.RLock()
+	defer cache.RUnlock()
 
-	return cres.resources[claimName+namespace]
+	return cache.resources[claimName+namespace]
 }
 
-func (cres *claimedResources) delete(claimName, namespace string) {
-	cres.Lock()
-	defer cres.Unlock()
+func (cache *claimInfoCache) delete(claimName, namespace string) {
+	cache.Lock()
+	defer cache.Unlock()
 
-	delete(cres.resources, claimName+namespace)
+	delete(cache.resources, claimName+namespace)
 }

@@ -37,8 +37,8 @@ import (
 type ManagerImpl struct {
 	sync.Mutex
 
-	// resources contains resources referenced by pod containers
-	resources *claimedResources
+	// cache contains cached claim info
+	cache *claimInfoCache
 
 	// KubeClient reference
 	kubeClient clientset.Interface
@@ -49,7 +49,7 @@ func NewManagerImpl(kubeClient clientset.Interface) (*ManagerImpl, error) {
 	klog.V(2).InfoS("Creating DRA manager")
 
 	manager := &ManagerImpl{
-		resources:  newClaimedResources(),
+		cache:      newClaimInfoCache(),
 		kubeClient: kubeClient,
 	}
 
@@ -86,7 +86,7 @@ func (m *ManagerImpl) prepareContainerResources(pod *v1.Pod, container *v1.Conta
 			claimName := resourceclaim.Name(pod, &podResourceClaim)
 			klog.V(3).InfoS("Processing resource", "claim", claimName, "pod", pod.Name)
 
-			if resource := m.resources.get(claimName, pod.Namespace); resource != nil {
+			if resource := m.cache.get(claimName, pod.Namespace); resource != nil {
 				// resource is already prepared, add pod UID to it
 				resource.addPodUID(pod.UID)
 
@@ -135,7 +135,7 @@ func (m *ManagerImpl) prepareContainerResources(pod *v1.Pod, container *v1.Conta
 			}
 
 			// Cache prepared resource
-			err = m.resources.add(
+			err = m.cache.add(
 				resourceClaim.Name,
 				resourceClaim.Namespace,
 				&resource{
@@ -177,7 +177,7 @@ func (m *ManagerImpl) PrepareResources(pod *v1.Pod, container *v1.Container) (*C
 				continue
 			}
 
-			resource := m.resources.get(claimName, pod.Namespace)
+			resource := m.cache.get(claimName, pod.Namespace)
 			if resource == nil {
 				return nil, fmt.Errorf("unable to get resource for namespace: %s, claim: %s", pod.Namespace, claimName)
 			}
@@ -198,7 +198,7 @@ func (m *ManagerImpl) UnprepareResources(pod *v1.Pod) error {
 	for _, podResourceClaim := range pod.Spec.ResourceClaims {
 		claimName := resourceclaim.Name(pod, &podResourceClaim)
 
-		resource := m.resources.get(claimName, pod.Namespace)
+		resource := m.cache.get(claimName, pod.Namespace)
 		if resource == nil {
 			return fmt.Errorf("failed to get resource for namespace %s, claim %s", pod.Namespace, claimName)
 		}
@@ -239,7 +239,7 @@ func (m *ManagerImpl) UnprepareResources(pod *v1.Pod) error {
 
 		klog.V(3).InfoS("NodeUnprepareResource succeeded", "response", response)
 		// delete resource from the cache
-		m.resources.delete(resource.claimName, pod.Namespace)
+		m.cache.delete(resource.claimName, pod.Namespace)
 	}
 
 	return nil
