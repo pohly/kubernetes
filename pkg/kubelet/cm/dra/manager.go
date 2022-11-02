@@ -57,7 +57,7 @@ func NewManagerImpl(kubeClient clientset.Interface) (*ManagerImpl, error) {
 }
 
 // Generate container annotations using CDI UpdateAnnotations API.
-func generateCDIAnnotation(
+func generateCDIAnnotations(
 	claimUID types.UID,
 	driverName string,
 	cdiDevices []string,
@@ -129,7 +129,7 @@ func (m *ManagerImpl) prepareContainerResources(pod *v1.Pod, container *v1.Conta
 
 			klog.V(3).InfoS("NodePrepareResource succeeded", "response", response)
 
-			annotations, err := generateCDIAnnotation(resourceClaim.UID, driverName, response.CdiDevice)
+			annotations, err := generateCDIAnnotations(resourceClaim.UID, driverName, response.CdiDevice)
 			if err != nil {
 				return fmt.Errorf("failed to generate container annotations, err: %+v", err)
 			}
