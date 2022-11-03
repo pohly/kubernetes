@@ -19,7 +19,6 @@ package dra
 import (
 	"context"
 	"fmt"
-	"sync"
 
 	"github.com/container-orchestrated-devices/container-device-interface/pkg/cdi"
 	v1 "k8s.io/api/core/v1"
@@ -35,8 +34,6 @@ import (
 
 // ManagerImpl is the structure in charge of managing DRA resource Plugins.
 type ManagerImpl struct {
-	sync.Mutex
-
 	// cache contains cached claim info
 	cache *claimInfoCache
 
@@ -191,9 +188,6 @@ func (m *ManagerImpl) PrepareResources(pod *v1.Pod, container *v1.Container) (*C
 }
 
 func (m *ManagerImpl) UnprepareResources(pod *v1.Pod) error {
-	m.Lock()
-	defer m.Unlock()
-
 	// Call NodeUnprepareResource RPC for every resource claim referenced by the pod
 	for _, podResourceClaim := range pod.Spec.ResourceClaims {
 		claimName := resourceclaim.Name(pod, &podResourceClaim)
