@@ -85,7 +85,7 @@ func (m *ManagerImpl) prepareContainerResources(pod *v1.Pod, container *v1.Conta
 
 			if resource := m.cache.get(claimName, pod.Namespace); resource != nil {
 				// resource is already prepared, add pod UID to it
-				resource.addPodUID(pod.UID)
+				resource.addPodReference(pod.UID)
 
 				continue
 			}

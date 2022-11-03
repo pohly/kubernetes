@@ -54,7 +54,7 @@ type resource struct {
 	annotations []kubecontainer.Annotation
 }
 
-func (res *resource) addPodUID(podUID types.UID) {
+func (res *resource) addPodReference(podUID types.UID) {
 	res.Lock()
 	defer res.Unlock()
 
