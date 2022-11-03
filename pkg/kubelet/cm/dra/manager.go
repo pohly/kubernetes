@@ -194,7 +194,8 @@ func (m *ManagerImpl) UnprepareResources(pod *v1.Pod) error {
 
 		resource := m.cache.get(claimName, pod.Namespace)
 		if resource == nil {
-			return fmt.Errorf("failed to get resource for namespace %s, claim %s", pod.Namespace, claimName)
+			// skip calling NodeUnprepareResource if claim info is not cached
+			continue
 		}
 
 		if !resource.hasPodUID(pod.UID) {
