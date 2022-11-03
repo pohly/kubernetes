@@ -61,7 +61,7 @@ func (res *resource) addPodReference(podUID types.UID) {
 	res.podUIDs.Insert(string(podUID))
 }
 
-func (res *resource) hasPodUID(podUID types.UID) bool {
+func (res *resource) referencedByPod(podUID types.UID) bool {
 	res.Lock()
 	defer res.Unlock()
 

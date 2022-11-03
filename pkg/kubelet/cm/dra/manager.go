@@ -198,7 +198,7 @@ func (m *ManagerImpl) UnprepareResources(pod *v1.Pod) error {
 			continue
 		}
 
-		if !resource.hasPodUID(pod.UID) {
+		if !resource.referencedByPod(pod.UID) {
 			// skip calling NodeUnprepareResource if pod is not cached
 			continue
 		}
