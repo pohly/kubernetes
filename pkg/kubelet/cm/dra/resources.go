@@ -28,7 +28,7 @@ import (
 // claimInfo contains attributes required
 // to prepare and unprepare the resource.
 type claimInfo struct {
-	sync.Mutex
+	sync.RWMutex
 
 	// name of the DRA driver
 	driverName string
@@ -62,8 +62,8 @@ func (res *claimInfo) addPodReference(podUID types.UID) {
 }
 
 func (res *claimInfo) referencedByPod(podUID types.UID) bool {
-	res.Lock()
-	defer res.Unlock()
+	res.RLock()
+	defer res.RUnlock()
 
 	return res.podUIDs.Has(string(podUID))
 }
