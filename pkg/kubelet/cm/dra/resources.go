@@ -25,9 +25,9 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
-// resource contains resource attributes required
+// claimInfo contains attributes required
 // to prepare and unprepare the resource.
-type resource struct {
+type claimInfo struct {
 	sync.Mutex
 
 	// name of the DRA driver
@@ -54,21 +54,21 @@ type resource struct {
 	annotations []kubecontainer.Annotation
 }
 
-func (res *resource) addPodReference(podUID types.UID) {
+func (res *claimInfo) addPodReference(podUID types.UID) {
 	res.Lock()
 	defer res.Unlock()
 
 	res.podUIDs.Insert(string(podUID))
 }
 
-func (res *resource) referencedByPod(podUID types.UID) bool {
+func (res *claimInfo) referencedByPod(podUID types.UID) bool {
 	res.Lock()
 	defer res.Unlock()
 
 	return res.podUIDs.Has(string(podUID))
 }
 
-func (res *resource) deletePodUID(podUID types.UID) {
+func (res *claimInfo) deletePodUID(podUID types.UID) {
 	res.Lock()
 	defer res.Unlock()
 
@@ -78,17 +78,17 @@ func (res *resource) deletePodUID(podUID types.UID) {
 // claimInfoCache is a cache of processed resources keyed by namespace + claim name.
 type claimInfoCache struct {
 	sync.RWMutex
-	resources map[string]*resource
+	resources map[string]*claimInfo
 }
 
 // newClaimInfoCache is a function that returns an instance of the claimInfoCache.
 func newClaimInfoCache() *claimInfoCache {
 	return &claimInfoCache{
-		resources: make(map[string]*resource),
+		resources: make(map[string]*claimInfo),
 	}
 }
 
-func (cache *claimInfoCache) add(claim, namespace string, res *resource) error {
+func (cache *claimInfoCache) add(claim, namespace string, res *claimInfo) error {
 	cache.Lock()
 	defer cache.Unlock()
 
@@ -102,7 +102,7 @@ func (cache *claimInfoCache) add(claim, namespace string, res *resource) error {
 	return nil
 }
 
-func (cache *claimInfoCache) get(claimName, namespace string) *resource {
+func (cache *claimInfoCache) get(claimName, namespace string) *claimInfo {
 	cache.RLock()
 	defer cache.RUnlock()
 

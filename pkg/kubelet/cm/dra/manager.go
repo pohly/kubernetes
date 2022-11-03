@@ -135,7 +135,7 @@ func (m *ManagerImpl) prepareContainerResources(pod *v1.Pod, container *v1.Conta
 			err = m.cache.add(
 				resourceClaim.Name,
 				resourceClaim.Namespace,
-				&resource{
+				&claimInfo{
 					driverName:  driverName,
 					claimUID:    resourceClaim.UID,
 					claimName:   resourceClaim.Name,
