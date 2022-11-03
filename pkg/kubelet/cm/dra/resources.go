@@ -45,9 +45,9 @@ type resource struct {
 	// podUIDs is a set of pod UIDs that reference a resource
 	podUIDs sets.Set[string]
 
-	// cdiDevice is a list of CDI devices returned by the
+	// cdiDevices is a list of CDI devices returned by the
 	// GRPC API call NodePrepareResource
-	cdiDevice []string
+	cdiDevices []string
 
 	// annotations is a list of container annotations associated with
 	// a prepared resource

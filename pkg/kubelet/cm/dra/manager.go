@@ -126,7 +126,7 @@ func (m *ManagerImpl) prepareContainerResources(pod *v1.Pod, container *v1.Conta
 
 			klog.V(3).InfoS("NodePrepareResource succeeded", "response", response)
 
-			annotations, err := generateCDIAnnotations(resourceClaim.UID, driverName, response.CdiDevice)
+			annotations, err := generateCDIAnnotations(resourceClaim.UID, driverName, response.CdiDevices)
 			if err != nil {
 				return fmt.Errorf("failed to generate container annotations, err: %+v", err)
 			}
@@ -141,7 +141,7 @@ func (m *ManagerImpl) prepareContainerResources(pod *v1.Pod, container *v1.Conta
 					claimName:   resourceClaim.Name,
 					namespace:   resourceClaim.Namespace,
 					podUIDs:     sets.New(string(pod.UID)),
-					cdiDevice:   response.CdiDevice,
+					cdiDevices:  response.CdiDevices,
 					annotations: annotations,
 				})
 			if err != nil {
@@ -221,14 +221,14 @@ func (m *ManagerImpl) UnprepareResources(pod *v1.Pod) error {
 			resource.namespace,
 			resource.claimUID,
 			resource.claimName,
-			resource.cdiDevice)
+			resource.cdiDevices)
 		if err != nil {
 			return fmt.Errorf(
 				"NodeUnprepareResource failed, pod: %s, claim UID: %s, claim name: %s, CDI devices: %s, err: %+v",
 				pod.Name,
 				resource.claimUID,
 				resource.claimName,
-				resource.cdiDevice, err)
+				resource.cdiDevices, err)
 		}
 
 		klog.V(3).InfoS("NodeUnprepareResource succeeded", "response", response)

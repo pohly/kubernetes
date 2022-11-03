@@ -179,7 +179,7 @@ func (ex *ExamplePlugin) NodePrepareResource(ctx context.Context, req *drapbv1.N
 	}
 
 	dev := cdiSpec.GetDevice(deviceName).GetQualifiedName()
-	resp := &drapbv1.NodePrepareResourceResponse{CdiDevice: []string{dev}}
+	resp := &drapbv1.NodePrepareResourceResponse{CdiDevices: []string{dev}}
 
 	ex.mutex.Lock()
 	defer ex.mutex.Unlock()
