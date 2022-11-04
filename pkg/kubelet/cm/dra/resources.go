@@ -68,7 +68,7 @@ func (res *claimInfo) referencedByPod(podUID types.UID) bool {
 	return res.podUIDs.Has(string(podUID))
 }
 
-func (res *claimInfo) deletePodUID(podUID types.UID) {
+func (res *claimInfo) deletePodReference(podUID types.UID) {
 	res.Lock()
 	defer res.Unlock()
 

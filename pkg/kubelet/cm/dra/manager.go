@@ -210,7 +210,7 @@ func (m *ManagerImpl) UnprepareResources(pod *v1.Pod) error {
 		}
 
 		// Delete pod UID from the cache
-		resource.deletePodUID(pod.UID)
+		resource.deletePodReference(pod.UID)
 
 		// Skip calling NodeUnprepareResource if other pods are still referencing it
 		if len(resource.podUIDs) > 0 {
