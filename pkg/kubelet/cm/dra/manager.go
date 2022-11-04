@@ -189,6 +189,7 @@ func (m *ManagerImpl) PrepareResources(pod *v1.Pod, container *v1.Container) (*C
 	if err := m.prepareContainerResources(pod, container); err != nil {
 		return nil, err
 	}
+
 	return m.getContainerInfo(pod, container)
 }
 
@@ -196,15 +197,15 @@ func (m *ManagerImpl) UnprepareResources(pod *v1.Pod) error {
 	// Call NodeUnprepareResource RPC for every resource claim referenced by the pod
 	for _, podResourceClaim := range pod.Spec.ResourceClaims {
 		claimName := resourceclaim.Name(pod, &podResourceClaim)
-
 		claimInfo := m.cache.get(claimName, pod.Namespace)
+
+		// Skip calling NodeUnprepareResource if claim info is not cached
 		if claimInfo == nil {
-			// skip calling NodeUnprepareResource if claim info is not cached
 			continue
 		}
 
+		// Skip calling NodeUnprepareResource if pod is not cached
 		if !claimInfo.referencedByPod(pod.UID) {
-			// skip calling NodeUnprepareResource if pod is not cached
 			continue
 		}
 
