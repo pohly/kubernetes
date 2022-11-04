@@ -75,7 +75,7 @@ func (res *claimInfo) deletePodUID(podUID types.UID) {
 	res.podUIDs.Delete(string(podUID))
 }
 
-// claimInfoCache is a cache of processed resources keyed by namespace + claim name.
+// claimInfoCache is a cache of processed resource claims keyed by namespace + claim name.
 type claimInfoCache struct {
 	sync.RWMutex
 	resources map[string]*claimInfo
