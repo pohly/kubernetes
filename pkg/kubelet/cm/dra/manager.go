@@ -83,9 +83,9 @@ func (m *ManagerImpl) prepareContainerResources(pod *v1.Pod, container *v1.Conta
 			claimName := resourceclaim.Name(pod, &podResourceClaim)
 			klog.V(3).InfoS("Processing resource", "claim", claimName, "pod", pod.Name)
 
-			if resource := m.cache.get(claimName, pod.Namespace); resource != nil {
+			if claimInfo := m.cache.get(claimName, pod.Namespace); claimInfo != nil {
 				// resource is already prepared, add pod UID to it
-				resource.addPodReference(pod.UID)
+				claimInfo.addPodReference(pod.UID)
 
 				continue
 			}
@@ -171,13 +171,13 @@ func (m *ManagerImpl) getContainerInfo(pod *v1.Pod, container *v1.Container) (*C
 				continue
 			}
 
-			resource := m.cache.get(claimName, pod.Namespace)
-			if resource == nil {
+			claimInfo := m.cache.get(claimName, pod.Namespace)
+			if claimInfo == nil {
 				return nil, fmt.Errorf("unable to get resource for namespace: %s, claim: %s", pod.Namespace, claimName)
 			}
 
-			klog.V(3).InfoS("add resource annotations", "claim", claimName, "annotations", resource.annotations)
-			annotations = append(annotations, resource.annotations...)
+			klog.V(3).InfoS("add resource annotations", "claim", claimName, "annotations", claimInfo.annotations)
+			annotations = append(annotations, claimInfo.annotations...)
 		}
 	}
 
@@ -189,7 +189,6 @@ func (m *ManagerImpl) PrepareResources(pod *v1.Pod, container *v1.Container) (*C
 	if err := m.prepareContainerResources(pod, container); err != nil {
 		return nil, err
 	}
-
 	return m.getContainerInfo(pod, container)
 }
 
@@ -198,49 +197,49 @@ func (m *ManagerImpl) UnprepareResources(pod *v1.Pod) error {
 	for _, podResourceClaim := range pod.Spec.ResourceClaims {
 		claimName := resourceclaim.Name(pod, &podResourceClaim)
 
-		resource := m.cache.get(claimName, pod.Namespace)
-		if resource == nil {
+		claimInfo := m.cache.get(claimName, pod.Namespace)
+		if claimInfo == nil {
 			// skip calling NodeUnprepareResource if claim info is not cached
 			continue
 		}
 
-		if !resource.referencedByPod(pod.UID) {
+		if !claimInfo.referencedByPod(pod.UID) {
 			// skip calling NodeUnprepareResource if pod is not cached
 			continue
 		}
 
 		// Delete pod UID from the cache
-		resource.deletePodReference(pod.UID)
+		claimInfo.deletePodReference(pod.UID)
 
 		// Skip calling NodeUnprepareResource if other pods are still referencing it
-		if len(resource.podUIDs) > 0 {
+		if len(claimInfo.podUIDs) > 0 {
 			continue
 		}
 
 		// Call NodeUnprepareResource only for the last pod that references the claim
-		client, err := dra.NewDRAPluginClient(resource.driverName)
+		client, err := dra.NewDRAPluginClient(claimInfo.driverName)
 		if err != nil || client == nil {
-			return fmt.Errorf("failed to get DRA Plugin client for plugin name %s, err=%+v", resource.driverName, err)
+			return fmt.Errorf("failed to get DRA Plugin client for plugin name %s, err=%+v", claimInfo.driverName, err)
 		}
 
 		response, err := client.NodeUnprepareResource(
 			context.Background(),
-			resource.namespace,
-			resource.claimUID,
-			resource.claimName,
-			resource.cdiDevices)
+			claimInfo.namespace,
+			claimInfo.claimUID,
+			claimInfo.claimName,
+			claimInfo.cdiDevices)
 		if err != nil {
 			return fmt.Errorf(
 				"NodeUnprepareResource failed, pod: %s, claim UID: %s, claim name: %s, CDI devices: %s, err: %+v",
 				pod.Name,
-				resource.claimUID,
-				resource.claimName,
-				resource.cdiDevices, err)
+				claimInfo.claimUID,
+				claimInfo.claimName,
+				claimInfo.cdiDevices, err)
 		}
 
 		klog.V(3).InfoS("NodeUnprepareResource succeeded", "response", response)
 		// delete resource from the cache
-		m.cache.delete(resource.claimName, pod.Namespace)
+		m.cache.delete(claimInfo.claimName, pod.Namespace)
 	}
 
 	return nil
