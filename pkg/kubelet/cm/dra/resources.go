@@ -78,13 +78,13 @@ func (res *claimInfo) deletePodReference(podUID types.UID) {
 // claimInfoCache is a cache of processed resource claims keyed by namespace + claim name.
 type claimInfoCache struct {
 	sync.RWMutex
-	resources map[string]*claimInfo
+	claimInfo map[string]*claimInfo
 }
 
 // newClaimInfoCache is a function that returns an instance of the claimInfoCache.
 func newClaimInfoCache() *claimInfoCache {
 	return &claimInfoCache{
-		resources: make(map[string]*claimInfo),
+		claimInfo: make(map[string]*claimInfo),
 	}
 }
 
@@ -93,11 +93,11 @@ func (cache *claimInfoCache) add(claim, namespace string, res *claimInfo) error 
 	defer cache.Unlock()
 
 	key := claim + namespace
-	if _, ok := cache.resources[key]; ok {
+	if _, ok := cache.claimInfo[key]; ok {
 		return fmt.Errorf("claim %s, namespace %s already cached", claim, namespace)
 	}
 
-	cache.resources[claim+namespace] = res
+	cache.claimInfo[claim+namespace] = res
 
 	return nil
 }
@@ -106,12 +106,12 @@ func (cache *claimInfoCache) get(claimName, namespace string) *claimInfo {
 	cache.RLock()
 	defer cache.RUnlock()
 
-	return cache.resources[claimName+namespace]
+	return cache.claimInfo[claimName+namespace]
 }
 
 func (cache *claimInfoCache) delete(claimName, namespace string) {
 	cache.Lock()
 	defer cache.Unlock()
 
-	delete(cache.resources, claimName+namespace)
+	delete(cache.claimInfo, claimName+namespace)
 }
