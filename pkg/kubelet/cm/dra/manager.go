@@ -158,12 +158,9 @@ func (m *ManagerImpl) prepareContainerResources(pod *v1.Pod, container *v1.Conta
 	return nil
 }
 
-// PrepareResources calls plugin NodePrepareResource from the registered DRA resource plugins.
-func (m *ManagerImpl) PrepareResources(pod *v1.Pod, container *v1.Container) (*ContainerInfo, error) {
-	if err := m.prepareContainerResources(pod, container); err != nil {
-		return nil, err
-	}
-
+// getContainerInfo gets a container info from the claimInfo cache.
+// This information is used by the caller to update a container config.
+func (m *ManagerImpl) getContainerInfo(pod *v1.Pod, container *v1.Container) (*ContainerInfo, error) {
 	annotations := []kubecontainer.Annotation{}
 
 	for _, podResourceClaim := range pod.Spec.ResourceClaims {
@@ -185,6 +182,15 @@ func (m *ManagerImpl) PrepareResources(pod *v1.Pod, container *v1.Container) (*C
 	}
 
 	return &ContainerInfo{Annotations: annotations}, nil
+}
+
+// PrepareResources calls plugin NodePrepareResource from the registered DRA resource plugins.
+func (m *ManagerImpl) PrepareResources(pod *v1.Pod, container *v1.Container) (*ContainerInfo, error) {
+	if err := m.prepareContainerResources(pod, container); err != nil {
+		return nil, err
+	}
+
+	return m.getContainerInfo(pod, container)
 }
 
 func (m *ManagerImpl) UnprepareResources(pod *v1.Pod) error {
