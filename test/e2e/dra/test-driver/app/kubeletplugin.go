@@ -29,7 +29,6 @@ import (
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
 	"k8s.io/klog/v2"
 	drapbv1 "k8s.io/kubelet/pkg/apis/dra/v1alpha1"
-	"sigs.k8s.io/yaml"
 )
 
 type ExamplePlugin struct {
@@ -55,9 +54,9 @@ type ClaimID struct {
 
 var _ drapbv1.NodeServer = &ExamplePlugin{}
 
-// getYAMLFilePath returns the absolute path where CDI file is/should be.
-func (ex *ExamplePlugin) getYAMLFilePath(claimUID string) string {
-	return filepath.Join(ex.cdiDir, fmt.Sprintf("%s-%s.yaml", ex.driverName, claimUID))
+// getJSONFilePath returns the absolute path where CDI file is/should be.
+func (ex *ExamplePlugin) getJSONFilePath(claimUID string) string {
+	return filepath.Join(ex.cdiDir, fmt.Sprintf("%s-%s.json", ex.driverName, claimUID))
 }
 
 // FileOperations defines optional callbacks for handling CDI files.
@@ -145,10 +144,11 @@ func (ex *ExamplePlugin) NodePrepareResource(ctx context.Context, req *drapbv1.N
 	}
 
 	deviceName := "claim-" + req.ClaimUid
-	spec := specs.Spec{
-		// TODO: clarify what version to put here (https://github.com/container-orchestrated-devices/container-device-interface/issues/60).
-		Version: "0.2.0",
-		Kind:    ex.driverName + "/test",
+	vendor := ex.driverName
+	class := "test"
+	spec := &specs.Spec{
+		Version: cdiapi.CurrentVersion,
+		Kind:    vendor + "/" + class,
 		// At least one device is required and its entry must have more
 		// than just the name.
 		Devices: []specs.Device{
@@ -160,25 +160,16 @@ func (ex *ExamplePlugin) NodePrepareResource(ctx context.Context, req *drapbv1.N
 			},
 		},
 	}
-	filePath := ex.getYAMLFilePath(req.ClaimUid)
-	cdiSpec, err := cdiapi.NewSpec(&spec, filePath, 1)
-	if err != nil {
-		return nil, fmt.Errorf("create spec: %v", err)
-	}
-
-	buffer, err := yaml.Marshal(*cdiSpec)
+	filePath := ex.getJSONFilePath(req.ClaimUid)
+	buffer, err := json.Marshal(spec)
 	if err != nil {
 		return nil, fmt.Errorf("marshal spec: %v", err)
 	}
-
-	// TODO: use a new cdi lib and its write interface once a decision
-	// about transient files has been reached (see
-	// https://github.com/container-orchestrated-devices/container-device-interface/pull/77)
 	if err := ex.fileOps.Create(filePath, buffer); err != nil {
 		return nil, fmt.Errorf("failed to write CDI file %v", err)
 	}
 
-	dev := cdiSpec.GetDevice(deviceName).GetQualifiedName()
+	dev := cdiapi.QualifiedName(vendor, class, deviceName)
 	resp := &drapbv1.NodePrepareResourceResponse{CdiDevices: []string{dev}}
 
 	ex.mutex.Lock()
@@ -195,7 +186,7 @@ func (ex *ExamplePlugin) NodePrepareResource(ctx context.Context, req *drapbv1.N
 func (ex *ExamplePlugin) NodeUnprepareResource(ctx context.Context, req *drapbv1.NodeUnprepareResourceRequest) (*drapbv1.NodeUnprepareResourceResponse, error) {
 	logger := klog.FromContext(ctx)
 
-	filePath := ex.getYAMLFilePath(req.ClaimUid)
+	filePath := ex.getJSONFilePath(req.ClaimUid)
 	if err := ex.fileOps.Remove(filePath); err != nil {
 		return nil, fmt.Errorf("error removing CDI file: %v", err)
 	}
