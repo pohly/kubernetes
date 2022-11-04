@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dra
+package plugin
 
 import (
 	"sync"
@@ -31,8 +31,8 @@ type Plugin struct {
 
 // PluginsStore holds a list of DRA Plugins.
 type PluginsStore struct {
-	store map[string]*Plugin
 	sync.RWMutex
+	store map[string]*Plugin
 }
 
 // Get lets you retrieve a DRA Plugin by name.

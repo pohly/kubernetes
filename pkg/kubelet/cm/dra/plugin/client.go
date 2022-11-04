@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dra
+package plugin
 
 import (
 	"context"
@@ -24,9 +24,7 @@ import (
 	"net"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/status"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 
@@ -69,26 +67,11 @@ type nodeV1ClientCreator func(addr draAddr) (
 	err error,
 )
 
-// UncertainProgressError indicates operation failed with a non-final error
-// and operation may be in-progress in background.
-type UncertainProgressError struct {
-	msg string
-}
-
-func (err *UncertainProgressError) Error() string {
-	return err.msg
-}
-
-// NewUncertainProgressError creates an instance of UncertainProgressError type.
-func NewUncertainProgressError(msg string) *UncertainProgressError {
-	return &UncertainProgressError{msg: msg}
-}
-
 // newV1NodeClient creates a new NodeClient with the internally used gRPC
 // connection set up. It also returns a closer which must be called to close
 // the gRPC connection when the NodeClient is not used anymore.
 // This is the default implementation for the nodeV1ClientCreator, used in
-// newCsiDriverClient.
+// newDRAPluginClient.
 func newV1NodeClient(addr draAddr) (nodeClient drapbv1.NodeClient, closer io.Closer, err error) {
 	var conn *grpc.ClientConn
 
@@ -105,14 +88,14 @@ func NewDRAPluginClient(pluginName string) (Client, error) {
 		return nil, fmt.Errorf("plugin name is empty")
 	}
 
-	existingDriver := draPlugins.Get(pluginName)
-	if existingDriver == nil {
+	existingPlugin := draPlugins.Get(pluginName)
+	if existingPlugin == nil {
 		return nil, fmt.Errorf("plugin name %s not found in the list of registered DRA plugins", pluginName)
 	}
 
 	return &draPluginClient{
 		pluginName:          pluginName,
-		addr:                draAddr(existingDriver.endpoint),
+		addr:                draAddr(existingPlugin.endpoint),
 		nodeV1ClientCreator: newV1NodeClient,
 	}, nil
 }
@@ -148,12 +131,7 @@ func (r *draPluginClient) NodePrepareResource(
 		ResourceHandle: resourceHandle,
 	}
 
-	response, err := nodeClient.NodePrepareResource(ctx, req)
-	if err != nil && !isFinalError(err) {
-		return nil, NewUncertainProgressError(err.Error())
-	}
-
-	return response, err
+	return nodeClient.NodePrepareResource(ctx, req)
 }
 
 func (r *draPluginClient) NodeUnprepareResource(
@@ -187,12 +165,7 @@ func (r *draPluginClient) NodeUnprepareResource(
 		CdiDevices: cdiDevices,
 	}
 
-	response, err := nodeClient.NodeUnprepareResource(ctx, req)
-	if err != nil && !isFinalError(err) {
-		return nil, NewUncertainProgressError(err.Error())
-	}
-
-	return response, err
+	return nodeClient.NodeUnprepareResource(ctx, req)
 }
 
 func newGrpcConn(addr draAddr) (*grpc.ClientConn, error) {
@@ -206,26 +179,4 @@ func newGrpcConn(addr draAddr) (*grpc.ClientConn, error) {
 			return (&net.Dialer{}).DialContext(ctx, network, target)
 		}),
 	)
-}
-
-func isFinalError(err error) bool {
-	stat, ok := status.FromError(err)
-	if !ok {
-		// This is not gRPC error. The operation must have failed before gRPC
-		// method was called, otherwise we would get gRPC error.
-		// We don't know if any previous volume operation is in progress, be on the safe side.
-		return false
-	}
-
-	switch stat.Code() {
-	case codes.Canceled, // gRPC: Client Application cancelled the request
-		codes.DeadlineExceeded,  // gRPC: Timeout
-		codes.Unavailable,       // gRPC: Server shutting down, TCP connection broken - previous volume operation may be still in progress.
-		codes.ResourceExhausted, // gRPC: Server temporarily out of resources - previous volume operation may be still in progress.
-		codes.Aborted:           // CSI: Operation pending for volume
-		return false
-	}
-	// All other errors mean that operation either did not
-	// even start or failed. It is for sure not in progress.
-	return true
 }

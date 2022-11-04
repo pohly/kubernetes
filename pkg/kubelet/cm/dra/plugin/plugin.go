@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dra
+package plugin
 
 import (
 	"errors"
@@ -37,7 +37,10 @@ var draPlugins = &PluginsStore{}
 // RegistrationHandler is the handler which is fed to the pluginwatcher API.
 type RegistrationHandler struct{}
 
-var PluginHandler = &RegistrationHandler{}
+// NewPluginHandler returns new registration handler.
+func NewRegistrationHandler() *RegistrationHandler {
+	return &RegistrationHandler{}
+}
 
 // RegisterPlugin is called when a plugin can be registered.
 func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string, versions []string) error {
@@ -61,7 +64,7 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 // Return the highest supported version.
 func highestSupportedVersion(versions []string) (*utilversion.Version, error) {
 	if len(versions) == 0 {
-		return nil, errors.New(log("DRA driver reporting empty array for supported versions"))
+		return nil, errors.New(log("DRA plugin reporting empty array for supported versions"))
 	}
 
 	var highestSupportedVersion *utilversion.Version
@@ -88,12 +91,12 @@ func highestSupportedVersion(versions []string) (*utilversion.Version, error) {
 
 	if highestSupportedVersion == nil {
 		return nil, fmt.Errorf(
-			"could not find a highest supported version from versions (%v) reported by this driver: %+v",
+			"could not find a highest supported version from versions (%v) reported by this plugin: %+v",
 			versions, theErr)
 	}
 
 	if highestSupportedVersion.Major() != 1 {
-		return nil, fmt.Errorf("highest supported version reported by driver is %v, must be v1.x", highestSupportedVersion)
+		return nil, fmt.Errorf("highest supported version reported by plugin is %v, must be v1.x", highestSupportedVersion)
 	}
 
 	return highestSupportedVersion, nil
@@ -107,7 +110,7 @@ func (h *RegistrationHandler) validateVersions(
 	if len(versions) == 0 {
 		return nil, errors.New(
 			log(
-				"%s for DRA driver %q failed. Plugin returned an empty list for supported versions",
+				"%s for DRA plugin %q failed. Plugin returned an empty list for supported versions",
 				callerName,
 				pluginName,
 			),
@@ -115,11 +118,11 @@ func (h *RegistrationHandler) validateVersions(
 	}
 
 	// Validate version
-	newDriverHighestVersion, err := highestSupportedVersion(versions)
+	newPluginHighestVersion, err := highestSupportedVersion(versions)
 	if err != nil {
 		return nil, errors.New(
 			log(
-				"%s for DRA driver %q failed. None of the versions specified %q are supported. err=%v",
+				"%s for DRA plugin %q failed. None of the versions specified %q are supported. err=%v",
 				callerName,
 				pluginName,
 				versions,
@@ -128,21 +131,21 @@ func (h *RegistrationHandler) validateVersions(
 		)
 	}
 
-	existingDriver := draPlugins.Get(pluginName)
-	if existingDriver != nil {
-		if !existingDriver.highestSupportedVersion.LessThan(newDriverHighestVersion) {
+	existingPlugin := draPlugins.Get(pluginName)
+	if existingPlugin != nil {
+		if !existingPlugin.highestSupportedVersion.LessThan(newPluginHighestVersion) {
 			return nil, errors.New(
 				log(
-					"%s for DRA driver %q failed. Another driver with the same name is already registered with a higher supported version: %q",
+					"%s for DRA plugin %q failed. Another plugin with the same name is already registered with a higher supported version: %q",
 					callerName,
 					pluginName,
-					existingDriver.highestSupportedVersion,
+					existingPlugin.highestSupportedVersion,
 				),
 			)
 		}
 	}
 
-	return newDriverHighestVersion, nil
+	return newPluginHighestVersion, nil
 }
 
 func unregisterPlugin(pluginName string) {
