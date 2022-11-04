@@ -22,7 +22,7 @@ require (
 	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
 	github.com/aws/aws-sdk-go v1.44.116
 	github.com/blang/semver/v4 v4.0.0
-	github.com/container-orchestrated-devices/container-device-interface v0.5.2
+	github.com/container-orchestrated-devices/container-device-interface v0.5.3
 	github.com/container-storage-interface/spec v1.6.0
 	github.com/coredns/corefile-migration v1.0.17
 	github.com/coreos/go-oidc v2.1.0+incompatible
@@ -183,8 +183,6 @@ require (
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway v1.16.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.7.0 // indirect
-	github.com/hashicorp/errwrap v1.0.0 // indirect
-	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/imdario/mergo v0.3.6 // indirect
 	github.com/inconshreveable/mousetrap v1.0.1 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect

@@ -184,8 +184,9 @@ github.com/cilium/ebpf/internal
 github.com/cilium/ebpf/internal/btf
 github.com/cilium/ebpf/internal/unix
 github.com/cilium/ebpf/link
-# github.com/container-orchestrated-devices/container-device-interface v0.5.2
+# github.com/container-orchestrated-devices/container-device-interface v0.5.3
 ## explicit; go 1.17
+github.com/container-orchestrated-devices/container-device-interface/internal/multierror
 github.com/container-orchestrated-devices/container-device-interface/pkg/cdi
 github.com/container-orchestrated-devices/container-device-interface/specs-go
 # github.com/container-storage-interface/spec v1.6.0
@@ -483,12 +484,6 @@ github.com/grpc-ecosystem/grpc-gateway/utilities
 github.com/grpc-ecosystem/grpc-gateway/v2/internal/httprule
 github.com/grpc-ecosystem/grpc-gateway/v2/runtime
 github.com/grpc-ecosystem/grpc-gateway/v2/utilities
-# github.com/hashicorp/errwrap v1.0.0
-## explicit
-github.com/hashicorp/errwrap
-# github.com/hashicorp/go-multierror v1.1.1
-## explicit; go 1.13
-github.com/hashicorp/go-multierror
 # github.com/imdario/mergo v0.3.6
 ## explicit
 github.com/imdario/mergo
