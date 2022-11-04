@@ -25,8 +25,8 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
-// claimInfo contains attributes required
-// to prepare and unprepare the resource.
+// claimInfo holds information required
+// to prepare and unprepare a resource claim.
 type claimInfo struct {
 	sync.RWMutex
 
