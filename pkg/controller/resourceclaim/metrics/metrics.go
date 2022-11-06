@@ -32,7 +32,7 @@ var (
 	ResourceClaimCreateAttempts = metrics.NewCounter(
 		&metrics.CounterOpts{
 			Subsystem:      ResourceClaimSubsystem,
-			Name:           "create_total",
+			Name:           "create_attempts_total",
 			Help:           "Number of ResourceClaims creation requests",
 			StabilityLevel: metrics.ALPHA,
 		})

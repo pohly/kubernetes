@@ -51,11 +51,7 @@ const (
 )
 
 // Controller creates ResourceClaims for ResourceClaimTemplates in a pod spec.
-type Controller interface {
-	Run(ctx context.Context, workers int)
-}
-
-type resourceClaimController struct {
+type Controller struct {
 	// kubeClient is the kube API client used to communicate with the API
 	// server.
 	kubeClient clientset.Interface
@@ -104,9 +100,9 @@ func NewController(
 	kubeClient clientset.Interface,
 	podInformer v1informers.PodInformer,
 	claimInformer resourcev1alpha1informers.ResourceClaimInformer,
-	templateInformer resourcev1alpha1informers.ResourceClaimTemplateInformer) (Controller, error) {
+	templateInformer resourcev1alpha1informers.ResourceClaimTemplateInformer) (*Controller, error) {
 
-	ec := &resourceClaimController{
+	ec := &Controller{
 		kubeClient:      kubeClient,
 		podLister:       podInformer.Lister(),
 		podIndexer:      podInformer.Informer().GetIndexer(),
@@ -155,7 +151,7 @@ func NewController(
 	return ec, nil
 }
 
-func (ec *resourceClaimController) enqueuePod(obj interface{}, deleted bool) {
+func (ec *Controller) enqueuePod(obj interface{}, deleted bool) {
 	if d, ok := obj.(cache.DeletedFinalStateUnknown); ok {
 		obj = d.Obj
 	}
@@ -197,7 +193,7 @@ func (ec *resourceClaimController) enqueuePod(obj interface{}, deleted bool) {
 	}
 }
 
-func (ec *resourceClaimController) onResourceClaimAddOrUpdate(obj interface{}) {
+func (ec *Controller) onResourceClaimAddOrUpdate(obj interface{}) {
 	claim, ok := obj.(*resourcev1alpha1.ResourceClaim)
 	if !ok {
 		return
@@ -209,7 +205,7 @@ func (ec *resourceClaimController) onResourceClaimAddOrUpdate(obj interface{}) {
 	ec.queue.Add(claimKeyPrefix + claim.Namespace + "/" + claim.Name)
 }
 
-func (ec *resourceClaimController) onResourceClaimDelete(obj interface{}) {
+func (ec *Controller) onResourceClaimDelete(obj interface{}) {
 	claim, ok := obj.(*resourcev1alpha1.ResourceClaim)
 	if !ok {
 		return
@@ -231,7 +227,7 @@ func (ec *resourceClaimController) onResourceClaimDelete(obj interface{}) {
 	}
 }
 
-func (ec *resourceClaimController) Run(ctx context.Context, workers int) {
+func (ec *Controller) Run(ctx context.Context, workers int) {
 	defer runtime.HandleCrash()
 	defer ec.queue.ShutDown()
 
@@ -249,12 +245,12 @@ func (ec *resourceClaimController) Run(ctx context.Context, workers int) {
 	<-ctx.Done()
 }
 
-func (ec *resourceClaimController) runWorker(ctx context.Context) {
+func (ec *Controller) runWorker(ctx context.Context) {
 	for ec.processNextWorkItem(ctx) {
 	}
 }
 
-func (ec *resourceClaimController) processNextWorkItem(ctx context.Context) bool {
+func (ec *Controller) processNextWorkItem(ctx context.Context) bool {
 	key, shutdown := ec.queue.Get()
 	if shutdown {
 		return false
@@ -275,7 +271,7 @@ func (ec *resourceClaimController) processNextWorkItem(ctx context.Context) bool
 
 // syncHandler is invoked for each work item which might need to be processed.
 // If an error is returned from this function, the item will be requeued.
-func (ec *resourceClaimController) syncHandler(ctx context.Context, key string) error {
+func (ec *Controller) syncHandler(ctx context.Context, key string) error {
 	sep := strings.Index(key, ":")
 	if sep < 0 {
 		return fmt.Errorf("unexpected key: %s", key)
@@ -297,7 +293,7 @@ func (ec *resourceClaimController) syncHandler(ctx context.Context, key string) 
 
 }
 
-func (ec *resourceClaimController) syncPod(ctx context.Context, namespace, name string) error {
+func (ec *Controller) syncPod(ctx context.Context, namespace, name string) error {
 	logger := klog.LoggerWithValues(klog.FromContext(ctx), "pod", klog.KRef(namespace, name))
 	ctx = klog.NewContext(ctx, logger)
 	pod, err := ec.podLister.Pods(namespace).Get(name)
@@ -326,7 +322,7 @@ func (ec *resourceClaimController) syncPod(ctx context.Context, namespace, name 
 }
 
 // handleResourceClaim is invoked for each volume of a pod.
-func (ec *resourceClaimController) handleClaim(ctx context.Context, pod *v1.Pod, podClaim v1.PodResourceClaim) error {
+func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podClaim v1.PodResourceClaim) error {
 	logger := klog.LoggerWithValues(klog.FromContext(ctx), "podClaim", podClaim.Name)
 	ctx = klog.NewContext(ctx, logger)
 	logger.V(5).Info("checking", "podClaim", podClaim.Name)
@@ -383,7 +379,7 @@ func (ec *resourceClaimController) handleClaim(ctx context.Context, pod *v1.Pod,
 	return nil
 }
 
-func (ec *resourceClaimController) syncClaim(ctx context.Context, namespace, name string) error {
+func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) error {
 	logger := klog.LoggerWithValues(klog.FromContext(ctx), "claim", klog.KRef(namespace, name))
 	ctx = klog.NewContext(ctx, logger)
 	claim, err := ec.claimLister.ResourceClaims(namespace).Get(name)
