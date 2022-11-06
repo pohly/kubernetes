@@ -128,6 +128,10 @@ func NewController(
 		return nil, err
 	}
 	if _, err := claimInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: ec.onResourceClaimAddOrUpdate,
+		UpdateFunc: func(old, updated interface{}) {
+			ec.onResourceClaimAddOrUpdate(updated)
+		},
 		DeleteFunc: ec.onResourceClaimDelete,
 	}); err != nil {
 		return nil, err
@@ -174,6 +178,18 @@ func (ec *resourceClaimController) enqueuePod(obj interface{}) {
 			}
 		}
 	}
+}
+
+func (ec *resourceClaimController) onResourceClaimAddOrUpdate(obj interface{}) {
+	claim, ok := obj.(*resourcev1alpha1.ResourceClaim)
+	if !ok {
+		return
+	}
+
+	// When starting up, we have to check all claims to find those with
+	// stale pods in ReservedFor. During an update, a pod might get added
+	// that already no longer exists.
+	ec.queue.Add(claimKeyPrefix + claim.Namespace + "/" + claim.Name)
 }
 
 func (ec *resourceClaimController) onResourceClaimDelete(obj interface{}) {
