@@ -90,6 +90,7 @@ func TestSyncHandler(t *testing.T) {
 		key             string
 		claims          []*resourcev1alpha1.ResourceClaim
 		pods            []*v1.Pod
+		podsLater       []*v1.Pod
 		templates       []*resourcev1alpha1.ResourceClaimTemplate
 		expectedClaims  []resourcev1alpha1.ResourceClaim
 		expectedError   bool
@@ -163,8 +164,16 @@ func TestSyncHandler(t *testing.T) {
 			expectedError:   true,
 		},
 		{
-			name:            "stay-reserved",
+			name:            "stay-reserved-seen",
 			pods:            []*v1.Pod{testPodWithResource},
+			key:             claimKey(testClaimReserved),
+			claims:          []*resourcev1alpha1.ResourceClaim{testClaimReserved},
+			expectedClaims:  []resourcev1alpha1.ResourceClaim{*testClaimReserved},
+			expectedMetrics: expectedMetrics{0, 0},
+		},
+		{
+			name:            "stay-reserved-not-seen",
+			podsLater:       []*v1.Pod{testPodWithResource},
 			key:             claimKey(testClaimReserved),
 			claims:          []*resourcev1alpha1.ResourceClaim{testClaimReserved},
 			expectedClaims:  []resourcev1alpha1.ResourceClaim{*testClaimReserved},
@@ -225,12 +234,22 @@ func TestSyncHandler(t *testing.T) {
 
 			// Ensure informers are up-to-date.
 			go informerFactory.Start(ctx.Done())
-			defer func() {
+			stopInformers := func() {
 				cancel()
 				informerFactory.Shutdown()
-			}()
+			}
+			defer stopInformers()
 			informerFactory.WaitForCacheSync(ctx.Done())
 			cache.WaitForCacheSync(ctx.Done(), podInformer.Informer().HasSynced, claimInformer.Informer().HasSynced, templateInformer.Informer().HasSynced)
+
+			// Simulate race: stop informers, add more pods that the controller doesn't know about.
+			stopInformers()
+			for _, pod := range tc.podsLater {
+				_, err := fakeKubeClient.CoreV1().Pods(pod.Namespace).Create(ctx, pod, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("unexpected error while creating pod: %v", err)
+				}
+			}
 
 			err = ec.syncHandler(context.TODO(), tc.key)
 			if err != nil && !tc.expectedError {

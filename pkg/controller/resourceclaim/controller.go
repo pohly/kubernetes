@@ -46,6 +46,8 @@ import (
 const (
 	// podResourceClaimIndex is the lookup name for the index function which indexes by pod ResourceClaim templates.
 	podResourceClaimIndex = "pod-resource-claim-index"
+
+	maxUIDCacheEntries = 500
 )
 
 // Controller creates ResourceClaims for ResourceClaimTemplates in a pod spec.
@@ -85,6 +87,11 @@ type resourceClaimController struct {
 	recorder record.EventRecorder
 
 	queue workqueue.RateLimitingInterface
+
+	// The deletedObjects cache keeps track of Pods for which we know that
+	// they have existed and have been removed. For those we can be sure
+	// that a ReservedFor entry needs to be removed.
+	deletedObjects *uidCache
 }
 
 const (
@@ -109,6 +116,7 @@ func NewController(
 		templateLister:  templateInformer.Lister(),
 		templatesSynced: templateInformer.Informer().HasSynced,
 		queue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "resource_claim"),
+		deletedObjects:  newUIDCache(maxUIDCacheEntries),
 	}
 
 	metrics.RegisterMetrics()
@@ -119,11 +127,15 @@ func NewController(
 	ec.recorder = eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "resource_claim"})
 
 	if _, err := podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: ec.enqueuePod,
-		UpdateFunc: func(old, updated interface{}) {
-			ec.enqueuePod(updated)
+		AddFunc: func(obj interface{}) {
+			ec.enqueuePod(obj, false)
 		},
-		DeleteFunc: ec.enqueuePod,
+		UpdateFunc: func(old, updated interface{}) {
+			ec.enqueuePod(updated, false)
+		},
+		DeleteFunc: func(obj interface{}) {
+			ec.enqueuePod(obj, true)
+		},
 	}); err != nil {
 		return nil, err
 	}
@@ -143,7 +155,7 @@ func NewController(
 	return ec, nil
 }
 
-func (ec *resourceClaimController) enqueuePod(obj interface{}) {
+func (ec *resourceClaimController) enqueuePod(obj interface{}, deleted bool) {
 	if d, ok := obj.(cache.DeletedFinalStateUnknown); ok {
 		obj = d.Obj
 	}
@@ -153,13 +165,18 @@ func (ec *resourceClaimController) enqueuePod(obj interface{}) {
 		return
 	}
 
+	if deleted {
+		ec.deletedObjects.Add(pod.UID)
+	}
+
 	if len(pod.Spec.ResourceClaims) == 0 {
 		// Nothing to do for it at all.
 		return
 	}
 
 	// Release reservations of a deleted or completed pod?
-	if pod.DeletionTimestamp != nil && pod.DeletionGracePeriodSeconds != nil && *pod.DeletionGracePeriodSeconds == 0 ||
+	if deleted ||
+		pod.DeletionTimestamp != nil && pod.DeletionGracePeriodSeconds != nil && *pod.DeletionGracePeriodSeconds == 0 ||
 		pod.Status.Phase == v1.PodFailed ||
 		pod.Status.Phase == v1.PodSucceeded {
 		for _, podClaim := range pod.Spec.ResourceClaims {
@@ -210,7 +227,7 @@ func (ec *resourceClaimController) onResourceClaimDelete(obj interface{}) {
 		return
 	}
 	for _, obj := range objs {
-		ec.enqueuePod(obj)
+		ec.enqueuePod(obj, false)
 	}
 }
 
@@ -382,12 +399,42 @@ func (ec *resourceClaimController) syncClaim(ctx context.Context, namespace, nam
 	for _, reservedFor := range claim.Status.ReservedFor {
 		if reservedFor.APIGroup == "" &&
 			reservedFor.Resource == "pods" {
-			pod, err := ec.podLister.Pods(claim.Namespace).Get(reservedFor.Name)
-			notFound := errors.IsNotFound(err)
-			if err != nil && !notFound {
-				return err
+			// A pod falls into one of three categories:
+			// - we have it in our cache -> don't remove it until we are told that it got removed
+			// - we don't have it in our cache anymore, but we have seen it before -> it was deleted, remove it
+			// - not in our cache, not seen -> double-check with API server before removal
+
+			keepEntry := true
+			if ec.deletedObjects.Has(reservedFor.UID) {
+				// We know that the pod was deleted. This is
+				// easy to check and thus is done first.
+				keepEntry = false
+			} else {
+				pod, err := ec.podLister.Pods(claim.Namespace).Get(reservedFor.Name)
+				notFound := errors.IsNotFound(err)
+				if err != nil && !notFound {
+					return err
+				}
+				if pod == nil {
+					// We might not have it in our informer cache
+					// yet. Removing the pod while the scheduler is
+					// scheduling it would be bad. We have to be
+					// absolutely sure and thus have to check with
+					// the API server.
+					pod, err := ec.kubeClient.CoreV1().Pods(claim.Namespace).Get(ctx, reservedFor.Name, metav1.GetOptions{})
+					if err != nil && !errors.IsNotFound(err) {
+						return err
+					}
+					if pod == nil || pod.UID != reservedFor.UID {
+						keepEntry = false
+					}
+				} else if pod.UID != reservedFor.UID {
+					// Pod exists, but is a different incarnation under the same name.
+					keepEntry = false
+				}
 			}
-			if pod != nil && pod.UID == reservedFor.UID {
+
+			if keepEntry {
 				valid = append(valid, reservedFor)
 			}
 			continue
