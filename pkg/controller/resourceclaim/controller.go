@@ -261,8 +261,6 @@ func (ec *resourceClaimController) processNextWorkItem(ctx context.Context) bool
 	}
 	defer ec.queue.Done(key)
 
-	logger := klog.LoggerWithValues(klog.FromContext(ctx), "key", key)
-	ctx = klog.NewContext(ctx, logger)
 	err := ec.syncHandler(ctx, key.(string))
 	if err == nil {
 		ec.queue.Forget(key)
@@ -300,11 +298,12 @@ func (ec *resourceClaimController) syncHandler(ctx context.Context, key string) 
 }
 
 func (ec *resourceClaimController) syncPod(ctx context.Context, namespace, name string) error {
-	logger := klog.FromContext(ctx)
+	logger := klog.LoggerWithValues(klog.FromContext(ctx), "pod", klog.KRef(namespace, name))
+	ctx = klog.NewContext(ctx, logger)
 	pod, err := ec.podLister.Pods(namespace).Get(name)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			logger.V(5).Info("nothing to do for pod, it is gone", "pod", klog.KRef(namespace, name))
+			logger.V(5).Info("nothing to do for pod, it is gone")
 			return nil
 		}
 		return err
@@ -312,7 +311,7 @@ func (ec *resourceClaimController) syncPod(ctx context.Context, namespace, name 
 
 	// Ignore pods which are already getting deleted.
 	if pod.DeletionTimestamp != nil {
-		logger.V(5).Info("nothing to do for pod, it is marked for deletion", "pod", klog.KRef(namespace, name))
+		logger.V(5).Info("nothing to do for pod, it is marked for deletion")
 		return nil
 	}
 
@@ -328,7 +327,8 @@ func (ec *resourceClaimController) syncPod(ctx context.Context, namespace, name 
 
 // handleResourceClaim is invoked for each volume of a pod.
 func (ec *resourceClaimController) handleClaim(ctx context.Context, pod *v1.Pod, podClaim v1.PodResourceClaim) error {
-	logger := klog.FromContext(ctx)
+	logger := klog.LoggerWithValues(klog.FromContext(ctx), "podClaim", podClaim.Name)
+	ctx = klog.NewContext(ctx, logger)
 	logger.V(5).Info("checking", "podClaim", podClaim.Name)
 	templateName := podClaim.Source.ResourceClaimTemplateName
 	if templateName == nil {
@@ -384,11 +384,12 @@ func (ec *resourceClaimController) handleClaim(ctx context.Context, pod *v1.Pod,
 }
 
 func (ec *resourceClaimController) syncClaim(ctx context.Context, namespace, name string) error {
-	logger := klog.FromContext(ctx)
+	logger := klog.LoggerWithValues(klog.FromContext(ctx), "claim", klog.KRef(namespace, name))
+	ctx = klog.NewContext(ctx, logger)
 	claim, err := ec.claimLister.ResourceClaims(namespace).Get(name)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			logger.V(5).Info("nothing to do for claim, it is gone", "claim", klog.KRef(namespace, name))
+			logger.V(5).Info("nothing to do for claim, it is gone")
 			return nil
 		}
 		return err
