@@ -41,7 +41,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/dynamic-resource-allocation/resourceclaim"
+	"k8s.io/kubernetes/pkg/util/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
 )
 

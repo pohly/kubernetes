@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/dynamic-resource-allocation/resourceclaim"
+	"k8s.io/kubernetes/pkg/util/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
 	dra "k8s.io/kubernetes/pkg/kubelet/cm/dra/plugin"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
