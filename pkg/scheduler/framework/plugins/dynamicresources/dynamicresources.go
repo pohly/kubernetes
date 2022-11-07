@@ -81,7 +81,7 @@ type stateData struct {
 	// podSchedulingDirty is true if the current copy was locally modified.
 	podSchedulingDirty bool
 
-	mutex *sync.Mutex
+	mutex sync.Mutex
 }
 
 func (d *stateData) Clone() framework.StateData {
@@ -245,6 +245,7 @@ func (pl *dynamicResources) EventsToRegister() []framework.ClusterEvent {
 		// When a driver has provided additional information, a pod waiting for that information
 		// may be schedulable.
 		// TODO: can we change this so that such an event does not trigger *all* pods?
+		// Yes: https://github.com/kubernetes/kubernetes/blob/abcbaed0784baf5ed2382aae9705a8918f2daa18/pkg/scheduler/eventhandlers.go#L70
 		{Resource: framework.PodScheduling, ActionType: framework.Add | framework.Update},
 		// A resource might depend on node labels for topology filtering.
 		// A new or updated node may make pods schedulable.
@@ -253,8 +254,8 @@ func (pl *dynamicResources) EventsToRegister() []framework.ClusterEvent {
 	return events
 }
 
-// podHasClaims returns the ResourceClaims for all pod.Spec.PodResourceClaims.
-func (pl *dynamicResources) podHasClaims(pod *v1.Pod) ([]*resourcev1alpha1.ResourceClaim, error) {
+// podResourceClaims returns the ResourceClaims for all pod.Spec.PodResourceClaims.
+func (pl *dynamicResources) podResourceClaims(pod *v1.Pod) ([]*resourcev1alpha1.ResourceClaim, error) {
 	if !pl.enabled {
 		return nil, nil
 	}
@@ -301,15 +302,15 @@ func (pl *dynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 	}
 	logger := klog.FromContext(ctx)
 
-	// If pod does not reference any claim, we don't need to do anything.
-	claims, err := pl.podHasClaims(pod)
+	claims, err := pl.podResourceClaims(pod)
 	if err != nil {
 		return nil, statusUnschedulable(logger, err.Error())
 	}
 	logger.V(5).Info("pod resource claims", "pod", klog.KObj(pod), "resourceclaims", klog.KObjs(claims))
-	s := &stateData{
-		mutex: new(sync.Mutex),
-	}
+	// If the pod does not reference any claim, we don't need to do
+	// anything for it. We just initialize an empty state to record that
+	// observation for the other functions.
+	s := &stateData{}
 	if len(claims) == 0 {
 		state.Write(stateKey, s)
 		return nil, nil
@@ -322,7 +323,7 @@ func (pl *dynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 			return nil, statusUnschedulable(logger, "unallocated immediate resourceclaim", "pod", klog.KObj(pod), "resourceclaim", klog.KObj(claim))
 		}
 		if claim.Status.DeallocationRequested {
-			// Same here
+			// This will get resolved by the resource driver.
 			return nil, statusUnschedulable(logger, "resourceclaim must be reallocated", "pod", klog.KObj(pod), "resourceclaim", klog.KObj(claim))
 		}
 		if claim.Status.Allocation != nil &&
@@ -378,16 +379,10 @@ func (pl *dynamicResources) Filter(ctx context.Context, cs *framework.CycleState
 
 	logger := klog.FromContext(ctx)
 	node := nodeInfo.Node()
-	if node == nil {
-		return statusError(logger, errors.New("node not found"))
-	}
 
-	// We bail out early here as soon as we know that the pod is unschedulable.
-	// We could also gather all reasons and then report all of them, but that is
-	// more complex.
 	var unavailableClaims []int
 	for index, claim := range state.claims {
-		logger.V(5).Info("filter", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim))
+		logger.V(10).Info("filtering based on resource claims of the pod", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim))
 		switch {
 		case claim.Status.Allocation != nil:
 			if claim.Status.Allocation.AvailableOnNodes != nil {
@@ -422,7 +417,7 @@ func (pl *dynamicResources) Filter(ctx context.Context, cs *framework.CycleState
 					return statusError(logger, fmt.Errorf("potential node filter: %v", err))
 				}
 				if !matches {
-					return statusUnschedulable(logger, "excluded via potential node filter in resource class", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclass", klog.KObj(class))
+					return statusUnschedulable(logger, "excluded by resource class node filter", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclass", klog.KObj(class))
 				}
 			}
 

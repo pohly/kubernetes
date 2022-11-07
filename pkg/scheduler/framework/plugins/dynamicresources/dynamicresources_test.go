@@ -407,18 +407,6 @@ type testContext struct {
 	state     *framework.CycleState
 }
 
-// currentState returns stateData without the fields that we don't want to
-// compare.
-func (tc *testContext) currentState() *stateData {
-	state, err := getStateData(tc.state)
-	if err != nil {
-		return &stateData{}
-	}
-	s := *state
-	s.mutex = nil
-	return &s
-}
-
 func overallResult(in any) result {
 	if in == nil {
 		return result{}
