@@ -60,6 +60,11 @@ type stateData struct {
 	// Empty if the Pod has no claims.
 	claims []*resourcev1alpha1.ResourceClaim
 
+	// The AvailableOnNodes node filters of the claims converted from the
+	// v1 API to nodeaffinity.NodeSelector by PreFilter for repeated
+	// evaluation in Filter. Nil for claims which don't have it.
+	availableOnNodes []*nodeaffinity.NodeSelector
+
 	// The indices of all claims that:
 	// - are allocated
 	// - use delayed allocation
@@ -316,7 +321,8 @@ func (pl *dynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 		return nil, nil
 	}
 
-	for _, claim := range claims {
+	s.availableOnNodes = make([]*nodeaffinity.NodeSelector, len(claims))
+	for index, claim := range claims {
 		if claim.Spec.AllocationMode == resourcev1alpha1.AllocationModeImmediate &&
 			claim.Status.Allocation == nil {
 			// This will get resolved by the resource driver.
@@ -331,6 +337,14 @@ func (pl *dynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 			!resourceclaim.IsReservedForPod(pod, claim) {
 			// Resource is in use. The pod has to wait.
 			return nil, statusUnschedulable(logger, "resourceclaim in use", "pod", klog.KObj(pod), "resourceclaim", klog.KObj(claim))
+		}
+		if claim.Status.Allocation != nil &&
+			claim.Status.Allocation.AvailableOnNodes != nil {
+			nodeSelector, err := nodeaffinity.NewNodeSelector(claim.Status.Allocation.AvailableOnNodes)
+			if err != nil {
+				return nil, statusError(logger, err)
+			}
+			s.availableOnNodes[index] = nodeSelector
 		}
 	}
 
@@ -385,11 +399,7 @@ func (pl *dynamicResources) Filter(ctx context.Context, cs *framework.CycleState
 		logger.V(10).Info("filtering based on resource claims of the pod", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim))
 		switch {
 		case claim.Status.Allocation != nil:
-			if claim.Status.Allocation.AvailableOnNodes != nil {
-				nodeSelector, err := nodeaffinity.NewNodeSelector(claim.Status.Allocation.AvailableOnNodes)
-				if err != nil {
-					return statusError(logger, err)
-				}
+			if nodeSelector := state.availableOnNodes[index]; nodeSelector != nil {
 				if !nodeSelector.Match(node) {
 					logger.V(5).Info("AvailableOnNodes does not match", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim))
 					unavailableClaims = append(unavailableClaims, index)
