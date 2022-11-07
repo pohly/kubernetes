@@ -26,9 +26,9 @@ import (
 
 	cdiapi "github.com/container-orchestrated-devices/container-device-interface/pkg/cdi"
 	specs "github.com/container-orchestrated-devices/container-device-interface/specs-go"
-	"k8s.io/dynamic-resource-allocation/kubeletplugin"
 	"k8s.io/klog/v2"
 	drapbv1 "k8s.io/kubelet/pkg/apis/dra/v1alpha1"
+	"k8s.io/kubernetes/pkg/util/dynamic-resource-allocation/kubeletplugin"
 )
 
 type ExamplePlugin struct {

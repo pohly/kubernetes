@@ -38,12 +38,12 @@ The binary itself is a Cobra command with two operations, `controller` and
 `kubelet-plugin`. Logging is done with [contextual
 logging](https://github.com/kubernetes/enhancements/tree/master/keps/sig-instrumentation/3077-contextual-logging).
 
-The `k8s.io/dynamic-resource-allocation/controller` package implements the
+The `k8s.io/kubernetes/pkg/util/dynamic-resource-allocation/controller` package implements the
 interaction with ResourceClaims. It is generic and relies on an interface to
 implement the actual driver logic. Long-term that part could be split out into
 a reusable utility package.
 
-The `k8s.io/dynamic-resource-allocation/kubelet-plugin` package implements the
+The `k8s.io/kubernetes/pkg/util/dynamic-resource-allocation/kubelet-plugin` package implements the
 interaction with kubelet, again relying only on the interface defined for the
 kubelet<->dynamic resource allocation plugin interaction.
 
