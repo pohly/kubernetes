@@ -199,7 +199,7 @@ func validateAllocationResult(allocation *resource.AllocationResult, fldPath *fi
 	return allErrs
 }
 
-func validateClaimUserReference(ref resource.ResourceClaimUserReference, fldPath *field.Path) field.ErrorList {
+func validateClaimUserReference(ref resource.ResourceClaimConsumerReference, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	// APIGroup is empty for the legacy group.
 	if ref.Resource == "" {

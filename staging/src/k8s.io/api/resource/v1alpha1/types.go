@@ -111,7 +111,7 @@ type ResourceClaimStatus struct {
 	// the future, but not reduced.
 	//
 	// +listType=set
-	ReservedFor []ResourceClaimUserReference `json:"reservedFor,omitempty" protobuf:"bytes,3,opt,name=reservedFor"`
+	ReservedFor []ResourceClaimConsumerReference `json:"reservedFor,omitempty" protobuf:"bytes,3,opt,name=reservedFor"`
 
 	// DeallocationRequested indicates that a ResourceClaim is to be
 	// deallocated.

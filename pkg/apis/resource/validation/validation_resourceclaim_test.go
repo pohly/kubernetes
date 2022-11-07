@@ -392,7 +392,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
 				for i := 0; i < resource.ResourceClaimReservedForMaxSize; i++ {
 					claim.Status.ReservedFor = append(claim.Status.ReservedFor,
-						resource.ResourceClaimUserReference{
+						resource.ResourceClaimConsumerReference{
 							Resource: "pods",
 							Name:     fmt.Sprintf("foo-%d", i),
 							UID:      "1",
@@ -407,7 +407,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 				claim.Status = *validAllocatedClaim.Status.DeepCopy()
 				for i := 0; i < resource.ResourceClaimReservedForMaxSize; i++ {
 					claim.Status.ReservedFor = append(claim.Status.ReservedFor,
-						resource.ResourceClaimUserReference{
+						resource.ResourceClaimConsumerReference{
 							Resource: "pods",
 							Name:     fmt.Sprintf("foo-%d", i),
 							UID:      "1",
@@ -422,7 +422,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
 				for i := 0; i < resource.ResourceClaimReservedForMaxSize+1; i++ {
 					claim.Status.ReservedFor = append(claim.Status.ReservedFor,
-						resource.ResourceClaimUserReference{
+						resource.ResourceClaimConsumerReference{
 							Resource: "pods",
 							Name:     fmt.Sprintf("foo-%d", i),
 							UID:      "1",
@@ -432,7 +432,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			},
 		},
 		"invalid-reserved-for-duplicate": {
-			wantFailures: field.ErrorList{field.Duplicate(field.NewPath("status", "reservedFor").Index(1), resource.ResourceClaimUserReference{
+			wantFailures: field.ErrorList{field.Duplicate(field.NewPath("status", "reservedFor").Index(1), resource.ResourceClaimConsumerReference{
 				Resource: "pods",
 				Name:     "foo",
 				UID:      "1",
@@ -441,7 +441,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
 				for i := 0; i < 2; i++ {
 					claim.Status.ReservedFor = append(claim.Status.ReservedFor,
-						resource.ResourceClaimUserReference{
+						resource.ResourceClaimConsumerReference{
 							Resource: "pods",
 							Name:     "foo",
 							UID:      "1",
@@ -460,7 +460,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
 				for i := 0; i < 2; i++ {
 					claim.Status.ReservedFor = append(claim.Status.ReservedFor,
-						resource.ResourceClaimUserReference{
+						resource.ResourceClaimConsumerReference{
 							Resource: "pods",
 							Name:     fmt.Sprintf("foo-%d", i),
 							UID:      "1",
@@ -474,7 +474,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			oldClaim:     validClaim,
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
 				claim.Status.DriverName = "valid"
-				claim.Status.ReservedFor = []resource.ResourceClaimUserReference{
+				claim.Status.ReservedFor = []resource.ResourceClaimConsumerReference{
 					{
 						Resource: "pods",
 						Name:     "foo",
@@ -488,7 +488,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			wantFailures: field.ErrorList{field.Required(field.NewPath("status", "reservedFor").Index(0).Child("resource"), "")},
 			oldClaim:     validAllocatedClaim,
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
-				claim.Status.ReservedFor = []resource.ResourceClaimUserReference{
+				claim.Status.ReservedFor = []resource.ResourceClaimConsumerReference{
 					{
 						Name: "foo",
 						UID:  "1",
@@ -501,7 +501,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			wantFailures: field.ErrorList{field.Required(field.NewPath("status", "reservedFor").Index(0).Child("name"), "")},
 			oldClaim:     validAllocatedClaim,
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
-				claim.Status.ReservedFor = []resource.ResourceClaimUserReference{
+				claim.Status.ReservedFor = []resource.ResourceClaimConsumerReference{
 					{
 						Resource: "pods",
 						UID:      "1",
@@ -514,7 +514,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			wantFailures: field.ErrorList{field.Required(field.NewPath("status", "reservedFor").Index(0).Child("uid"), "")},
 			oldClaim:     validAllocatedClaim,
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
-				claim.Status.ReservedFor = []resource.ResourceClaimUserReference{
+				claim.Status.ReservedFor = []resource.ResourceClaimConsumerReference{
 					{
 						Resource: "pods",
 						Name:     "foo",
@@ -532,7 +532,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 				return claim
 			}(),
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
-				claim.Status.ReservedFor = []resource.ResourceClaimUserReference{
+				claim.Status.ReservedFor = []resource.ResourceClaimConsumerReference{
 					{
 						Resource: "pods",
 						Name:     "foo",
@@ -550,7 +550,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 				return claim
 			}(),
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
-				claim.Status.ReservedFor = []resource.ResourceClaimUserReference{
+				claim.Status.ReservedFor = []resource.ResourceClaimConsumerReference{
 					{
 						Resource: "pods",
 						Name:     "foo",
@@ -583,7 +583,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			wantFailures: field.ErrorList{field.Forbidden(field.NewPath("status", "deallocationRequested"), "deallocation cannot be requested for claims which are in use")},
 			oldClaim: func() *resource.ResourceClaim {
 				claim := validAllocatedClaim.DeepCopy()
-				claim.Status.ReservedFor = []resource.ResourceClaimUserReference{
+				claim.Status.ReservedFor = []resource.ResourceClaimConsumerReference{
 					{
 						Resource: "pods",
 						Name:     "foo",
