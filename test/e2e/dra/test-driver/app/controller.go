@@ -33,8 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/dynamic-resource-allocation/controller"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/util/dynamic-resource-allocation/controller"
 )
 
 type Resources struct {

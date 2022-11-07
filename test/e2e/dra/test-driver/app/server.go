@@ -46,9 +46,9 @@ import (
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/term"
-	"k8s.io/dynamic-resource-allocation/kubeletplugin"
-	"k8s.io/dynamic-resource-allocation/leaderelection"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/util/dynamic-resource-allocation/kubeletplugin"
+	"k8s.io/kubernetes/pkg/util/dynamic-resource-allocation/leaderelection"
 )
 
 // NewCommand creates a *cobra.Command object with default parameters.
