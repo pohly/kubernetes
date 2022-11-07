@@ -116,14 +116,6 @@ func applyFeatureGates(config *v1beta2.Plugins) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority) {
 		config.Score.Enabled = append(config.Score.Enabled, v1beta2.Plugin{Name: names.VolumeBinding, Weight: pointer.Int32(1)})
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-		config.PreFilter.Enabled = append(config.PreFilter.Enabled, v1beta2.Plugin{Name: names.DynamicResources})
-		config.Filter.Enabled = append(config.Filter.Enabled, v1beta2.Plugin{Name: names.DynamicResources})
-		config.PostFilter.Enabled = append(config.PostFilter.Enabled, v1beta2.Plugin{Name: names.DynamicResources})
-		config.PreScore.Enabled = append(config.PreScore.Enabled, v1beta2.Plugin{Name: names.DynamicResources})
-		config.Reserve.Enabled = append(config.Reserve.Enabled, v1beta2.Plugin{Name: names.DynamicResources})
-		config.PostBind.Enabled = append(config.PostBind.Enabled, v1beta2.Plugin{Name: names.DynamicResources})
-	}
 }
 
 // mergePlugins merges the custom set into the given default one, handling disabled sets.

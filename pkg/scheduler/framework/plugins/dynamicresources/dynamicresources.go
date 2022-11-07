@@ -36,6 +36,7 @@ import (
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
@@ -202,6 +203,7 @@ func statusForClaim(podScheduling *resourcev1alpha1.PodScheduling, podClaimName 
 
 // dynamicResources is a plugin that ensures that ResourceClaims are allocated.
 type dynamicResources struct {
+	enabled             bool
 	clientset           kubernetes.Interface
 	claimLister         resourcev1alpha1listers.ResourceClaimLister
 	classLister         resourcev1alpha1listers.ResourceClassLister
@@ -209,8 +211,9 @@ type dynamicResources struct {
 }
 
 // New initializes a new plugin and returns it.
-func New(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+func New(plArgs runtime.Object, fh framework.Handle, fts feature.Features) (framework.Plugin, error) {
 	return &dynamicResources{
+		enabled:             fts.EnableDynamicResourceAllocation,
 		clientset:           fh.ClientSet(),
 		claimLister:         fh.SharedInformerFactory().Resource().V1alpha1().ResourceClaims().Lister(),
 		classLister:         fh.SharedInformerFactory().Resource().V1alpha1().ResourceClasses().Lister(),
@@ -234,6 +237,10 @@ func (pl *dynamicResources) Name() string {
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
 func (pl *dynamicResources) EventsToRegister() []framework.ClusterEvent {
+	if !pl.enabled {
+		return nil
+	}
+
 	events := []framework.ClusterEvent{
 		// Allocation is tracked in ResourceClaims, so any changes may make the pods schedulable.
 		{Resource: framework.ResourceClaim, ActionType: framework.Add | framework.Update},
@@ -250,6 +257,10 @@ func (pl *dynamicResources) EventsToRegister() []framework.ClusterEvent {
 
 // podHasClaims returns the ResourceClaims for all pod.Spec.PodResourceClaims.
 func (pl *dynamicResources) podHasClaims(pod *v1.Pod) ([]*resourcev1alpha1.ResourceClaim, error) {
+	if !pl.enabled {
+		return nil, nil
+	}
+
 	claims := make([]*resourcev1alpha1.ResourceClaim, 0, len(pod.Spec.ResourceClaims))
 	for _, resource := range pod.Spec.ResourceClaims {
 		claimName := resourceclaim.Name(pod, &resource)
@@ -287,6 +298,9 @@ func (pl *dynamicResources) podHasClaims(pod *v1.Pod) ([]*resourcev1alpha1.Resou
 // immediate claims bound. UnschedulableAndUnresolvable is returned if
 // the pod cannot be scheduled at the moment on any node.
 func (pl *dynamicResources) PreFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+	if !pl.enabled {
+		return nil, nil
+	}
 	logger := klog.FromContext(ctx)
 
 	// If pod does not reference any claim, we don't need to do anything.
@@ -354,6 +368,9 @@ func getStateData(cs *framework.CycleState) (*stateData, error) {
 // For claims that are unbound, it checks whether the claim might get allocated
 // for the node.
 func (pl *dynamicResources) Filter(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+	if !pl.enabled {
+		return nil
+	}
 	state, err := getStateData(cs)
 	if err != nil {
 		return statusError(klog.FromContext(ctx), err)
@@ -444,6 +461,9 @@ func (pl *dynamicResources) Filter(ctx context.Context, cs *framework.CycleState
 // PostFilter checks whether freeing an allocated claim might help to get a Pod
 // schedulable. This only gets called when filtering found no suitable node.
 func (pl *dynamicResources) PostFilter(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, filteredNodeStatusMap framework.NodeToStatusMap) (*framework.PostFilterResult, *framework.Status) {
+	if !pl.enabled {
+		return nil, nil
+	}
 	logger := klog.FromContext(ctx)
 	state, err := getStateData(cs)
 	if err != nil {
@@ -476,6 +496,9 @@ func (pl *dynamicResources) PostFilter(ctx context.Context, cs *framework.CycleS
 // claims are necessarily allocated yet, so here we can set the SuitableNodes
 // field for those which are pending.
 func (pl *dynamicResources) PreScore(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodes []*v1.Node) *framework.Status {
+	if !pl.enabled {
+		return nil
+	}
 	state, err := getStateData(cs)
 	if err != nil {
 		return statusError(klog.FromContext(ctx), err)
@@ -555,6 +578,9 @@ func haveNode(nodeNames []string, nodeName string) bool {
 
 // Reserve reserves claims for the pod.
 func (pl *dynamicResources) Reserve(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
+	if !pl.enabled {
+		return nil
+	}
 	state, err := getStateData(cs)
 	if err != nil {
 		return statusError(klog.FromContext(ctx), err)
@@ -656,6 +682,9 @@ func (pl *dynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 // Unreserve clears the ReservedFor field for all claims.
 // It's idempotent, and does nothing if no state found for the given pod.
 func (pl *dynamicResources) Unreserve(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeName string) {
+	if !pl.enabled {
+		return
+	}
 	state, err := getStateData(cs)
 	if err != nil {
 		return
@@ -694,6 +723,9 @@ func (pl *dynamicResources) Unreserve(ctx context.Context, cs *framework.CycleSt
 // be any retries.  This is okay because it should usually work and in those
 // cases where it doesn't, the garbage collector will eventually clean up.
 func (pl *dynamicResources) PostBind(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeName string) {
+	if !pl.enabled {
+		return
+	}
 	state, err := getStateData(cs)
 	if err != nil {
 		return

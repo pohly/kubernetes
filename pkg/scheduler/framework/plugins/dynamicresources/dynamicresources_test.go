@@ -43,6 +43,7 @@ import (
 	"k8s.io/klog/v2/ktesting"
 	_ "k8s.io/klog/v2/ktesting/init"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 )
 
@@ -574,7 +575,7 @@ func setup(t *testing.T, nodes []*v1.Node, claims []*resourcev1alpha1.ResourceCl
 		t.Fatal(err)
 	}
 
-	pl, err := New(nil, fh)
+	pl, err := New(nil, fh, feature.Features{EnableDynamicResourceAllocation: true})
 	if err != nil {
 		t.Fatal(err)
 	}

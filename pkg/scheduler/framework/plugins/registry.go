@@ -51,6 +51,7 @@ func NewInTreeRegistry() runtime.Registry {
 		EnableMinDomainsInPodTopologySpread:          feature.DefaultFeatureGate.Enabled(features.MinDomainsInPodTopologySpread),
 		EnableNodeInclusionPolicyInPodTopologySpread: feature.DefaultFeatureGate.Enabled(features.NodeInclusionPolicyInPodTopologySpread),
 		EnableMatchLabelKeysInPodTopologySpread:      feature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpread),
+		EnableDynamicResourceAllocation:              feature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation),
 	}
 
 	registry := runtime.Registry{
@@ -75,10 +76,7 @@ func NewInTreeRegistry() runtime.Registry {
 		queuesort.Name:                       queuesort.New,
 		defaultbinder.Name:                   defaultbinder.New,
 		defaultpreemption.Name:               runtime.FactoryAdapter(fts, defaultpreemption.New),
-	}
-
-	if feature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-		registry[dynamicresources.Name] = dynamicresources.New
+		dynamicresources.Name:                runtime.FactoryAdapter(fts, dynamicresources.New),
 	}
 
 	return registry
