@@ -706,8 +706,8 @@ func (ctrl *controller) syncPodScheduling(ctx context.Context, podScheduling *re
 			// Add new entry.
 			podScheduling.Status.ResourceClaims = append(podScheduling.Status.ResourceClaims,
 				resourcev1alpha1.ResourceClaimSchedulingStatus{
-					PodClaimName: delayed.PodClaimName,
-					UnsuitableNodes:      delayed.UnsuitableNodes,
+					PodClaimName:    delayed.PodClaimName,
+					UnsuitableNodes: delayed.UnsuitableNodes,
 				})
 			modified = true
 		} else if stringsDiffer(podScheduling.Status.ResourceClaims[i].UnsuitableNodes, delayed.UnsuitableNodes) {
@@ -742,6 +742,7 @@ func (claims claimAllocations) MarshalLog() interface{} {
 
 var _ logr.Marshaler = claimAllocations{}
 
+// findClaim returns the index of the specified pod claim, -1 if not found.
 func findClaim(claims []resourcev1alpha1.ResourceClaimSchedulingStatus, podClaimName string) int {
 	for i := range claims {
 		if claims[i].PodClaimName == podClaimName {
@@ -751,6 +752,7 @@ func findClaim(claims []resourcev1alpha1.ResourceClaimSchedulingStatus, podClaim
 	return -1
 }
 
+// hasString checks for a string in a slice.
 func hasString(strings []string, str string) bool {
 	for _, s := range strings {
 		if s == str {
@@ -773,6 +775,7 @@ func stringsDiffer(a, b []string) bool {
 	return false
 }
 
+// hasFinalizer checks if the claim has the finalizer of the driver.
 func (ctrl *controller) hasFinalizer(claim *resourcev1alpha1.ResourceClaim) bool {
 	for _, finalizer := range claim.Finalizers {
 		if finalizer == ctrl.finalizer {
@@ -782,6 +785,7 @@ func (ctrl *controller) hasFinalizer(claim *resourcev1alpha1.ResourceClaim) bool
 	return false
 }
 
+// removeFinalizer creates a new slice without the finalizer of the driver.
 func (ctrl *controller) removeFinalizer(in []string) []string {
 	out := make([]string, 0, len(in))
 	for _, finalizer := range in {
