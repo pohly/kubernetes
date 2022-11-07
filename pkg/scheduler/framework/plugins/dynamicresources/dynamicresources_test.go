@@ -415,7 +415,6 @@ func (tc *testContext) currentState() *stateData {
 		return &stateData{}
 	}
 	s := *state
-	s.clientset = nil
 	s.mutex = nil
 	return &s
 }

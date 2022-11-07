@@ -51,8 +51,6 @@ const (
 // framework.CycleState, in the later phases we don't need to call Write method
 // to update the value
 type stateData struct {
-	clientset kubernetes.Interface
-
 	// A copy of all claims for the Pod (i.e. 1:1 match with
 	// pod.Spec.ResourceClaims), initially with the status from the start
 	// of the scheduling cycle. Each claim instance is read-only because it
@@ -90,10 +88,10 @@ func (d *stateData) Clone() framework.StateData {
 	return d
 }
 
-func (d *stateData) updateClaimStatus(ctx context.Context, index int, claim *resourcev1alpha1.ResourceClaim) error {
+func (d *stateData) updateClaimStatus(ctx context.Context, clientset kubernetes.Interface, index int, claim *resourcev1alpha1.ResourceClaim) error {
 	// TODO (?): replace with patch operation. Beware that patching must only succeed if the
 	// object has not been modified in parallel by someone else.
-	claim, err := d.clientset.ResourceV1alpha1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
+	claim, err := clientset.ResourceV1alpha1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
 	// TODO: metric for update results, with the operation ("set selected
 	// node", "set PotentialNodes", etc.) as one dimension.
 	if err != nil {
@@ -153,7 +151,7 @@ func (d *stateData) initializePodScheduling(ctx context.Context, pod *v1.Pod, po
 }
 
 // publishPodScheduling creates or updates the PodScheduling object.
-func (d *stateData) publishPodScheduling(ctx context.Context, podScheduling *resourcev1alpha1.PodScheduling) error {
+func (d *stateData) publishPodScheduling(ctx context.Context, clientset kubernetes.Interface, podScheduling *resourcev1alpha1.PodScheduling) error {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
@@ -170,10 +168,10 @@ func (d *stateData) publishPodScheduling(ctx context.Context, podScheduling *res
 		logger.V(5).Info(msg, "podscheduling", klog.KObj(podScheduling))
 	}
 	if podScheduling.UID == "" {
-		podScheduling, err = d.clientset.ResourceV1alpha1().PodSchedulings(podScheduling.Namespace).Create(ctx, podScheduling, metav1.CreateOptions{})
+		podScheduling, err = clientset.ResourceV1alpha1().PodSchedulings(podScheduling.Namespace).Create(ctx, podScheduling, metav1.CreateOptions{})
 	} else {
 		// TODO: patch here to avoid racing with drivers which update the status.
-		podScheduling, err = d.clientset.ResourceV1alpha1().PodSchedulings(podScheduling.Namespace).Update(ctx, podScheduling, metav1.UpdateOptions{})
+		podScheduling, err = clientset.ResourceV1alpha1().PodSchedulings(podScheduling.Namespace).Update(ctx, podScheduling, metav1.UpdateOptions{})
 	}
 	if err != nil {
 		return err
@@ -335,7 +333,6 @@ func (pl *dynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 		}
 	}
 
-	s.clientset = pl.clientset
 	s.claims = claims
 	state.Write(stateKey, s)
 	return nil, nil
@@ -483,7 +480,7 @@ func (pl *dynamicResources) PostFilter(ctx context.Context, cs *framework.CycleS
 			claim.Status.DeallocationRequested = true
 			claim.Status.ReservedFor = nil
 			logger.V(5).Info("reallocate", "pod", klog.KObj(pod), "resourceclaim", klog.KObj(claim))
-			if err := state.updateClaimStatus(ctx, index, claim); err != nil {
+			if err := state.updateClaimStatus(ctx, pl.clientset, index, claim); err != nil {
 				return nil, statusError(logger, err)
 			}
 			break
@@ -656,7 +653,7 @@ func (pl *dynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 		podScheduling = podScheduling.DeepCopy()
 		podScheduling.Spec.SelectedNode = nodeName
 		logger.V(5).Info("start allocation", "pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName})
-		if err := state.publishPodScheduling(ctx, podScheduling); err != nil {
+		if err := state.publishPodScheduling(ctx, pl.clientset, podScheduling); err != nil {
 			return statusError(logger, err)
 		}
 		return statusUnschedulable(logger, "waiting for resource driver to allocate resource", "pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName})
@@ -664,7 +661,7 @@ func (pl *dynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 
 	// May have been modified earlier in PreScore or above.
 	if podSchedulingDirty {
-		if err := state.publishPodScheduling(ctx, podScheduling); err != nil {
+		if err := state.publishPodScheduling(ctx, pl.clientset, podScheduling); err != nil {
 			return statusError(logger, err)
 		}
 	}
@@ -708,7 +705,7 @@ func (pl *dynamicResources) Unreserve(ctx context.Context, cs *framework.CycleSt
 			}
 			claim.Status.ReservedFor = reservedFor
 			logger.V(5).Info("unreserve", "resourceclaim", klog.KObj(claim))
-			if err := state.updateClaimStatus(ctx, index, claim); err != nil {
+			if err := state.updateClaimStatus(ctx, pl.clientset, index, claim); err != nil {
 				// We will get here again when pod scheduling
 				// is retried.
 				logger.Error(err, "unreserve", "resourceclaim", klog.KObj(claim))
