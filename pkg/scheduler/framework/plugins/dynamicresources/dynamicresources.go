@@ -472,7 +472,7 @@ func (pl *dynamicResources) PostFilter(ctx context.Context, cs *framework.CycleS
 		return nil, statusError(logger, err)
 	}
 	if len(state.claims) == 0 {
-		return nil, nil
+		return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, "nothing done, no claims")
 	}
 
 	// Iterating over a map is random. This is intentional here, we want to
@@ -484,14 +484,14 @@ func (pl *dynamicResources) PostFilter(ctx context.Context, cs *framework.CycleS
 			claim := state.claims[index].DeepCopy()
 			claim.Status.DeallocationRequested = true
 			claim.Status.ReservedFor = nil
-			logger.V(5).Info("reallocate", "pod", klog.KObj(pod), "resourceclaim", klog.KObj(claim))
+			logger.V(5).Info("Requesting deallocation of ResourceClaim", "pod", klog.KObj(pod), "resourceclaim", klog.KObj(claim))
 			if err := state.updateClaimStatus(ctx, pl.clientset, index, claim); err != nil {
 				return nil, statusError(logger, err)
 			}
-			break
+			return nil, nil
 		}
 	}
-	return nil, nil
+	return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, "still not schedulable")
 }
 
 // PreScore is passed a list of all nodes that would fit the pod. Not all
