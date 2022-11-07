@@ -656,6 +656,12 @@ func (pl *dynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 	// making a decision that might have to be reversed later.
 	if pending == 1 || infos == pending {
 		podScheduling = podScheduling.DeepCopy()
+		// TODO: can we increase the chance that the scheduler picks
+		// the same node as before when allocation is on-going,
+		// assuming that that node still fits the pod?  Picking a
+		// different node may lead to some claims being allocated for
+		// one node and others for another, which then would have to be
+		// resolved with deallocation.
 		podScheduling.Spec.SelectedNode = nodeName
 		logger.V(5).Info("start allocation", "pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName})
 		if err := state.publishPodScheduling(ctx, pl.clientset, podScheduling); err != nil {
