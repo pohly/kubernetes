@@ -27,7 +27,6 @@ import (
 type AllocationResultApplyConfiguration struct {
 	ResourceHandle   *string                            `json:"resourceHandle,omitempty"`
 	AvailableOnNodes *v1.NodeSelectorApplyConfiguration `json:"availableOnNodes,omitempty"`
-	Shareable        *bool                              `json:"shareable,omitempty"`
 }
 
 // AllocationResultApplyConfiguration constructs an declarative configuration of the AllocationResult type for use with
@@ -49,13 +48,5 @@ func (b *AllocationResultApplyConfiguration) WithResourceHandle(value string) *A
 // If called multiple times, the AvailableOnNodes field is set to the value of the last call.
 func (b *AllocationResultApplyConfiguration) WithAvailableOnNodes(value *v1.NodeSelectorApplyConfiguration) *AllocationResultApplyConfiguration {
 	b.AvailableOnNodes = value
-	return b
-}
-
-// WithShareable sets the Shareable field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Shareable field is set to the value of the last call.
-func (b *AllocationResultApplyConfiguration) WithShareable(value bool) *AllocationResultApplyConfiguration {
-	b.Shareable = &value
 	return b
 }

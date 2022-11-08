@@ -47,10 +47,6 @@ message AllocationResult {
   // Setting this field is optional. If null, the resource is available
   // everywhere.
   optional k8s.io.api.core.v1.NodeSelector availableOnNodes = 2;
-
-  // Shareable determines whether the resource supports more
-  // than one consumer at a time.
-  optional bool shareable = 3;
 }
 
 // PodScheduling objects hold information that is needed to schedule

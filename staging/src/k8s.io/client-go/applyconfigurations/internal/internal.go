@@ -11439,9 +11439,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: resourceHandle
       type:
         scalar: string
-    - name: shareable
-      type:
-        scalar: boolean
 - name: io.k8s.api.resource.v1alpha1.PodScheduling
   map:
     fields:
