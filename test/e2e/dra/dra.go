@@ -45,9 +45,7 @@ const (
 )
 
 func networkResources() app.Resources {
-	return app.Resources{
-		Shareable: true,
-	}
+	return app.Resources{}
 }
 
 var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", func() {
@@ -192,32 +190,6 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 				b.create(ctx, parameters, b.externalClaim(allocationMode), pod)
 
 				b.testPod(f.ClientSet, pod)
-			})
-
-			ginkgo.It("supports external claim referenced by multiple pods", func() {
-				parameters := b.parameters()
-				pod1 := b.podExternal()
-				pod2 := b.podExternal()
-				pod3 := b.podExternal()
-				claim := b.externalClaim(allocationMode)
-				b.create(ctx, parameters, claim, pod1, pod2, pod3)
-
-				for _, pod := range []*v1.Pod{pod1, pod2, pod3} {
-					b.testPod(f.ClientSet, pod)
-				}
-			})
-
-			ginkgo.It("supports external claim referenced by multiple containers of multiple pods", func() {
-				parameters := b.parameters()
-				pod1 := b.podExternalMultiple()
-				pod2 := b.podExternalMultiple()
-				pod3 := b.podExternalMultiple()
-				claim := b.externalClaim(allocationMode)
-				b.create(ctx, parameters, claim, pod1, pod2, pod3)
-
-				for _, pod := range []*v1.Pod{pod1, pod2, pod3} {
-					b.testPod(f.ClientSet, pod)
-				}
 			})
 		}
 

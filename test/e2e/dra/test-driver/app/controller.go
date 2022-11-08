@@ -41,7 +41,6 @@ type Resources struct {
 	NodeLocal      bool
 	Nodes          []string
 	MaxAllocations int
-	Shareable      bool
 
 	// AllocateWrapper, if set, gets called for each Allocate call.
 	AllocateWrapper AllocateWrapperType
@@ -210,9 +209,7 @@ func (c *ExampleController) allocate(ctx context.Context, claim *resourcev1alpha
 		}
 	}
 
-	allocation := &resourcev1alpha1.AllocationResult{
-		Shareable: c.resources.Shareable,
-	}
+	allocation := &resourcev1alpha1.AllocationResult{}
 	p := parameters{
 		EnvVars:  make(map[string]string),
 		NodeName: node,
