@@ -51,7 +51,6 @@ func getDefaultPlugins() *v1.Plugins {
 				{Name: names.NodeResourcesBalancedAllocation, Weight: pointer.Int32(1)},
 				{Name: names.ImageLocality, Weight: pointer.Int32(1)},
 				{Name: names.DefaultBinder},
-				{Name: names.DynamicResources},
 			},
 		},
 	}
@@ -63,6 +62,9 @@ func getDefaultPlugins() *v1.Plugins {
 func applyFeatureGates(config *v1.Plugins) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodSchedulingReadiness) {
 		config.MultiPoint.Enabled = append(config.MultiPoint.Enabled, v1.Plugin{Name: names.SchedulingGates})
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+		config.MultiPoint.Enabled = append(config.MultiPoint.Enabled, v1.Plugin{Name: names.DynamicResources})
 	}
 }
 
