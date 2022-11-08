@@ -172,9 +172,10 @@ func (ec *Controller) enqueuePod(obj interface{}, deleted bool) {
 
 	// Release reservations of a deleted or completed pod?
 	if deleted ||
-		pod.DeletionTimestamp != nil && pod.DeletionGracePeriodSeconds != nil && *pod.DeletionGracePeriodSeconds == 0 ||
 		pod.Status.Phase == v1.PodFailed ||
-		pod.Status.Phase == v1.PodSucceeded {
+		pod.Status.Phase == v1.PodSucceeded ||
+		// Deleted and not scheduled:
+		pod.DeletionTimestamp != nil && pod.Spec.NodeName == "" {
 		for _, podClaim := range pod.Spec.ResourceClaims {
 			claimName := resourceclaim.Name(pod, &podClaim)
 			ec.queue.Add(claimKeyPrefix + pod.Namespace + "/" + claimName)
@@ -313,7 +314,7 @@ func (ec *Controller) syncPod(ctx context.Context, namespace, name string) error
 
 	for _, podClaim := range pod.Spec.ResourceClaims {
 		if err := ec.handleClaim(ctx, pod, podClaim); err != nil {
-			ec.recorder.Event(pod, v1.EventTypeWarning, "ResourceClaimCreation", fmt.Sprintf("PodResourceClaim %s: %v", podClaim.Name, err))
+			ec.recorder.Event(pod, v1.EventTypeWarning, "FailedResourceClaimCreation", fmt.Sprintf("PodResourceClaim %s: %v", podClaim.Name, err))
 			return fmt.Errorf("pod %s/%s, PodResourceClaim %s: %v", namespace, name, podClaim.Name, err)
 		}
 	}
@@ -402,14 +403,20 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 			// - not in our cache, not seen -> double-check with API server before removal
 
 			keepEntry := true
+
+			// Tracking deleted pods in the LRU cache is an
+			// optimization. Without this cache, the code would
+			// have to do the API call below for every deleted pod
+			// to ensure that the pod really doesn't exist. With
+			// the cache, most of the time the pod will be recorded
+			// as deleted and the API call can be avoided.
 			if ec.deletedObjects.Has(reservedFor.UID) {
 				// We know that the pod was deleted. This is
 				// easy to check and thus is done first.
 				keepEntry = false
 			} else {
 				pod, err := ec.podLister.Pods(claim.Namespace).Get(reservedFor.Name)
-				notFound := errors.IsNotFound(err)
-				if err != nil && !notFound {
+				if err != nil && !errors.IsNotFound(err) {
 					return err
 				}
 				if pod == nil {
@@ -442,7 +449,7 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 	}
 
 	if len(valid) < len(claim.Status.ReservedFor) {
-		// TODO: patch
+		// TODO (#113700): patch
 		claim := claim.DeepCopy()
 		claim.Status.ReservedFor = valid
 		_, err := ec.kubeClient.ResourceV1alpha1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
