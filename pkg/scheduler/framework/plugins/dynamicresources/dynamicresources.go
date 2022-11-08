@@ -163,9 +163,9 @@ func (d *stateData) publishPodScheduling(ctx context.Context, clientset kubernet
 
 	var err error
 	logger := klog.FromContext(ctx)
-	msg := "updating PodScheduling"
+	msg := "Updating PodScheduling"
 	if podScheduling.UID == "" {
-		msg = "creating PodScheduling"
+		msg = "Creating PodScheduling"
 	}
 	if loggerV := logger.V(6); loggerV.Enabled() {
 		// At a high enough log level, dump the entire object.
@@ -598,8 +598,8 @@ func (pl *dynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 		return nil
 	}
 
-	pending := 0
-	infos := 0
+	numDelayedAllocationPending := 0
+	numClaimsWithStatusInfo := 0
 	logger := klog.FromContext(ctx)
 	podScheduling, err := state.initializePodScheduling(ctx, pod, pl.podSchedulingLister)
 	if err != nil {
@@ -630,17 +630,17 @@ func (pl *dynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 			// it.
 		} else {
 			// Must be delayed allocation.
-			pending++
+			numDelayedAllocationPending++
 
 			// Did the driver provide information that steered node
 			// selection towards a node that it can support?
 			if statusForClaim(podScheduling, pod.Spec.ResourceClaims[index].Name) != nil {
-				infos++
+				numClaimsWithStatusInfo++
 			}
 		}
 	}
 
-	if pending == 0 {
+	if numDelayedAllocationPending == 0 {
 		// Nothing left to do.
 		return nil
 	}
@@ -661,7 +661,7 @@ func (pl *dynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 	// requesting allocation even when we don't have the information from
 	// the driver yet. Otherwise we wait for information before blindly
 	// making a decision that might have to be reversed later.
-	if pending == 1 || infos == pending {
+	if numDelayedAllocationPending == 1 || numClaimsWithStatusInfo == numDelayedAllocationPending {
 		podScheduling = podScheduling.DeepCopy()
 		// TODO: can we increase the chance that the scheduler picks
 		// the same node as before when allocation is on-going,

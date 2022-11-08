@@ -60,26 +60,128 @@ var (
 
 	resourceClass = toResourceClass(resourcev1alpha1ac.ResourceClass(className))
 
-	podWithClaimName      = toPod(corev1ac.Pod(podName, namespace).WithUID(podUID).WithSpec(corev1ac.PodSpec().WithResourceClaims(corev1ac.PodResourceClaim().WithName(resourceName).WithSource(corev1ac.ClaimSource().WithResourceClaimName(claimName)))))
-	otherPodWithClaimName = toPod(corev1ac.Pod(podName, namespace).WithUID(podUID + "-II").WithSpec(corev1ac.PodSpec().WithResourceClaims(corev1ac.PodResourceClaim().WithName(resourceName).WithSource(corev1ac.ClaimSource().WithResourceClaimName(claimName)))))
-	podWithClaimTemplate  = toPod(corev1ac.Pod(podName, namespace).WithUID(podUID).WithSpec(corev1ac.PodSpec().WithResourceClaims(corev1ac.PodResourceClaim().WithName(resourceName).WithSource(corev1ac.ClaimSource().WithResourceClaimTemplateName(templateName)))))
-	podWithTwoClaimNames  = toPod(corev1ac.Pod(podName, namespace).WithUID(podUID).WithSpec(corev1ac.PodSpec().WithResourceClaims(corev1ac.PodResourceClaim().WithName(resourceName).WithSource(corev1ac.ClaimSource().WithResourceClaimName(claimName)), corev1ac.PodResourceClaim().WithName(resourceName2).WithSource(corev1ac.ClaimSource().WithResourceClaimName(claimName2)))))
+	podWithClaimName = toPod(corev1ac.Pod(podName, namespace).
+				WithUID(podUID).
+				WithSpec(corev1ac.PodSpec().
+					WithResourceClaims(corev1ac.PodResourceClaim().
+						WithName(resourceName).
+						WithSource(corev1ac.ClaimSource().
+							WithResourceClaimName(claimName)))))
+	otherPodWithClaimName = toPod(corev1ac.Pod(podName, namespace).
+				WithUID(podUID + "-II").
+				WithSpec(corev1ac.PodSpec().
+					WithResourceClaims(corev1ac.PodResourceClaim().
+						WithName(resourceName).
+						WithSource(corev1ac.ClaimSource().
+							WithResourceClaimName(claimName)))))
+	podWithClaimTemplate = toPod(corev1ac.Pod(podName, namespace).
+				WithUID(podUID).
+				WithSpec(corev1ac.PodSpec().
+					WithResourceClaims(corev1ac.PodResourceClaim().
+						WithName(resourceName).
+						WithSource(corev1ac.ClaimSource().
+							WithResourceClaimTemplateName(templateName)))))
+	podWithTwoClaimNames = toPod(corev1ac.Pod(podName, namespace).
+				WithUID(podUID).
+				WithSpec(corev1ac.PodSpec().
+					WithResourceClaims(
+				corev1ac.PodResourceClaim().
+					WithName(resourceName).
+					WithSource(corev1ac.ClaimSource().
+						WithResourceClaimName(claimName)),
+				corev1ac.PodResourceClaim().
+					WithName(resourceName2).
+					WithSource(corev1ac.ClaimSource().
+						WithResourceClaimName(claimName2)))))
 
-	workerNode = toNode(corev1ac.Node("worker").WithLabels(map[string]string{"nodename": "worker"}))
+	workerNode = toNode(corev1ac.Node("worker").
+			WithLabels(map[string]string{"nodename": "worker"}))
 
-	pendingImmediateClaim           = toResourceClaim(resourcev1alpha1ac.ResourceClaim(claimName, namespace).WithSpec(resourcev1alpha1ac.ResourceClaimSpec().WithAllocationMode(resourcev1alpha1.AllocationModeImmediate).WithResourceClassName(className)))
-	pendingDelayedClaim             = toResourceClaim(resourcev1alpha1ac.ResourceClaim(claimName, namespace).WithSpec(resourcev1alpha1ac.ResourceClaimSpec().WithAllocationMode(resourcev1alpha1.AllocationModeWaitForFirstConsumer).WithResourceClassName(className)))
-	pendingDelayedClaim2            = toResourceClaim(resourcev1alpha1ac.ResourceClaim(claimName2, namespace).WithSpec(resourcev1alpha1ac.ResourceClaimSpec().WithAllocationMode(resourcev1alpha1.AllocationModeWaitForFirstConsumer).WithResourceClassName(className)))
-	deallocatingClaim               = toResourceClaim(resourcev1alpha1ac.ResourceClaim(claimName, namespace).WithStatus(resourcev1alpha1ac.ResourceClaimStatus().WithAllocation(resourcev1alpha1ac.AllocationResult()).WithDeallocationRequested(true)))
-	inUseClaim                      = toResourceClaim(resourcev1alpha1ac.ResourceClaim(claimName, namespace).WithStatus(resourcev1alpha1ac.ResourceClaimStatus().WithAllocation(resourcev1alpha1ac.AllocationResult()).WithReservedFor(resourcev1alpha1ac.ResourceClaimConsumerReference().WithUID(podUID))))
-	allocatedClaim                  = toResourceClaim(resourcev1alpha1ac.ResourceClaim(claimName, namespace).WithOwnerReferences(metav1ac.OwnerReference().WithUID(podUID).WithController(true)).WithStatus(resourcev1alpha1ac.ResourceClaimStatus().WithAllocation(resourcev1alpha1ac.AllocationResult())))
-	allocatedClaimWithWrongTopology = toResourceClaim(resourcev1alpha1ac.ResourceClaim(claimName, namespace).WithOwnerReferences(metav1ac.OwnerReference().WithUID(podUID).WithController(true)).WithStatus(resourcev1alpha1ac.ResourceClaimStatus().WithAllocation(resourcev1alpha1ac.AllocationResult().WithAvailableOnNodes(corev1ac.NodeSelector().WithNodeSelectorTerms(corev1ac.NodeSelectorTerm().WithMatchExpressions(corev1ac.NodeSelectorRequirement().WithKey("no-such-label").WithOperator(v1.NodeSelectorOpIn).WithValues("no-such-value")))))))
-	allocatedClaimWithGoodTopology  = toResourceClaim(resourcev1alpha1ac.ResourceClaim(claimName, namespace).WithOwnerReferences(metav1ac.OwnerReference().WithUID(podUID).WithController(true)).WithStatus(resourcev1alpha1ac.ResourceClaimStatus().WithAllocation(resourcev1alpha1ac.AllocationResult().WithAvailableOnNodes(corev1ac.NodeSelector().WithNodeSelectorTerms(corev1ac.NodeSelectorTerm().WithMatchExpressions(corev1ac.NodeSelectorRequirement().WithKey("nodename").WithOperator(v1.NodeSelectorOpIn).WithValues("worker")))))))
-	otherClaim                      = toResourceClaim(resourcev1alpha1ac.ResourceClaim("not-my-claim", namespace))
+	pendingImmediateClaim = toResourceClaim(resourcev1alpha1ac.ResourceClaim(claimName, namespace).
+				WithSpec(resourcev1alpha1ac.ResourceClaimSpec().
+					WithAllocationMode(resourcev1alpha1.AllocationModeImmediate).
+					WithResourceClassName(className)))
+	pendingDelayedClaim = toResourceClaim(resourcev1alpha1ac.ResourceClaim(claimName, namespace).
+				WithSpec(resourcev1alpha1ac.ResourceClaimSpec().
+					WithAllocationMode(resourcev1alpha1.AllocationModeWaitForFirstConsumer).
+					WithResourceClassName(className)))
+	pendingDelayedClaim2 = toResourceClaim(resourcev1alpha1ac.ResourceClaim(claimName2, namespace).
+				WithSpec(resourcev1alpha1ac.ResourceClaimSpec().
+					WithAllocationMode(resourcev1alpha1.AllocationModeWaitForFirstConsumer).
+					WithResourceClassName(className)))
+	deallocatingClaim = toResourceClaim(resourcev1alpha1ac.ResourceClaim(claimName, namespace).
+				WithStatus(resourcev1alpha1ac.ResourceClaimStatus().
+					WithAllocation(resourcev1alpha1ac.AllocationResult()).
+					WithDeallocationRequested(true)))
+	inUseClaim = toResourceClaim(resourcev1alpha1ac.ResourceClaim(claimName, namespace).
+			WithStatus(resourcev1alpha1ac.ResourceClaimStatus().
+				WithAllocation(resourcev1alpha1ac.AllocationResult()).
+				WithReservedFor(resourcev1alpha1ac.ResourceClaimConsumerReference().
+					WithUID(podUID))))
+	allocatedClaim = toResourceClaim(resourcev1alpha1ac.ResourceClaim(claimName, namespace).
+			WithOwnerReferences(metav1ac.OwnerReference().
+				WithUID(podUID).
+				WithController(true)).
+			WithStatus(resourcev1alpha1ac.ResourceClaimStatus().
+				WithAllocation(resourcev1alpha1ac.AllocationResult())))
+	allocatedClaimWithWrongTopology = toResourceClaim(resourcev1alpha1ac.ResourceClaim(claimName, namespace).
+					WithOwnerReferences(metav1ac.OwnerReference().
+						WithUID(podUID).
+						WithController(true)).
+					WithStatus(resourcev1alpha1ac.ResourceClaimStatus().
+						WithAllocation(resourcev1alpha1ac.AllocationResult().
+							WithAvailableOnNodes(corev1ac.NodeSelector().
+								WithNodeSelectorTerms(corev1ac.NodeSelectorTerm().
+									WithMatchExpressions(corev1ac.NodeSelectorRequirement().
+										WithKey("no-such-label").
+										WithOperator(v1.NodeSelectorOpIn).
+										WithValues("no-such-value")))))))
+	allocatedClaimWithGoodTopology = toResourceClaim(resourcev1alpha1ac.ResourceClaim(claimName, namespace).
+					WithOwnerReferences(metav1ac.OwnerReference().
+						WithUID(podUID).
+						WithController(true)).
+					WithStatus(resourcev1alpha1ac.ResourceClaimStatus().
+						WithAllocation(resourcev1alpha1ac.AllocationResult().
+							WithAvailableOnNodes(corev1ac.NodeSelector().
+								WithNodeSelectorTerms(corev1ac.NodeSelectorTerm().
+									WithMatchExpressions(corev1ac.NodeSelectorRequirement().
+										WithKey("nodename").
+										WithOperator(v1.NodeSelectorOpIn).
+										WithValues("worker")))))))
+	otherClaim = toResourceClaim(resourcev1alpha1ac.ResourceClaim("not-my-claim", namespace))
 
-	schedulingSelectedPotential = toPodScheduling(resourcev1alpha1ac.PodScheduling(podName, namespace).WithOwnerReferences(metav1ac.OwnerReference().WithAPIVersion("v1").WithController(true).WithKind("Pod").WithName(podName).WithUID(podUID)).WithSpec(resourcev1alpha1ac.PodSchedulingSpec().WithSelectedNode(workerNode.Name).WithPotentialNodes(workerNode.Name)))
-	schedulingPotential         = toPodScheduling(resourcev1alpha1ac.PodScheduling(podName, namespace).WithOwnerReferences(metav1ac.OwnerReference().WithAPIVersion("v1").WithController(true).WithKind("Pod").WithName(podName).WithUID(podUID)).WithSpec(resourcev1alpha1ac.PodSchedulingSpec().WithPotentialNodes(workerNode.Name)))
-	schedulingInfo              = toPodScheduling(resourcev1alpha1ac.PodScheduling(podName, namespace).WithOwnerReferences(metav1ac.OwnerReference().WithAPIVersion("v1").WithController(true).WithKind("Pod").WithName(podName).WithUID(podUID)).WithSpec(resourcev1alpha1ac.PodSchedulingSpec().WithPotentialNodes(workerNode.Name)).WithStatus(resourcev1alpha1ac.PodSchedulingStatus().WithResourceClaims(resourcev1alpha1ac.ResourceClaimSchedulingStatus().WithName(resourceName), resourcev1alpha1ac.ResourceClaimSchedulingStatus().WithName(resourceName2))))
+	schedulingSelectedPotential = toPodScheduling(resourcev1alpha1ac.PodScheduling(podName, namespace).
+					WithOwnerReferences(metav1ac.OwnerReference().
+						WithAPIVersion("v1").
+						WithController(true).
+						WithKind("Pod").
+						WithName(podName).
+						WithUID(podUID)).
+					WithSpec(resourcev1alpha1ac.PodSchedulingSpec().
+						WithSelectedNode(workerNode.Name).
+						WithPotentialNodes(workerNode.Name)))
+	schedulingPotential = toPodScheduling(resourcev1alpha1ac.PodScheduling(podName, namespace).
+				WithOwnerReferences(metav1ac.OwnerReference().
+					WithAPIVersion("v1").
+					WithController(true).
+					WithKind("Pod").
+					WithName(podName).
+					WithUID(podUID)).
+				WithSpec(resourcev1alpha1ac.PodSchedulingSpec().
+					WithPotentialNodes(workerNode.Name)))
+	schedulingInfo = toPodScheduling(resourcev1alpha1ac.PodScheduling(podName, namespace).
+			WithOwnerReferences(metav1ac.OwnerReference().
+				WithAPIVersion("v1").
+				WithController(true).
+				WithKind("Pod").
+				WithName(podName).
+				WithUID(podUID)).
+			WithSpec(resourcev1alpha1ac.PodSchedulingSpec().
+				WithPotentialNodes(workerNode.Name)).
+			WithStatus(resourcev1alpha1ac.PodSchedulingStatus().
+				WithResourceClaims(resourcev1alpha1ac.ResourceClaimSchedulingStatus().
+					WithName(resourceName), resourcev1alpha1ac.ResourceClaimSchedulingStatus().
+					WithName(resourceName2))))
 )
 
 // result defines the expected outcome of some operation. It covers return
