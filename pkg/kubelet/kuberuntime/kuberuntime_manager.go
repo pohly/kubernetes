@@ -762,6 +762,14 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		// When runc supports slash as sysctl separator, this function can no longer be used.
 		sysctl.ConvertPodSysctlsVariableToDotsSeparator(pod.Spec.SecurityContext)
 
+		// Prepare resources for all pod containers
+		for _, container := range append(pod.Spec.InitContainers[:], pod.Spec.Containers...) {
+			err := m.runtimeHelper.PrepareResources(pod, &container)
+			if err != nil {
+				return
+			}
+		}
+
 		podSandboxID, msg, err = m.createPodSandbox(ctx, pod, podContainerChanges.Attempt)
 		if err != nil {
 			// createPodSandbox can return an error from CNI, CSI,

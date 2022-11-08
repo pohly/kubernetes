@@ -72,11 +72,11 @@ func generateCDIAnnotations(
 	return kubeAnnotations, nil
 }
 
-// prepareContainerResources attempts to prepare all of required resource
+// PrepareResources attempts to prepare all of required resource
 // plugin resources for the input container, issue an NodePrepareResource rpc request
 // for each new resource requirement, process their responses and update the cached
 // containerResources on success.
-func (m *ManagerImpl) prepareContainerResources(pod *v1.Pod, container *v1.Container) error {
+func (m *ManagerImpl) PrepareResources(pod *v1.Pod, container *v1.Container) error {
 	// Process resources for each resource claim referenced by container
 	for range container.Resources.Claims {
 		for i, podResourceClaim := range pod.Spec.ResourceClaims {
@@ -158,9 +158,9 @@ func (m *ManagerImpl) prepareContainerResources(pod *v1.Pod, container *v1.Conta
 	return nil
 }
 
-// getContainerInfo gets a container info from the claimInfo cache.
+// GetResources gets a container info from the claimInfo cache.
 // This information is used by the caller to update a container config.
-func (m *ManagerImpl) getContainerInfo(pod *v1.Pod, container *v1.Container) (*ContainerInfo, error) {
+func (m *ManagerImpl) GetResources(pod *v1.Pod, container *v1.Container) (*ContainerInfo, error) {
 	annotations := []kubecontainer.Annotation{}
 
 	for i, podResourceClaim := range pod.Spec.ResourceClaims {
@@ -182,15 +182,6 @@ func (m *ManagerImpl) getContainerInfo(pod *v1.Pod, container *v1.Container) (*C
 	}
 
 	return &ContainerInfo{Annotations: annotations}, nil
-}
-
-// PrepareResources calls plugin NodePrepareResource from the registered DRA resource plugins.
-func (m *ManagerImpl) PrepareResources(pod *v1.Pod, container *v1.Container) (*ContainerInfo, error) {
-	if err := m.prepareContainerResources(pod, container); err != nil {
-		return nil, err
-	}
-
-	return m.getContainerInfo(pod, container)
 }
 
 func (m *ManagerImpl) UnprepareResources(pod *v1.Pod) error {

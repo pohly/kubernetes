@@ -71,3 +71,7 @@ func (f *FakeRuntimeHelper) GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int6
 func (f *FakeRuntimeHelper) GetOrCreateUserNamespaceMappings(pod *v1.Pod) (*runtimeapi.UserNamespace, error) {
 	return nil, nil
 }
+
+func (f *FakeRuntimeHelper) PrepareResources(pod *v1.Pod, container *v1.Container) error {
+	return nil
+}

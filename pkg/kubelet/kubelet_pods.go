@@ -472,6 +472,15 @@ func (kl *Kubelet) GenerateRunContainerOptions(ctx context.Context, pod *v1.Pod,
 	if err != nil {
 		return nil, nil, err
 	}
+
+	if kl.draManager != nil {
+		resOpts, err := kl.draManager.GetResources(pod, container)
+		if err != nil {
+			return nil, nil, err
+		}
+		opts.Annotations = append(opts.Annotations, resOpts.Annotations...)
+	}
+
 	// The value of hostname is the short host name and it is sent to makeMounts to create /etc/hosts file.
 	hostname, hostDomainName, err := kl.GeneratePodHostNameAndDomain(pod)
 	if err != nil {

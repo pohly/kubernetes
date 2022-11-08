@@ -67,12 +67,14 @@ import (
 	pluginwatcherapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/features"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	kubeletcertificate "k8s.io/kubernetes/pkg/kubelet/certificate"
 	"k8s.io/kubernetes/pkg/kubelet/cloudresource"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/pkg/kubelet/cm/dra"
 	draplugin "k8s.io/kubernetes/pkg/kubelet/cm/dra/plugin"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
@@ -870,6 +872,14 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	// since this relies on the rest of the Kubelet having been constructed.
 	klet.setNodeStatusFuncs = klet.defaultNodeStatusFuncs()
 
+	// Initialize DRA manager
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) {
+		klet.draManager, err = dra.NewManagerImpl(klet.kubeClient)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return klet, nil
 }
 
@@ -1198,6 +1208,9 @@ type Kubelet struct {
 
 	// Manage user namespaces
 	usernsManager *usernsManager
+
+	// draManager handles Dynamic Resource Allocation requests.
+	draManager dra.Manager
 }
 
 // ListPodStats is delegated to StatsProvider, which implements stats.Provider interface
@@ -1899,7 +1912,7 @@ func (kl *Kubelet) syncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus
 	// NOTE: resources must be unprepared BEFORE pod status is changed on the API server
 	// to avoid race conditions with the resource deallocation code in kubernetes core
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-		if err := kl.containerManager.UnprepareResources(pod); err != nil {
+		if err := kl.UnprepareResources(pod); err != nil {
 			return err
 		}
 	}
@@ -2536,6 +2549,20 @@ func (kl *Kubelet) CheckpointContainer(
 
 func (kl *Kubelet) supportLocalStorageCapacityIsolation() bool {
 	return kl.GetConfiguration().LocalStorageCapacityIsolation
+}
+
+func (kl *Kubelet) PrepareResources(pod *v1.Pod, container *v1.Container) error {
+	if kl.draManager != nil {
+		return kl.draManager.PrepareResources(pod, container)
+	}
+	return nil
+}
+
+func (kl *Kubelet) UnprepareResources(pod *v1.Pod) error {
+	if kl.draManager != nil {
+		return kl.draManager.UnprepareResources(pod)
+	}
+	return nil
 }
 
 // isSyncPodWorthy filters out events that are not worthy of pod syncing

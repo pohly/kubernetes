@@ -54,7 +54,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
-	"k8s.io/kubernetes/pkg/kubelet/cm/dra"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager"
 	memorymanagerstate "k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
@@ -130,8 +129,6 @@ type containerManagerImpl struct {
 	memoryManager memorymanager.Manager
 	// Interface for Topology resource co-ordination
 	topologyManager topologymanager.Manager
-	// Interface for Dynamic Resource Allocation management.
-	draManager dra.Manager
 }
 
 type features struct {
@@ -310,15 +307,6 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		return nil, err
 	}
 	cm.topologyManager.AddHintProvider(cm.deviceManager)
-
-	// initialize DRA manager
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) {
-		klog.InfoS("Creating Dynamic Resource Allocation (DRA) manager")
-		cm.draManager, err = dra.NewManagerImpl(kubeClient)
-		if err != nil {
-			return nil, err
-		}
-	}
 
 	// Initialize CPU manager
 	cm.cpuManager, err = cpumanager.NewManager(
@@ -655,13 +643,6 @@ func (cm *containerManagerImpl) GetPluginRegistrationHandler() cache.PluginHandl
 // TODO: move the GetResources logic to PodContainerManager.
 func (cm *containerManagerImpl) GetResources(pod *v1.Pod, container *v1.Container) (*kubecontainer.RunContainerOptions, error) {
 	opts := &kubecontainer.RunContainerOptions{}
-	if cm.draManager != nil {
-		resOpts, err := cm.PrepareResources(pod, container)
-		if err != nil {
-			return nil, err
-		}
-		opts.Annotations = append(opts.Annotations, resOpts.Annotations...)
-	}
 	// Allocate should already be called during predicateAdmitHandler.Admit(),
 	// just try to fetch device runtime information from cached state here
 	devOpts, err := cm.deviceManager.GetDeviceRunContainerOptions(pod, container)
@@ -691,14 +672,13 @@ func (cm *containerManagerImpl) GetAllocateResourcesPodAdmitHandler() lifecycle.
 	// work as we add more and more hint providers that the TopologyManager
 	// needs to call Allocate() on (that may not be directly intstantiated
 	// inside this component).
-	return &resourceAllocator{cm.cpuManager, cm.memoryManager, cm.deviceManager, cm.draManager}
+	return &resourceAllocator{cm.cpuManager, cm.memoryManager, cm.deviceManager}
 }
 
 type resourceAllocator struct {
 	cpuManager    cpumanager.Manager
 	memoryManager memorymanager.Manager
 	deviceManager devicemanager.Manager
-	draManager    dra.Manager
 }
 
 func (m *resourceAllocator) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
@@ -1029,12 +1009,4 @@ func containerMemoryFromBlock(blocks []memorymanagerstate.Block) []*podresources
 	}
 
 	return containerMemories
-}
-
-func (cm *containerManagerImpl) PrepareResources(pod *v1.Pod, container *v1.Container) (*dra.ContainerInfo, error) {
-	return cm.draManager.PrepareResources(pod, container)
-}
-
-func (cm *containerManagerImpl) UnprepareResources(pod *v1.Pod) error {
-	return cm.draManager.UnprepareResources(pod)
 }
