@@ -138,10 +138,6 @@ type AllocationResult struct {
 	// Setting this field is optional. If null, the resource is available
 	// everywhere.
 	AvailableOnNodes *core.NodeSelector
-
-	// Shareable determines whether the resource supports more
-	// than one consumer at a time.
-	Shareable bool
 }
 
 // ResourceHandleMaxSize is the maximum size of allocation.resourceHandle.

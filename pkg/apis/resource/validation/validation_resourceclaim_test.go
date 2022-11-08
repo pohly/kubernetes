@@ -324,7 +324,6 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 		DriverName: "valid",
 		Allocation: &resource.AllocationResult{
 			ResourceHandle: strings.Repeat(" ", resource.ResourceHandleMaxSize),
-			Shareable:      true,
 		},
 	}
 
@@ -454,7 +453,6 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			wantFailures: field.ErrorList{field.Forbidden(field.NewPath("status", "reservedFor"), "the claim cannot be reserved more than once")},
 			oldClaim: func() *resource.ResourceClaim {
 				claim := validAllocatedClaim.DeepCopy()
-				claim.Status.Allocation.Shareable = false
 				return claim
 			}(),
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {

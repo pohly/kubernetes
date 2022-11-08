@@ -142,10 +142,6 @@ type AllocationResult struct {
 	// Setting this field is optional. If null, the resource is available
 	// everywhere.
 	AvailableOnNodes *v1.NodeSelector `json:"availableOnNodes,omitempty" protobuf:"bytes,2,opt,name=availableOnNodes"`
-
-	// Shareable determines whether the resource supports more
-	// than one consumer at a time.
-	Shareable bool `json:"shareable,omitempty" protobuf:"varint,3,opt,name=shareable"`
 }
 
 // ResourceHandleMaxSize is the maximum size of allocation.resourceHandle.
