@@ -141,7 +141,7 @@ func ValidateClaimStatusUpdate(resourceClaim, oldClaim *resource.ResourceClaim) 
 		if resourceClaim.Status.Allocation == nil {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("reservedFor"), "only allocated claims can be reserved"))
 		} else {
-			if len(resourceClaim.Status.ReservedFor) > 1 {
+			if !resourceClaim.Status.Allocation.Shareable && len(resourceClaim.Status.ReservedFor) > 1 {
 				allErrs = append(allErrs, field.Forbidden(fldPath.Child("reservedFor"), "the claim cannot be reserved more than once"))
 			}
 			// Items may be removed from ReservedFor while the claim is meant to be deallocated,
