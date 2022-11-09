@@ -1634,11 +1634,11 @@ func ValidateTemplateObjectMeta(objMeta *metav1.ObjectMeta, fldPath *field.Path)
 	// but then adding a new one to ObjectMeta wouldn't be checked
 	// unless this code gets updated. Instead, we ensure that
 	// only allowed fields are set via reflection.
-	allErrs = append(allErrs, ValidateFieldAllowList(*objMeta, AllowedTemplateObjectMetaFields, "cannot be set", fldPath)...)
+	allErrs = append(allErrs, ValidateFieldAllowList(*objMeta, allowedTemplateObjectMetaFields, "cannot be set", fldPath)...)
 	return allErrs
 }
 
-var AllowedTemplateObjectMetaFields = map[string]bool{
+var allowedTemplateObjectMetaFields = map[string]bool{
 	"Annotations": true,
 	"Labels":      true,
 }
@@ -2758,7 +2758,7 @@ func validatePodResourceClaim(claim core.PodResourceClaim, podClaimNames *sets.S
 func validatePodResourceClaimSource(claimSource core.ClaimSource, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if claimSource.ResourceClaimName != nil && claimSource.ResourceClaimTemplateName != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, claimSource, "may not have more than one field specified"))
+		allErrs = append(allErrs, field.Invalid(fldPath, claimSource, "at most one of `resourceClaimName` or `resourceClaimTemplateName` may be specified"))
 	}
 	if claimSource.ResourceClaimName == nil && claimSource.ResourceClaimTemplateName == nil {
 		allErrs = append(allErrs, field.Invalid(fldPath, claimSource, "must specify one of: `resourceClaimName`, `resourceClaimTemplateName`"))
