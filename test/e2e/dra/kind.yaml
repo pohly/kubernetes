@@ -35,3 +35,4 @@ nodes:
         v: "5"
 featureGates:
   DynamicResourceAllocation: true
+  APIServerTracing: false
