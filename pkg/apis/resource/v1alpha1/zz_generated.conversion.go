@@ -226,6 +226,7 @@ func RegisterConversions(s *runtime.Scheme) error {
 func autoConvert_v1alpha1_AllocationResult_To_resource_AllocationResult(in *v1alpha1.AllocationResult, out *resource.AllocationResult, s conversion.Scope) error {
 	out.ResourceHandle = in.ResourceHandle
 	out.AvailableOnNodes = (*core.NodeSelector)(unsafe.Pointer(in.AvailableOnNodes))
+	out.Shareable = in.Shareable
 	return nil
 }
 
@@ -237,6 +238,7 @@ func Convert_v1alpha1_AllocationResult_To_resource_AllocationResult(in *v1alpha1
 func autoConvert_resource_AllocationResult_To_v1alpha1_AllocationResult(in *resource.AllocationResult, out *v1alpha1.AllocationResult, s conversion.Scope) error {
 	out.ResourceHandle = in.ResourceHandle
 	out.AvailableOnNodes = (*v1.NodeSelector)(unsafe.Pointer(in.AvailableOnNodes))
+	out.Shareable = in.Shareable
 	return nil
 }
 

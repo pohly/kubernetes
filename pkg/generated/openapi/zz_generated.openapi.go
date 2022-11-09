@@ -41246,6 +41246,13 @@ func schema_k8sio_api_resource_v1alpha1_AllocationResult(ref common.ReferenceCal
 							Ref:         ref("k8s.io/api/core/v1.NodeSelector"),
 						},
 					},
+					"shareable": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Shareable determines whether the resource supports more than one consumer at a time.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},
