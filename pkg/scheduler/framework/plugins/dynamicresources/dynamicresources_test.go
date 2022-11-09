@@ -217,7 +217,7 @@ type perNodeResult map[string]result
 
 type want map[operation]any
 
-func TestPreFilter(t *testing.T) {
+func TestPlugin(t *testing.T) {
 	var nilPreFilterResult *framework.PreFilterResult
 
 	testcases := map[string]struct {
@@ -420,32 +420,32 @@ func TestPreFilter(t *testing.T) {
 		},
 	}
 
-	for name, testcase := range testcases {
+	for name, tc := range testcases {
 		// We can run in parallel because logging is per-test.
-		testcase := testcase
+		tc := tc
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			nodes := testcase.nodes
+			nodes := tc.nodes
 			if nodes == nil {
 				nodes = []*v1.Node{workerNode}
 			}
-			tc := setup(t, nodes, testcase.claims, testcase.classes, testcase.schedulings)
+			testCtx := setup(t, nodes, tc.claims, tc.classes, tc.schedulings)
 
-			initialObjects := tc.listAll(t)
-			result, status := tc.p.PreFilter(tc.ctx, tc.state, testcase.pod)
+			initialObjects := testCtx.listAll(t)
+			result, status := testCtx.p.PreFilter(testCtx.ctx, testCtx.state, tc.pod)
 			t.Run("prefilter", func(t *testing.T) {
-				tc.verify(t, overallResult(testcase.want[prefilterOp]), initialObjects, result, status)
+				testCtx.verify(t, overallResult(tc.want[prefilterOp]), initialObjects, result, status)
 			})
 			unschedulable := status.Code() != framework.Success
 
 			var potentialNodes []*v1.Node
 			if !unschedulable {
-				for _, nodeInfo := range tc.nodeInfos {
-					initialObjects = tc.listAll(t)
-					status := tc.p.Filter(tc.ctx, tc.state, testcase.pod, nodeInfo)
+				for _, nodeInfo := range testCtx.nodeInfos {
+					initialObjects = testCtx.listAll(t)
+					status := testCtx.p.Filter(testCtx.ctx, testCtx.state, tc.pod, nodeInfo)
 					nodeName := nodeInfo.Node().Name
 					t.Run(fmt.Sprintf("filter/%s", nodeInfo.Node().Name), func(t *testing.T) {
-						tc.verify(t, nodeResult(testcase.want[filterOp], nodeName), initialObjects, nil, status)
+						testCtx.verify(t, nodeResult(tc.want[filterOp], nodeName), initialObjects, nil, status)
 					})
 					if status.Code() != framework.Success {
 						unschedulable = true
@@ -456,10 +456,10 @@ func TestPreFilter(t *testing.T) {
 			}
 
 			if !unschedulable && len(potentialNodes) > 0 {
-				initialObjects = tc.listAll(t)
-				status := tc.p.PreScore(tc.ctx, tc.state, testcase.pod, potentialNodes)
+				initialObjects = testCtx.listAll(t)
+				status := testCtx.p.PreScore(testCtx.ctx, testCtx.state, tc.pod, potentialNodes)
 				t.Run("prescore", func(t *testing.T) {
-					tc.verify(t, overallResult(testcase.want[prescoreOp]), initialObjects, nil, status)
+					testCtx.verify(t, overallResult(tc.want[prescoreOp]), initialObjects, nil, status)
 				})
 				if status.Code() != framework.Success {
 					unschedulable = true
@@ -470,10 +470,10 @@ func TestPreFilter(t *testing.T) {
 			if !unschedulable && len(potentialNodes) > 0 {
 				selectedNode = potentialNodes[0]
 
-				initialObjects = tc.listAll(t)
-				status := tc.p.Reserve(tc.ctx, tc.state, testcase.pod, selectedNode.Name)
+				initialObjects = testCtx.listAll(t)
+				status := testCtx.p.Reserve(testCtx.ctx, testCtx.state, tc.pod, selectedNode.Name)
 				t.Run("reserve", func(t *testing.T) {
-					tc.verify(t, overallResult(testcase.want[reserveOp]), initialObjects, nil, status)
+					testCtx.verify(t, overallResult(tc.want[reserveOp]), initialObjects, nil, status)
 				})
 				if status.Code() != framework.Success {
 					unschedulable = true
@@ -482,16 +482,16 @@ func TestPreFilter(t *testing.T) {
 
 			if selectedNode != nil {
 				if unschedulable {
-					initialObjects = tc.listAll(t)
-					tc.p.Unreserve(tc.ctx, tc.state, testcase.pod, selectedNode.Name)
+					initialObjects = testCtx.listAll(t)
+					testCtx.p.Unreserve(testCtx.ctx, testCtx.state, tc.pod, selectedNode.Name)
 					t.Run("unreserve", func(t *testing.T) {
-						tc.verify(t, overallResult(testcase.want[unreserveOp]), initialObjects, nil, status)
+						testCtx.verify(t, overallResult(tc.want[unreserveOp]), initialObjects, nil, status)
 					})
 				} else {
-					initialObjects = tc.listAll(t)
-					tc.p.PostBind(tc.ctx, tc.state, testcase.pod, selectedNode.Name)
+					initialObjects = testCtx.listAll(t)
+					testCtx.p.PostBind(testCtx.ctx, testCtx.state, tc.pod, selectedNode.Name)
 					t.Run("postbind", func(t *testing.T) {
-						tc.verify(t, overallResult(testcase.want[postbindOp]), initialObjects, nil, status)
+						testCtx.verify(t, overallResult(tc.want[postbindOp]), initialObjects, nil, status)
 					})
 				}
 			}
