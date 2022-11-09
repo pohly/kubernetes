@@ -184,12 +184,18 @@ func TestValidateClass(t *testing.T) {
 			}(),
 		},
 		"missing-driver-name": {
-			wantFailures: field.ErrorList{field.Required(field.NewPath("driverName"), "")},
-			class:        testClass(goodName, ""),
+			wantFailures: field.ErrorList{field.Required(field.NewPath("driverName"), ""),
+				field.Invalid(field.NewPath("driverName"), "", "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
+			},
+			class: testClass(goodName, ""),
 		},
 		"invalid-driver-name": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("driverName"), badName, "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("driverName"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
 			class:        testClass(goodName, badName),
+		},
+		"invalid-qualified-driver-name": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("driverName"), goodName+"/path", "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
+			class:        testClass(goodName, goodName+"/path"),
 		},
 		"good-parameters": {
 			class: func() *resource.ResourceClass {

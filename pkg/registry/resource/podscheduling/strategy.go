@@ -151,7 +151,7 @@ func Match(label labels.Selector, field fields.Selector) storage.SelectionPredic
 func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	scheduling, ok := obj.(*resource.PodScheduling)
 	if !ok {
-		return nil, nil, errors.New("not a podScheduling")
+		return nil, nil, errors.New("not a PodScheduling")
 	}
 	return labels.Set(scheduling.Labels), toSelectableFields(scheduling), nil
 }

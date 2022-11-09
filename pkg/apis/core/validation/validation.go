@@ -34,6 +34,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
+	pathvalidation "k8s.io/apimachinery/pkg/api/validation/path"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/labels"
@@ -2748,6 +2749,10 @@ func validatePodResourceClaim(claim core.PodResourceClaim, podClaimNames *sets.S
 	} else if podClaimNames.Has(claim.Name) {
 		allErrs = append(allErrs, field.Duplicate(fldPath.Child("name"), claim.Name))
 	} else {
+		// Check for things like ./..
+		for _, msg := range pathvalidation.ValidatePathSegmentName(claim.Name, false) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), claim.Name, msg))
+		}
 		podClaimNames.Insert(claim.Name)
 	}
 	allErrs = append(allErrs, validatePodResourceClaimSource(claim.Source, fldPath.Child("source"))...)

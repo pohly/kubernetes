@@ -345,7 +345,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			},
 		},
 		"invalid-add-allocation": {
-			wantFailures: field.ErrorList{field.Required(field.NewPath("status", "driverName"), "must be set when a claim is allocated")},
+			wantFailures: field.ErrorList{field.Required(field.NewPath("status", "driverName"), "must be specified when `allocation` is set")},
 			oldClaim:     validClaim,
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
 				// DriverName must also get set here!
@@ -451,7 +451,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			},
 		},
 		"invalid-reserved-for-not-shared": {
-			wantFailures: field.ErrorList{field.Forbidden(field.NewPath("status", "reservedFor"), "the claim cannot be reserved more than once")},
+			wantFailures: field.ErrorList{field.Forbidden(field.NewPath("status", "reservedFor"), "may not be reserved more than once")},
 			oldClaim: func() *resource.ResourceClaim {
 				claim := validAllocatedClaim.DeepCopy()
 				claim.Status.Allocation.Shareable = false
@@ -470,7 +470,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			},
 		},
 		"invalid-reserved-for-no-allocation": {
-			wantFailures: field.ErrorList{field.Forbidden(field.NewPath("status", "reservedFor"), "only allocated claims can be reserved")},
+			wantFailures: field.ErrorList{field.Forbidden(field.NewPath("status", "reservedFor"), "may not be specified when `allocated` is not set")},
 			oldClaim:     validClaim,
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
 				claim.Status.DriverName = "valid"
@@ -568,7 +568,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			},
 		},
 		"invalid-deallocation-requested-removal": {
-			wantFailures: field.ErrorList{field.Forbidden(field.NewPath("status", "deallocationRequested"), "may only be cleared together with the allocation")},
+			wantFailures: field.ErrorList{field.Forbidden(field.NewPath("status", "deallocationRequested"), "may not be cleared when `allocation` is set")},
 			oldClaim: func() *resource.ResourceClaim {
 				claim := validAllocatedClaim.DeepCopy()
 				claim.Status.DeallocationRequested = true
@@ -580,7 +580,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			},
 		},
 		"invalid-deallocation-requested-in-use": {
-			wantFailures: field.ErrorList{field.Forbidden(field.NewPath("status", "deallocationRequested"), "deallocation cannot be requested for claims which are in use")},
+			wantFailures: field.ErrorList{field.Forbidden(field.NewPath("status", "deallocationRequested"), "deallocation cannot be requested while `reservedFor` is set")},
 			oldClaim: func() *resource.ResourceClaim {
 				claim := validAllocatedClaim.DeepCopy()
 				claim.Status.ReservedFor = []resource.ResourceClaimConsumerReference{
@@ -598,7 +598,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			},
 		},
 		"invalid-deallocation-not-allocated": {
-			wantFailures: field.ErrorList{field.Forbidden(field.NewPath("status", "deallocationRequested"), "claim is not allocated")},
+			wantFailures: field.ErrorList{field.Forbidden(field.NewPath("status", "deallocationRequested"), "may not be set when `allocation` is not set")},
 			oldClaim:     validClaim,
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
 				claim.Status.DeallocationRequested = true
@@ -606,7 +606,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			},
 		},
 		"invalid-allocation-removal-not-reset": {
-			wantFailures: field.ErrorList{field.Forbidden(field.NewPath("status", "deallocationRequested"), "must be reset together with removing the allocation")},
+			wantFailures: field.ErrorList{field.Forbidden(field.NewPath("status", "deallocationRequested"), "must be cleared when `allocation` is unset")},
 			oldClaim: func() *resource.ResourceClaim {
 				claim := validAllocatedClaim.DeepCopy()
 				claim.Status.DeallocationRequested = true

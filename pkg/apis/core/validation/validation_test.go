@@ -9195,6 +9195,16 @@ func TestValidatePodSpec(t *testing.T) {
 				},
 			},
 		},
+		"bad pod resource claim name": {
+			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+			ResourceClaims: []core.PodResourceClaim{
+				{
+					Name: "../my-claim",
+				},
+			},
+		},
 		"resource claim reference and template": {
 			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}},
 			RestartPolicy: core.RestartPolicyAlways,

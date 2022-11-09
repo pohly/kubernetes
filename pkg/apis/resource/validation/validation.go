@@ -17,8 +17,6 @@ limitations under the License.
 package validation
 
 import (
-	"strings"
-
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -26,21 +24,25 @@ import (
 	"k8s.io/kubernetes/pkg/apis/resource"
 )
 
-// ValidateClaimTemplateName can be used to check whether the given
+// validateClaimTemplateName can be used to check whether the given
 // name for a ResourceClaimTemplate is valid.
-var ValidateClaimTemplateName = apimachineryvalidation.NameIsDNSSubdomain
+var validateClaimTemplateName = apimachineryvalidation.NameIsDNSSubdomain
 
-// ValidateResourceClaimName can be used to check whether the given
+// validateResourceClaimName can be used to check whether the given
 // name for a ResourceClaim is valid.
-var ValidateResourceClaimName = apimachineryvalidation.NameIsDNSSubdomain
+var validateResourceClaimName = apimachineryvalidation.NameIsDNSSubdomain
 
-// ValidateResourceClaimTemplateName can be used to check whether the given
+// validateResourceClaimTemplateName can be used to check whether the given
 // name for a ResourceClaimTemplate is valid.
-var ValidateResourceClaimTemplateName = apimachineryvalidation.NameIsDNSSubdomain
+var validateResourceClaimTemplateName = apimachineryvalidation.NameIsDNSSubdomain
+
+// validateResourceDriverName reuses the validation of a CSI driver because
+// the allowed values are exactly the same.
+var validateResourceDriverName = corevalidation.ValidateCSIDriverName
 
 // ValidateClaim validates a ResourceClaim.
 func ValidateClaim(resourceClaim *resource.ResourceClaim) field.ErrorList {
-	allErrs := corevalidation.ValidateObjectMeta(&resourceClaim.ObjectMeta, true, ValidateResourceClaimName, field.NewPath("metadata"))
+	allErrs := corevalidation.ValidateObjectMeta(&resourceClaim.ObjectMeta, true, validateResourceClaimName, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateResourceClaimSpec(&resourceClaim.Spec, field.NewPath("spec"))...)
 	return allErrs
 }
@@ -129,7 +131,7 @@ func ValidateClaimStatusUpdate(resourceClaim, oldClaim *resource.ResourceClaim) 
 	if resourceClaim.Status.DriverName != "" {
 		allErrs = append(allErrs, validateResourceDriverName(resourceClaim.Status.DriverName, fldPath.Child("driverName"))...)
 	} else if resourceClaim.Status.Allocation != nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("driverName"), "must be set when a claim is allocated"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("driverName"), "must be specified when `allocation` is set"))
 	}
 
 	allErrs = append(allErrs, validateAllocationResult(resourceClaim.Status.Allocation, fldPath.Child("allocation"))...)
@@ -139,15 +141,14 @@ func ValidateClaimStatusUpdate(resourceClaim, oldClaim *resource.ResourceClaim) 
 	// Now check for invariants that must be valid for a ResourceClaim.
 	if len(resourceClaim.Status.ReservedFor) > 0 {
 		if resourceClaim.Status.Allocation == nil {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("reservedFor"), "only allocated claims can be reserved"))
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("reservedFor"), "may not be specified when `allocated` is not set"))
 		} else {
 			if !resourceClaim.Status.Allocation.Shareable && len(resourceClaim.Status.ReservedFor) > 1 {
-				allErrs = append(allErrs, field.Forbidden(fldPath.Child("reservedFor"), "the claim cannot be reserved more than once"))
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("reservedFor"), "may not be reserved more than once"))
 			}
 			// Items may be removed from ReservedFor while the claim is meant to be deallocated,
 			// but not added.
-			if resourceClaim.DeletionTimestamp != nil ||
-				resourceClaim.Status.DeallocationRequested {
+			if resourceClaim.DeletionTimestamp != nil || resourceClaim.Status.DeallocationRequested {
 				oldSet := sets.New(oldClaim.Status.ReservedFor...)
 				newSet := sets.New(resourceClaim.Status.ReservedFor...)
 				newItems := newSet.Difference(oldSet)
@@ -161,15 +162,22 @@ func ValidateClaimStatusUpdate(resourceClaim, oldClaim *resource.ResourceClaim) 
 	if !oldClaim.Status.DeallocationRequested &&
 		resourceClaim.Status.DeallocationRequested &&
 		len(resourceClaim.Status.ReservedFor) > 0 {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("deallocationRequested"), "deallocation cannot be requested for claims which are in use"))
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("deallocationRequested"), "deallocation cannot be requested while `reservedFor` is set"))
 	}
 
 	if resourceClaim.Status.Allocation == nil &&
 		resourceClaim.Status.DeallocationRequested {
+		// This combination is an error. We could just state that fact
+		// (i.e. "deallocationRequested: must not be set when
+		// `allocation` is nil"), but that is a confusing error message
+		// when the driver author tried to clear `allocation` and
+		// forgot about `deallocationRequested`. By looking at the
+		// change that is being made as part of the update we can
+		// provide a more helpful message.
 		if oldClaim.Status.Allocation != nil {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("deallocationRequested"), "must be reset together with removing the allocation"))
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("deallocationRequested"), "must be cleared when `allocation` is unset"))
 		} else {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("deallocationRequested"), "claim is not allocated"))
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("deallocationRequested"), "may not be set when `allocation` is not set"))
 		}
 	}
 
@@ -180,7 +188,7 @@ func ValidateClaimStatusUpdate(resourceClaim, oldClaim *resource.ResourceClaim) 
 	if oldClaim.Status.DeallocationRequested &&
 		!resourceClaim.Status.DeallocationRequested &&
 		resourceClaim.Status.Allocation != nil {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("deallocationRequested"), "may only be cleared together with the allocation"))
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("deallocationRequested"), "may not be cleared when `allocation` is set"))
 	}
 
 	return allErrs
@@ -209,16 +217,6 @@ func validateResourceClaimUserReference(ref resource.ResourceClaimConsumerRefere
 	}
 	if ref.UID == "" {
 		allErrs = append(allErrs, field.Required(fldPath.Child("uid"), ""))
-	}
-	return allErrs
-}
-
-func validateResourceDriverName(driverName string, fldPath *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
-	if driverName == "" {
-		allErrs = append(allErrs, field.Required(fldPath, ""))
-	} else {
-		allErrs = append(allErrs, corevalidation.ValidateQualifiedName(strings.ToLower(driverName), fldPath)...)
 	}
 	return allErrs
 }
@@ -296,7 +294,7 @@ func validatePodSchedulingClaim(status resource.ResourceClaimSchedulingStatus, f
 
 // ValidateClaimTemplace validates a ResourceClaimTemplate.
 func ValidateClaimTemplate(template *resource.ResourceClaimTemplate) field.ErrorList {
-	allErrs := corevalidation.ValidateObjectMeta(&template.ObjectMeta, true, ValidateResourceClaimTemplateName, field.NewPath("metadata"))
+	allErrs := corevalidation.ValidateObjectMeta(&template.ObjectMeta, true, validateResourceClaimTemplateName, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateResourceClaimTemplateSpec(&template.Spec, field.NewPath("spec"))...)
 	return allErrs
 }
