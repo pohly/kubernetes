@@ -309,17 +309,21 @@ func (pl *dynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 	}
 	logger := klog.FromContext(ctx)
 
+	// If the pod does not reference any claim, we don't need to do
+	// anything for it. We just initialize an empty state to record that
+	// observation for the other functions. This gets updated below
+	// if we get that far.
+	s := &stateData{}
+	state.Write(stateKey, s)
+
 	claims, err := pl.podResourceClaims(pod)
 	if err != nil {
 		return nil, statusUnschedulable(logger, err.Error())
 	}
 	logger.V(5).Info("pod resource claims", "pod", klog.KObj(pod), "resourceclaims", klog.KObjs(claims))
 	// If the pod does not reference any claim, we don't need to do
-	// anything for it. We just initialize an empty state to record that
-	// observation for the other functions.
-	s := &stateData{}
+	// anything for it.
 	if len(claims) == 0 {
-		state.Write(stateKey, s)
 		return nil, nil
 	}
 
