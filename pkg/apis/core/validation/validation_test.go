@@ -21776,7 +21776,7 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 		},
 		"ephemeral container don't support resource requirements": {
 			Containers:          []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}},
-			EphemeralContainers: []core.EphemeralContainer{{core.EphemeralContainerCommon{Name: "ctr-ephemeral", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}, "ctr"}},
+			EphemeralContainers: []core.EphemeralContainer{{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "ctr-ephemeral", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}, TargetContainerName: "ctr"}},
 			RestartPolicy:       core.RestartPolicyAlways,
 			DNSPolicy:           core.DNSClusterFirst,
 			ResourceClaims: []core.PodResourceClaim{
