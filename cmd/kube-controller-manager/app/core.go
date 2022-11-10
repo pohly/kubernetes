@@ -358,6 +358,8 @@ func startEphemeralVolumeController(ctx context.Context, controllerContext Contr
 	return nil, true, nil
 }
 
+const defaultResourceClaimControllerWorkers = 10
+
 func startResourceClaimController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	ephemeralController, err := resourceclaim.NewController(
 		controllerContext.ClientBuilder.ClientOrDie("resource-claim-controller"),
@@ -367,7 +369,7 @@ func startResourceClaimController(ctx context.Context, controllerContext Control
 	if err != nil {
 		return nil, true, fmt.Errorf("failed to start ephemeral volume controller: %v", err)
 	}
-	go ephemeralController.Run(ctx, int(controllerContext.ComponentConfig.ResourceClaimController.ConcurrentResourceClaimSyncs))
+	go ephemeralController.Run(ctx, defaultResourceClaimControllerWorkers)
 	return nil, true, nil
 }
 

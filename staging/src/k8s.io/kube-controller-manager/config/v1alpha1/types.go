@@ -165,9 +165,6 @@ type KubeControllerManagerConfiguration struct {
 	// TTLAfterFinishedControllerConfiguration holds configuration for
 	// TTLAfterFinishedController related features.
 	TTLAfterFinishedController TTLAfterFinishedControllerConfiguration
-	// ResourceClaimControllerConfiguration holds configuration for ResourceClaimController
-	// related features.
-	ResourceClaimController ResourceClaimControllerConfiguration
 }
 
 // AttachDetachControllerConfiguration contains elements describing AttachDetachController.
@@ -301,14 +298,6 @@ type EphemeralVolumeControllerConfiguration struct {
 	// that will be done concurrently. Larger number = faster ephemeral volume updating,
 	// but more CPU (and network) load.
 	ConcurrentEphemeralVolumeSyncs int32
-}
-
-// ResourceClaimControllerConfiguration contains elements describing ResourceClaimController.
-type ResourceClaimControllerConfiguration struct {
-	// ConcurrentResourceClaimSyncseSyncs is the number of ResourceClaim syncing operations
-	// that will be done concurrently. Larger number = faster ResourceClaim updating,
-	// but more CPU (and network) load.
-	ConcurrentResourceClaimSyncs int32
 }
 
 // GarbageCollectorControllerConfiguration contains elements describing GarbageCollectorController.
