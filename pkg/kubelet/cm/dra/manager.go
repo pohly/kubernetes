@@ -192,6 +192,10 @@ func (m *ManagerImpl) PrepareResources(pod *v1.Pod, container *v1.Container) (*C
 	return m.getContainerInfo(pod, container)
 }
 
+// UnprepareResources calls a plugin's NodeUnprepareResource API for each resource claim owned by a pod.
+// This function is idempotent and may be called multiple times against the same pod.
+// As such, calls to the underlying NodeUnprepareResource API are skipped for claims that have
+// already been successfully unprepared.
 func (m *ManagerImpl) UnprepareResources(pod *v1.Pod) error {
 	// Call NodeUnprepareResource RPC for every resource claim referenced by the pod
 	for i := range pod.Spec.ResourceClaims {
@@ -200,11 +204,6 @@ func (m *ManagerImpl) UnprepareResources(pod *v1.Pod) error {
 
 		// Skip calling NodeUnprepareResource if claim info is not cached
 		if claimInfo == nil {
-			continue
-		}
-
-		// Skip calling NodeUnprepareResource if pod is not cached
-		if !claimInfo.referencedByPod(pod.UID) {
 			continue
 		}
 
