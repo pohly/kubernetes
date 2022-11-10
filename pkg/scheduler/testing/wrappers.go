@@ -929,6 +929,15 @@ func (wrapper *PodSchedulingWrapper) OwnerReference(name, uid string, gvk schema
 	return wrapper
 }
 
+// Label applies a {k,v} label pair to the inner object
+func (wrapper *PodSchedulingWrapper) Label(k, v string) *PodSchedulingWrapper {
+	if wrapper.Labels == nil {
+		wrapper.Labels = make(map[string]string)
+	}
+	wrapper.Labels[k] = v
+	return wrapper
+}
+
 // SelectedNode sets that field of the inner object.
 func (wrapper *PodSchedulingWrapper) SelectedNode(s string) *PodSchedulingWrapper {
 	wrapper.Spec.SelectedNode = s
