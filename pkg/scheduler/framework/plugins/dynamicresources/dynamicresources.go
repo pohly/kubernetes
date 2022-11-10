@@ -480,7 +480,7 @@ func (pl *dynamicResources) PostFilter(ctx context.Context, cs *framework.CycleS
 		return nil, statusError(logger, err)
 	}
 	if len(state.claims) == 0 {
-		return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, "nothing done, no claims")
+		return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, "no new claims to deallocate")
 	}
 
 	// Iterating over a map is random. This is intentional here, we want to
