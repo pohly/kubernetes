@@ -64,7 +64,21 @@ func applyFeatureGates(config *v1.Plugins) {
 		config.MultiPoint.Enabled = append(config.MultiPoint.Enabled, v1.Plugin{Name: names.SchedulingGates})
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-		config.MultiPoint.Enabled = append(config.MultiPoint.Enabled, v1.Plugin{Name: names.DynamicResources})
+		// This plugin should come before DefaultPreemption because if
+		// there is a problem with a Pod and PostFilter gets called to
+		// resolve the problem, it is better to first deallocate an
+		// idle ResourceClaim than it is to evict some Pod that might
+		// be doing useful work.
+		for i := range config.MultiPoint.Enabled {
+			if config.MultiPoint.Enabled[i].Name == names.DefaultPreemption {
+				extended := make([]v1.Plugin, 0, len(config.MultiPoint.Enabled)+1)
+				extended = append(extended, config.MultiPoint.Enabled[:i]...)
+				extended = append(extended, v1.Plugin{Name: names.DynamicResources})
+				extended = append(extended, config.MultiPoint.Enabled[i:]...)
+				config.MultiPoint.Enabled = extended
+				break
+			}
+		}
 	}
 }
 
