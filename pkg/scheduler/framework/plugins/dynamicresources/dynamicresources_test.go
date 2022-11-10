@@ -18,7 +18,6 @@ package dynamicresources
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
@@ -34,9 +33,6 @@ import (
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
-	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
-	resourcev1alpha1ac "k8s.io/client-go/applyconfigurations/resource/v1alpha1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	cgotesting "k8s.io/client-go/testing"
@@ -45,155 +41,113 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
 var (
-	podName       = "my-pod"
-	podUID        = types.UID("1234")
-	resourceName  = "my-resource"
-	resourceName2 = resourceName + "-2"
-	claimName     = podName + "-" + resourceName
-	claimName2    = podName + "-" + resourceName + "-2"
-	className     = "my-resource-class"
-	namespace     = "default"
-	templateName  = "my-template"
+	podKind        = v1.SchemeGroupVersion.WithKind("Pod")
+	schedulingKind = resourcev1alpha1.SchemeGroupVersion.WithKind("PodScheduling")
+	claimKind      = resourcev1alpha1.SchemeGroupVersion.WithKind("ResourceClaim")
+	podName        = "my-pod"
+	podUID         = "1234"
+	resourceName   = "my-resource"
+	resourceName2  = resourceName + "-2"
+	claimName      = podName + "-" + resourceName
+	claimName2     = podName + "-" + resourceName + "-2"
+	className      = "my-resource-class"
+	namespace      = "default"
+	templateName   = "my-template"
 
-	resourceClass = toResourceClass(resourcev1alpha1ac.ResourceClass(className))
+	resourceClass = &resourcev1alpha1.ResourceClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: className,
+		},
+		DriverName: "some-driver",
+	}
 
-	podWithClaimName = toPod(corev1ac.Pod(podName, namespace).
-				WithUID(podUID).
-				WithSpec(corev1ac.PodSpec().
-					WithResourceClaims(corev1ac.PodResourceClaim().
-						WithName(resourceName).
-						WithSource(corev1ac.ClaimSource().
-							WithResourceClaimName(claimName)))))
-	otherPodWithClaimName = toPod(corev1ac.Pod(podName, namespace).
-				WithUID(podUID + "-II").
-				WithSpec(corev1ac.PodSpec().
-					WithResourceClaims(corev1ac.PodResourceClaim().
-						WithName(resourceName).
-						WithSource(corev1ac.ClaimSource().
-							WithResourceClaimName(claimName)))))
-	podWithClaimTemplate = toPod(corev1ac.Pod(podName, namespace).
-				WithUID(podUID).
-				WithSpec(corev1ac.PodSpec().
-					WithResourceClaims(corev1ac.PodResourceClaim().
-						WithName(resourceName).
-						WithSource(corev1ac.ClaimSource().
-							WithResourceClaimTemplateName(templateName)))))
-	podWithTwoClaimNames = toPod(corev1ac.Pod(podName, namespace).
-				WithUID(podUID).
-				WithSpec(corev1ac.PodSpec().
-					WithResourceClaims(
-				corev1ac.PodResourceClaim().
-					WithName(resourceName).
-					WithSource(corev1ac.ClaimSource().
-						WithResourceClaimName(claimName)),
-				corev1ac.PodResourceClaim().
-					WithName(resourceName2).
-					WithSource(corev1ac.ClaimSource().
-						WithResourceClaimName(claimName2)))))
+	podWithClaimName = st.MakePod().Name(podName).Namespace(namespace).
+				UID(podUID).
+				PodResourceClaims(v1.PodResourceClaim{resourceName, v1.ClaimSource{ResourceClaimName: &claimName}}).
+				Obj()
+	otherPodWithClaimName = st.MakePod().Name(podName).Namespace(namespace).
+				UID(podUID + "-II").
+				PodResourceClaims(v1.PodResourceClaim{resourceName, v1.ClaimSource{ResourceClaimName: &claimName}}).
+				Obj()
+	podWithClaimTemplate = st.MakePod().Name(podName).Namespace(namespace).
+				UID(podUID).
+				PodResourceClaims(v1.PodResourceClaim{resourceName, v1.ClaimSource{ResourceClaimTemplateName: &claimName}}).
+				Obj()
+	podWithTwoClaimNames = st.MakePod().Name(podName).Namespace(namespace).
+				UID(podUID).
+				PodResourceClaims(v1.PodResourceClaim{resourceName, v1.ClaimSource{ResourceClaimName: &claimName}}).
+				PodResourceClaims(v1.PodResourceClaim{resourceName2, v1.ClaimSource{ResourceClaimName: &claimName2}}).
+				Obj()
 
-	workerNode = toNode(corev1ac.Node("worker").
-			WithLabels(map[string]string{"nodename": "worker"}))
+	workerNode = &st.MakeNode().Name("worker").Label("nodename", "worker").Node
 
-	pendingImmediateClaim = toResourceClaim(resourcev1alpha1ac.ResourceClaim(claimName, namespace).
-				WithSpec(resourcev1alpha1ac.ResourceClaimSpec().
-					WithAllocationMode(resourcev1alpha1.AllocationModeImmediate).
-					WithResourceClassName(className)))
-	pendingDelayedClaim = toResourceClaim(resourcev1alpha1ac.ResourceClaim(claimName, namespace).
-				WithSpec(resourcev1alpha1ac.ResourceClaimSpec().
-					WithAllocationMode(resourcev1alpha1.AllocationModeWaitForFirstConsumer).
-					WithResourceClassName(className)))
-	pendingDelayedClaim2 = toResourceClaim(resourcev1alpha1ac.ResourceClaim(claimName2, namespace).
-				WithSpec(resourcev1alpha1ac.ResourceClaimSpec().
-					WithAllocationMode(resourcev1alpha1.AllocationModeWaitForFirstConsumer).
-					WithResourceClassName(className)))
-	deallocatingClaim = toResourceClaim(resourcev1alpha1ac.ResourceClaim(claimName, namespace).
-				WithStatus(resourcev1alpha1ac.ResourceClaimStatus().
-					WithAllocation(resourcev1alpha1ac.AllocationResult()).
-					WithDeallocationRequested(true)))
-	inUseClaim = toResourceClaim(resourcev1alpha1ac.ResourceClaim(claimName, namespace).
-			WithStatus(resourcev1alpha1ac.ResourceClaimStatus().
-				WithAllocation(resourcev1alpha1ac.AllocationResult()).
-				WithReservedFor(resourcev1alpha1ac.ResourceClaimConsumerReference().
-					WithUID(podUID))))
-	allocatedClaim = toResourceClaim(resourcev1alpha1ac.ResourceClaim(claimName, namespace).
-			WithOwnerReferences(metav1ac.OwnerReference().
-				WithUID(podUID).
-				WithController(true)).
-			WithStatus(resourcev1alpha1ac.ResourceClaimStatus().
-				WithAllocation(resourcev1alpha1ac.AllocationResult())))
-	allocatedClaimWithWrongTopology = toResourceClaim(resourcev1alpha1ac.ResourceClaim(claimName, namespace).
-					WithOwnerReferences(metav1ac.OwnerReference().
-						WithUID(podUID).
-						WithController(true)).
-					WithStatus(resourcev1alpha1ac.ResourceClaimStatus().
-						WithAllocation(resourcev1alpha1ac.AllocationResult().
-							WithAvailableOnNodes(corev1ac.NodeSelector().
-								WithNodeSelectorTerms(corev1ac.NodeSelectorTerm().
-									WithMatchExpressions(corev1ac.NodeSelectorRequirement().
-										WithKey("no-such-label").
-										WithOperator(v1.NodeSelectorOpIn).
-										WithValues("no-such-value")))))))
-	allocatedClaimWithGoodTopology = toResourceClaim(resourcev1alpha1ac.ResourceClaim(claimName, namespace).
-					WithOwnerReferences(metav1ac.OwnerReference().
-						WithUID(podUID).
-						WithController(true)).
-					WithStatus(resourcev1alpha1ac.ResourceClaimStatus().
-						WithAllocation(resourcev1alpha1ac.AllocationResult().
-							WithAvailableOnNodes(corev1ac.NodeSelector().
-								WithNodeSelectorTerms(corev1ac.NodeSelectorTerm().
-									WithMatchExpressions(corev1ac.NodeSelectorRequirement().
-										WithKey("nodename").
-										WithOperator(v1.NodeSelectorOpIn).
-										WithValues("worker")))))))
-	otherClaim = toResourceClaim(resourcev1alpha1ac.ResourceClaim("not-my-claim", namespace))
+	claim = st.MakeResourceClaim().
+		Name(claimName).
+		Namespace(namespace).
+		ResourceClassName(className).
+		Obj()
+	pendingImmediateClaim = st.FromResourceClaim(claim).
+				AllocationMode(resourcev1alpha1.AllocationModeImmediate).
+				Obj()
+	pendingDelayedClaim = st.FromResourceClaim(claim).
+				AllocationMode(resourcev1alpha1.AllocationModeWaitForFirstConsumer).
+				Obj()
+	pendingDelayedClaim2 = st.FromResourceClaim(pendingDelayedClaim).
+				Name(claimName2).
+				Obj()
+	deallocatingClaim = st.FromResourceClaim(pendingImmediateClaim).
+				Allocation(&resourcev1alpha1.AllocationResult{}).
+				DeallocationRequested(true).
+				Obj()
+	inUseClaim = st.FromResourceClaim(pendingImmediateClaim).
+			Allocation(&resourcev1alpha1.AllocationResult{}).
+			ReservedFor(resourcev1alpha1.ResourceClaimConsumerReference{UID: types.UID(podUID)}).
+			Obj()
+	allocatedClaim = st.FromResourceClaim(pendingDelayedClaim).
+			OwnerReference(podName, podUID, podKind).
+			Allocation(&resourcev1alpha1.AllocationResult{}).
+			Obj()
+	allocatedClaimWithWrongTopology = st.FromResourceClaim(allocatedClaim).
+					Allocation(&resourcev1alpha1.AllocationResult{AvailableOnNodes: st.MakeNodeSelector().In("no-such-label", []string{"no-such-value"}).Obj()}).
+					Obj()
+	allocatedClaimWithGoodTopology = st.FromResourceClaim(allocatedClaim).
+					Allocation(&resourcev1alpha1.AllocationResult{AvailableOnNodes: st.MakeNodeSelector().In("nodename", []string{"worker"}).Obj()}).
+					Obj()
+	otherClaim = st.MakeResourceClaim().
+			Name("not-my-claim").
+			Namespace(namespace).
+			ResourceClassName(className).
+			Obj()
 
-	schedulingSelectedPotential = toPodScheduling(resourcev1alpha1ac.PodScheduling(podName, namespace).
-					WithOwnerReferences(metav1ac.OwnerReference().
-						WithAPIVersion("v1").
-						WithController(true).
-						WithKind("Pod").
-						WithName(podName).
-						WithUID(podUID)).
-					WithSpec(resourcev1alpha1ac.PodSchedulingSpec().
-						WithSelectedNode(workerNode.Name).
-						WithPotentialNodes(workerNode.Name)))
-	schedulingPotential = toPodScheduling(resourcev1alpha1ac.PodScheduling(podName, namespace).
-				WithOwnerReferences(metav1ac.OwnerReference().
-					WithAPIVersion("v1").
-					WithController(true).
-					WithKind("Pod").
-					WithName(podName).
-					WithUID(podUID)).
-				WithSpec(resourcev1alpha1ac.PodSchedulingSpec().
-					WithPotentialNodes(workerNode.Name)))
-	schedulingInfo = toPodScheduling(resourcev1alpha1ac.PodScheduling(podName, namespace).
-			WithOwnerReferences(metav1ac.OwnerReference().
-				WithAPIVersion("v1").
-				WithController(true).
-				WithKind("Pod").
-				WithName(podName).
-				WithUID(podUID)).
-			WithSpec(resourcev1alpha1ac.PodSchedulingSpec().
-				WithPotentialNodes(workerNode.Name)).
-			WithStatus(resourcev1alpha1ac.PodSchedulingStatus().
-				WithResourceClaims(resourcev1alpha1ac.ResourceClaimSchedulingStatus().
-					WithName(resourceName), resourcev1alpha1ac.ResourceClaimSchedulingStatus().
-					WithName(resourceName2))))
+	scheduling = st.MakePodScheduling().Name(podName).Namespace(namespace).
+			OwnerReference(podName, podUID, podKind).
+			Obj()
+	schedulingPotential = st.FromPodScheduling(scheduling).
+				PotentialNodes(workerNode.Name).
+				Obj()
+	schedulingSelectedPotential = st.FromPodScheduling(schedulingPotential).
+					SelectedNode(workerNode.Name).
+					Obj()
+	schedulingInfo = st.FromPodScheduling(schedulingPotential).
+			ResourceClaims(resourcev1alpha1.ResourceClaimSchedulingStatus{Name: resourceName},
+			resourcev1alpha1.ResourceClaimSchedulingStatus{Name: resourceName2}).
+		Obj()
 )
 
 // result defines the expected outcome of some operation. It covers return
 // values, the plugin state and the state of the world (= objects).
 type result struct {
-	returnValue interface{}
-	status      *framework.Status
+	preFilterResult *framework.PreFilterResult
+	status          *framework.Status
 
-	// changes contains corev1ac apply configuration instances that contain
-	// the expected changes to existing objects. This way, new fields and
-	// can be described concisely. Removal of fields is not needed.
-	changes []any
+	// changes contains a mapping of name to an update function for
+	// the corresponding object. These functions apply exactly the expected
+	// changes to a copy of the object as it existed before the operation.
+	changes changeMapping
 
 	// added contains objects created by the operation.
 	added []metav1.Object
@@ -201,6 +155,8 @@ type result struct {
 	// removed contains objects deleted by the operation.
 	removed []metav1.Object
 }
+
+type changeMapping map[string]func(metav1.Object) metav1.Object
 
 type operation int
 
@@ -218,8 +174,6 @@ type perNodeResult map[string]result
 type want map[operation]any
 
 func TestPlugin(t *testing.T) {
-	var nilPreFilterResult *framework.PreFilterResult
-
 	testcases := map[string]struct {
 		nodes       []*v1.Node // default if unset is workerNode
 		pod         *v1.Pod
@@ -230,38 +184,21 @@ func TestPlugin(t *testing.T) {
 		want want
 	}{
 		"empty": {
-			pod: toPod(corev1ac.Pod("foo", "default")),
-			want: want{
-				prefilterOp: result{
-					returnValue: nilPreFilterResult,
-				},
-			},
+			pod: st.MakePod().Name("foo").Namespace("default").Obj(),
 		},
 		"claim-reference": {
 			pod:    podWithClaimName,
 			claims: []*resourcev1alpha1.ResourceClaim{allocatedClaim, otherClaim},
-			want: want{
-				prefilterOp: result{
-
-					returnValue: nilPreFilterResult,
-				},
-			},
 		},
 		"claim-template": {
 			pod:    podWithClaimTemplate,
 			claims: []*resourcev1alpha1.ResourceClaim{allocatedClaim, otherClaim},
-			want: want{
-				prefilterOp: result{
-					returnValue: nilPreFilterResult,
-				},
-			},
 		},
 		"missing-claim": {
 			pod: podWithClaimTemplate,
 			want: want{
 				prefilterOp: result{
-					returnValue: nilPreFilterResult,
-					status:      framework.NewStatus(framework.UnschedulableAndUnresolvable, `waiting for dynamic resource controller to create the resourceclaim "my-pod-my-resource"`),
+					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `waiting for dynamic resource controller to create the resourceclaim "my-pod-my-resource"`),
 				},
 			},
 		},
@@ -270,8 +207,7 @@ func TestPlugin(t *testing.T) {
 			claims: []*resourcev1alpha1.ResourceClaim{pendingImmediateClaim},
 			want: want{
 				prefilterOp: result{
-					returnValue: nilPreFilterResult,
-					status:      framework.NewStatus(framework.UnschedulableAndUnresolvable, `unallocated immediate resourceclaim`),
+					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `unallocated immediate resourceclaim`),
 				},
 			},
 		},
@@ -280,8 +216,7 @@ func TestPlugin(t *testing.T) {
 			claims: []*resourcev1alpha1.ResourceClaim{deallocatingClaim},
 			want: want{
 				prefilterOp: result{
-					returnValue: nilPreFilterResult,
-					status:      framework.NewStatus(framework.UnschedulableAndUnresolvable, `resourceclaim must be reallocated`),
+					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `resourceclaim must be reallocated`),
 				},
 			},
 		},
@@ -289,9 +224,6 @@ func TestPlugin(t *testing.T) {
 			pod:    podWithClaimName,
 			claims: []*resourcev1alpha1.ResourceClaim{pendingDelayedClaim},
 			want: want{
-				prefilterOp: result{
-					returnValue: nilPreFilterResult,
-				},
 				filterOp: perNodeResult{
 					workerNode.Name: {
 						status: framework.AsStatus(fmt.Errorf(`look up resource class: resourceclass.resource.k8s.io "%s" not found`, className)),
@@ -306,9 +238,6 @@ func TestPlugin(t *testing.T) {
 			claims:  []*resourcev1alpha1.ResourceClaim{pendingDelayedClaim},
 			classes: []*resourcev1alpha1.ResourceClass{resourceClass},
 			want: want{
-				prefilterOp: result{
-					returnValue: nilPreFilterResult,
-				},
 				reserveOp: result{
 					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `waiting for resource driver to allocate resource`),
 					added:  []metav1.Object{schedulingSelectedPotential},
@@ -323,9 +252,6 @@ func TestPlugin(t *testing.T) {
 			claims:  []*resourcev1alpha1.ResourceClaim{pendingDelayedClaim, pendingDelayedClaim2},
 			classes: []*resourcev1alpha1.ResourceClass{resourceClass},
 			want: want{
-				prefilterOp: result{
-					returnValue: nilPreFilterResult,
-				},
 				reserveOp: result{
 					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `waiting for resource driver to provide information`),
 					added:  []metav1.Object{schedulingPotential},
@@ -340,13 +266,18 @@ func TestPlugin(t *testing.T) {
 			schedulings: []*resourcev1alpha1.PodScheduling{schedulingInfo},
 			classes:     []*resourcev1alpha1.ResourceClass{resourceClass},
 			want: want{
-				prefilterOp: result{
-					returnValue: nilPreFilterResult,
-				},
 				reserveOp: result{
 					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `waiting for resource driver to allocate resource`),
-					changes: []any{
-						resourcev1alpha1ac.PodScheduling(podName, namespace).WithSpec(resourcev1alpha1ac.PodSchedulingSpec().WithSelectedNode(workerNode.Name)),
+					changes: changeMapping{
+						podName: func(in metav1.Object) metav1.Object {
+							scheduling, ok := in.(*resourcev1alpha1.PodScheduling)
+							if !ok {
+								return in
+							}
+							return st.FromPodScheduling(scheduling).
+								SelectedNode(workerNode.Name).
+								Obj()
+						},
 					},
 				},
 			},
@@ -358,12 +289,17 @@ func TestPlugin(t *testing.T) {
 			schedulings: []*resourcev1alpha1.PodScheduling{schedulingInfo},
 			classes:     []*resourcev1alpha1.ResourceClass{resourceClass},
 			want: want{
-				prefilterOp: result{
-					returnValue: nilPreFilterResult,
-				},
 				reserveOp: result{
-					changes: []any{
-						resourcev1alpha1ac.ResourceClaim(claimName, namespace).WithStatus(resourcev1alpha1ac.ResourceClaimStatus().WithReservedFor(resourcev1alpha1ac.ResourceClaimConsumerReference().WithResource("pods").WithName(podName).WithUID(podUID))),
+					changes: changeMapping{
+						claimName: func(in metav1.Object) metav1.Object {
+							claim, ok := in.(*resourcev1alpha1.ResourceClaim)
+							if !ok {
+								return in
+							}
+							return st.FromResourceClaim(claim).
+								ReservedFor(resourcev1alpha1.ResourceClaimConsumerReference{Resource: "pods", Name: podName, UID: types.UID(podUID)}).
+								Obj()
+						},
 					},
 				},
 				postbindOp: result{
@@ -376,8 +312,7 @@ func TestPlugin(t *testing.T) {
 			claims: []*resourcev1alpha1.ResourceClaim{inUseClaim},
 			want: want{
 				prefilterOp: result{
-					returnValue: nilPreFilterResult,
-					status:      framework.NewStatus(framework.UnschedulableAndUnresolvable, `resourceclaim in use`),
+					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `resourceclaim in use`),
 				},
 			},
 		},
@@ -385,9 +320,6 @@ func TestPlugin(t *testing.T) {
 			pod:    podWithClaimName,
 			claims: []*resourcev1alpha1.ResourceClaim{allocatedClaimWithWrongTopology},
 			want: want{
-				prefilterOp: result{
-					returnValue: nilPreFilterResult,
-				},
 				filterOp: perNodeResult{
 					workerNode.Name: {
 						status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `resourceclaim not available on the node`),
@@ -399,12 +331,17 @@ func TestPlugin(t *testing.T) {
 			pod:    podWithClaimName,
 			claims: []*resourcev1alpha1.ResourceClaim{allocatedClaimWithGoodTopology},
 			want: want{
-				prefilterOp: result{
-					returnValue: nilPreFilterResult,
-				},
 				reserveOp: result{
-					changes: []any{
-						resourcev1alpha1ac.ResourceClaim(claimName, namespace).WithStatus(resourcev1alpha1ac.ResourceClaimStatus().WithReservedFor(resourcev1alpha1ac.ResourceClaimConsumerReference().WithResource("pods").WithName(podName).WithUID(podUID))),
+					changes: changeMapping{
+						claimName: func(in metav1.Object) metav1.Object {
+							claim, ok := in.(*resourcev1alpha1.ResourceClaim)
+							if !ok {
+								return in
+							}
+							return st.FromResourceClaim(claim).
+								ReservedFor(resourcev1alpha1.ResourceClaimConsumerReference{Resource: "pods", Name: podName, UID: types.UID(podUID)}).
+								Obj()
+						},
 					},
 				},
 			},
@@ -412,11 +349,6 @@ func TestPlugin(t *testing.T) {
 		"reserved-okay": {
 			pod:    podWithClaimName,
 			claims: []*resourcev1alpha1.ResourceClaim{inUseClaim},
-			want: want{
-				prefilterOp: result{
-					returnValue: nilPreFilterResult,
-				},
-			},
 		},
 	}
 
@@ -434,7 +366,9 @@ func TestPlugin(t *testing.T) {
 			initialObjects := testCtx.listAll(t)
 			result, status := testCtx.p.PreFilter(testCtx.ctx, testCtx.state, tc.pod)
 			t.Run("prefilter", func(t *testing.T) {
-				testCtx.verify(t, overallResult(tc.want[prefilterOp]), initialObjects, result, status)
+				want := overallResult(tc.want[prefilterOp])
+				assert.Equal(t, want.preFilterResult, result)
+				testCtx.verify(t, want, initialObjects, result, status)
 			})
 			unschedulable := status.Code() != framework.Success
 
@@ -531,7 +465,6 @@ func nodeResult(in any, nodeName string) result {
 
 func (tc *testContext) verify(t *testing.T, expected result, initialObjects []metav1.Object, result interface{}, status *framework.Status) {
 	t.Helper()
-	assert.Equal(t, expected.returnValue, result)
 	assert.Equal(t, expected.status, status)
 	objects := tc.listAll(t)
 	wantObjects := update(t, initialObjects, expected.changes)
@@ -598,43 +531,21 @@ func sortObjects(objects []metav1.Object) {
 	})
 }
 
-type namespacedName struct {
-	Name      string `json:"name"`
-	Namespace string `json:"namespace"`
-}
+// update walks through all existing objects, finds the corresponding update
+// function based on name and kind, and replaces those objects that have an
+// update function. The rest is left unchanged.
+func update(t *testing.T, objects []metav1.Object, updates changeMapping) []metav1.Object {
+	var updated []metav1.Object
 
-type object struct {
-	Metadata namespacedName `json:"metadata"`
-}
-
-func update[T metav1.Object](t *testing.T, objects []T, updates []any) []T {
-	var updated []T
-
-	// Convert all updates from apply configuration to the corresponding
-	// JSON. By decoding the JSON into namespacedName we can figure out
-	// what the update is for.
-	jsonUpdates := make(map[namespacedName][]byte)
-	for _, update := range updates {
-		data, err := json.Marshal(update)
-		require.NoError(t, err)
-		var o object
-		require.NoError(t, json.Unmarshal(data, &o))
-		jsonUpdates[o.Metadata] = data
+	for _, obj := range objects {
+		name := obj.GetName()
+		updater, ok := updates[name]
+		if ok {
+			obj = updater(obj)
+		}
+		updated = append(updated, obj)
 	}
 
-	for _, object := range objects {
-		// We can get this through the common interface.
-		id := namespacedName{
-			Name:      object.GetName(),
-			Namespace: object.GetNamespace(),
-		}
-
-		if data, ok := jsonUpdates[id]; ok {
-			// Updates are not proper server-side-apply - here we just overwrite fields.
-			require.NoError(t, json.Unmarshal(data, object))
-		}
-		updated = append(updated, object)
-	}
 	return updated
 }
 
