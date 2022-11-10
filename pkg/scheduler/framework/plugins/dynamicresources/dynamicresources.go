@@ -414,10 +414,7 @@ func (pl *dynamicResources) Filter(ctx context.Context, cs *framework.CycleState
 		case claim.Status.DeallocationRequested:
 			// We shouldn't get here. PreFilter already checked this.
 			return statusUnschedulable(logger, "resourceclaim must be reallocated", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim))
-		default:
-			// This must be delayed allocation. Immediate
-			// allocation was already checked for in PreFilter.
-
+		case claim.Spec.AllocationMode == resourcev1alpha1.AllocationModeWaitForFirstConsumer:
 			// The ResourceClass might have a node filter. This is
 			// useful for trimming the initial set of potential
 			// nodes before we ask the driver(s) for information
@@ -451,6 +448,10 @@ func (pl *dynamicResources) Filter(ctx context.Context, cs *framework.CycleState
 					}
 				}
 			}
+		default:
+			// This should have been delayed allocation. Immediate
+			// allocation was already checked for in PreFilter.
+			return statusError(logger, fmt.Errorf("internal error, unexpected allocation mode %v", claim.Spec.AllocationMode))
 		}
 	}
 
