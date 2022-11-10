@@ -138,11 +138,10 @@ var (
 		Obj()
 )
 
-// result defines the expected outcome of some operation. It covers return
-// values, the plugin state and the state of the world (= objects).
+// result defines the expected outcome of some operation. It covers
+// operation's status and the state of the world (= objects).
 type result struct {
-	preFilterResult *framework.PreFilterResult
-	status          *framework.Status
+	status *framework.Status
 
 	// changes contains a mapping of name to an update function for
 	// the corresponding object. These functions apply exactly the expected
@@ -156,22 +155,29 @@ type result struct {
 	removed []metav1.Object
 }
 
+type resultPreFilter struct {
+	result
+	preFilterResult *framework.PreFilterResult
+}
+
 type changeMapping map[string]func(metav1.Object) metav1.Object
-
-type operation int
-
-const (
-	prefilterOp operation = iota
-	filterOp
-	prescoreOp
-	reserveOp
-	unreserveOp
-	postbindOp
-)
-
 type perNodeResult map[string]result
 
-type want map[operation]any
+func (p perNodeResult) forNode(nodeName string) result {
+	if p == nil {
+		return result{}
+	}
+	return p[nodeName]
+}
+
+type want struct {
+	prefilter resultPreFilter
+	filter    perNodeResult
+	prescore  result
+	reserve   result
+	unreserve result
+	postbind  result
+}
 
 func TestPlugin(t *testing.T) {
 	testcases := map[string]struct {
@@ -197,8 +203,10 @@ func TestPlugin(t *testing.T) {
 		"missing-claim": {
 			pod: podWithClaimTemplate,
 			want: want{
-				prefilterOp: result{
-					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `waiting for dynamic resource controller to create the resourceclaim "my-pod-my-resource"`),
+				prefilter: resultPreFilter{
+					result: result{
+						status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `waiting for dynamic resource controller to create the resourceclaim "my-pod-my-resource"`),
+					},
 				},
 			},
 		},
@@ -206,8 +214,10 @@ func TestPlugin(t *testing.T) {
 			pod:    podWithClaimName,
 			claims: []*resourcev1alpha1.ResourceClaim{pendingImmediateClaim},
 			want: want{
-				prefilterOp: result{
-					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `unallocated immediate resourceclaim`),
+				prefilter: resultPreFilter{
+					result: result{
+						status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `unallocated immediate resourceclaim`),
+					},
 				},
 			},
 		},
@@ -215,8 +225,10 @@ func TestPlugin(t *testing.T) {
 			pod:    podWithClaimName,
 			claims: []*resourcev1alpha1.ResourceClaim{deallocatingClaim},
 			want: want{
-				prefilterOp: result{
-					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `resourceclaim must be reallocated`),
+				prefilter: resultPreFilter{
+					result: result{
+						status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `resourceclaim must be reallocated`),
+					},
 				},
 			},
 		},
@@ -224,7 +236,7 @@ func TestPlugin(t *testing.T) {
 			pod:    podWithClaimName,
 			claims: []*resourcev1alpha1.ResourceClaim{pendingDelayedClaim},
 			want: want{
-				filterOp: perNodeResult{
+				filter: perNodeResult{
 					workerNode.Name: {
 						status: framework.AsStatus(fmt.Errorf(`look up resource class: resourceclass.resource.k8s.io "%s" not found`, className)),
 					},
@@ -238,7 +250,7 @@ func TestPlugin(t *testing.T) {
 			claims:  []*resourcev1alpha1.ResourceClaim{pendingDelayedClaim},
 			classes: []*resourcev1alpha1.ResourceClass{resourceClass},
 			want: want{
-				reserveOp: result{
+				reserve: result{
 					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `waiting for resource driver to allocate resource`),
 					added:  []metav1.Object{schedulingSelectedPotential},
 				},
@@ -252,7 +264,7 @@ func TestPlugin(t *testing.T) {
 			claims:  []*resourcev1alpha1.ResourceClaim{pendingDelayedClaim, pendingDelayedClaim2},
 			classes: []*resourcev1alpha1.ResourceClass{resourceClass},
 			want: want{
-				reserveOp: result{
+				reserve: result{
 					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `waiting for resource driver to provide information`),
 					added:  []metav1.Object{schedulingPotential},
 				},
@@ -266,7 +278,7 @@ func TestPlugin(t *testing.T) {
 			schedulings: []*resourcev1alpha1.PodScheduling{schedulingInfo},
 			classes:     []*resourcev1alpha1.ResourceClass{resourceClass},
 			want: want{
-				reserveOp: result{
+				reserve: result{
 					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `waiting for resource driver to allocate resource`),
 					changes: changeMapping{
 						podName: func(in metav1.Object) metav1.Object {
@@ -289,7 +301,7 @@ func TestPlugin(t *testing.T) {
 			schedulings: []*resourcev1alpha1.PodScheduling{schedulingInfo},
 			classes:     []*resourcev1alpha1.ResourceClass{resourceClass},
 			want: want{
-				reserveOp: result{
+				reserve: result{
 					changes: changeMapping{
 						claimName: func(in metav1.Object) metav1.Object {
 							claim, ok := in.(*resourcev1alpha1.ResourceClaim)
@@ -302,7 +314,7 @@ func TestPlugin(t *testing.T) {
 						},
 					},
 				},
-				postbindOp: result{
+				postbind: result{
 					removed: []metav1.Object{schedulingInfo},
 				},
 			},
@@ -311,8 +323,10 @@ func TestPlugin(t *testing.T) {
 			pod:    otherPodWithClaimName,
 			claims: []*resourcev1alpha1.ResourceClaim{inUseClaim},
 			want: want{
-				prefilterOp: result{
-					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `resourceclaim in use`),
+				prefilter: resultPreFilter{
+					result: result{
+						status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `resourceclaim in use`),
+					},
 				},
 			},
 		},
@@ -320,7 +334,7 @@ func TestPlugin(t *testing.T) {
 			pod:    podWithClaimName,
 			claims: []*resourcev1alpha1.ResourceClaim{allocatedClaimWithWrongTopology},
 			want: want{
-				filterOp: perNodeResult{
+				filter: perNodeResult{
 					workerNode.Name: {
 						status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `resourceclaim not available on the node`),
 					},
@@ -331,7 +345,7 @@ func TestPlugin(t *testing.T) {
 			pod:    podWithClaimName,
 			claims: []*resourcev1alpha1.ResourceClaim{allocatedClaimWithGoodTopology},
 			want: want{
-				reserveOp: result{
+				reserve: result{
 					changes: changeMapping{
 						claimName: func(in metav1.Object) metav1.Object {
 							claim, ok := in.(*resourcev1alpha1.ResourceClaim)
@@ -366,9 +380,8 @@ func TestPlugin(t *testing.T) {
 			initialObjects := testCtx.listAll(t)
 			result, status := testCtx.p.PreFilter(testCtx.ctx, testCtx.state, tc.pod)
 			t.Run("prefilter", func(t *testing.T) {
-				want := overallResult(tc.want[prefilterOp])
-				assert.Equal(t, want.preFilterResult, result)
-				testCtx.verify(t, want, initialObjects, result, status)
+				assert.Equal(t, tc.want.prefilter.preFilterResult, result)
+				testCtx.verify(t, tc.want.prefilter.result, initialObjects, result, status)
 			})
 			unschedulable := status.Code() != framework.Success
 
@@ -379,7 +392,7 @@ func TestPlugin(t *testing.T) {
 					status := testCtx.p.Filter(testCtx.ctx, testCtx.state, tc.pod, nodeInfo)
 					nodeName := nodeInfo.Node().Name
 					t.Run(fmt.Sprintf("filter/%s", nodeInfo.Node().Name), func(t *testing.T) {
-						testCtx.verify(t, nodeResult(tc.want[filterOp], nodeName), initialObjects, nil, status)
+						testCtx.verify(t, tc.want.filter.forNode(nodeName), initialObjects, nil, status)
 					})
 					if status.Code() != framework.Success {
 						unschedulable = true
@@ -393,7 +406,7 @@ func TestPlugin(t *testing.T) {
 				initialObjects = testCtx.listAll(t)
 				status := testCtx.p.PreScore(testCtx.ctx, testCtx.state, tc.pod, potentialNodes)
 				t.Run("prescore", func(t *testing.T) {
-					testCtx.verify(t, overallResult(tc.want[prescoreOp]), initialObjects, nil, status)
+					testCtx.verify(t, tc.want.prescore, initialObjects, nil, status)
 				})
 				if status.Code() != framework.Success {
 					unschedulable = true
@@ -407,7 +420,7 @@ func TestPlugin(t *testing.T) {
 				initialObjects = testCtx.listAll(t)
 				status := testCtx.p.Reserve(testCtx.ctx, testCtx.state, tc.pod, selectedNode.Name)
 				t.Run("reserve", func(t *testing.T) {
-					testCtx.verify(t, overallResult(tc.want[reserveOp]), initialObjects, nil, status)
+					testCtx.verify(t, tc.want.reserve, initialObjects, nil, status)
 				})
 				if status.Code() != framework.Success {
 					unschedulable = true
@@ -419,13 +432,13 @@ func TestPlugin(t *testing.T) {
 					initialObjects = testCtx.listAll(t)
 					testCtx.p.Unreserve(testCtx.ctx, testCtx.state, tc.pod, selectedNode.Name)
 					t.Run("unreserve", func(t *testing.T) {
-						testCtx.verify(t, overallResult(tc.want[unreserveOp]), initialObjects, nil, status)
+						testCtx.verify(t, tc.want.unreserve, initialObjects, nil, status)
 					})
 				} else {
 					initialObjects = testCtx.listAll(t)
 					testCtx.p.PostBind(testCtx.ctx, testCtx.state, tc.pod, selectedNode.Name)
 					t.Run("postbind", func(t *testing.T) {
-						testCtx.verify(t, overallResult(tc.want[postbindOp]), initialObjects, nil, status)
+						testCtx.verify(t, tc.want.postbind, initialObjects, nil, status)
 					})
 				}
 			}
@@ -439,28 +452,6 @@ type testContext struct {
 	p         *dynamicResources
 	nodeInfos []*framework.NodeInfo
 	state     *framework.CycleState
-}
-
-func overallResult(in any) result {
-	if in == nil {
-		return result{}
-	}
-	out, ok := in.(result)
-	if !ok {
-		panic(fmt.Sprintf("internal error, expected result value, got %T: %v", in, in))
-	}
-	return out
-}
-
-func nodeResult(in any, nodeName string) result {
-	if in == nil {
-		return result{}
-	}
-	out, ok := in.(perNodeResult)
-	if !ok {
-		panic(fmt.Sprintf("internal error, expected perNodeResult value, got %T: %v", in, in))
-	}
-	return out[nodeName]
 }
 
 func (tc *testContext) verify(t *testing.T, expected result, initialObjects []metav1.Object, result interface{}, status *framework.Status) {
