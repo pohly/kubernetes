@@ -41,6 +41,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/resourceclaim/metrics"
 	"k8s.io/kubernetes/pkg/util/dynamic-resource-allocation/resourceclaim"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
 const (
@@ -172,8 +173,7 @@ func (ec *Controller) enqueuePod(obj interface{}, deleted bool) {
 
 	// Release reservations of a deleted or completed pod?
 	if deleted ||
-		pod.Status.Phase == v1.PodFailed ||
-		pod.Status.Phase == v1.PodSucceeded ||
+		podutil.IsPodTerminal(pod) ||
 		// Deleted and not scheduled:
 		pod.DeletionTimestamp != nil && pod.Spec.NodeName == "" {
 		for _, podClaim := range pod.Spec.ResourceClaims {
