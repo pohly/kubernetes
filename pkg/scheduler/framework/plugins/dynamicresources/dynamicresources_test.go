@@ -685,7 +685,9 @@ func setup(t *testing.T, nodes []*v1.Node, claims []*resourcev1alpha1.ResourceCl
 
 	informerFactory.Start(tc.ctx.Done())
 	t.Cleanup(func() {
+		// Need to cancel before waiting for the shutdown.
 		cancel()
+		// Now we can wait for all goroutines to stop.
 		informerFactory.Shutdown()
 	})
 
@@ -705,7 +707,6 @@ func setup(t *testing.T, nodes []*v1.Node, claims []*resourcev1alpha1.ResourceCl
 // the fake client. Add it with client.PrependReactor to your fake client.
 func createReactor(tracker cgotesting.ObjectTracker) func(action cgotesting.Action) (handled bool, ret apiruntime.Object, err error) {
 	var uidCounter int
-	var resourceVersionCounter int
 	var mutex sync.Mutex
 
 	return func(action cgotesting.Action) (handled bool, ret apiruntime.Object, err error) {
@@ -725,37 +726,13 @@ func createReactor(tracker cgotesting.ObjectTracker) func(action cgotesting.Acti
 			if obj.GetUID() != "" {
 				return true, nil, errors.New("UID must not be set on create")
 			}
-			if obj.GetResourceVersion() != "" {
-				return true, nil, errors.New("ResourceVersion must not be set on create")
-			}
 			obj.SetUID(types.UID(fmt.Sprintf("UID-%d", uidCounter)))
 			uidCounter++
-			obj.SetResourceVersion(fmt.Sprintf("REV-%d", resourceVersionCounter))
-			resourceVersionCounter++
 		case "update":
 			uid := obj.GetUID()
-			resourceVersion := obj.GetResourceVersion()
 			if uid == "" {
 				return true, nil, errors.New("UID must be set on update")
 			}
-			if resourceVersion == "" {
-				return true, nil, errors.New("ResourceVersion must be set on update")
-			}
-
-			oldObj, err := tracker.Get(action.GetResource(), obj.GetNamespace(), obj.GetName())
-			if err != nil {
-				return true, nil, err
-			}
-			oldObjMeta, ok := oldObj.(metav1.Object)
-			if !ok {
-				return true, nil, errors.New("internal error: unexpected old object type")
-			}
-			if oldObjMeta.GetResourceVersion() != resourceVersion {
-				return true, nil, errors.New("ResourceVersion must match the object that gets updated")
-			}
-
-			obj.SetResourceVersion(fmt.Sprintf("REV-%d", resourceVersionCounter))
-			resourceVersionCounter++
 		}
 		return false, nil, nil
 	}
