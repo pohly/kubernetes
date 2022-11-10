@@ -14,6 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// The code below was copied from
+// https://github.com/container-orchestrated-devices/container-device-interface/blob/v0.5.3/pkg/cdi/annotations.go
+// https://github.com/container-orchestrated-devices/container-device-interface/blob/v0.5.3/pkg/cdi/qualified-device.go
+// to avoid a dependency on that package and the indirect dependencies that
+// this would have implied.
+//
+// Long term it would be good to avoid this duplication:
+// https://github.com/container-orchestrated-devices/container-device-interface/issues/97
+
 package dra
 
 import (
@@ -163,7 +172,9 @@ func parseDevice(device string) (string, string, string) {
 
 // parseQualifier splits a device qualifier into vendor and class.
 // The syntax for a device qualifier is
-//     "<vendor>/<class>"
+//
+//	"<vendor>/<class>"
+//
 // If parsing fails, an empty vendor and the class set to the
 // verbatim input is returned.
 func parseQualifier(kind string) (string, string) {
