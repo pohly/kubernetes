@@ -141,7 +141,6 @@ var (
 // operation's status and the state of the world (= objects).
 type result struct {
 	status *framework.Status
-
 	// changes contains a mapping of name to an update function for
 	// the corresponding object. These functions apply exactly the expected
 	// changes to a copy of the object as it existed before the operation.
@@ -165,13 +164,15 @@ func (p perNodeResult) forNode(nodeName string) result {
 }
 
 type want struct {
-	preFilterResult *framework.PreFilterResult
-	prefilter       result
-	filter          perNodeResult
-	prescore        result
-	reserve         result
-	unreserve       result
-	postbind        result
+	preFilterResult  *framework.PreFilterResult
+	prefilter        result
+	filter           perNodeResult
+	prescore         result
+	reserve          result
+	unreserve        result
+	postbind         result
+	postFilterResult *framework.PostFilterResult
+	postfilter       result
 }
 
 // prepare contains changes for objects in the API server.
@@ -179,11 +180,12 @@ type want struct {
 // be used to simulate concurrent changes by some other entities
 // like a resource driver.
 type prepare struct {
-	filter    changeMapping
-	prescore  changeMapping
-	reserve   changeMapping
-	unreserve changeMapping
-	postbind  changeMapping
+	filter     changeMapping
+	prescore   changeMapping
+	reserve    changeMapping
+	unreserve  changeMapping
+	postbind   changeMapping
+	postfilter changeMapping
 }
 
 func TestPlugin(t *testing.T) {
@@ -214,6 +216,9 @@ func TestPlugin(t *testing.T) {
 				prefilter: result{
 					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `waiting for dynamic resource controller to create the resourceclaim "my-pod-my-resource"`),
 				},
+				postfilter: result{
+					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `no new claims to deallocate`),
+				},
 			},
 		},
 		"waiting-for-immediate-allocation": {
@@ -223,6 +228,9 @@ func TestPlugin(t *testing.T) {
 				prefilter: result{
 					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `unallocated immediate resourceclaim`),
 				},
+				postfilter: result{
+					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `no new claims to deallocate`),
+				},
 			},
 		},
 		"waiting-for-deallocation": {
@@ -231,6 +239,9 @@ func TestPlugin(t *testing.T) {
 			want: want{
 				prefilter: result{
 					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `resourceclaim must be reallocated`),
+				},
+				postfilter: result{
+					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `no new claims to deallocate`),
 				},
 			},
 		},
@@ -242,6 +253,9 @@ func TestPlugin(t *testing.T) {
 					workerNode.Name: {
 						status: framework.AsStatus(fmt.Errorf(`look up resource class: resourceclass.resource.k8s.io "%s" not found`, className)),
 					},
+				},
+				postfilter: result{
+					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `still not schedulable`),
 				},
 			},
 		},
@@ -351,21 +365,43 @@ func TestPlugin(t *testing.T) {
 			},
 		},
 		"in-use-by-other": {
-			pod:    otherPodWithClaimName,
-			claims: []*resourcev1alpha1.ResourceClaim{inUseClaim},
+			nodes:       []*v1.Node{},
+			pod:         otherPodWithClaimName,
+			claims:      []*resourcev1alpha1.ResourceClaim{inUseClaim},
+			classes:     []*resourcev1alpha1.ResourceClass{},
+			schedulings: []*resourcev1alpha1.PodScheduling{},
+			prepare:     prepare{},
 			want: want{
 				prefilter: result{
 					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `resourceclaim in use`),
 				},
+				postfilter: result{
+					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `no new claims to deallocate`),
+				},
 			},
 		},
 		"wrong-topology": {
+			// PostFilter tries to get the pod scheduleable by
+			// deallocating the claim.
 			pod:    podWithClaimName,
 			claims: []*resourcev1alpha1.ResourceClaim{allocatedClaimWithWrongTopology},
 			want: want{
 				filter: perNodeResult{
 					workerNode.Name: {
 						status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `resourceclaim not available on the node`),
+					},
+				},
+				postfilter: result{
+					changes: changeMapping{
+						claimName: func(in metav1.Object) metav1.Object {
+							claim, ok := in.(*resourcev1alpha1.ResourceClaim)
+							if !ok {
+								return in
+							}
+							return st.FromResourceClaim(claim).
+								DeallocationRequested(true).
+								Obj()
+						},
 					},
 				},
 			},
@@ -477,6 +513,14 @@ func TestPlugin(t *testing.T) {
 						testCtx.verify(t, tc.want.postbind, initialObjects, nil, status)
 					})
 				}
+			} else {
+				initialObjects = testCtx.listAll(t)
+				initialObjects = testCtx.updateAPIServer(t, initialObjects, tc.prepare.postfilter)
+				result, status := testCtx.p.PostFilter(testCtx.ctx, testCtx.state, tc.pod, nil /* filteredNodeStatusMap not used by plugin */)
+				t.Run("postfilter", func(t *testing.T) {
+					assert.Equal(t, tc.want.postFilterResult, result)
+					testCtx.verify(t, tc.want.postfilter, initialObjects, nil, status)
+				})
 			}
 		})
 	}
