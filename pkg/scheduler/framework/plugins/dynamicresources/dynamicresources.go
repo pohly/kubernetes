@@ -267,10 +267,6 @@ func (pl *dynamicResources) EventsToRegister() []framework.ClusterEvent {
 
 // podResourceClaims returns the ResourceClaims for all pod.Spec.PodResourceClaims.
 func (pl *dynamicResources) podResourceClaims(pod *v1.Pod) ([]*resourcev1alpha1.ResourceClaim, error) {
-	if !pl.enabled {
-		return nil, nil
-	}
-
 	claims := make([]*resourcev1alpha1.ResourceClaim, 0, len(pod.Spec.ResourceClaims))
 	for _, resource := range pod.Spec.ResourceClaims {
 		claimName := resourceclaim.Name(pod, &resource)
