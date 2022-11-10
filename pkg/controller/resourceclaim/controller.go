@@ -39,9 +39,9 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/resourceclaim/metrics"
 	"k8s.io/kubernetes/pkg/util/dynamic-resource-allocation/resourceclaim"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
 const (
