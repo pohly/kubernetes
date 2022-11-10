@@ -524,7 +524,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			},
 		},
 		"invalid-reserved-deleted": {
-			wantFailures: field.ErrorList{field.Forbidden(field.NewPath("status", "reservedFor"), "new entries may not be added while the claim is meant to be deallocated")},
+			wantFailures: field.ErrorList{field.Forbidden(field.NewPath("status", "reservedFor"), "new entries may not be added while `deallocationRequested` or `deletionTimestamp` are set")},
 			oldClaim: func() *resource.ResourceClaim {
 				claim := validAllocatedClaim.DeepCopy()
 				var deletionTimestamp metav1.Time
@@ -543,7 +543,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			},
 		},
 		"invalid-reserved-deallocation-requested": {
-			wantFailures: field.ErrorList{field.Forbidden(field.NewPath("status", "reservedFor"), "new entries may not be added while the claim is meant to be deallocated")},
+			wantFailures: field.ErrorList{field.Forbidden(field.NewPath("status", "reservedFor"), "new entries may not be added while `deallocationRequested` or `deletionTimestamp` are set")},
 			oldClaim: func() *resource.ResourceClaim {
 				claim := validAllocatedClaim.DeepCopy()
 				claim.Status.DeallocationRequested = true
@@ -598,7 +598,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			},
 		},
 		"invalid-deallocation-not-allocated": {
-			wantFailures: field.ErrorList{field.Forbidden(field.NewPath("status", "deallocationRequested"), "may not be set when `allocation` is not set")},
+			wantFailures: field.ErrorList{field.Forbidden(field.NewPath("status"), "`allocation` must be set when `deallocationRequested` is set")},
 			oldClaim:     validClaim,
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
 				claim.Status.DeallocationRequested = true
@@ -606,7 +606,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			},
 		},
 		"invalid-allocation-removal-not-reset": {
-			wantFailures: field.ErrorList{field.Forbidden(field.NewPath("status", "deallocationRequested"), "must be cleared when `allocation` is unset")},
+			wantFailures: field.ErrorList{field.Forbidden(field.NewPath("status"), "`allocation` must be set when `deallocationRequested` is set")},
 			oldClaim: func() *resource.ResourceClaim {
 				claim := validAllocatedClaim.DeepCopy()
 				claim.Status.DeallocationRequested = true

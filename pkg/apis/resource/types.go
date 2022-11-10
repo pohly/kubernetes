@@ -33,6 +33,7 @@ import (
 type ResourceClaim struct {
 	metav1.TypeMeta
 	// Standard object metadata
+	// +optional
 	metav1.ObjectMeta
 
 	// Spec describes the desired attributes of a resource that then needs
@@ -42,6 +43,7 @@ type ResourceClaim struct {
 
 	// Status describes whether the resource is available and with which
 	// attributes.
+	// +optional
 	Status ResourceClaimStatus
 }
 
@@ -57,10 +59,12 @@ type ResourceClaimSpec struct {
 	// claim.
 	//
 	// The object must be in the same namespace as the ResourceClaim.
+	// +optional
 	ParametersRef *ResourceClaimParametersReference
 
 	// Allocation can start immediately or when a Pod wants to use the
 	// resource. "WaitForFirstConsumer" is the default.
+	// +optional
 	AllocationMode AllocationMode
 }
 
@@ -90,11 +94,13 @@ const (
 type ResourceClaimStatus struct {
 	// DriverName is a copy of the driver name from the ResourceClass at
 	// the time when allocation started.
+	// +optional
 	DriverName string
 
 	// Allocation is set by the resource driver once a resource has been
 	// allocated successfully. If this is not specified, the resource is
 	// not yet allocated.
+	// +optional
 	Allocation *AllocationResult
 
 	// ReservedFor indicates which entities are currently allowed to use
@@ -103,6 +109,7 @@ type ResourceClaimStatus struct {
 	//
 	// There can be at most 32 such reservations. This may get increased in
 	// the future, but not reduced.
+	// +optional
 	ReservedFor []ResourceClaimConsumerReference
 
 	// DeallocationRequested indicates that a ResourceClaim is to be
@@ -113,6 +120,7 @@ type ResourceClaimStatus struct {
 	//
 	// While DeallocationRequested is set, no new consumers may be added to
 	// ReservedFor.
+	// +optional
 	DeallocationRequested bool
 }
 
@@ -129,6 +137,7 @@ type AllocationResult struct {
 	//
 	// The maximum size of this field is 16KiB. This may get
 	// increased in the future, but not reduced.
+	// +optional
 	ResourceHandle string
 
 	// This field will get set by the resource driver after it has
@@ -137,10 +146,12 @@ type AllocationResult struct {
 	//
 	// Setting this field is optional. If null, the resource is available
 	// everywhere.
+	// +optional
 	AvailableOnNodes *core.NodeSelector
 
 	// Shareable determines whether the resource supports more
 	// than one consumer at a time.
+	// +optional
 	Shareable bool
 }
 
@@ -153,6 +164,7 @@ const ResourceHandleMaxSize = 16 * 1024
 type ResourceClaimList struct {
 	metav1.TypeMeta
 	// Standard list metadata
+	// +optional
 	metav1.ListMeta
 
 	// Items is the list of resource claims.
@@ -170,6 +182,7 @@ type ResourceClaimList struct {
 type PodScheduling struct {
 	metav1.TypeMeta
 	// Standard object metadata
+	// +optional
 	metav1.ObjectMeta
 
 	// Spec describes where resources for the Pod are needed.
@@ -192,6 +205,7 @@ type PodSchedulingSpec struct {
 	// many clusters. Larger clusters may need more attempts to find a node
 	// that suits all pending resources. This may get increased in the
 	// future, but not reduced.
+	// +optional
 	PotentialNodes []string
 }
 
@@ -200,6 +214,7 @@ type PodSchedulingStatus struct {
 	// ResourceClaims describes resource availability for each
 	// pod.spec.resourceClaim entry where the corresponding ResourceClaim
 	// uses "WaitForFirstConsumer" allocation mode.
+	// +optional
 	ResourceClaims []ResourceClaimSchedulingStatus
 
 	// If there ever is a need to support other kinds of resources
@@ -219,6 +234,7 @@ type ResourceClaimSchedulingStatus struct {
 	// The size of this field is limited to 128, the same as for
 	// PodSchedulingSpec.PotentialNodes. This may get increased in the
 	// future, but not reduced.
+	// +optional
 	UnsuitableNodes []string
 }
 
@@ -233,6 +249,7 @@ const PodSchedulingNodeListMaxSize = 128
 type PodSchedulingList struct {
 	metav1.TypeMeta
 	// Standard list metadata
+	// +optional
 	metav1.ListMeta
 
 	// Items is the list of PodScheduling objects.
@@ -249,6 +266,7 @@ type PodSchedulingList struct {
 type ResourceClass struct {
 	metav1.TypeMeta
 	// Standard object metadata
+	// +optional
 	metav1.ObjectMeta
 
 	// DriverName defines the name of the dynamic resource driver that is
@@ -263,6 +281,7 @@ type ResourceClass struct {
 	// resource that uses this class. A dynamic resource driver can
 	// distinguish between parameters stored here and and those stored in
 	// ResourceClaimSpec.
+	// +optional
 	ParametersRef *ResourceClassParametersReference
 
 	// Only nodes matching the selector will be considered by the scheduler
@@ -270,6 +289,7 @@ type ResourceClass struct {
 	// a ResourceClaim that has not been allocated yet.
 	//
 	// Setting this field is optional. If null, all nodes are candidates.
+	// +optional
 	SuitableNodes *core.NodeSelector
 }
 
@@ -279,6 +299,7 @@ type ResourceClass struct {
 type ResourceClassList struct {
 	metav1.TypeMeta
 	// Standard list metadata
+	// +optional
 	metav1.ListMeta
 
 	// Items is the list of resource classes.
@@ -291,6 +312,7 @@ type ResourceClassParametersReference struct {
 	// APIGroup is the group for the resource being referenced. It is
 	// empty for the core API. This matches the group in the APIVersion
 	// that is used when creating the resources.
+	// +optional
 	APIGroup string
 	// Kind is the type of resource being referenced. This is the same
 	// value as in the parameter object's metadata.
@@ -300,6 +322,7 @@ type ResourceClassParametersReference struct {
 	// Namespace that contains the referenced resource. Must be empty
 	// for cluster-scoped resources and non-empty for namespaced
 	// resources.
+	// +optional
 	Namespace string
 }
 
@@ -310,6 +333,7 @@ type ResourceClaimParametersReference struct {
 	// APIGroup is the group for the resource being referenced. It is
 	// empty for the core API. This matches the group in the APIVersion
 	// that is used when creating the resources.
+	// +optional
 	APIGroup string
 	// Kind is the type of resource being referenced. This is the same
 	// value as in the parameter object's metadata, for example "ConfigMap".
@@ -325,6 +349,7 @@ type ResourceClaimConsumerReference struct {
 	// APIGroup is the group for the resource being referenced. It is
 	// empty for the core API. This matches the group in the APIVersion
 	// that is used when creating the resources.
+	// +optional
 	APIGroup string
 	// Resource is the type of resource being referenced, for example "pods".
 	Resource string
@@ -340,6 +365,7 @@ type ResourceClaimConsumerReference struct {
 type ResourceClaimTemplate struct {
 	metav1.TypeMeta
 	// Standard object metadata
+	// +optional
 	metav1.ObjectMeta
 
 	// Describes the ResourceClaim that is to be generated.
@@ -355,6 +381,7 @@ type ResourceClaimTemplateSpec struct {
 	// ObjectMeta may contain labels and annotations that will be copied into the PVC
 	// when creating it. No other fields are allowed and will be rejected during
 	// validation.
+	// +optional
 	metav1.ObjectMeta
 
 	// Spec for the ResourceClaim. The entire content is copied unchanged
@@ -369,6 +396,7 @@ type ResourceClaimTemplateSpec struct {
 type ResourceClaimTemplateList struct {
 	metav1.TypeMeta
 	// Standard list metadata
+	// +optional
 	metav1.ListMeta
 
 	// Items is the list of resource claim templates.

@@ -149,7 +149,7 @@ func ValidateClaimStatusUpdate(resourceClaim, oldClaim *resource.ResourceClaim) 
 				newSet := sets.New(resourceClaim.Status.ReservedFor...)
 				newItems := newSet.Difference(oldSet)
 				if len(newItems) > 0 {
-					allErrs = append(allErrs, field.Forbidden(fldPath.Child("reservedFor"), "new entries may not be added while the claim is meant to be deallocated"))
+					allErrs = append(allErrs, field.Forbidden(fldPath.Child("reservedFor"), "new entries may not be added while `deallocationRequested` or `deletionTimestamp` are set"))
 				}
 			}
 		}
@@ -163,18 +163,10 @@ func ValidateClaimStatusUpdate(resourceClaim, oldClaim *resource.ResourceClaim) 
 
 	if resourceClaim.Status.Allocation == nil &&
 		resourceClaim.Status.DeallocationRequested {
-		// This combination is an error. We could just state that fact
-		// (i.e. "deallocationRequested: must not be set when
-		// `allocation` is nil"), but that is a confusing error message
-		// when the driver author tried to clear `allocation` and
-		// forgot about `deallocationRequested`. By looking at the
-		// change that is being made as part of the update we can
-		// provide a more helpful message.
-		if oldClaim.Status.Allocation != nil {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("deallocationRequested"), "must be cleared when `allocation` is unset"))
-		} else {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("deallocationRequested"), "may not be set when `allocation` is not set"))
-		}
+		// Either one or the other field was modified incorrectly.
+		// For the sake of simplicity this only reports the invalid
+		// end result.
+		allErrs = append(allErrs, field.Forbidden(fldPath, "`allocation` must be set when `deallocationRequested` is set"))
 	}
 
 	// Once deallocation has been requested, that request cannot be removed

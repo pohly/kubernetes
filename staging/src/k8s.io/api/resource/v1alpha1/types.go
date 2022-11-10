@@ -35,7 +35,8 @@ import (
 type ResourceClaim struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object metadata
-	metav1.ObjectMeta `json:"metadata" protobuf:"bytes,1,name=metadata"`
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Spec describes the desired attributes of a resource that then needs
 	// to be allocated. It can only be set once when creating the
@@ -44,6 +45,7 @@ type ResourceClaim struct {
 
 	// Status describes whether the resource is available and with which
 	// attributes.
+	// +optional
 	Status ResourceClaimStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
@@ -59,10 +61,12 @@ type ResourceClaimSpec struct {
 	// claim.
 	//
 	// The object must be in the same namespace as the ResourceClaim.
+	// +optional
 	ParametersRef *ResourceClaimParametersReference `json:"parametersRef,omitempty" protobuf:"bytes,2,opt,name=parametersRef"`
 
 	// Allocation can start immediately or when a Pod wants to use the
 	// resource. "WaitForFirstConsumer" is the default.
+	// +optional
 	AllocationMode AllocationMode `json:"allocationMode,omitempty" protobuf:"bytes,3,opt,name=allocationMode"`
 }
 
@@ -92,11 +96,13 @@ const (
 type ResourceClaimStatus struct {
 	// DriverName is a copy of the driver name from the ResourceClass at
 	// the time when allocation started.
+	// +optional
 	DriverName string `json:"driverName,omitempty" protobuf:"bytes,1,opt,name=driverName"`
 
 	// Allocation is set by the resource driver once a resource has been
 	// allocated successfully. If this is not specified, the resource is
 	// not yet allocated.
+	// +optional
 	Allocation *AllocationResult `json:"allocation,omitempty" protobuf:"bytes,2,opt,name=allocation"`
 
 	// ReservedFor indicates which entities are currently allowed to use
@@ -107,6 +113,7 @@ type ResourceClaimStatus struct {
 	// the future, but not reduced.
 	//
 	// +listType=set
+	// +optional
 	ReservedFor []ResourceClaimConsumerReference `json:"reservedFor,omitempty" protobuf:"bytes,3,opt,name=reservedFor"`
 
 	// DeallocationRequested indicates that a ResourceClaim is to be
@@ -117,6 +124,7 @@ type ResourceClaimStatus struct {
 	//
 	// While DeallocationRequested is set, no new consumers may be added to
 	// ReservedFor.
+	// +optional
 	DeallocationRequested bool `json:"deallocationRequested,omitempty" protobuf:"varint,4,opt,name=deallocationRequested"`
 }
 
@@ -133,6 +141,7 @@ type AllocationResult struct {
 	//
 	// The maximum size of this field is 16KiB. This may get
 	// increased in the future, but not reduced.
+	// +optional
 	ResourceHandle string `json:"resourceHandle,omitempty" protobuf:"bytes,1,opt,name=resourceHandle"`
 
 	// This field will get set by the resource driver after it has
@@ -141,10 +150,12 @@ type AllocationResult struct {
 	//
 	// Setting this field is optional. If null, the resource is available
 	// everywhere.
+	// +optional
 	AvailableOnNodes *v1.NodeSelector `json:"availableOnNodes,omitempty" protobuf:"bytes,2,opt,name=availableOnNodes"`
 
 	// Shareable determines whether the resource supports more
 	// than one consumer at a time.
+	// +optional
 	Shareable bool `json:"shareable,omitempty" protobuf:"varint,3,opt,name=shareable"`
 }
 
@@ -158,6 +169,7 @@ const ResourceHandleMaxSize = 16 * 1024
 type ResourceClaimList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata
+	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Items is the list of resource claims.
@@ -177,12 +189,14 @@ type ResourceClaimList struct {
 type PodScheduling struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object metadata
-	metav1.ObjectMeta `json:"metadata" protobuf:"bytes,1,name=metadata"`
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Spec describes where resources for the Pod are needed.
 	Spec PodSchedulingSpec `json:"spec" protobuf:"bytes,2,name=spec"`
 
 	// Status describes where resources for the Pod can be allocated.
+	// +optional
 	Status PodSchedulingStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
@@ -191,6 +205,7 @@ type PodSchedulingSpec struct {
 	// SelectedNode is the node for which allocation of ResourceClaims that
 	// are referenced by the Pod and that use "WaitForFirstConsumer"
 	// allocation is to be attempted.
+	// +optional
 	SelectedNode string `json:"selectedNode,omitempty" protobuf:"bytes,1,opt,name=selectedNode"`
 
 	// PotentialNodes lists nodes where the Pod might be able to run.
@@ -201,6 +216,7 @@ type PodSchedulingSpec struct {
 	// future, but not reduced.
 	//
 	// +listType=set
+	// +optional
 	PotentialNodes []string `json:"potentialNodes,omitempty" protobuf:"bytes,2,opt,name=potentialNodes"`
 }
 
@@ -224,6 +240,7 @@ type PodSchedulingStatus struct {
 // ResourceClaim with "WaitForFirstConsumer" allocation mode.
 type ResourceClaimSchedulingStatus struct {
 	// Name matches the pod.spec.resourceClaims[*].Name field.
+	// +optional
 	Name string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
 
 	// UnsuitableNodes lists nodes that the ResourceClaim cannot be
@@ -234,6 +251,7 @@ type ResourceClaimSchedulingStatus struct {
 	// future, but not reduced.
 	//
 	// +listType=set
+	// +optional
 	UnsuitableNodes []string `json:"unsuitableNodes,omitempty" protobuf:"bytes,2,opt,name=unsuitableNodes"`
 }
 
@@ -249,6 +267,7 @@ const PodSchedulingNodeListMaxSize = 128
 type PodSchedulingList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata
+	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Items is the list of PodScheduling objects.
@@ -268,6 +287,7 @@ type PodSchedulingList struct {
 type ResourceClass struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object metadata
+	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// DriverName defines the name of the dynamic resource driver that is
@@ -275,13 +295,14 @@ type ResourceClass struct {
 	//
 	// Resource drivers have a unique name in forward domain order
 	// (acme.example.com).
-	DriverName string `json:"driverName,omitempty" protobuf:"bytes,2,opt,name=driverName"`
+	DriverName string `json:"driverName" protobuf:"bytes,2,name=driverName"`
 
 	// ParametersRef references an arbitrary separate object that may hold
 	// parameters that will be used by the driver when allocating a
 	// resource that uses this class. A dynamic resource driver can
 	// distinguish between parameters stored here and and those stored in
 	// ResourceClaimSpec.
+	// +optional
 	ParametersRef *ResourceClassParametersReference `json:"parametersRef,omitempty" protobuf:"bytes,3,opt,name=parametersRef"`
 
 	// Only nodes matching the selector will be considered by the scheduler
@@ -289,6 +310,7 @@ type ResourceClass struct {
 	// a ResourceClaim that has not been allocated yet.
 	//
 	// Setting this field is optional. If null, all nodes are candidates.
+	// +optional
 	SuitableNodes *v1.NodeSelector `json:"suitableNodes,omitempty" protobuf:"bytes,4,opt,name=suitableNodes"`
 }
 
@@ -299,6 +321,7 @@ type ResourceClass struct {
 type ResourceClassList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata
+	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Items is the list of resource classes.
@@ -311,6 +334,7 @@ type ResourceClassParametersReference struct {
 	// APIGroup is the group for the resource being referenced. It is
 	// empty for the core API. This matches the group in the APIVersion
 	// that is used when creating the resources.
+	// +optional
 	APIGroup string `json:"apiGroup,omitempty" protobuf:"bytes,1,opt,name=apiGroup"`
 	// Kind is the type of resource being referenced. This is the same
 	// value as in the parameter object's metadata.
@@ -320,6 +344,7 @@ type ResourceClassParametersReference struct {
 	// Namespace that contains the referenced resource. Must be empty
 	// for cluster-scoped resources and non-empty for namespaced
 	// resources.
+	// +optional
 	Namespace string `json:"namespace,omitempty" protobuf:"bytes,4,opt,name=namespace"`
 }
 
@@ -330,6 +355,7 @@ type ResourceClaimParametersReference struct {
 	// APIGroup is the group for the resource being referenced. It is
 	// empty for the core API. This matches the group in the APIVersion
 	// that is used when creating the resources.
+	// +optional
 	APIGroup string `json:"apiGroup,omitempty" protobuf:"bytes,1,opt,name=apiGroup"`
 	// Kind is the type of resource being referenced. This is the same
 	// value as in the parameter object's metadata, for example "ConfigMap".
@@ -345,6 +371,7 @@ type ResourceClaimConsumerReference struct {
 	// APIGroup is the group for the resource being referenced. It is
 	// empty for the core API. This matches the group in the APIVersion
 	// that is used when creating the resources.
+	// +optional
 	APIGroup string `json:"apiGroup,omitempty" protobuf:"bytes,1,opt,name=apiGroup"`
 	// Resource is the type of resource being referenced, for example "pods".
 	Resource string `json:"resource" protobuf:"bytes,3,name=resource"`
@@ -362,7 +389,8 @@ type ResourceClaimConsumerReference struct {
 type ResourceClaimTemplate struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object metadata
-	metav1.ObjectMeta `json:"metadata" protobuf:"bytes,1,name=metadata"`
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Describes the ResourceClaim that is to be generated.
 	//
@@ -377,6 +405,7 @@ type ResourceClaimTemplateSpec struct {
 	// ObjectMeta may contain labels and annotations that will be copied into the PVC
 	// when creating it. No other fields are allowed and will be rejected during
 	// validation.
+	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Spec for the ResourceClaim. The entire content is copied unchanged
@@ -392,6 +421,7 @@ type ResourceClaimTemplateSpec struct {
 type ResourceClaimTemplateList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata
+	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Items is the list of resource claim templates.
