@@ -219,6 +219,18 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 					b.testPod(f.ClientSet, pod)
 				}
 			})
+
+			ginkgo.It("supports init containers", func() {
+				parameters := b.parameters()
+				pod, template := b.podInline(allocationMode)
+				pod.Spec.InitContainers = []v1.Container{pod.Spec.Containers[0]}
+				pod.Spec.InitContainers[0].Name += "-init"
+				// This must succeed for the pod to start.
+				pod.Spec.InitContainers[0].Command = []string{"sh", "-c", "env | grep user_a=b"}
+				b.create(ctx, parameters, pod, template)
+
+				b.testPod(f.ClientSet, pod)
+			})
 		}
 
 		ginkgo.Context("with delayed allocation", func() {
