@@ -108,7 +108,7 @@ func (m *ManagerImpl) prepareContainerResources(pod *v1.Pod, container *v1.Conta
 			driverName := resourceClaim.Status.DriverName
 
 			client, err := dra.NewDRAPluginClient(driverName)
-			if err != nil || client == nil {
+			if err != nil {
 				return fmt.Errorf("failed to get DRA Plugin client for plugin name %s, err=%+v", driverName, err)
 			}
 
@@ -218,7 +218,7 @@ func (m *ManagerImpl) UnprepareResources(pod *v1.Pod) error {
 
 		// Call NodeUnprepareResource only for the last pod that references the claim
 		client, err := dra.NewDRAPluginClient(claimInfo.driverName)
-		if err != nil || client == nil {
+		if err != nil {
 			return fmt.Errorf("failed to get DRA Plugin client for plugin name %s, err=%+v", claimInfo.driverName, err)
 		}
 
