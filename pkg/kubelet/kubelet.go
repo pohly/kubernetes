@@ -1927,6 +1927,15 @@ func (kl *Kubelet) syncTerminatingPod(_ context.Context, pod *v1.Pod, podStatus 
 		return fmt.Errorf("detected running containers after a successful KillPod, CRI violation: %v", runningContainers)
 	}
 
+	// NOTE: resources must be unprepared AFTER all containers have stopped
+	// and BEFORE the pod status is changed on the API server
+	// to avoid race conditions with the resource deallocation code in kubernetes core.
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+		if err := kl.containerManager.UnprepareResources(pod); err != nil {
+			return err
+		}
+	}
+
 	// we have successfully stopped all containers, the pod is terminating, our status is "done"
 	klog.V(4).InfoS("Pod termination stopped all running containers", "pod", klog.KObj(pod), "podUID", pod.UID)
 
@@ -1944,14 +1953,6 @@ func (kl *Kubelet) syncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus
 	// generate the final status of the pod
 	// TODO: should we simply fold this into TerminatePod? that would give a single pod update
 	apiPodStatus := kl.generateAPIPodStatus(pod, podStatus)
-
-	// NOTE: resources must be unprepared BEFORE pod status is changed on the API server
-	// to avoid race conditions with the resource deallocation code in kubernetes core
-	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-		if err := kl.containerManager.UnprepareResources(pod); err != nil {
-			return err
-		}
-	}
 
 	kl.statusManager.SetPodStatus(pod, apiPodStatus)
 
