@@ -153,11 +153,6 @@ type result struct {
 	removed []metav1.Object
 }
 
-type resultPreFilter struct {
-	result
-	preFilterResult *framework.PreFilterResult
-}
-
 type changeMapping map[string]func(metav1.Object) metav1.Object
 type perNodeResult map[string]result
 
@@ -169,12 +164,25 @@ func (p perNodeResult) forNode(nodeName string) result {
 }
 
 type want struct {
-	prefilter resultPreFilter
-	filter    perNodeResult
-	prescore  result
-	reserve   result
-	unreserve result
-	postbind  result
+	preFilterResult *framework.PreFilterResult
+	prefilter       result
+	filter          perNodeResult
+	prescore        result
+	reserve         result
+	unreserve       result
+	postbind        result
+}
+
+// prepare contains changes for objects in the API server.
+// Those changes are applied before running the steps. This can
+// be used to simulate concurrent changes by some other entities
+// like a resource driver.
+type prepare struct {
+	filter    changeMapping
+	prescore  changeMapping
+	reserve   changeMapping
+	unreserve changeMapping
+	postbind  changeMapping
 }
 
 func TestPlugin(t *testing.T) {
@@ -201,10 +209,8 @@ func TestPlugin(t *testing.T) {
 		"missing-claim": {
 			pod: podWithClaimTemplate,
 			want: want{
-				prefilter: resultPreFilter{
-					result: result{
-						status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `waiting for dynamic resource controller to create the resourceclaim "my-pod-my-resource"`),
-					},
+				prefilter: result{
+					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `waiting for dynamic resource controller to create the resourceclaim "my-pod-my-resource"`),
 				},
 			},
 		},
@@ -212,10 +218,8 @@ func TestPlugin(t *testing.T) {
 			pod:    podWithClaimName,
 			claims: []*resourcev1alpha1.ResourceClaim{pendingImmediateClaim},
 			want: want{
-				prefilter: resultPreFilter{
-					result: result{
-						status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `unallocated immediate resourceclaim`),
-					},
+				prefilter: result{
+					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `unallocated immediate resourceclaim`),
 				},
 			},
 		},
@@ -223,10 +227,8 @@ func TestPlugin(t *testing.T) {
 			pod:    podWithClaimName,
 			claims: []*resourcev1alpha1.ResourceClaim{deallocatingClaim},
 			want: want{
-				prefilter: resultPreFilter{
-					result: result{
-						status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `resourceclaim must be reallocated`),
-					},
+				prefilter: result{
+					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `resourceclaim must be reallocated`),
 				},
 			},
 		},
@@ -321,10 +323,8 @@ func TestPlugin(t *testing.T) {
 			pod:    otherPodWithClaimName,
 			claims: []*resourcev1alpha1.ResourceClaim{inUseClaim},
 			want: want{
-				prefilter: resultPreFilter{
-					result: result{
-						status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `resourceclaim in use`),
-					},
+				prefilter: result{
+					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `resourceclaim in use`),
 				},
 			},
 		},
@@ -378,8 +378,8 @@ func TestPlugin(t *testing.T) {
 			initialObjects := testCtx.listAll(t)
 			result, status := testCtx.p.PreFilter(testCtx.ctx, testCtx.state, tc.pod)
 			t.Run("prefilter", func(t *testing.T) {
-				assert.Equal(t, tc.want.prefilter.preFilterResult, result)
-				testCtx.verify(t, tc.want.prefilter.result, initialObjects, result, status)
+				assert.Equal(t, tc.want.preFilterResult, result)
+				testCtx.verify(t, tc.want.prefilter, initialObjects, result, status)
 			})
 			unschedulable := status.Code() != framework.Success
 
