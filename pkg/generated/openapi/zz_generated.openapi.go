@@ -22959,12 +22959,12 @@ func schema_k8sio_api_core_v1_PodResourceClaim(ref common.ReferenceCallback) com
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "PodResourceClaim references exactly one ResourceClaim through a ClaimSource and adds a name to it that is used inside a Pod.",
+				Description: "PodResourceClaim references exactly one ResourceClaim through a ClaimSource. It adds a name to it that uniquely identifies the ResourceClaim inside the Pod. Containers that need access to the ResourceClaim reference it with this name.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "A name under which this resource can be referenced by the containers.",
+							Description: "Name uniquely identifies this resource claim inside the pod. This must be a DNS_LABEL.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -22972,7 +22972,7 @@ func schema_k8sio_api_core_v1_PodResourceClaim(ref common.ReferenceCallback) com
 					},
 					"source": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Source determines where to find the ResourceClaim.",
+							Description: "Source describes where to find the ResourceClaim.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/api/core/v1.ClaimSource"),
 						},
@@ -24759,7 +24759,7 @@ func schema_k8sio_api_core_v1_ResourceClaim(ref common.ReferenceCallback) common
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Name is the name chosen for a resource claim in spec.resourceClaims.",
+							Description: "Name must match the name of one entry in pod.spec.resourceClaims of the Pod where this field is used. It makes that resource available inside a container.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -41444,7 +41444,7 @@ func schema_k8sio_api_resource_v1alpha1_PodScheduling(ref common.ReferenceCallba
 						},
 					},
 				},
-				Required: []string{"metadata", "spec"},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -41623,7 +41623,7 @@ func schema_k8sio_api_resource_v1alpha1_ResourceClaim(ref common.ReferenceCallba
 						},
 					},
 				},
-				Required: []string{"metadata", "spec"},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -41931,7 +41931,7 @@ func schema_k8sio_api_resource_v1alpha1_ResourceClaimTemplate(ref common.Referen
 						},
 					},
 				},
-				Required: []string{"metadata", "spec"},
+				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -42051,6 +42051,7 @@ func schema_k8sio_api_resource_v1alpha1_ResourceClass(ref common.ReferenceCallba
 					"driverName": {
 						SchemaProps: spec.SchemaProps{
 							Description: "DriverName defines the name of the dynamic resource driver that is used for allocation of a ResourceClaim that uses this class.\n\nResource drivers have a unique name in forward domain order (acme.example.com).",
+							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -42068,6 +42069,7 @@ func schema_k8sio_api_resource_v1alpha1_ResourceClass(ref common.ReferenceCallba
 						},
 					},
 				},
+				Required: []string{"driverName"},
 			},
 		},
 		Dependencies: []string{

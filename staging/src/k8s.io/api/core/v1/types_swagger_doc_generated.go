@@ -1617,9 +1617,9 @@ func (PodReadinessGate) SwaggerDoc() map[string]string {
 }
 
 var map_PodResourceClaim = map[string]string{
-	"":       "PodResourceClaim references exactly one ResourceClaim through a ClaimSource and adds a name to it that is used inside a Pod.",
-	"name":   "A name under which this resource can be referenced by the containers.",
-	"source": "Source determines where to find the ResourceClaim.",
+	"":       "PodResourceClaim references exactly one ResourceClaim through a ClaimSource. It adds a name to it that uniquely identifies the ResourceClaim inside the Pod. Containers that need access to the ResourceClaim reference it with this name.",
+	"name":   "Name uniquely identifies this resource claim inside the pod. This must be a DNS_LABEL.",
+	"source": "Source describes where to find the ResourceClaim.",
 }
 
 func (PodResourceClaim) SwaggerDoc() map[string]string {
@@ -1977,7 +1977,7 @@ func (ReplicationControllerStatus) SwaggerDoc() map[string]string {
 
 var map_ResourceClaim = map[string]string{
 	"":     "ResourceClaim references one entry in PodSpec.ResourceClaims.",
-	"name": "Name is the name chosen for a resource claim in spec.resourceClaims.",
+	"name": "Name must match the name of one entry in pod.spec.resourceClaims of the Pod where this field is used. It makes that resource available inside a container.",
 }
 
 func (ResourceClaim) SwaggerDoc() map[string]string {

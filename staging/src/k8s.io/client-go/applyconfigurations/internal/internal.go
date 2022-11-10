@@ -11673,6 +11673,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: driverName
       type:
         scalar: string
+      default: ""
     - name: kind
       type:
         scalar: string

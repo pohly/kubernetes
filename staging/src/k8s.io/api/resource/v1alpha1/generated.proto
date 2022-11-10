@@ -38,6 +38,7 @@ message AllocationResult {
   //
   // The maximum size of this field is 16KiB. This may get
   // increased in the future, but not reduced.
+  // +optional
   optional string resourceHandle = 1;
 
   // This field will get set by the resource driver after it has
@@ -46,10 +47,12 @@ message AllocationResult {
   //
   // Setting this field is optional. If null, the resource is available
   // everywhere.
+  // +optional
   optional k8s.io.api.core.v1.NodeSelector availableOnNodes = 2;
 
   // Shareable determines whether the resource supports more
   // than one consumer at a time.
+  // +optional
   optional bool shareable = 3;
 }
 
@@ -61,18 +64,21 @@ message AllocationResult {
 // feature gate.
 message PodScheduling {
   // Standard object metadata
+  // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec describes where resources for the Pod are needed.
   optional PodSchedulingSpec spec = 2;
 
   // Status describes where resources for the Pod can be allocated.
+  // +optional
   optional PodSchedulingStatus status = 3;
 }
 
 // PodSchedulingList is a collection of Pod scheduling objects.
 message PodSchedulingList {
   // Standard list metadata
+  // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is the list of PodScheduling objects.
@@ -84,6 +90,7 @@ message PodSchedulingSpec {
   // SelectedNode is the node for which allocation of ResourceClaims that
   // are referenced by the Pod and that use "WaitForFirstConsumer"
   // allocation is to be attempted.
+  // +optional
   optional string selectedNode = 1;
 
   // PotentialNodes lists nodes where the Pod might be able to run.
@@ -94,6 +101,7 @@ message PodSchedulingSpec {
   // future, but not reduced.
   //
   // +listType=set
+  // +optional
   repeated string potentialNodes = 2;
 }
 
@@ -117,6 +125,7 @@ message PodSchedulingStatus {
 // feature gate.
 message ResourceClaim {
   // Standard object metadata
+  // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec describes the desired attributes of a resource that then needs
@@ -126,6 +135,7 @@ message ResourceClaim {
 
   // Status describes whether the resource is available and with which
   // attributes.
+  // +optional
   optional ResourceClaimStatus status = 3;
 }
 
@@ -136,6 +146,7 @@ message ResourceClaimConsumerReference {
   // APIGroup is the group for the resource being referenced. It is
   // empty for the core API. This matches the group in the APIVersion
   // that is used when creating the resources.
+  // +optional
   optional string apiGroup = 1;
 
   // Resource is the type of resource being referenced, for example "pods".
@@ -151,6 +162,7 @@ message ResourceClaimConsumerReference {
 // ResourceClaimList is a collection of claims.
 message ResourceClaimList {
   // Standard list metadata
+  // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is the list of resource claims.
@@ -164,6 +176,7 @@ message ResourceClaimParametersReference {
   // APIGroup is the group for the resource being referenced. It is
   // empty for the core API. This matches the group in the APIVersion
   // that is used when creating the resources.
+  // +optional
   optional string apiGroup = 1;
 
   // Kind is the type of resource being referenced. This is the same
@@ -178,6 +191,7 @@ message ResourceClaimParametersReference {
 // ResourceClaim with "WaitForFirstConsumer" allocation mode.
 message ResourceClaimSchedulingStatus {
   // Name matches the pod.spec.resourceClaims[*].Name field.
+  // +optional
   optional string name = 1;
 
   // UnsuitableNodes lists nodes that the ResourceClaim cannot be
@@ -188,6 +202,7 @@ message ResourceClaimSchedulingStatus {
   // future, but not reduced.
   //
   // +listType=set
+  // +optional
   repeated string unsuitableNodes = 2;
 }
 
@@ -203,10 +218,12 @@ message ResourceClaimSpec {
   // claim.
   //
   // The object must be in the same namespace as the ResourceClaim.
+  // +optional
   optional ResourceClaimParametersReference parametersRef = 2;
 
   // Allocation can start immediately or when a Pod wants to use the
   // resource. "WaitForFirstConsumer" is the default.
+  // +optional
   optional string allocationMode = 3;
 }
 
@@ -215,11 +232,13 @@ message ResourceClaimSpec {
 message ResourceClaimStatus {
   // DriverName is a copy of the driver name from the ResourceClass at
   // the time when allocation started.
+  // +optional
   optional string driverName = 1;
 
   // Allocation is set by the resource driver once a resource has been
   // allocated successfully. If this is not specified, the resource is
   // not yet allocated.
+  // +optional
   optional AllocationResult allocation = 2;
 
   // ReservedFor indicates which entities are currently allowed to use
@@ -230,6 +249,7 @@ message ResourceClaimStatus {
   // the future, but not reduced.
   //
   // +listType=set
+  // +optional
   repeated ResourceClaimConsumerReference reservedFor = 3;
 
   // DeallocationRequested indicates that a ResourceClaim is to be
@@ -240,12 +260,14 @@ message ResourceClaimStatus {
   //
   // While DeallocationRequested is set, no new consumers may be added to
   // ReservedFor.
+  // +optional
   optional bool deallocationRequested = 4;
 }
 
 // ResourceClaimTemplate is used to produce ResourceClaim objects.
 message ResourceClaimTemplate {
   // Standard object metadata
+  // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Describes the ResourceClaim that is to be generated.
@@ -259,6 +281,7 @@ message ResourceClaimTemplate {
 // ResourceClaimTemplateList is a collection of claim templates.
 message ResourceClaimTemplateList {
   // Standard list metadata
+  // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is the list of resource claim templates.
@@ -270,6 +293,7 @@ message ResourceClaimTemplateSpec {
   // ObjectMeta may contain labels and annotations that will be copied into the PVC
   // when creating it. No other fields are allowed and will be rejected during
   // validation.
+  // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Spec for the ResourceClaim. The entire content is copied unchanged
@@ -285,6 +309,7 @@ message ResourceClaimTemplateSpec {
 // feature gate.
 message ResourceClass {
   // Standard object metadata
+  // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // DriverName defines the name of the dynamic resource driver that is
@@ -299,6 +324,7 @@ message ResourceClass {
   // resource that uses this class. A dynamic resource driver can
   // distinguish between parameters stored here and and those stored in
   // ResourceClaimSpec.
+  // +optional
   optional ResourceClassParametersReference parametersRef = 3;
 
   // Only nodes matching the selector will be considered by the scheduler
@@ -306,12 +332,14 @@ message ResourceClass {
   // a ResourceClaim that has not been allocated yet.
   //
   // Setting this field is optional. If null, all nodes are candidates.
+  // +optional
   optional k8s.io.api.core.v1.NodeSelector suitableNodes = 4;
 }
 
 // ResourceClassList is a collection of classes.
 message ResourceClassList {
   // Standard list metadata
+  // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is the list of resource classes.
@@ -324,6 +352,7 @@ message ResourceClassParametersReference {
   // APIGroup is the group for the resource being referenced. It is
   // empty for the core API. This matches the group in the APIVersion
   // that is used when creating the resources.
+  // +optional
   optional string apiGroup = 1;
 
   // Kind is the type of resource being referenced. This is the same
@@ -336,6 +365,7 @@ message ResourceClassParametersReference {
   // Namespace that contains the referenced resource. Must be empty
   // for cluster-scoped resources and non-empty for namespaced
   // resources.
+  // +optional
   optional string namespace = 4;
 }
 

@@ -144,7 +144,6 @@
           }
         },
         "required": [
-          "metadata",
           "spec"
         ],
         "type": "object",
@@ -282,7 +281,6 @@
           }
         },
         "required": [
-          "metadata",
           "spec"
         ],
         "type": "object",
@@ -504,7 +502,6 @@
           }
         },
         "required": [
-          "metadata",
           "spec"
         ],
         "type": "object",
@@ -596,6 +593,7 @@
             "type": "string"
           },
           "driverName": {
+            "default": "",
             "description": "DriverName defines the name of the dynamic resource driver that is used for allocation of a ResourceClaim that uses this class.\n\nResource drivers have a unique name in forward domain order (acme.example.com).",
             "type": "string"
           },
@@ -629,6 +627,9 @@
             "description": "Only nodes matching the selector will be considered by the scheduler when trying to find a Node that fits a Pod when that Pod uses a ResourceClaim that has not been allocated yet.\n\nSetting this field is optional. If null, all nodes are candidates."
           }
         },
+        "required": [
+          "driverName"
+        ],
         "type": "object",
         "x-kubernetes-group-version-kind": [
           {
