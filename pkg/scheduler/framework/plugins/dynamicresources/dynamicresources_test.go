@@ -24,6 +24,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -193,7 +194,8 @@ func TestPlugin(t *testing.T) {
 		classes     []*resourcev1alpha1.ResourceClass
 		schedulings []*resourcev1alpha1.PodScheduling
 
-		want want
+		prepare prepare
+		want    want
 	}{
 		"empty": {
 			pod: st.MakePod().Name("foo").Namespace("default").Obj(),
@@ -294,6 +296,35 @@ func TestPlugin(t *testing.T) {
 				},
 			},
 		},
+		"delayed-allocation-scheduling-finish-concurrent-label-update": {
+			// Use the populated PodScheduling object to select a
+			// node.
+			pod:         podWithClaimName,
+			claims:      []*resourcev1alpha1.ResourceClaim{pendingDelayedClaim},
+			schedulings: []*resourcev1alpha1.PodScheduling{schedulingInfo},
+			classes:     []*resourcev1alpha1.ResourceClass{resourceClass},
+			prepare: prepare{
+				reserve: changeMapping{
+					podName: func(in metav1.Object) metav1.Object {
+						scheduling, ok := in.(*resourcev1alpha1.PodScheduling)
+						if !ok {
+							return in
+						}
+						// This does not actually conflict with setting the
+						// selected node, but because the plugin is not using
+						// patching yet, Update nonetheless fails.
+						return st.FromPodScheduling(scheduling).
+							Label("hello", "world").
+							Obj()
+					},
+				},
+			},
+			want: want{
+				reserve: result{
+					status: framework.AsStatus(errors.New(`ResourceVersion must match the object that gets updated`)),
+				},
+			},
+		},
 		"delayed-allocation-scheduling-completed": {
 			// Remove PodScheduling object once the pod is scheduled.
 			pod:         podWithClaimName,
@@ -384,6 +415,9 @@ func TestPlugin(t *testing.T) {
 			unschedulable := status.Code() != framework.Success
 
 			var potentialNodes []*v1.Node
+
+			initialObjects = testCtx.listAll(t)
+			testCtx.updateAPIServer(t, initialObjects, tc.prepare.filter)
 			if !unschedulable {
 				for _, nodeInfo := range testCtx.nodeInfos {
 					initialObjects = testCtx.listAll(t)
@@ -402,6 +436,7 @@ func TestPlugin(t *testing.T) {
 
 			if !unschedulable && len(potentialNodes) > 0 {
 				initialObjects = testCtx.listAll(t)
+				initialObjects = testCtx.updateAPIServer(t, initialObjects, tc.prepare.prescore)
 				status := testCtx.p.PreScore(testCtx.ctx, testCtx.state, tc.pod, potentialNodes)
 				t.Run("prescore", func(t *testing.T) {
 					testCtx.verify(t, tc.want.prescore, initialObjects, nil, status)
@@ -416,6 +451,7 @@ func TestPlugin(t *testing.T) {
 				selectedNode = potentialNodes[0]
 
 				initialObjects = testCtx.listAll(t)
+				initialObjects = testCtx.updateAPIServer(t, initialObjects, tc.prepare.reserve)
 				status := testCtx.p.Reserve(testCtx.ctx, testCtx.state, tc.pod, selectedNode.Name)
 				t.Run("reserve", func(t *testing.T) {
 					testCtx.verify(t, tc.want.reserve, initialObjects, nil, status)
@@ -428,12 +464,14 @@ func TestPlugin(t *testing.T) {
 			if selectedNode != nil {
 				if unschedulable {
 					initialObjects = testCtx.listAll(t)
+					initialObjects = testCtx.updateAPIServer(t, initialObjects, tc.prepare.unreserve)
 					testCtx.p.Unreserve(testCtx.ctx, testCtx.state, tc.pod, selectedNode.Name)
 					t.Run("unreserve", func(t *testing.T) {
 						testCtx.verify(t, tc.want.unreserve, initialObjects, nil, status)
 					})
 				} else {
 					initialObjects = testCtx.listAll(t)
+					initialObjects = testCtx.updateAPIServer(t, initialObjects, tc.prepare.postbind)
 					testCtx.p.PostBind(testCtx.ctx, testCtx.state, tc.pod, selectedNode.Name)
 					t.Run("postbind", func(t *testing.T) {
 						testCtx.verify(t, tc.want.postbind, initialObjects, nil, status)
@@ -509,6 +547,34 @@ func (tc *testContext) listAll(t *testing.T) (objects []metav1.Object) {
 
 	sortObjects(objects)
 	return
+}
+
+// updateAPIServer modifies objects and stores any changed object in the API server.
+func (tc *testContext) updateAPIServer(t *testing.T, objects []metav1.Object, updates changeMapping) []metav1.Object {
+	modified := update(t, objects, updates)
+	for i := range modified {
+		obj := modified[i]
+		if diff := cmp.Diff(objects[i], obj); diff != "" {
+			t.Logf("Updating %T %q, diff (-old, +new):\n%s", obj, obj.GetName(), diff)
+			switch obj := obj.(type) {
+			case *resourcev1alpha1.ResourceClaim:
+				obj, err := tc.client.ResourceV1alpha1().ResourceClaims(obj.Namespace).Update(tc.ctx, obj, metav1.UpdateOptions{})
+				if err != nil {
+					t.Fatalf("unexpected error during prepare update: %v", err)
+				}
+				modified[i] = obj
+			case *resourcev1alpha1.PodScheduling:
+				obj, err := tc.client.ResourceV1alpha1().PodSchedulings(obj.Namespace).Update(tc.ctx, obj, metav1.UpdateOptions{})
+				if err != nil {
+					t.Fatalf("unexpected error during prepare update: %v", err)
+				}
+				modified[i] = obj
+			default:
+				t.Fatalf("unsupported object type %T", obj)
+			}
+		}
+	}
+	return modified
 }
 
 func sortObjects(objects []metav1.Object) {
@@ -603,10 +669,13 @@ func setup(t *testing.T, nodes []*v1.Node, claims []*resourcev1alpha1.ResourceCl
 	return tc
 }
 
-// createReactor implements the logic required for the UID and ResourceVersion fields to work when using
-// the fake client. Add it with client.PrependReactor to your fake client.
+// createReactor implements the logic required for the UID and ResourceVersion
+// fields to work when using the fake client. Add it with client.PrependReactor
+// to your fake client. ResourceVersion handling is required for conflict
+// detection during updates, which is covered by some scenarios.
 func createReactor(tracker cgotesting.ObjectTracker) func(action cgotesting.Action) (handled bool, ret apiruntime.Object, err error) {
 	var uidCounter int
+	var resourceVersionCounter int
 	var mutex sync.Mutex
 
 	return func(action cgotesting.Action) (handled bool, ret apiruntime.Object, err error) {
@@ -626,13 +695,37 @@ func createReactor(tracker cgotesting.ObjectTracker) func(action cgotesting.Acti
 			if obj.GetUID() != "" {
 				return true, nil, errors.New("UID must not be set on create")
 			}
+			if obj.GetResourceVersion() != "" {
+				return true, nil, errors.New("ResourceVersion must not be set on create")
+			}
 			obj.SetUID(types.UID(fmt.Sprintf("UID-%d", uidCounter)))
 			uidCounter++
+			obj.SetResourceVersion(fmt.Sprintf("REV-%d", resourceVersionCounter))
+			resourceVersionCounter++
 		case "update":
 			uid := obj.GetUID()
+			resourceVersion := obj.GetResourceVersion()
 			if uid == "" {
 				return true, nil, errors.New("UID must be set on update")
 			}
+			if resourceVersion == "" {
+				return true, nil, errors.New("ResourceVersion must be set on update")
+			}
+
+			oldObj, err := tracker.Get(action.GetResource(), obj.GetNamespace(), obj.GetName())
+			if err != nil {
+				return true, nil, err
+			}
+			oldObjMeta, ok := oldObj.(metav1.Object)
+			if !ok {
+				return true, nil, errors.New("internal error: unexpected old object type")
+			}
+			if oldObjMeta.GetResourceVersion() != resourceVersion {
+				return true, nil, errors.New("ResourceVersion must match the object that gets updated")
+			}
+
+			obj.SetResourceVersion(fmt.Sprintf("REV-%d", resourceVersionCounter))
+			resourceVersionCounter++
 		}
 		return false, nil, nil
 	}
