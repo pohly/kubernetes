@@ -34,7 +34,6 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
-	pathvalidation "k8s.io/apimachinery/pkg/api/validation/path"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/labels"
@@ -1635,7 +1634,7 @@ func ValidateTemplateObjectMeta(objMeta *metav1.ObjectMeta, fldPath *field.Path)
 	// but then adding a new one to ObjectMeta wouldn't be checked
 	// unless this code gets updated. Instead, we ensure that
 	// only allowed fields are set via reflection.
-	allErrs = append(allErrs, ValidateFieldAllowList(*objMeta, allowedTemplateObjectMetaFields, "cannot be set", fldPath)...)
+	allErrs = append(allErrs, validateFieldAllowList(*objMeta, allowedTemplateObjectMetaFields, "cannot be set", fldPath)...)
 	return allErrs
 }
 
@@ -2733,13 +2732,26 @@ func ValidateVolumeDevices(devices []core.VolumeDevice, volmounts map[string]str
 	return allErrs
 }
 
-func validatePodResourceClaims(claims []core.PodResourceClaim, fldPath *field.Path) (sets.String, field.ErrorList) {
+func validatePodResourceClaims(claims []core.PodResourceClaim, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	podClaimNames := sets.NewString()
 	for i, claim := range claims {
 		allErrs = append(allErrs, validatePodResourceClaim(claim, &podClaimNames, fldPath.Index(i))...)
 	}
-	return podClaimNames, allErrs
+	return allErrs
+}
+
+// gatherPodResourceClaimNames returns a set of all non-empty
+// PodResourceClaim.Name values. Validation that those names are valid is
+// handled by validatePodResourceClaims.
+func gatherPodResourceClaimNames(claims []core.PodResourceClaim) sets.String {
+	podClaimNames := sets.String{}
+	for _, claim := range claims {
+		if claim.Name != "" {
+			podClaimNames.Insert(claim.Name)
+		}
+	}
+	return podClaimNames
 }
 
 func validatePodResourceClaim(claim core.PodResourceClaim, podClaimNames *sets.String, fldPath *field.Path) field.ErrorList {
@@ -2749,10 +2761,7 @@ func validatePodResourceClaim(claim core.PodResourceClaim, podClaimNames *sets.S
 	} else if podClaimNames.Has(claim.Name) {
 		allErrs = append(allErrs, field.Duplicate(fldPath.Child("name"), claim.Name))
 	} else {
-		// Check for things like ./..
-		for _, msg := range pathvalidation.ValidatePathSegmentName(claim.Name, false) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), claim.Name, msg))
-		}
+		allErrs = append(allErrs, ValidateDNS1123Label(claim.Name, fldPath.Child("name"))...)
 		podClaimNames.Insert(claim.Name)
 	}
 	allErrs = append(allErrs, validatePodResourceClaimSource(claim.Source, fldPath.Child("source"))...)
@@ -3034,7 +3043,7 @@ func validateEphemeralContainers(ephemeralContainers []core.EphemeralContainer, 
 		// Ephemeral containers should not be relied upon for fundamental pod services, so fields such as
 		// Lifecycle, probes, resources and ports should be disallowed. This is implemented as a list
 		// of allowed fields so that new fields will be given consideration prior to inclusion in ephemeral containers.
-		allErrs = append(allErrs, ValidateFieldAllowList(ec.EphemeralContainerCommon, allowedEphemeralContainerFields, "cannot be set for an Ephemeral Container", idxPath)...)
+		allErrs = append(allErrs, validateFieldAllowList(ec.EphemeralContainerCommon, allowedEphemeralContainerFields, "cannot be set for an Ephemeral Container", idxPath)...)
 
 		// VolumeMount subpaths have the potential to leak resources since they're implemented with bind mounts
 		// that aren't cleaned up until the pod exits. Since they also imply that the container is being used
@@ -3054,7 +3063,7 @@ func validateEphemeralContainers(ephemeralContainers []core.EphemeralContainer, 
 
 // ValidateFieldAcceptList checks that only allowed fields are set.
 // The value must be a struct (not a pointer to a struct!).
-func ValidateFieldAllowList(value interface{}, allowedFields map[string]bool, errorText string, fldPath *field.Path) field.ErrorList {
+func validateFieldAllowList(value interface{}, allowedFields map[string]bool, errorText string, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 
 	reflectType, reflectValue := reflect.TypeOf(value), reflect.ValueOf(value)
@@ -3700,8 +3709,8 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 
 	vols, vErrs := ValidateVolumes(spec.Volumes, podMeta, fldPath.Child("volumes"), opts)
 	allErrs = append(allErrs, vErrs...)
-	podClaimNames, claimErrs := validatePodResourceClaims(spec.ResourceClaims, fldPath.Child("resourceClaims"))
-	allErrs = append(allErrs, claimErrs...)
+	podClaimNames := gatherPodResourceClaimNames(spec.ResourceClaims)
+	allErrs = append(allErrs, validatePodResourceClaims(spec.ResourceClaims, fldPath.Child("resourceClaims"))...)
 	allErrs = append(allErrs, validateContainers(spec.Containers, vols, podClaimNames, fldPath.Child("containers"), opts)...)
 	allErrs = append(allErrs, validateInitContainers(spec.InitContainers, spec.Containers, vols, podClaimNames, fldPath.Child("initContainers"), opts)...)
 	allErrs = append(allErrs, validateEphemeralContainers(spec.EphemeralContainers, spec.Containers, spec.InitContainers, vols, podClaimNames, fldPath.Child("ephemeralContainers"), opts)...)
@@ -3781,7 +3790,6 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 			allErrs = append(allErrs, validateWindows(spec, fldPath)...)
 		}
 	}
-
 	return allErrs
 }
 
@@ -5930,6 +5938,9 @@ func ValidateResourceRequirements(requirements *core.ResourceRequirements, podCl
 	return allErrs
 }
 
+// validateResourceClaimNames checks that the names in
+// ResourceRequirements.Claims have a corresponding entry in
+// PodSpec.ResourceClaims.
 func validateResourceClaimNames(claims []core.ResourceClaim, podClaimNames sets.String, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	names := sets.String{}
@@ -5944,7 +5955,17 @@ func validateResourceClaimNames(claims []core.ResourceClaim, podClaimNames sets.
 				names.Insert(name)
 			}
 			if !podClaimNames.Has(name) {
-				allErrs = append(allErrs, field.NotFound(fldPath.Index(i), name))
+				// field.NotFound doesn't accept an
+				// explanation. Adding one here is more
+				// user-friendly.
+				error := field.NotFound(fldPath.Index(i), name)
+				error.Detail = "must be one of the names in pod.spec.resourceClaims"
+				if len(podClaimNames) == 0 {
+					error.Detail += " which is empty"
+				} else {
+					error.Detail += ": " + strings.Join(podClaimNames.List(), ", ")
+				}
+				allErrs = append(allErrs, error)
 			}
 		}
 	}

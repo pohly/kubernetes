@@ -7224,7 +7224,6 @@ func TestValidateLinuxPodSecurityContext(t *testing.T) {
 
 func TestValidateContainers(t *testing.T) {
 	volumeDevices := make(map[string]core.VolumeSource)
-	names := sets.NewString("my-claim")
 	capabilities.SetForTests(capabilities.Capabilities{
 		AllowPrivileged: true,
 	})
@@ -7337,15 +7336,6 @@ func TestValidateContainers(t *testing.T) {
 			TerminationMessagePolicy: "File",
 		},
 		{
-			Name:  "claim-request",
-			Image: "image",
-			Resources: core.ResourceRequirements{
-				Claims: []core.ResourceClaim{{Name: "my-claim"}},
-			},
-			ImagePullPolicy:          "IfNotPresent",
-			TerminationMessagePolicy: "File",
-		},
-		{
 			Name:  "same-host-port-different-protocol",
 			Image: "image",
 			Ports: []core.ContainerPort{
@@ -7412,7 +7402,7 @@ func TestValidateContainers(t *testing.T) {
 			TerminationMessagePolicy: "File",
 		},
 	}
-	if errs := validateContainers(successCase, volumeDevices, names, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
+	if errs := validateContainers(successCase, volumeDevices, nil, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -8012,54 +8002,6 @@ func TestValidateContainers(t *testing.T) {
 			field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "containers[0].resources.requests"}},
 		},
 		{
-			"claim name duplicates",
-			line(),
-			[]core.Container{
-				{
-					Name:  "abc-123",
-					Image: "image",
-					Resources: core.ResourceRequirements{
-						Claims: []core.ResourceClaim{{Name: "my-claim"}, {Name: "my-claim"}},
-					},
-					ImagePullPolicy:          "IfNotPresent",
-					TerminationMessagePolicy: "File",
-				},
-			},
-			field.ErrorList{{Type: field.ErrorTypeDuplicate, Field: "containers[0].resources.claims[1]"}},
-		},
-		{
-			"claim name empty",
-			line(),
-			[]core.Container{
-				{
-					Name:  "abc-123",
-					Image: "image",
-					Resources: core.ResourceRequirements{
-						Claims: []core.ResourceClaim{{Name: ""}},
-					},
-					ImagePullPolicy:          "IfNotPresent",
-					TerminationMessagePolicy: "File",
-				},
-			},
-			field.ErrorList{{Type: field.ErrorTypeRequired, Field: "containers[0].resources.claims[0]"}},
-		},
-		{
-			"claim name empty",
-			line(),
-			[]core.Container{
-				{
-					Name:  "abc-123",
-					Image: "image",
-					Resources: core.ResourceRequirements{
-						Claims: []core.ResourceClaim{{Name: "no-such-claim"}},
-					},
-					ImagePullPolicy:          "IfNotPresent",
-					TerminationMessagePolicy: "File",
-				},
-			},
-			field.ErrorList{{Type: field.ErrorTypeNotFound, Field: "containers[0].resources.claims[0]"}},
-		},
-		{
 			"Invalid env from",
 			line(),
 			[]core.Container{
@@ -8084,7 +8026,7 @@ func TestValidateContainers(t *testing.T) {
 	}
 	for _, tc := range errorCases {
 		t.Run(tc.title+"__@L"+tc.line, func(t *testing.T) {
-			errs := validateContainers(tc.containers, volumeDevices, names, field.NewPath("containers"), PodValidationOptions{})
+			errs := validateContainers(tc.containers, volumeDevices, nil, field.NewPath("containers"), PodValidationOptions{})
 			if len(errs) == 0 {
 				t.Fatal("expected error but received none")
 			}
@@ -8797,9 +8739,6 @@ func TestValidatePodSpec(t *testing.T) {
 	badfsGroupChangePolicy1 := core.PodFSGroupChangePolicy("invalid")
 	badfsGroupChangePolicy2 := core.PodFSGroupChangePolicy("")
 
-	externalClaimName := "some-claim"
-	externalClaimTemplateName := "some-claim-template"
-
 	successCases := map[string]core.PodSpec{
 		"populate basic fields, leave defaults for most": {
 			Volumes:       []core.Volume{{Name: "vol", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
@@ -8953,32 +8892,6 @@ func TestValidatePodSpec(t *testing.T) {
 			},
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
-		},
-		"resource claim reference": {
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-			ResourceClaims: []core.PodResourceClaim{
-				{
-					Name: "my-claim",
-					Source: core.ClaimSource{
-						ResourceClaimName: &externalClaimName,
-					},
-				},
-			},
-		},
-		"resource claim template": {
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-			ResourceClaims: []core.PodResourceClaim{
-				{
-					Name: "my-claim",
-					Source: core.ClaimSource{
-						ResourceClaimTemplateName: &externalClaimTemplateName,
-					},
-				},
-			},
 		},
 	}
 	for k, v := range successCases {
@@ -9184,85 +9097,6 @@ func TestValidatePodSpec(t *testing.T) {
 			},
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
-		},
-		"resource claim source missing": {
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-			ResourceClaims: []core.PodResourceClaim{
-				{
-					Name: "my-claim",
-				},
-			},
-		},
-		"bad pod resource claim name": {
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-			ResourceClaims: []core.PodResourceClaim{
-				{
-					Name: "../my-claim",
-				},
-			},
-		},
-		"resource claim reference and template": {
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-			ResourceClaims: []core.PodResourceClaim{
-				{
-					Name: "my-claim",
-					Source: core.ClaimSource{
-						ResourceClaimName:         &externalClaimName,
-						ResourceClaimTemplateName: &externalClaimTemplateName,
-					},
-				},
-			},
-		},
-		"empty resource claim reference": {
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-			ResourceClaims: []core.PodResourceClaim{
-				{
-					Name: "",
-					Source: core.ClaimSource{
-						ResourceClaimName: &externalClaimName,
-					},
-				},
-			},
-		},
-		"wrong pod claim name": {
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "no-such-claim"}}}}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-			ResourceClaims: []core.PodResourceClaim{
-				{
-					Name: "my-claim",
-					Source: core.ClaimSource{
-						ResourceClaimName: &externalClaimName,
-					},
-				},
-			},
-		},
-		"duplicate pod claim name": {
-			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}},
-			RestartPolicy: core.RestartPolicyAlways,
-			DNSPolicy:     core.DNSClusterFirst,
-			ResourceClaims: []core.PodResourceClaim{
-				{
-					Name: "my-claim",
-					Source: core.ClaimSource{
-						ResourceClaimName: &externalClaimName,
-					},
-				},
-				{
-					Name: "my-claim",
-					Source: core.ClaimSource{
-						ResourceClaimName: &externalClaimName,
-					},
-				},
-			},
 		},
 	}
 	for k, v := range failureCases {
@@ -20932,7 +20766,6 @@ func TestValidateResourceRequirements(t *testing.T) {
 		name         string
 		requirements core.ResourceRequirements
 		opts         PodValidationOptions
-		names        sets.String
 	}{
 		{
 			name: "limits and requests of hugepage resource are equal",
@@ -20972,18 +20805,11 @@ func TestValidateResourceRequirements(t *testing.T) {
 			},
 			opts: PodValidationOptions{},
 		},
-		{
-			name: "resource claims",
-			requirements: core.ResourceRequirements{
-				Claims: []core.ResourceClaim{{Name: "my-resource"}},
-			},
-			names: sets.NewString("my-resource"),
-		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if errs := ValidateResourceRequirements(&tc.requirements, tc.names, path, tc.opts); len(errs) != 0 {
+			if errs := ValidateResourceRequirements(&tc.requirements, nil, path, tc.opts); len(errs) != 0 {
 				t.Errorf("unexpected errors: %v", errs)
 			}
 		})
@@ -20993,7 +20819,6 @@ func TestValidateResourceRequirements(t *testing.T) {
 		name         string
 		requirements core.ResourceRequirements
 		opts         PodValidationOptions
-		names        sets.String
 	}{
 		{
 			name: "hugepage resource without cpu or memory",
@@ -21006,13 +20831,6 @@ func TestValidateResourceRequirements(t *testing.T) {
 				},
 			},
 			opts: PodValidationOptions{},
-		},
-		{
-			name: "resource claims",
-			requirements: core.ResourceRequirements{
-				Claims: []core.ResourceClaim{{Name: "my-resource"}, {Name: "no-such-resource"}},
-			},
-			names: sets.NewString("my-resource"),
 		},
 	}
 
@@ -21756,5 +21574,222 @@ func TestValidatePVSecretReference(t *testing.T) {
 				t.Errorf("Unexpected error(s): %v", errs)
 			}
 		})
+	}
+}
+
+func TestValidateDynamicResourceAllocation(t *testing.T) {
+	externalClaimName := "some-claim"
+	externalClaimTemplateName := "some-claim-template"
+	goodClaimSource := core.ClaimSource{
+		ResourceClaimName: &externalClaimName,
+	}
+
+	successCases := map[string]core.PodSpec{
+		"resource claim reference": {
+			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+			ResourceClaims: []core.PodResourceClaim{
+				{
+					Name: "my-claim",
+					Source: core.ClaimSource{
+						ResourceClaimName: &externalClaimName,
+					},
+				},
+			},
+		},
+		"resource claim template": {
+			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+			ResourceClaims: []core.PodResourceClaim{
+				{
+					Name: "my-claim",
+					Source: core.ClaimSource{
+						ResourceClaimTemplateName: &externalClaimTemplateName,
+					},
+				},
+			},
+		},
+		"multiple claims": {
+			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}, {Name: "another-claim"}}}}},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+			ResourceClaims: []core.PodResourceClaim{
+				{
+					Name:   "my-claim",
+					Source: goodClaimSource,
+				},
+				{
+					Name:   "another-claim",
+					Source: goodClaimSource,
+				},
+			},
+		},
+		"init container": {
+			Containers:     []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}},
+			InitContainers: []core.Container{{Name: "ctr-init", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}},
+			RestartPolicy:  core.RestartPolicyAlways,
+			DNSPolicy:      core.DNSClusterFirst,
+			ResourceClaims: []core.PodResourceClaim{
+				{
+					Name:   "my-claim",
+					Source: goodClaimSource,
+				},
+			},
+		},
+	}
+	for k, v := range successCases {
+		t.Run(k, func(t *testing.T) {
+			if errs := ValidatePodSpec(&v, nil, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
+				t.Errorf("expected success: %v", errs)
+			}
+		})
+	}
+
+	failureCases := map[string]core.PodSpec{
+		"pod claim name with prefix": {
+			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+			ResourceClaims: []core.PodResourceClaim{
+				{
+					Name:   "../my-claim",
+					Source: goodClaimSource,
+				},
+			},
+		},
+		"pod claim name with path": {
+			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+			ResourceClaims: []core.PodResourceClaim{
+				{
+					Name:   "my/claim",
+					Source: goodClaimSource,
+				},
+			},
+		},
+		"pod claim name empty": {
+			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+			ResourceClaims: []core.PodResourceClaim{
+				{
+					Name:   "",
+					Source: goodClaimSource,
+				},
+			},
+		},
+		"duplicate pod claim entries": {
+			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+			ResourceClaims: []core.PodResourceClaim{
+				{
+					Name:   "my-claim",
+					Source: goodClaimSource,
+				},
+				{
+					Name:   "my-claim",
+					Source: goodClaimSource,
+				},
+			},
+		},
+		"resource claim source empty": {
+			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+			ResourceClaims: []core.PodResourceClaim{
+				{
+					Name:   "my-claim",
+					Source: core.ClaimSource{},
+				},
+			},
+		},
+		"resource claim reference and template": {
+			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+			ResourceClaims: []core.PodResourceClaim{
+				{
+					Name: "my-claim",
+					Source: core.ClaimSource{
+						ResourceClaimName:         &externalClaimName,
+						ResourceClaimTemplateName: &externalClaimTemplateName,
+					},
+				},
+			},
+		},
+		"claim not found": {
+			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "no-such-claim"}}}}},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+			ResourceClaims: []core.PodResourceClaim{
+				{
+					Name:   "my-claim",
+					Source: goodClaimSource,
+				},
+			},
+		},
+		"claim name empty": {
+			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: ""}}}}},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+			ResourceClaims: []core.PodResourceClaim{
+				{
+					Name:   "my-claim",
+					Source: goodClaimSource,
+				},
+			},
+		},
+		"pod claim name duplicates": {
+			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}, {Name: "my-claim"}}}}},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+			ResourceClaims: []core.PodResourceClaim{
+				{
+					Name:   "my-claim",
+					Source: goodClaimSource,
+				},
+			},
+		},
+		"no claims defined": {
+			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+		},
+		"duplicate pod claim name": {
+			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+			ResourceClaims: []core.PodResourceClaim{
+				{
+					Name:   "my-claim",
+					Source: goodClaimSource,
+				},
+				{
+					Name:   "my-claim",
+					Source: goodClaimSource,
+				},
+			},
+		},
+		"ephemeral container don't support resource requirements": {
+			Containers:          []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}},
+			EphemeralContainers: []core.EphemeralContainer{{core.EphemeralContainerCommon{Name: "ctr-ephemeral", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}}}}, "ctr"}},
+			RestartPolicy:       core.RestartPolicyAlways,
+			DNSPolicy:           core.DNSClusterFirst,
+			ResourceClaims: []core.PodResourceClaim{
+				{
+					Name:   "my-claim",
+					Source: goodClaimSource,
+				},
+			},
+		},
+	}
+	for k, v := range failureCases {
+		if errs := ValidatePodSpec(&v, nil, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
+			t.Errorf("expected failure for %q", k)
+		}
 	}
 }

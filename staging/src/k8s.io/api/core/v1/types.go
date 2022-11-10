@@ -2299,16 +2299,16 @@ type ResourceRequirements struct {
 	//
 	// +listType=set
 	// +featureGate=DynamicResourceAllocation
+	// +optional
 	Claims []ResourceClaim `json:"claims,omitempty" protobuf:"bytes,3,opt,name=claims"`
 }
 
 // ResourceClaim references one entry in PodSpec.ResourceClaims.
 type ResourceClaim struct {
-	// Name is the name chosen for a resource claim in spec.resourceClaims.
+	// Name must match the name of one entry in pod.spec.resourceClaims of
+	// the Pod where this field is used. It makes that resource available
+	// inside a container.
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
-
-	// More fields might get added in the future, therefore Claims above
-	// doesn't use a simpler string array.
 }
 
 const (
@@ -3366,7 +3366,6 @@ type PodSpec struct {
 	// +listType=map
 	// +listMapKey=name
 	SchedulingGates []PodSchedulingGate `json:"schedulingGates,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,38,opt,name=schedulingGates"`
-
 	// ResourceClaims defines which ResourceClaims must be allocated
 	// and reserved before the Pod is allowed to start. The resources
 	// will be made available to those containers which consume them
@@ -3382,16 +3381,19 @@ type PodSpec struct {
 	// +listType=map
 	// +listMapKey=name
 	// +featureGate=DynamicResourceAllocation
+	// +optional
 	ResourceClaims []PodResourceClaim `json:"resourceClaims,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name" protobuf:"bytes,39,rep,name=resourceClaims"`
 }
 
-// PodResourceClaim references exactly one ResourceClaim through a ClaimSource
-// and adds a name to it that is used inside a Pod.
+// PodResourceClaim references exactly one ResourceClaim through a ClaimSource.
+// It adds a name to it that uniquely identifies the ResourceClaim inside the Pod.
+// Containers that need access to the ResourceClaim reference it with this name.
 type PodResourceClaim struct {
-	// A name under which this resource can be referenced by the containers.
+	// Name uniquely identifies this resource claim inside the pod.
+	// This must be a DNS_LABEL.
 	Name string `json:"name" protobuf:"bytes,1,name=name"`
 
-	// Source determines where to find the ResourceClaim.
+	// Source describes where to find the ResourceClaim.
 	Source ClaimSource `json:"source,omitempty" protobuf:"bytes,2,name=source"`
 }
 

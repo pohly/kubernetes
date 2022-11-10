@@ -2169,16 +2169,16 @@ type ResourceRequirements struct {
 	// This field is immutable.
 	//
 	// +featureGate=DynamicResourceAllocation
+	// +optional
 	Claims []ResourceClaim
 }
 
 // ResourceClaim references one entry in PodSpec.ResourceClaims.
 type ResourceClaim struct {
-	// Name is the name chosen for a resource claim in spec.resourceClaims.
+	// Name must match the name of one entry in pod.spec.resourceClaims of
+	// the Pod where this field is used. It makes that resource available
+	// inside a container.
 	Name string
-
-	// More fields might get added in the future, therefore Claims above
-	// doesn't use a simpler string array.
 }
 
 // Container represents a single container that is expected to be run on the host.
@@ -3025,7 +3025,6 @@ type PodSpec struct {
 	// This is an alpha-level feature enabled by PodSchedulingReadiness feature gate.
 	// +optional
 	SchedulingGates []PodSchedulingGate
-
 	// ResourceClaims defines which ResourceClaims must be allocated
 	// and reserved before the Pod is allowed to start. The resources
 	// will be made available to those containers which consume them
@@ -3037,16 +3036,19 @@ type PodSpec struct {
 	// This field is immutable.
 	//
 	// +featureGate=DynamicResourceAllocation
+	// +optional
 	ResourceClaims []PodResourceClaim
 }
 
-// PodResourceClaim references exactly one ResourceClaim through a ClaimSource
-// and adds a name to it that is used inside a Pod.
+// PodResourceClaim references exactly one ResourceClaim through a ClaimSource.
+// It adds a name to it that uniquely identifies the ResourceClaim inside the Pod.
+// Containers that need access to the ResourceClaim reference it with this name.
 type PodResourceClaim struct {
-	// A name under which this resource can be referenced by the containers.
+	// Name uniquely identifies this resource claim inside the pod.
+	// This must be a DNS_LABEL.
 	Name string
 
-	// Source determines where to find the ResourceClaim.
+	// Source describes where to find the ResourceClaim.
 	Source ClaimSource
 }
 
