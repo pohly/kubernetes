@@ -45,18 +45,16 @@ import (
 )
 
 var (
-	podKind        = v1.SchemeGroupVersion.WithKind("Pod")
-	schedulingKind = resourcev1alpha1.SchemeGroupVersion.WithKind("PodScheduling")
-	claimKind      = resourcev1alpha1.SchemeGroupVersion.WithKind("ResourceClaim")
-	podName        = "my-pod"
-	podUID         = "1234"
-	resourceName   = "my-resource"
-	resourceName2  = resourceName + "-2"
-	claimName      = podName + "-" + resourceName
-	claimName2     = podName + "-" + resourceName + "-2"
-	className      = "my-resource-class"
-	namespace      = "default"
-	templateName   = "my-template"
+	podKind = v1.SchemeGroupVersion.WithKind("Pod")
+
+	podName       = "my-pod"
+	podUID        = "1234"
+	resourceName  = "my-resource"
+	resourceName2 = resourceName + "-2"
+	claimName     = podName + "-" + resourceName
+	claimName2    = podName + "-" + resourceName + "-2"
+	className     = "my-resource-class"
+	namespace     = "default"
 
 	resourceClass = &resourcev1alpha1.ResourceClass{
 		ObjectMeta: metav1.ObjectMeta{
@@ -67,20 +65,20 @@ var (
 
 	podWithClaimName = st.MakePod().Name(podName).Namespace(namespace).
 				UID(podUID).
-				PodResourceClaims(v1.PodResourceClaim{resourceName, v1.ClaimSource{ResourceClaimName: &claimName}}).
+				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, Source: v1.ClaimSource{ResourceClaimName: &claimName}}).
 				Obj()
 	otherPodWithClaimName = st.MakePod().Name(podName).Namespace(namespace).
 				UID(podUID + "-II").
-				PodResourceClaims(v1.PodResourceClaim{resourceName, v1.ClaimSource{ResourceClaimName: &claimName}}).
+				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, Source: v1.ClaimSource{ResourceClaimName: &claimName}}).
 				Obj()
 	podWithClaimTemplate = st.MakePod().Name(podName).Namespace(namespace).
 				UID(podUID).
-				PodResourceClaims(v1.PodResourceClaim{resourceName, v1.ClaimSource{ResourceClaimTemplateName: &claimName}}).
+				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, Source: v1.ClaimSource{ResourceClaimTemplateName: &claimName}}).
 				Obj()
 	podWithTwoClaimNames = st.MakePod().Name(podName).Namespace(namespace).
 				UID(podUID).
-				PodResourceClaims(v1.PodResourceClaim{resourceName, v1.ClaimSource{ResourceClaimName: &claimName}}).
-				PodResourceClaims(v1.PodResourceClaim{resourceName2, v1.ClaimSource{ResourceClaimName: &claimName2}}).
+				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, Source: v1.ClaimSource{ResourceClaimName: &claimName}}).
+				PodResourceClaims(v1.PodResourceClaim{Name: resourceName2, Source: v1.ClaimSource{ResourceClaimName: &claimName2}}).
 				Obj()
 
 	workerNode = &st.MakeNode().Name("worker").Label("nodename", "worker").Node
