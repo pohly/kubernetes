@@ -260,3 +260,7 @@ func (cm *containerManagerImpl) PrepareResources(pod *v1.Pod, container *v1.Cont
 func (cm *containerManagerImpl) UnprepareResources(*v1.Pod) error {
 	return nil
 }
+
+func (cm *containerManagerImpl) PodMightNeedToUnprepareResources(UID types.UID) bool {
+	return false
+}
