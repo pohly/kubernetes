@@ -212,3 +212,7 @@ require (
 	mvdan.cc/unparam v0.0.0-20220706161116-678bad134442 // indirect
 	sigs.k8s.io/yaml v1.2.0 // indirect
 )
+
+replace github.com/golangci/golangci-lint => github.com/pohly/golangci-lint v1.50.2-0.20221218140654-69123917fbfb
+
+replace github.com/ashanbrown/forbidigo => github.com/pohly/forbidigo v1.3.1-0.20221206081620-267f111f0502
