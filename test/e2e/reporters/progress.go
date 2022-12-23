@@ -23,6 +23,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -60,8 +61,9 @@ type ProgressReporter struct {
 
 	Failures []string `json:"failures,omitempty"`
 
-	progressURL string
-	client      *http.Client
+	progressURL  string
+	client       *http.Client
+	pendingPosts sync.WaitGroup
 }
 
 // NewProgressReporter returns a progress reporter which posts updates to the given URL.
@@ -87,7 +89,11 @@ func (reporter *ProgressReporter) SendUpdates() {
 		return
 	}
 	b := reporter.serialize()
-	go reporter.postProgressToURL(b)
+	reporter.pendingPosts.Add(1)
+	go func() {
+		defer reporter.pendingPosts.Done()
+		reporter.postProgressToURL(b)
+	}()
 }
 
 func (reporter *ProgressReporter) postProgressToURL(b []byte) {
@@ -161,4 +167,9 @@ func (reporter *ProgressReporter) ProcessSpecReport(report ginkgo.SpecReport) {
 func (reporter *ProgressReporter) SetEndMsg() {
 	reporter.LastMsg = "Test Suite completed"
 	reporter.SendUpdates()
+}
+
+// Wait blocks infinitely until all started POST requests are completed.
+func (reporter *ProgressReporter) Wait() {
+	reporter.pendingPosts.Wait()
 }
