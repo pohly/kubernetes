@@ -23,6 +23,78 @@ import (
 	"github.com/onsi/gomega/format"
 )
 
+// NewGomega is a wrapper around gomega.NewGomega which sets up Gomega so that
+// the failure is recorded locally as an error. This enables the use of Gomega
+// in a function which is expected to return an error:
+//
+//     gErr := NewGomega()
+//     gErr.Expect(...).To(...)
+//     if g := NewGomega(), g.Expect(...).To(...); g.Failed() {
+//         return g
+//     }
+//
+// This error can get wrapped to provide additional context for the
+// failure. The test then should use ExpectNoError to turn a non-nilr
+// error into a failure.
+func NewGomega() GomegaInstance {
+	g := gomegaInstance{}
+	g.Gomega = gomega.NewGomega(g.failure)
+	return g
+}
+
+type GomegaInstance interface {
+	gomega.Gomega
+	error
+	Failed() bool
+}
+
+type gomegaInstance struct {
+	gomega.Gomega
+	failureMsg *string
+}
+
+var _ GomegaInstance = gomegaInstance{}
+
+func (g *gomegaInstance) failure(msg string, callerSkip ...int) {
+	g.failureMsg = &msg
+}
+
+func (g gomegaInstance) Failed() bool {
+	return g.failureMsg != nil
+}
+
+func (g gomegaInstance) Is(target error) bool {
+	return target == ErrFailure
+}
+
+func (g gomegaInstance) Error() string {
+	if g.failureMsg == nil {
+		return ""
+	}
+	return *g.failureMsg
+}
+
+// FailureError is an error where the error string is meant to be
+// passed to ginkgo.Fail directly, i.e. adding some prefix
+// like "unexpected error" is not necessary. It is also not
+// necessary to dump the error struct.
+type FailureError string
+
+func (f FailureError) Error() string {
+	return string(f)
+}
+
+// ErrFailure is an emtpy error that can be wrapped to
+// indicate that an error is a FailureError:
+//
+//    return fmt.Errorf("some problem%w", ErrFailure)
+//    ...
+//    err := someOperation()
+//    if errors.is(err, ErrFailure) {
+//        ...
+//    }
+var ErrFailure error = FailureError("")
+
 // ExpectEqual expects the specified two are the same, otherwise an exception raises
 func ExpectEqual(actual interface{}, extra interface{}, explain ...interface{}) {
 	gomega.ExpectWithOffset(1, actual).To(gomega.Equal(extra), explain...)
