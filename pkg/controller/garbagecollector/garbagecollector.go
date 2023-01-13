@@ -131,11 +131,11 @@ func NewGarbageCollector(
 
 // resyncMonitors starts or stops resource monitors as needed to ensure that all
 // (and only) those resources present in the map are monitored.
-func (gc *GarbageCollector) resyncMonitors(deletableResources map[schema.GroupVersionResource]struct{}) error {
-	if err := gc.dependencyGraphBuilder.syncMonitors(deletableResources); err != nil {
+func (gc *GarbageCollector) resyncMonitors(ctx context.Context, deletableResources map[schema.GroupVersionResource]struct{}) error {
+	if err := gc.dependencyGraphBuilder.syncMonitors(ctx, deletableResources); err != nil {
 		return err
 	}
-	gc.dependencyGraphBuilder.startMonitors()
+	gc.dependencyGraphBuilder.startMonitors(ctx)
 	return nil
 }
 
@@ -151,21 +151,25 @@ func (gc *GarbageCollector) Run(ctx context.Context, workers int) {
 	gc.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: gc.kubeClient.CoreV1().Events("")})
 	defer gc.eventBroadcaster.Shutdown()
 
-	klog.Infof("Starting garbage collector controller")
-	defer klog.Infof("Shutting down garbage collector controller")
+	logger := klog.FromContext(ctx)
+	logger.Info("Starting controller", "controller", "garbage-collector")
+	defer logger.Info("Shutting down controller", "controller", "garbage-collector")
 
-	go gc.dependencyGraphBuilder.Run(ctx.Done())
+	graphLogger := klog.LoggerWithName(logger, "graphbuilder")
+	go gc.dependencyGraphBuilder.Run(klog.NewContext(ctx, graphLogger))
 
-	if !cache.WaitForNamedCacheSync("garbage collector", ctx.Done(), gc.dependencyGraphBuilder.IsSynced) {
+	if !cache.WaitForNamedCacheSync("garbage collector", ctx.Done(), func() bool {
+		return gc.dependencyGraphBuilder.IsSynced(ctx)
+	}) {
 		return
 	}
 
-	klog.Infof("Garbage collector: all resource monitors have synced. Proceeding to collect garbage")
+	logger.Info("All resource monitors have synced. Proceeding to collect garbage")
 
 	// gc workers
 	for i := 0; i < workers; i++ {
 		go wait.UntilWithContext(ctx, gc.runAttemptToDeleteWorker, 1*time.Second)
-		go wait.Until(gc.runAttemptToOrphanWorker, 1*time.Second, ctx.Done())
+		go wait.UntilWithContext(ctx, gc.runAttemptToOrphanWorker, 1*time.Second)
 	}
 
 	<-ctx.Done()
@@ -178,22 +182,24 @@ func (gc *GarbageCollector) Run(ctx context.Context, workers int) {
 // Note that discoveryClient should NOT be shared with gc.restMapper, otherwise
 // the mapper's underlying discovery client will be unnecessarily reset during
 // the course of detecting new resources.
-func (gc *GarbageCollector) Sync(discoveryClient discovery.ServerResourcesInterface, period time.Duration, stopCh <-chan struct{}) {
+func (gc *GarbageCollector) Sync(ctx context.Context, discoveryClient discovery.ServerResourcesInterface, period time.Duration) {
 	oldResources := make(map[schema.GroupVersionResource]struct{})
-	wait.Until(func() {
+	wait.UntilWithContext(ctx, func(ctx context.Context) {
+		logger := klog.FromContext(ctx)
+
 		// Get the current resource list from discovery.
 		newResources := GetDeletableResources(discoveryClient)
 
 		// This can occur if there is an internal error in GetDeletableResources.
 		if len(newResources) == 0 {
-			klog.V(2).Infof("no resources reported by discovery, skipping garbage collector sync")
+			logger.V(2).Info("no resources reported by discovery, skipping garbage collector sync")
 			metrics.GarbageCollectorResourcesSyncError.Inc()
 			return
 		}
 
 		// Decide whether discovery has reported a change.
 		if reflect.DeepEqual(oldResources, newResources) {
-			klog.V(5).Infof("no resource updates from discovery, skipping garbage collector sync")
+			logger.V(5).Info("no resource updates from discovery, skipping garbage collector sync")
 			return
 		}
 
@@ -204,26 +210,30 @@ func (gc *GarbageCollector) Sync(discoveryClient discovery.ServerResourcesInterf
 
 		// Once we get here, we should not unpause workers until we've successfully synced
 		attempt := 0
-		wait.PollImmediateUntil(100*time.Millisecond, func() (bool, error) {
+		wait.PollImmediateUntilWithContext(ctx, 100*time.Millisecond, func(ctx context.Context) (bool, error) {
 			attempt++
 
 			// On a reattempt, check if available resources have changed
 			if attempt > 1 {
 				newResources = GetDeletableResources(discoveryClient)
 				if len(newResources) == 0 {
-					klog.V(2).Infof("no resources reported by discovery (attempt %d)", attempt)
+					logger.V(2).Info("no resources reported by discovery", "attempt", attempt)
 					metrics.GarbageCollectorResourcesSyncError.Inc()
 					return false, nil
 				}
 			}
 
-			klog.V(2).Infof("syncing garbage collector with updated resources from discovery (attempt %d): %s", attempt, printDiff(oldResources, newResources))
+			logger.V(2).Info(
+				"syncing garbage collector with updated resources from discovery",
+				"attempt", attempt,
+				"diff", printDiff(oldResources, newResources),
+			)
 
 			// Resetting the REST mapper will also invalidate the underlying discovery
 			// client. This is a leaky abstraction and assumes behavior about the REST
 			// mapper, but we'll deal with it for now.
 			gc.restMapper.Reset()
-			klog.V(4).Infof("reset restmapper")
+			logger.V(4).Info("reset restmapper")
 
 			// Perform the monitor resync and wait for controllers to report cache sync.
 			//
@@ -234,19 +244,21 @@ func (gc *GarbageCollector) Sync(discoveryClient discovery.ServerResourcesInterf
 			// discovery call if the resources appeared in-between the calls. In that
 			// case, the restMapper will fail to map some of newResources until the next
 			// attempt.
-			if err := gc.resyncMonitors(newResources); err != nil {
+			if err := gc.resyncMonitors(ctx, newResources); err != nil {
 				utilruntime.HandleError(fmt.Errorf("failed to sync resource monitors (attempt %d): %v", attempt, err))
 				metrics.GarbageCollectorResourcesSyncError.Inc()
 				return false, nil
 			}
-			klog.V(4).Infof("resynced monitors")
+			logger.V(4).Info("resynced monitors")
 
 			// wait for caches to fill for a while (our sync period) before attempting to rediscover resources and retry syncing.
 			// this protects us from deadlocks where available resources changed and one of our informer caches will never fill.
 			// informers keep attempting to sync in the background, so retrying doesn't interrupt them.
 			// the call to resyncMonitors on the reattempt will no-op for resources that still exist.
 			// note that workers stay paused until we successfully resync.
-			if !cache.WaitForNamedCacheSync("garbage collector", waitForStopOrTimeout(stopCh, period), gc.dependencyGraphBuilder.IsSynced) {
+			if !cache.WaitForNamedCacheSync("garbage collector", waitForStopOrTimeout(ctx.Done(), period), func() bool {
+				return gc.dependencyGraphBuilder.IsSynced(ctx)
+			}) {
 				utilruntime.HandleError(fmt.Errorf("timed out waiting for dependency graph builder sync during GC sync (attempt %d)", attempt))
 				metrics.GarbageCollectorResourcesSyncError.Inc()
 				return false, nil
@@ -254,14 +266,14 @@ func (gc *GarbageCollector) Sync(discoveryClient discovery.ServerResourcesInterf
 
 			// success, break out of the loop
 			return true, nil
-		}, stopCh)
+		})
 
 		// Finally, keep track of our new state. Do this after all preceding steps
 		// have succeeded to ensure we'll retry on subsequent syncs if an error
 		// occurred.
 		oldResources = newResources
-		klog.V(2).Infof("synced garbage collector")
-	}, period, stopCh)
+		logger.V(2).Info("synced garbage collector")
+	}, period)
 }
 
 // printDiff returns a human-readable summary of what resources were added and removed
@@ -295,8 +307,8 @@ func waitForStopOrTimeout(stopCh <-chan struct{}, timeout time.Duration) <-chan 
 }
 
 // IsSynced returns true if dependencyGraphBuilder is synced.
-func (gc *GarbageCollector) IsSynced() bool {
-	return gc.dependencyGraphBuilder.IsSynced()
+func (gc *GarbageCollector) IsSynced(ctx context.Context) bool {
+	return gc.dependencyGraphBuilder.IsSynced(ctx)
 }
 
 func (gc *GarbageCollector) runAttemptToDeleteWorker(ctx context.Context) {
@@ -342,18 +354,21 @@ func (gc *GarbageCollector) attemptToDeleteWorker(ctx context.Context, item inte
 		return forgetItem
 	}
 
+	logger := klog.FromContext(ctx)
+	logger = klog.LoggerWithValues(logger, "item", n)
+
 	if !n.isObserved() {
 		nodeFromGraph, existsInGraph := gc.dependencyGraphBuilder.uidToNode.Read(n.identity.UID)
 		if !existsInGraph {
 			// this can happen if attemptToDelete loops on a requeued virtual node because attemptToDeleteItem returned an error,
 			// and in the meantime a deletion of the real object associated with that uid was observed
-			klog.V(5).Infof("item %s no longer in the graph, skipping attemptToDeleteItem", n)
+			logger.V(5).Info("item no longer in the graph, skipping attemptToDeleteItem", "item", n)
 			return forgetItem
 		}
 		if nodeFromGraph.isObserved() {
 			// this can happen if attemptToDelete loops on a requeued virtual node because attemptToDeleteItem returned an error,
 			// and in the meantime the real object associated with that uid was observed
-			klog.V(5).Infof("item %s no longer virtual in the graph, skipping attemptToDeleteItem on virtual node", n)
+			logger.V(5).Info("item no longer virtual in the graph, skipping attemptToDeleteItem on virtual node", "item", n)
 			return forgetItem
 		}
 	}
@@ -374,7 +389,7 @@ func (gc *GarbageCollector) attemptToDeleteWorker(ctx context.Context, item inte
 			//    have a way to distinguish this from a valid type we will recognize
 			//    after the next discovery sync.
 			// For now, record the error and retry.
-			klog.V(5).Infof("error syncing item %s: %v", n, err)
+			logger.V(5).Error(err, "error syncing item", "item", n)
 		} else {
 			utilruntime.HandleError(fmt.Errorf("error syncing item %s: %v", n, err))
 		}
@@ -384,7 +399,7 @@ func (gc *GarbageCollector) attemptToDeleteWorker(ctx context.Context, item inte
 		// requeue if item hasn't been observed via an informer event yet.
 		// otherwise a virtual node for an item added AND removed during watch reestablishment can get stuck in the graph and never removed.
 		// see https://issue.k8s.io/56121
-		klog.V(5).Infof("item %s hasn't been observed via informer yet", n.identity)
+		logger.V(5).Info("item hasn't been observed via informer yet", "item", n, "identity", n.identity)
 		return requeueItem
 	}
 
@@ -397,16 +412,32 @@ func (gc *GarbageCollector) attemptToDeleteWorker(ctx context.Context, item inte
 func (gc *GarbageCollector) isDangling(ctx context.Context, reference metav1.OwnerReference, item *node) (
 	dangling bool, owner *metav1.PartialObjectMetadata, err error) {
 
+	logger := klog.FromContext(ctx)
+	logger = klog.LoggerWithValues(logger,
+		"objectUID", item.identity.UID,
+		"owner", reference,
+	)
+
 	// check for recorded absent cluster-scoped parent
 	absentOwnerCacheKey := objectReference{OwnerReference: ownerReferenceCoordinates(reference)}
 	if gc.absentOwnerCache.Has(absentOwnerCacheKey) {
-		klog.V(5).Infof("according to the absentOwnerCache, object %s's owner %s/%s, %s does not exist", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
+		logger.V(5).Info("according to the absentOwnerCache, object's owner does not exist",
+			"objectUID", item.identity.UID,
+			"owner", reference,
+		)
 		return true, nil, nil
 	}
+
+	logger = klog.LoggerWithValues(logger, "ownerNamespace", item.identity.Namespace)
+
 	// check for recorded absent namespaced parent
 	absentOwnerCacheKey.Namespace = item.identity.Namespace
 	if gc.absentOwnerCache.Has(absentOwnerCacheKey) {
-		klog.V(5).Infof("according to the absentOwnerCache, object %s's owner %s/%s, %s does not exist in namespace %s", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name, item.identity.Namespace)
+		logger.V(5).Info("according to the absentOwnerCache, object's owner does not exist in namespace",
+			"objectUID", item.identity.UID,
+			"owner", reference,
+			"ownerNamespace", item.identity.Namespace,
+		)
 		return true, nil, nil
 	}
 
@@ -427,7 +458,11 @@ func (gc *GarbageCollector) isDangling(ctx context.Context, reference metav1.Own
 	if len(item.identity.Namespace) == 0 && namespaced {
 		// item is a cluster-scoped object referring to a namespace-scoped owner, which is not valid.
 		// return a marker error, rather than retrying on the lookup failure forever.
-		klog.V(2).Infof("object %s is cluster-scoped, but refers to a namespaced owner of type %s/%s", item.identity, reference.APIVersion, reference.Kind)
+		logger.V(2).Info("object is cluster-scoped, but refers to a namespaced owner",
+			"objectUID", item.identity.UID,
+			"owner", reference,
+			"ownerNamespace", item.identity.Namespace,
+		)
 		return false, nil, namespacedOwnerOfClusterScopedObjectErr
 	}
 
@@ -438,14 +473,23 @@ func (gc *GarbageCollector) isDangling(ctx context.Context, reference metav1.Own
 	switch {
 	case errors.IsNotFound(err):
 		gc.absentOwnerCache.Add(absentOwnerCacheKey)
-		klog.V(5).Infof("object %s's owner %s/%s, %s is not found", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
+		logger.V(5).Info("object's owner is not found",
+			"objectUID", item.identity.UID,
+			"owner", reference,
+			"ownerNamespace", item.identity.Namespace,
+		)
 		return true, nil, nil
 	case err != nil:
 		return false, nil, err
 	}
 
 	if owner.GetUID() != reference.UID {
-		klog.V(5).Infof("object %s's owner %s/%s, %s is not found, UID mismatch", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
+		logger.V(5).Info("object's owner is not found, UID mismatch",
+			"objectUID", item.identity.UID,
+			"reference", reference,
+			"ownerNamespace", item.identity.Namespace,
+			"owner", owner.GetUID(),
+		)
 		gc.absentOwnerCache.Add(absentOwnerCacheKey)
 		return true, nil, nil
 	}
@@ -498,12 +542,29 @@ func ownerRefsToUIDs(refs []metav1.OwnerReference) []types.UID {
 // if the API get request returns a NotFound error, or the retrieved item's uid does not match,
 // a virtual delete event for the node is enqueued and enqueuedVirtualDeleteEventErr is returned.
 func (gc *GarbageCollector) attemptToDeleteItem(ctx context.Context, item *node) error {
-	klog.V(2).InfoS("Processing object", "object", klog.KRef(item.identity.Namespace, item.identity.Name),
-		"objectUID", item.identity.UID, "kind", item.identity.Kind, "virtual", !item.isObserved())
+	logger := klog.FromContext(ctx)
+	logger = klog.LoggerWithValues(logger,
+		"object", klog.KRef(item.identity.Namespace, item.identity.Name),
+		"objectUID", item.identity.UID,
+		"kind", item.identity.Kind,
+		"virtual", !item.isObserved(),
+	)
+
+	logger.V(2).Info("Processing object",
+		"object", klog.KRef(item.identity.Namespace, item.identity.Name),
+		"objectUID", item.identity.UID,
+		"kind", item.identity.Kind,
+		"virtual", !item.isObserved(),
+	)
 
 	// "being deleted" is an one-way trip to the final deletion. We'll just wait for the final deletion, and then process the object's dependents.
 	if item.isBeingDeleted() && !item.isDeletingDependents() {
-		klog.V(5).Infof("processing item %s returned at once, because its DeletionTimestamp is non-nil", item.identity)
+		logger.V(5).Info("processing item returned at once, because its DeletionTimestamp is non-nil",
+			"object", klog.KRef(item.identity.Namespace, item.identity.Name),
+			"objectUID", item.identity.UID,
+			"kind", item.identity.Kind,
+			"virtual", !item.isObserved(),
+		)
 		return nil
 	}
 	// TODO: It's only necessary to talk to the API server if this is a
@@ -515,7 +576,12 @@ func (gc *GarbageCollector) attemptToDeleteItem(ctx context.Context, item *node)
 		// the GraphBuilder can add "virtual" node for an owner that doesn't
 		// exist yet, so we need to enqueue a virtual Delete event to remove
 		// the virtual node from GraphBuilder.uidToNode.
-		klog.V(5).Infof("item %v not found, generating a virtual delete event", item.identity)
+		logger.V(5).Info("item not found, generating a virtual delete event",
+			"object", klog.KRef(item.identity.Namespace, item.identity.Name),
+			"objectUID", item.identity.UID,
+			"kind", item.identity.Kind,
+			"virtual", !item.isObserved(),
+		)
 		gc.dependencyGraphBuilder.enqueueVirtualDeleteEvent(item.identity)
 		return enqueuedVirtualDeleteEventErr
 	case err != nil:
@@ -523,7 +589,13 @@ func (gc *GarbageCollector) attemptToDeleteItem(ctx context.Context, item *node)
 	}
 
 	if latest.GetUID() != item.identity.UID {
-		klog.V(5).Infof("UID doesn't match, item %v not found, generating a virtual delete event", item.identity)
+		logger.V(5).Info("UID doesn't match, item not found, generating a virtual delete event",
+			"object", klog.KRef(item.identity.Namespace, item.identity.Name),
+			"objectUID", item.identity.UID,
+			"kind", item.identity.Kind,
+			"virtual", !item.isObserved(),
+			"latestUID", latest.GetUID(),
+		)
 		gc.dependencyGraphBuilder.enqueueVirtualDeleteEvent(item.identity)
 		return enqueuedVirtualDeleteEventErr
 	}
@@ -531,13 +603,18 @@ func (gc *GarbageCollector) attemptToDeleteItem(ctx context.Context, item *node)
 	// TODO: attemptToOrphanWorker() routine is similar. Consider merging
 	// attemptToOrphanWorker() into attemptToDeleteItem() as well.
 	if item.isDeletingDependents() {
-		return gc.processDeletingDependentsItem(item)
+		return gc.processDeletingDependentsItem(ctx, item)
 	}
 
 	// compute if we should delete the item
 	ownerReferences := latest.GetOwnerReferences()
 	if len(ownerReferences) == 0 {
-		klog.V(2).Infof("object %s's doesn't have an owner, continue on next item", item.identity)
+		logger.V(2).Info("object doesn't have an owner, continue on next item",
+			"object", klog.KRef(item.identity.Namespace, item.identity.Name),
+			"objectUID", item.identity.UID,
+			"kind", item.identity.Kind,
+			"virtual", !item.isObserved(),
+		)
 		return nil
 	}
 
@@ -545,15 +622,32 @@ func (gc *GarbageCollector) attemptToDeleteItem(ctx context.Context, item *node)
 	if err != nil {
 		return err
 	}
-	klog.V(5).Infof("classify references of %s.\nsolid: %#v\ndangling: %#v\nwaitingForDependentsDeletion: %#v\n", item.identity, solid, dangling, waitingForDependentsDeletion)
+	logger.V(5).Info("classify object references",
+		"solid", solid,
+		"dangling", dangling,
+		"waitingForDependentsDeletion", waitingForDependentsDeletion,
+	)
 
 	switch {
 	case len(solid) != 0:
-		klog.V(2).Infof("object %#v has at least one existing owner: %#v, will not garbage collect", item.identity, solid)
+		logger.V(2).Info("object has at least one existing owner, will not garbage collect",
+			"object", klog.KRef(item.identity.Namespace, item.identity.Name),
+			"objectUID", item.identity.UID,
+			"kind", item.identity.Kind,
+			"virtual", !item.isObserved(),
+			"owner", solid,
+		)
 		if len(dangling) == 0 && len(waitingForDependentsDeletion) == 0 {
 			return nil
 		}
-		klog.V(2).Infof("remove dangling references %#v and waiting references %#v for object %s", dangling, waitingForDependentsDeletion, item.identity)
+		logger.V(2).Info("remove dangling references and waiting references for object",
+			"object", klog.KRef(item.identity.Namespace, item.identity.Name),
+			"objectUID", item.identity.UID,
+			"kind", item.identity.Kind,
+			"virtual", !item.isObserved(),
+			"dangling", dangling,
+			"waitingForDependentsDeletion", waitingForDependentsDeletion,
+		)
 		// waitingForDependentsDeletion needs to be deleted from the
 		// ownerReferences, otherwise the referenced objects will be stuck with
 		// the FinalizerDeletingDependents and never get deleted.
@@ -575,7 +669,13 @@ func (gc *GarbageCollector) attemptToDeleteItem(ctx context.Context, item *node)
 				// problem.
 				// there are multiple workers run attemptToDeleteItem in
 				// parallel, the circle detection can fail in a race condition.
-				klog.V(2).Infof("processing object %s, some of its owners and its dependent [%s] have FinalizerDeletingDependents, to prevent potential cycle, its ownerReferences are going to be modified to be non-blocking, then the object is going to be deleted with Foreground", item.identity, dep.identity)
+				logger.V(2).Info("processing object, some of its owners and its dependent have FinalizerDeletingDependents, to prevent potential cycle, its ownerReferences are going to be modified to be non-blocking, then the object is going to be deleted with Foreground",
+					"object", klog.KRef(item.identity.Namespace, item.identity.Name),
+					"objectUID", item.identity.UID,
+					"kind", item.identity.Kind,
+					"virtual", !item.isObserved(),
+					"dependent", dep.identity,
+				)
 				patch, err := item.unblockOwnerReferencesStrategicMergePatch()
 				if err != nil {
 					return err
@@ -586,7 +686,12 @@ func (gc *GarbageCollector) attemptToDeleteItem(ctx context.Context, item *node)
 				break
 			}
 		}
-		klog.V(2).Infof("at least one owner of object %s has FinalizerDeletingDependents, and the object itself has dependents, so it is going to be deleted in Foreground", item.identity)
+		logger.V(2).Info("at least one owner of object has FinalizerDeletingDependents, and the object itself has dependents, so it is going to be deleted in Foreground",
+			"object", klog.KRef(item.identity.Namespace, item.identity.Name),
+			"objectUID", item.identity.UID,
+			"kind", item.identity.Kind,
+			"virtual", !item.isObserved(),
+		)
 		// the deletion event will be observed by the graphBuilder, so the item
 		// will be processed again in processDeletingDependentsItem. If it
 		// doesn't have dependents, the function will remove the
@@ -610,22 +715,33 @@ func (gc *GarbageCollector) attemptToDeleteItem(ctx context.Context, item *node)
 			// otherwise, default to background.
 			policy = metav1.DeletePropagationBackground
 		}
-		klog.V(2).InfoS("Deleting object", "object", klog.KRef(item.identity.Namespace, item.identity.Name),
-			"objectUID", item.identity.UID, "kind", item.identity.Kind, "propagationPolicy", policy)
+		logger.V(2).Info("Deleting object",
+			"object", klog.KRef(item.identity.Namespace, item.identity.Name),
+			"objectUID", item.identity.UID,
+			"kind", item.identity.Kind,
+			"virtual", !item.isObserved(),
+			"propagationPolicy", policy,
+		)
 		return gc.deleteObject(item.identity, &policy)
 	}
 }
 
 // process item that's waiting for its dependents to be deleted
-func (gc *GarbageCollector) processDeletingDependentsItem(item *node) error {
+func (gc *GarbageCollector) processDeletingDependentsItem(ctx context.Context, item *node) error {
+	logger := klog.FromContext(ctx)
+	logger = klog.LoggerWithValues(logger, "item", item.identity)
+
 	blockingDependents := item.blockingDependents()
 	if len(blockingDependents) == 0 {
-		klog.V(2).Infof("remove DeleteDependents finalizer for item %s", item.identity)
-		return gc.removeFinalizer(item, metav1.FinalizerDeleteDependents)
+		logger.V(2).Info("remove DeleteDependents finalizer for item", "item", item.identity)
+		return gc.removeFinalizer(ctx, item, metav1.FinalizerDeleteDependents)
 	}
 	for _, dep := range blockingDependents {
 		if !dep.isDeletingDependents() {
-			klog.V(2).Infof("adding %s to attemptToDelete, because its owner %s is deletingDependents", dep.identity, item.identity)
+			logger.V(2).Info("adding dependent to attemptToDelete, because its owner is deletingDependents",
+				"item", item.identity,
+				"dependent", dep.identity,
+			)
 			gc.attemptToDelete.Add(dep)
 		}
 	}
@@ -633,7 +749,7 @@ func (gc *GarbageCollector) processDeletingDependentsItem(item *node) error {
 }
 
 // dependents are copies of pointers to the owner's dependents, they don't need to be locked.
-func (gc *GarbageCollector) orphanDependents(owner objectReference, dependents []*node) error {
+func (gc *GarbageCollector) orphanDependents(ctx context.Context, owner objectReference, dependents []*node) error {
 	errCh := make(chan error, len(dependents))
 	wg := sync.WaitGroup{}
 	wg.Add(len(dependents))
@@ -667,12 +783,13 @@ func (gc *GarbageCollector) orphanDependents(owner objectReference, dependents [
 	if len(errorsSlice) != 0 {
 		return fmt.Errorf("failed to orphan dependents of owner %s, got errors: %s", owner, utilerrors.NewAggregate(errorsSlice).Error())
 	}
-	klog.V(5).Infof("successfully updated all dependents of owner %s", owner)
+	logger := klog.FromContext(ctx)
+	logger.V(5).Info("successfully updated all dependents", "owner", owner)
 	return nil
 }
 
-func (gc *GarbageCollector) runAttemptToOrphanWorker() {
-	for gc.processAttemptToOrphanWorker() {
+func (gc *GarbageCollector) runAttemptToOrphanWorker(ctx context.Context) {
+	for gc.processAttemptToOrphanWorker(ctx) {
 	}
 }
 
@@ -681,7 +798,7 @@ func (gc *GarbageCollector) runAttemptToOrphanWorker() {
 // OwnerReferences of its dependents, and finally updates the owner to remove
 // the "Orphan" finalizer. The node is added back into the attemptToOrphan if any of
 // these steps fail.
-func (gc *GarbageCollector) processAttemptToOrphanWorker() bool {
+func (gc *GarbageCollector) processAttemptToOrphanWorker(ctx context.Context) bool {
 	item, quit := gc.attemptToOrphan.Get()
 	gc.workerLock.RLock()
 	defer gc.workerLock.RUnlock()
@@ -690,7 +807,7 @@ func (gc *GarbageCollector) processAttemptToOrphanWorker() bool {
 	}
 	defer gc.attemptToOrphan.Done(item)
 
-	action := gc.attemptToOrphanWorker(item)
+	action := gc.attemptToOrphanWorker(ctx, item)
 	switch action {
 	case forgetItem:
 		gc.attemptToOrphan.Forget(item)
@@ -701,7 +818,7 @@ func (gc *GarbageCollector) processAttemptToOrphanWorker() bool {
 	return true
 }
 
-func (gc *GarbageCollector) attemptToOrphanWorker(item interface{}) workQueueItemAction {
+func (gc *GarbageCollector) attemptToOrphanWorker(ctx context.Context, item interface{}) workQueueItemAction {
 	owner, ok := item.(*node)
 	if !ok {
 		utilruntime.HandleError(fmt.Errorf("expect *node, got %#v", item))
@@ -715,13 +832,13 @@ func (gc *GarbageCollector) attemptToOrphanWorker(item interface{}) workQueueIte
 	}
 	owner.dependentsLock.RUnlock()
 
-	err := gc.orphanDependents(owner.identity, dependents)
+	err := gc.orphanDependents(ctx, owner.identity, dependents)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("orphanDependents for %s failed with %v", owner.identity, err))
 		return requeueItem
 	}
 	// update the owner, remove "orphaningFinalizer" from its finalizers list
-	err = gc.removeFinalizer(owner, metav1.FinalizerOrphanDependents)
+	err = gc.removeFinalizer(ctx, owner, metav1.FinalizerOrphanDependents)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("removeOrphanFinalizer for %s failed with %v", owner.identity, err))
 		return requeueItem
