@@ -32,6 +32,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -60,13 +61,17 @@ import (
 type operationCode string
 
 const (
-	createNodesOpcode      operationCode = "createNodes"
-	createNamespacesOpcode operationCode = "createNamespaces"
-	createPodsOpcode       operationCode = "createPods"
-	createPodSetsOpcode    operationCode = "createPodSets"
-	churnOpcode            operationCode = "churn"
-	barrierOpcode          operationCode = "barrier"
-	sleepOpcode            operationCode = "sleep"
+	createNodesOpcode                 operationCode = "createNodes"
+	createNamespacesOpcode            operationCode = "createNamespaces"
+	createPodsOpcode                  operationCode = "createPods"
+	createPodSetsOpcode               operationCode = "createPodSets"
+	createResourceClaimsOpcode        operationCode = "createResourceClaims"
+	createResourceClaimTemplateOpcode operationCode = "createResourceClaimTemplate"
+	createResourceClassOpcode         operationCode = "createResourceClass"
+	createResourceDriverOpcode        operationCode = "createResourceDriver"
+	churnOpcode                       operationCode = "churn"
+	barrierOpcode                     operationCode = "barrier"
+	sleepOpcode                       operationCode = "sleep"
 )
 
 const (
@@ -228,6 +233,10 @@ func (op *op) UnmarshalJSON(b []byte) error {
 		&createNamespacesOp{},
 		&createPodsOp{},
 		&createPodSetsOp{},
+		&createResourceClaimsOp{},
+		&createOp[resourcev1alpha2.ResourceClaimTemplate, createResourceClaimTemplateOpType]{},
+		&createOp[resourcev1alpha2.ResourceClass, createResourceClassOpType]{},
+		&createResourceDriverOp{},
 		&churnOp{},
 		&barrierOp{},
 		&sleepOp{},
@@ -264,6 +273,18 @@ type realOp interface {
 	// callers don't want the receiver to inadvertently modify the realOp
 	// (instead, it's returned as a return value).
 	patchParams(w *workload) (realOp, error)
+}
+
+// runnableOp is an interface implemented by some operations. It makes it posssible
+// to execute the operation without having to add separate code into runWorkload.
+type runnableOp interface {
+	realOp
+
+	// requiredNamespaces returns all namespaces that runWorkload must create
+	// before running the operation.
+	requiredNamespaces() []string
+	// run executes the steps provided by the operation.
+	run(context.Context, testing.TB, clientset.Interface)
 }
 
 func isValidParameterizable(val string) bool {
@@ -790,7 +811,7 @@ func runWorkload(ctx context.Context, b *testing.B, tc *testCase, w *workload) [
 			b.Fatalf("validate scheduler config file failed: %v", err)
 		}
 	}
-	informerFactory, client, dynClient := mustSetupScheduler(ctx, b, cfg)
+	informerFactory, client, dynClient := mustSetupScheduler(ctx, b, cfg, tc.FeatureGates)
 
 	// Additional informers needed for testing.
 	podInformer := informerFactory.Core().V1().Pods()
@@ -1052,6 +1073,14 @@ func runWorkload(ctx context.Context, b *testing.B, tc *testCase, w *workload) [
 			}
 		default:
 			b.Fatalf("op %d: invalid op %v", opIndex, concreteOp)
+			runable, ok := concreteOp.(runnableOp)
+			if !ok {
+				b.Fatalf("op %d: invalid op %v", opIndex, concreteOp)
+			}
+			for _, namespace := range runable.requiredNamespaces() {
+				maybeCreateNamespace(ctx, b, client, namespace, &numPodsScheduledPerNamespace)
+			}
+			runable.run(ctx, b, client)
 		}
 	}
 

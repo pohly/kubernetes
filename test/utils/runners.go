@@ -1353,7 +1353,7 @@ func makeCreatePod(client clientset.Interface, namespace string, podTemplate *v1
 }
 
 // InjectCounter marshals the object with JSON, replaces the `--counter` string (chosen
-// that way because it is valid inside most fields as suffix which unlikely to occur
+// that way because it is valid inside most fields as suffix and is unlikely to occur
 // by chance), and umarshals the modified object.
 func InjectCounter(counter int, in, out interface{}) error {
 	buffer, err := json.Marshal(in)
