@@ -30,6 +30,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	resourcev1alpha1 "k8s.io/api/resource/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -38,11 +39,13 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
-	"k8s.io/kube-scheduler/config/v1beta2"
+	configv1 "k8s.io/kube-scheduler/config/v1"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
+	"k8s.io/kubernetes/pkg/controller/resourceclaim"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	kubeschedulerscheme "k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -62,7 +65,7 @@ var dataItemsDir = flag.String("data-items-dir", "", "destination directory for 
 var runID = time.Now().Format(dateFormat)
 
 func newDefaultComponentConfig() (*config.KubeSchedulerConfiguration, error) {
-	gvk := v1beta2.SchemeGroupVersion.WithKind("KubeSchedulerConfiguration")
+	gvk := configv1.SchemeGroupVersion.WithKind("KubeSchedulerConfiguration")
 	cfg := config.KubeSchedulerConfiguration{}
 	_, _, err := kubeschedulerscheme.Codecs.UniversalDecoder().Decode(nil, &gvk, &cfg)
 	if err != nil {
@@ -78,7 +81,7 @@ func newDefaultComponentConfig() (*config.KubeSchedulerConfiguration, error) {
 // remove resources after finished.
 // Notes on rate limiter:
 //   - client rate limit is set to 5000.
-func mustSetupScheduler(ctx context.Context, b *testing.B, config *config.KubeSchedulerConfiguration) (informers.SharedInformerFactory, clientset.Interface, dynamic.Interface) {
+func mustSetupScheduler(ctx context.Context, b *testing.B, config *config.KubeSchedulerConfiguration, withDynamicResourceAllocation bool) (informers.SharedInformerFactory, clientset.Interface, dynamic.Interface) {
 	ctx, cancel := context.WithCancel(ctx)
 	b.Cleanup(cancel)
 	// Run API server with minimimal logging by default. Can be raised with -v.
@@ -88,6 +91,13 @@ func mustSetupScheduler(ctx context.Context, b *testing.B, config *config.KubeSc
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition", "Priority"}
+
+			// Enable DRA API group.
+			if withDynamicResourceAllocation {
+				opts.APIEnablement.RuntimeConfig = cliflag.ConfigurationMap{
+					resourcev1alpha1.SchemeGroupVersion.String(): "true",
+				}
+			}
 		},
 	})
 	b.Cleanup(tearDownFn)
@@ -114,6 +124,26 @@ func mustSetupScheduler(ctx context.Context, b *testing.B, config *config.KubeSc
 	// be applied to start a scheduler, most of them are defined in `scheduler.schedulerOptions`.
 	_, informerFactory := util.StartScheduler(ctx, client, cfg, config)
 	util.StartFakePVController(ctx, client)
+
+	// Testing of DRA with inline resource claims depends on these
+	// controllers for creating and removing ResourceClaims.
+	if withDynamicResourceAllocation {
+		podInformer := informerFactory.Core().V1().Pods()
+		claimInformer := informerFactory.Resource().V1alpha1().ResourceClaims()
+		claimTemplateInformer := informerFactory.Resource().V1alpha1().ResourceClaimTemplates()
+		claimController, err := resourceclaim.NewController(client, podInformer, claimInformer, claimTemplateInformer)
+		if err != nil {
+			b.Fatalf("Error creating claim controller: %v", err)
+		}
+
+		// TODO: run garbage collector or implement
+		// https://github.com/kubernetes/kubernetes/issues/113890.
+
+		informerFactory.Start(ctx.Done())
+		informerFactory.WaitForCacheSync(ctx.Done())
+
+		go claimController.Run(ctx, 5 /* workers */)
+	}
 
 	return informerFactory, client, dynClient
 }

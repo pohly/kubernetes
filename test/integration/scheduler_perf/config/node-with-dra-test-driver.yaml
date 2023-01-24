@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Node
+metadata:
+  generateName: scheduler-perf-dra-
+  labels:
+    have-test-resources: "true"
+spec: {}
+status:
+  capacity:
+    pods: "110"
+    cpu: "4"
+    memory: 32Gi
+  conditions:
+    - status: "True"
+      type: Ready
+  phase: Running

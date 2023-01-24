@@ -633,3 +633,180 @@
       taintNodes: 1000
       normalNodes: 4000
       measurePods: 4000
+
+- name: SchedulingWithExternalResourceClaims
+  featureGates:
+    DynamicResourceAllocation: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $nodesWithoutDRA
+  - opcode: createNodes
+    nodeTemplatePath: config/node-with-dra-test-driver.yaml
+    countParam: $nodesWithDRA
+  - opcode: createResourceDriver
+    driverName: test-driver.cdi.k8s.io
+    nodes: scheduler-perf-dra-*
+    maxClaimsPerNodeParam: $maxClaimsPerNode
+  - opcode: createResourceClass
+    templatePath: config/resourceclass.yaml
+  - opcode: createResourceClaims
+    namespace: init
+    countParam: $initPods
+    templatePath: config/resourceclaim-init.yaml
+  - opcode: createPods
+    namespace: init
+    countParam: $initPods
+    podTemplatePath: config/pod-with-init-claim-reference.yaml
+  - opcode: createResourceClaims
+    namespace: test
+    countParam: $measurePods
+    templatePath: config/resourceclaim.yaml
+  - opcode: createPods
+    namespace: test
+    countParam: $measurePods
+    podTemplatePath: config/pod-with-claim-reference.yaml
+    collectMetrics: true
+  workloads:
+  - name: base
+    params:
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      initPods: 0
+      measurePods: 1
+      maxClaimsPerNode: 10
+  - name: 1node
+    params:
+      nodesWithDRA: 1
+      nodesWithoutDRA: 0
+      initPods: 0
+      measurePods: 100
+      maxClaimsPerNode: 100
+  - name: 10nodes
+    params:
+      nodesWithDRA: 10
+      nodesWithoutDRA: 0
+      initPods: 0
+      measurePods: 100
+      maxClaimsPerNode: 10
+  - name: 2000pods_200nodes
+    params:
+      nodesWithDRA: 200
+      nodesWithoutDRA: 0
+      initPods: 1000
+      measurePods: 1000
+      maxClaimsPerNode: 10
+  - name: 2000pods_100nodes
+    params:
+      nodesWithDRA: 100
+      nodesWithoutDRA: 0
+      initPods: 1000
+      measurePods: 1000
+      maxClaimsPerNode: 20
+
+- name: SchedulingWithInlineResourceClaims
+  featureGates:
+    DynamicResourceAllocation: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $nodesWithoutDRA
+  - opcode: createNodes
+    nodeTemplatePath: config/node-with-dra-test-driver.yaml
+    countParam: $nodesWithDRA
+  - opcode: createResourceDriver
+    driverName: test-driver.cdi.k8s.io
+    nodes: scheduler-perf-dra-*
+    maxClaimsPerNodeParam: $maxClaimsPerNode
+  - opcode: createResourceClass
+    templatePath: config/resourceclass.yaml
+  - opcode: createResourceClaimTemplate
+    templatePath: config/resourceclaimtemplate.yaml
+    namespace: init
+  - opcode: createPods
+    namespace: init
+    countParam: $initPods
+    podTemplatePath: config/pod-with-claim-template.yaml
+  - opcode: createResourceClaimTemplate
+    templatePath: config/resourceclaimtemplate.yaml
+    namespace: test
+  - opcode: createPods
+    namespace: test
+    countParam: $measurePods
+    podTemplatePath: config/pod-with-claim-template.yaml
+    collectMetrics: true
+  workloads:
+  - name: base
+    params:
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      initPods: 0
+      measurePods: 1
+      maxClaimsPerNode: 10
+  - name: 1node
+    params:
+      nodesWithDRA: 1
+      nodesWithoutDRA: 0
+      initPods: 0
+      measurePods: 100
+      maxClaimsPerNode: 100
+  - name: 10nodes
+    params:
+      nodesWithDRA: 10
+      nodesWithoutDRA: 0
+      initPods: 0
+      measurePods: 100
+      maxClaimsPerNode: 10
+  - name: 2000pods_200nodes
+    params:
+      nodesWithDRA: 200
+      nodesWithoutDRA: 0
+      initPods: 1000
+      measurePods: 1000
+      maxClaimsPerNode: 10
+  - name: 2000pods_100nodes
+    params:
+      nodesWithDRA: 100
+      nodesWithoutDRA: 0
+      initPods: 1000
+      measurePods: 1000
+      maxClaimsPerNode: 20
+
+- name: LatencyWithInlineResourceClaims
+  featureGates:
+    DynamicResourceAllocation: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $nodesWithoutDRA
+  - opcode: createNodes
+    nodeTemplatePath: config/node-with-dra-test-driver.yaml
+    countParam: $nodesWithDRA
+  - opcode: createResourceDriver
+    driverName: test-driver.cdi.k8s.io
+    nodes: scheduler-perf-dra-*
+    maxClaimsPerNodeParam: $maxClaimsPerNode
+  - opcode: createResourceClass
+    templatePath: config/resourceclass.yaml
+  - opcode: createResourceClaimTemplate
+    templatePath: config/resourceclaimtemplate.yaml
+    namespace: init
+  - opcode: createPods
+    namespace: init
+    countParam: $initPods
+    podTemplatePath: config/pod-with-claim-template.yaml
+  - opcode: createResourceClaimTemplate
+    templatePath: config/resourceclaimtemplate.yaml
+    namespace: test
+  - opcode: createPods
+    namespace: test
+    countParam: $measurePods
+    podTemplatePath: config/pod-with-claim-template.yaml
+    sequentially: true
+    collectMetrics: true
+  workloads:
+  - name: 50pods
+    params:
+      nodesWithDRA: 1
+      nodesWithoutDRA: 0
+      initPods: 0
+      measurePods: 50
+      # TODO: reduce to 1 and ensure that claims get deleted
+      maxClaimsPerNode: 10000

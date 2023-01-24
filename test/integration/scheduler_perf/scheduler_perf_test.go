@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -29,6 +30,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	resourcev1alpha1 "k8s.io/api/resource/v1alpha1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,12 +44,16 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
+	draapp "k8s.io/kubernetes/test/e2e/dra/test-driver/app"
 	"k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -57,13 +63,17 @@ import (
 type operationCode string
 
 const (
-	createNodesOpcode      operationCode = "createNodes"
-	createNamespacesOpcode operationCode = "createNamespaces"
-	createPodsOpcode       operationCode = "createPods"
-	createPodSetsOpcode    operationCode = "createPodSets"
-	churnOpcode            operationCode = "churn"
-	barrierOpcode          operationCode = "barrier"
-	sleepOpcode            operationCode = "sleep"
+	createNodesOpcode                 operationCode = "createNodes"
+	createNamespacesOpcode            operationCode = "createNamespaces"
+	createPodsOpcode                  operationCode = "createPods"
+	createPodSetsOpcode               operationCode = "createPodSets"
+	createResourceClaimsOpcode        operationCode = "createResourceClaims"
+	createResourceClaimTemplateOpcode operationCode = "createResourceClaimTemplate"
+	createResourceClassOpcode         operationCode = "createResourceClass"
+	createResourceDriverOpcode        operationCode = "createResourceDriver"
+	churnOpcode                       operationCode = "churn"
+	barrierOpcode                     operationCode = "barrier"
+	sleepOpcode                       operationCode = "sleep"
 )
 
 const (
@@ -221,6 +231,10 @@ func (op *op) UnmarshalJSON(b []byte) error {
 		&createNamespacesOp{},
 		&createPodsOp{},
 		&createPodSetsOp{},
+		&createResourceClaimsOp{},
+		&createResourceClaimTemplateOp{},
+		&createResourceClassOp{},
+		&createResourceDriverOp{},
 		&churnOp{},
 		&barrierOp{},
 		&sleepOp{},
@@ -465,6 +479,149 @@ func (cpso createPodSetsOp) patchParams(w *workload) (realOp, error) {
 		}
 	}
 	return &cpso, (&cpso).isValid(true)
+}
+
+// createResourceClaimsOp defines an op where resource claims are created.
+type createResourceClaimsOp struct {
+	// Must be createResourceClaimsOpcode.
+	Opcode operationCode
+	// Number of claims to create. Parameterizable through CountParam.
+	Count int
+	// Template parameter for Count.
+	CountParam string
+	// Namespace the claims should be created in.
+	Namespace string
+	// Path to spec file describing the claims to create.
+	TemplatePath string
+}
+
+func (crco *createResourceClaimsOp) isValid(allowParameterization bool) error {
+	if crco.Opcode != createResourceClaimsOpcode {
+		return fmt.Errorf("invalid opcode %q; expected %q", crco.Opcode, createResourceClaimsOpcode)
+	}
+	if !isValidCount(allowParameterization, crco.Count, crco.CountParam) {
+		return fmt.Errorf("invalid Count=%d / CountParam=%q", crco.Count, crco.CountParam)
+	}
+	if crco.Namespace == "" {
+		fmt.Errorf("Namespace must be set")
+	}
+	if crco.TemplatePath == "" {
+		fmt.Errorf("TemplatePath must be set")
+	}
+	return nil
+}
+
+func (crco createResourceClaimsOp) collectsMetrics() bool {
+	return false
+}
+func (crco createResourceClaimsOp) patchParams(w *workload) (realOp, error) {
+	if crco.CountParam != "" {
+		var err error
+		crco.Count, err = w.Params.get(crco.CountParam[1:])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &crco, (&crco).isValid(false)
+}
+
+// createResourceClaimTemplateOp defines an op where resource claims are created.
+type createResourceClaimTemplateOp struct {
+	// Must be createResourceClaimTemplateOpcode.
+	Opcode operationCode
+	// Namespace the claim template should be created in.
+	Namespace string
+	// Path to spec file describing the claim template to create.
+	TemplatePath string
+}
+
+func (crcto *createResourceClaimTemplateOp) isValid(allowParameterization bool) error {
+	if crcto.Opcode != createResourceClaimTemplateOpcode {
+		return fmt.Errorf("invalid opcode %q; expected %q", crcto.Opcode, createResourceClaimTemplateOpcode)
+	}
+	if crcto.Namespace == "" {
+		fmt.Errorf("Namespace must be set")
+	}
+	if crcto.TemplatePath == "" {
+		fmt.Errorf("TemplatePath must be set")
+	}
+	return nil
+}
+
+func (crco createResourceClaimTemplateOp) collectsMetrics() bool {
+	return false
+}
+func (crco createResourceClaimTemplateOp) patchParams(w *workload) (realOp, error) {
+	return &crco, (&crco).isValid(false)
+}
+
+// createResourceClassOp defines an op where resource claims are created.
+type createResourceClassOp struct {
+	// Must be createResourceClassOpcode.
+	Opcode operationCode
+	// Path to spec file describing the class to create.
+	TemplatePath string
+}
+
+func (crco *createResourceClassOp) isValid(allowParameterization bool) error {
+	if crco.Opcode != createResourceClassOpcode {
+		return fmt.Errorf("invalid opcode %q; expected %q", crco.Opcode, createResourceClassOpcode)
+	}
+	if crco.TemplatePath == "" {
+		fmt.Errorf("TemplatePath must be set")
+	}
+	return nil
+}
+
+func (crco createResourceClassOp) collectsMetrics() bool {
+	return false
+}
+func (crco createResourceClassOp) patchParams(w *workload) (realOp, error) {
+	return &crco, nil
+}
+
+// createResourceDriverOp defines an op where resource claims are created.
+type createResourceDriverOp struct {
+	// Must be createResourceDriverOpcode.
+	Opcode operationCode
+	// Name of the driver, used to reference it in a resource class.
+	DriverName string
+	// Number of claims to allow per node. Parameterizable through MaxClaimsPerNodeParam.
+	MaxClaimsPerNode int
+	// Template parameter for MaxClaimsPerNode.
+	MaxClaimsPerNodeParam string
+	// Nodes matching this glob pattern have resources managed by the driver.
+	Nodes string
+}
+
+func (crco *createResourceDriverOp) isValid(allowParameterization bool) error {
+	if crco.Opcode != createResourceDriverOpcode {
+		return fmt.Errorf("invalid opcode %q; expected %q", crco.Opcode, createResourceDriverOpcode)
+	}
+	if !isValidCount(allowParameterization, crco.MaxClaimsPerNode, crco.MaxClaimsPerNodeParam) {
+		return fmt.Errorf("invalid MaxClaimsPerNode=%d / MaxClaimsPerNodeParam=%q", crco.MaxClaimsPerNode, crco.MaxClaimsPerNodeParam)
+	}
+	if crco.DriverName == "" {
+		fmt.Errorf("DriverName must be set")
+	}
+	if crco.Nodes == "" {
+		fmt.Errorf("Nodes must be set")
+	}
+	return nil
+}
+
+func (crco createResourceDriverOp) collectsMetrics() bool {
+	return false
+}
+func (crco createResourceDriverOp) patchParams(w *workload) (realOp, error) {
+	if crco.MaxClaimsPerNodeParam != "" {
+		var err error
+		crco.MaxClaimsPerNode, err = w.Params.get(crco.MaxClaimsPerNodeParam[1:])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &crco, (&crco).isValid(false)
 }
 
 // churnOp defines an op where services are created as a part of a workload.
@@ -741,7 +898,7 @@ func runWorkload(ctx context.Context, b *testing.B, tc *testCase, w *workload) [
 			b.Fatalf("validate scheduler config file failed: %v", err)
 		}
 	}
-	informerFactory, client, dynClient := mustSetupScheduler(ctx, b, cfg)
+	informerFactory, client, dynClient := mustSetupScheduler(ctx, b, cfg, tc.FeatureGates[features.DynamicResourceAllocation])
 
 	// Additional informers needed for testing.
 	podInformer := informerFactory.Core().V1().Pods()
@@ -889,6 +1046,28 @@ func runWorkload(ctx context.Context, b *testing.B, tc *testCase, w *workload) [
 				// So we reset the metrics in global registry; otherwise metrics gathered in this step
 				// will be carried over to next step.
 				legacyregistry.Reset()
+			}
+
+		case *createResourceClaimsOp:
+			maybeCreateNamespace(concreteOp.Namespace)
+			if err := createResourceClaims(ctx, b, concreteOp, client); err != nil {
+				b.Fatalf("op %d: %v", opIndex, err)
+			}
+
+		case *createResourceClaimTemplateOp:
+			maybeCreateNamespace(concreteOp.Namespace)
+			if err := createResourceClaimTemplate(ctx, b, concreteOp, client); err != nil {
+				b.Fatalf("op %d: %v", opIndex, err)
+			}
+
+		case *createResourceClassOp:
+			if err := createResourceClass(ctx, b, concreteOp, client); err != nil {
+				b.Fatalf("op %d: %v", opIndex, err)
+			}
+
+		case *createResourceDriverOp:
+			if err := createResourceDriver(ctx, b, concreteOp, client); err != nil {
+				b.Fatalf("op %d: %v", opIndex, err)
 			}
 
 		case *churnOp:
@@ -1167,6 +1346,114 @@ func createPodsSequentially(ctx context.Context, b *testing.B, namespace string,
 		},
 	}
 	return []DataItem{result}, nil
+}
+
+func createResourceClaims(ctx context.Context, b *testing.B, crco *createResourceClaimsOp, clientset clientset.Interface) error {
+	b.Logf("creating %d claims in namespace %q", crco.Count, crco.Namespace)
+
+	var claimTemplate *resourcev1alpha1.ResourceClaim
+	if err := getSpecFromFile(&crco.TemplatePath, &claimTemplate); err != nil {
+		return fmt.Errorf("parsing ResourceClaim %q: %v", crco.TemplatePath, err)
+	}
+	var createErr error
+	var mutex sync.Mutex
+	create := func(i int) {
+		err := func() error {
+			var claim *resourcev1alpha1.ResourceClaim
+			if err := testutils.InjectCounter(i, claimTemplate, &claim); err != nil {
+				return fmt.Errorf("injecting counter: %v", err)
+			}
+			if _, err := clientset.ResourceV1alpha1().ResourceClaims(crco.Namespace).Create(ctx, claim, metav1.CreateOptions{}); err != nil {
+				return fmt.Errorf("create claim: %v", err)
+			}
+			return nil
+		}()
+		if err != nil {
+			mutex.Lock()
+			defer mutex.Unlock()
+			createErr = err
+		}
+	}
+
+	workers := crco.Count
+	if workers > 30 {
+		workers = 30
+	}
+	workqueue.ParallelizeUntil(ctx, workers, crco.Count, create)
+	return createErr
+}
+
+func createResourceClaimTemplate(ctx context.Context, b *testing.B, crcto *createResourceClaimTemplateOp, clientset clientset.Interface) error {
+	b.Logf("creating resource claim template")
+
+	var claimTemplate *resourcev1alpha1.ResourceClaimTemplate
+	if err := getSpecFromFile(&crcto.TemplatePath, &claimTemplate); err != nil {
+		return fmt.Errorf("parsing ResourceClaimTemplate %q: %v", crcto.TemplatePath, err)
+	}
+	if _, err := clientset.ResourceV1alpha1().ResourceClaimTemplates(crcto.Namespace).Create(ctx, claimTemplate, metav1.CreateOptions{}); err != nil {
+		return fmt.Errorf("create ResourceClass: %v", err)
+	}
+	return nil
+}
+
+func createResourceClass(ctx context.Context, b *testing.B, crco *createResourceClassOp, clientset clientset.Interface) error {
+	b.Logf("creating resource class")
+
+	var classTemplate *resourcev1alpha1.ResourceClass
+	if err := getSpecFromFile(&crco.TemplatePath, &classTemplate); err != nil {
+		return fmt.Errorf("parsing ResourceClass %q: %v", crco.TemplatePath, err)
+	}
+	if _, err := clientset.ResourceV1alpha1().ResourceClasses().Create(ctx, classTemplate, metav1.CreateOptions{}); err != nil {
+		return fmt.Errorf("create ResourceClass: %v", err)
+	}
+	return nil
+}
+
+func createResourceDriver(ctx context.Context, b *testing.B, crdo *createResourceDriverOp, clientset clientset.Interface) error {
+	b.Logf("creating resource driver %q for nodes matching %q", crdo.DriverName, crdo.Nodes)
+
+	// Start the controller side of the DRA test driver such that it simulates
+	// per-node resources.
+	resources := draapp.Resources{
+		NodeLocal:      true,
+		MaxAllocations: crdo.MaxClaimsPerNode,
+	}
+
+	nodes, err := clientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("list nodes: %v", err)
+	}
+	for _, node := range nodes.Items {
+		match, err := filepath.Match(crdo.Nodes, node.Name)
+		if err != nil {
+			return fmt.Errorf("matching glob pattern %q against node name %q: %v", crdo.Nodes, node.Name, err)
+		}
+		if match {
+			resources.Nodes = append(resources.Nodes, node.Name)
+		}
+	}
+
+	controller := draapp.NewController(clientset, "test-driver.cdi.k8s.io", resources)
+	ctx, cancel := context.WithCancel(ctx)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		ctx := klog.NewContext(ctx, klog.LoggerWithName(klog.FromContext(ctx), "DRA test driver"))
+		controller.Run(ctx, 5 /* workers */)
+	}()
+	b.Cleanup(func() {
+		b.Logf("stopping resource driver %q", crdo.DriverName)
+		// We must cancel before waiting.
+		cancel()
+		wg.Wait()
+		b.Logf("stopped resource driver %q", crdo.DriverName)
+	})
+
+	// We could start the claim controller here to support claim templates. Instead
+	// the tests have to create claim objects themselves.
+
+	return nil
 }
 
 // waitUntilPodsScheduledInNamespace blocks until all pods in the given
