@@ -715,6 +715,19 @@ func runWorkload(ctx context.Context, b *testing.B, tc *testCase, w *workload) [
 	// numPodsScheduledPerNamespace has all namespaces created in workload and the number of pods they (will) have.
 	// All namespaces listed in numPodsScheduledPerNamespace will be cleaned up.
 	numPodsScheduledPerNamespace := make(map[string]int)
+
+	maybeCreateNamespace := func(namespace string) {
+		if _, ok := numPodsScheduledPerNamespace[namespace]; !ok {
+			// The namespace has not created yet.
+			// So, creat that and register it to numPodsScheduledPerNamespace.
+			_, err := client.CoreV1().Namespaces().Create(ctx, &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}, metav1.CreateOptions{})
+			if err != nil {
+				b.Fatalf("failed to create namespace for Pod: %v", namespace)
+			}
+			numPodsScheduledPerNamespace[namespace] = 0
+		}
+	}
+
 	b.Cleanup(func() {
 		for namespace := range numPodsScheduledPerNamespace {
 			if err := client.CoreV1().Namespaces().Delete(ctx, namespace, metav1.DeleteOptions{}); err != nil {
@@ -773,15 +786,7 @@ func runWorkload(ctx context.Context, b *testing.B, tc *testCase, w *workload) [
 			if concreteOp.Namespace != nil {
 				namespace = *concreteOp.Namespace
 			}
-			if _, ok := numPodsScheduledPerNamespace[namespace]; !ok {
-				// The namespace has not created yet.
-				// So, creat that and register it to numPodsScheduledPerNamespace.
-				_, err := client.CoreV1().Namespaces().Create(ctx, &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}, metav1.CreateOptions{})
-				if err != nil {
-					b.Fatalf("failed to create namespace for Pod: %v", namespace)
-				}
-				numPodsScheduledPerNamespace[namespace] = 0
-			}
+			maybeCreateNamespace(namespace)
 			if concreteOp.PodTemplatePath == nil {
 				concreteOp.PodTemplatePath = tc.DefaultPodTemplatePath
 			}
