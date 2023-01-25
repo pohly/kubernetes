@@ -25,8 +25,6 @@
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes
-    uniqueNodeLabelStrategy:
-      labelKey: kubernetes.io/hostname
   - opcode: createNamespaces
     prefix: sched
     count: 2
@@ -200,8 +198,6 @@
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes
-    uniqueNodeLabelStrategy:
-      labelKey: kubernetes.io/hostname
   - opcode: createNamespaces
     prefix: sched
     count: 2
@@ -229,8 +225,6 @@
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes
-    uniqueNodeLabelStrategy:
-      labelKey: kubernetes.io/hostname
   - opcode: createNamespaces
     prefix: sched
     count: 2
@@ -493,8 +487,6 @@
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes
-    uniqueNodeLabelStrategy:
-      labelKey: kubernetes.io/hostname
   - opcode: createNamespaces
     prefix: init-ns
     countParam: $initNamespaces
@@ -526,8 +518,6 @@
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes
-    uniqueNodeLabelStrategy:
-      labelKey: kubernetes.io/hostname
   - opcode: createNamespaces
     prefix: init-ns
     countParam: $initNamespaces
@@ -593,8 +583,6 @@
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes
-    uniqueNodeLabelStrategy:
-      labelKey: kubernetes.io/hostname
   - opcode: createNamespaces
     prefix: init-ns
     countParam: $initNamespaces
@@ -628,13 +616,9 @@
   workloadTemplate:
   - opcode: createNodes
     countParam: $normalNodes
-    uniqueNodeLabelStrategy:
-      labelKey: kubernetes.io/hostname
   - opcode: createNodes
     nodeTemplatePath: config/node-with-taint.yaml
     countParam: $taintNodes
-    uniqueNodeLabelStrategy:
-      labelKey: kubernetes.io/hostname
   - opcode: createPods
     countParam: $measurePods
     collectMetrics: true

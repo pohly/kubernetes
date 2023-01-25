@@ -18,6 +18,8 @@ package framework
 
 import (
 	"context"
+	"fmt"
+	"math/rand"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -89,7 +91,20 @@ func (p *IntegrationTestNodePreparer) PrepareNodes(ctx context.Context, nextNode
 	for i := 0; i < numNodes; i++ {
 		var err error
 		for retry := 0; retry < retries; retry++ {
-			_, err = p.client.CoreV1().Nodes().Create(ctx, baseNode, metav1.CreateOptions{})
+			// Create nodes with the usual kubernetes.io/hostname label.
+			// For that we need to know the name in advance, if we want to
+			// do it in one request.
+			node := baseNode.DeepCopy()
+			name := node.Name
+			if name == "" {
+				name = node.GenerateName + fmt.Sprintf("%x", rand.Int31())
+				node.Name = name
+			}
+			if node.Labels == nil {
+				node.Labels = make(map[string]string)
+			}
+			node.Labels["kubernetes.io/hostname"] = name
+			_, err = p.client.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{})
 			if err == nil {
 				break
 			}
