@@ -75,8 +75,9 @@ func newDefaultComponentConfig() (*config.KubeSchedulerConfiguration, error) {
 // remove resources after finished.
 // Notes on rate limiter:
 //   - client rate limit is set to 5000.
-func mustSetupScheduler(ctx context.Context, b *testing.B, config *config.KubeSchedulerConfiguration) (util.ShutdownFunc, coreinformers.PodInformer, clientset.Interface, dynamic.Interface) {
+func mustSetupScheduler(ctx context.Context, b *testing.B, config *config.KubeSchedulerConfiguration) (coreinformers.PodInformer, clientset.Interface, dynamic.Interface) {
 	ctx, cancel := context.WithCancel(ctx)
+	b.Cleanup(cancel)
 	// Run API server with minimimal logging by default. Can be raised with -v.
 	framework.MinVerbosity = 0
 
@@ -86,6 +87,7 @@ func mustSetupScheduler(ctx context.Context, b *testing.B, config *config.KubeSc
 			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition", "Priority"}
 		},
 	})
+	b.Cleanup(tearDownFn)
 
 	// TODO: client connection configuration, such as QPS or Burst is configurable in theory, this could be derived from the `config`, need to
 	// support this when there is any testcase that depends on such configuration.
@@ -110,12 +112,7 @@ func mustSetupScheduler(ctx context.Context, b *testing.B, config *config.KubeSc
 	_, podInformer := util.StartScheduler(ctx, client, cfg, config)
 	util.StartFakePVController(ctx, client)
 
-	shutdownFn := func() {
-		cancel()
-		tearDownFn()
-	}
-
-	return shutdownFn, podInformer, client, dynClient
+	return podInformer, client, dynClient
 }
 
 // Returns the list of scheduled pods in the specified namespaces.
