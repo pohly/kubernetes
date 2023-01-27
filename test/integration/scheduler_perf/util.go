@@ -50,10 +50,10 @@ import (
 )
 
 const (
-	dateFormat                = "2006-01-02T15:04:05Z"
-	testNamespace             = "sched-test"
-	setupNamespace            = "sched-setup"
-	throughputSampleFrequency = time.Second
+	dateFormat               = "2006-01-02T15:04:05Z"
+	testNamespace            = "sched-test"
+	setupNamespace           = "sched-setup"
+	throughputSampleInterval = time.Second
 )
 
 var dataItemsDir = flag.String("data-items-dir", "", "destination directory for storing generated data items for perf dashboard")
@@ -306,28 +306,51 @@ func (tc *throughputCollector) run(ctx context.Context) {
 		klog.Fatalf("%v", err)
 	}
 	lastScheduledCount := len(podsScheduled)
-	ticker := time.NewTicker(throughputSampleFrequency)
+	ticker := time.NewTicker(throughputSampleInterval)
 	defer ticker.Stop()
+	lastSampleTime := time.Now()
+	doSample := func() {
+		now := time.Now()
+		podsScheduled, err := getScheduledPods(tc.podInformer, tc.namespaces...)
+		if err != nil {
+			klog.Fatalf("%v", err)
+		}
+
+		scheduled := len(podsScheduled)
+		// Only do sampling if number of scheduled pods is greater than zero
+		if scheduled > 0 {
+			newScheduled := scheduled - lastScheduledCount
+			if newScheduled == 0 {
+				// Throughput would be zero for the last interval.
+				// Instead of recording 0 pods/s, keep expanding
+				// the interval until we see at least one additional
+				// pod being scheduled.
+				return
+			}
+
+			// This should be roughly equal to
+			// throughputSampleInterval, but we don't count
+			// on that because the goroutine might not be
+			// scheduled immediately when the timer
+			// triggers. Instead we track the actual time
+			// stamps.
+			duration := now.Sub(lastSampleTime)
+			durationInSeconds := duration.Seconds()
+			throughput := float64(newScheduled) / durationInSeconds
+			tc.schedulingThroughputs = append(tc.schedulingThroughputs, throughput)
+			lastScheduledCount = scheduled
+			klog.Infof("%d pods scheduled", lastScheduledCount)
+		}
+		lastSampleTime = now
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
+			doSample()
 			return
 		case <-ticker.C:
-			podsScheduled, err := getScheduledPods(tc.podInformer, tc.namespaces...)
-			if err != nil {
-				klog.Fatalf("%v", err)
-			}
-
-			scheduled := len(podsScheduled)
-			// Only do sampling if number of scheduled pods is greater than zero
-			if scheduled > 0 {
-				samplingRatioSeconds := float64(throughputSampleFrequency) / float64(time.Second)
-				throughput := float64(scheduled-lastScheduledCount) / samplingRatioSeconds
-				tc.schedulingThroughputs = append(tc.schedulingThroughputs, throughput)
-				lastScheduledCount = scheduled
-				klog.Infof("%d pods scheduled", lastScheduledCount)
-			}
-
+			doSample()
 		}
 	}
 }
