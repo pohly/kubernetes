@@ -59,6 +59,8 @@ const (
 
 var dataItemsDir = flag.String("data-items-dir", "", "destination directory for storing generated data items for perf dashboard")
 
+var runID = time.Now().Format(dateFormat)
+
 func newDefaultComponentConfig() (*config.KubeSchedulerConfiguration, error) {
 	gvk := v1beta2.SchemeGroupVersion.WithKind("KubeSchedulerConfiguration")
 	cfg := config.KubeSchedulerConfiguration{}
@@ -145,12 +147,22 @@ type DataItem struct {
 	Unit string `json:"unit"`
 	// Labels is the labels of the data item.
 	Labels map[string]string `json:"labels,omitempty"`
+
+	// progress contains number of scheduled pods over time.
+	progress   []podScheduling
+	start, end time.Time
 }
 
 // DataItems is the data point set. It is the struct that perf dashboard expects.
 type DataItems struct {
 	Version   string     `json:"version"`
 	DataItems []DataItem `json:"dataItems"`
+}
+
+type podScheduling struct {
+	ts        time.Time
+	attempts  int
+	completed int
 }
 
 // makeBasePod creates a Pod object to be used as a template.
@@ -183,6 +195,17 @@ func dataItems2JSONFile(dataItems DataItems, namePrefix string) error {
 		return fmt.Errorf("indenting error: %v", err)
 	}
 	return os.WriteFile(destFile, formatted.Bytes(), 0644)
+}
+
+func dataFilename(destFile string) (string, error) {
+	if *dataItemsDir != "" {
+		// Ensure the "dataItemsDir" path to be valid.
+		if err := os.MkdirAll(*dataItemsDir, 0750); err != nil {
+			return "", fmt.Errorf("dataItemsDir path %v does not exist and cannot be created: %v", *dataItemsDir, err)
+		}
+		destFile = path.Join(*dataItemsDir, destFile)
+	}
+	return destFile, nil
 }
 
 type labelValues struct {
@@ -288,6 +311,9 @@ type throughputCollector struct {
 	schedulingThroughputs []float64
 	labels                map[string]string
 	namespaces            []string
+
+	progress   []podScheduling
+	start, end time.Time
 }
 
 func newThroughputCollector(podInformer coreinformers.PodInformer, labels map[string]string, namespaces []string) *throughputCollector {
@@ -307,6 +333,7 @@ func (tc *throughputCollector) run(ctx context.Context) {
 	ticker := time.NewTicker(throughputSampleInterval)
 	defer ticker.Stop()
 	lastSampleTime := time.Now()
+	started := false
 	doSample := func() {
 		now := time.Now()
 		podsScheduled, err := getScheduledPods(tc.podInformer, tc.namespaces...)
@@ -317,6 +344,14 @@ func (tc *throughputCollector) run(ctx context.Context) {
 		scheduled := len(podsScheduled)
 		// Only do sampling if number of scheduled pods is greater than zero
 		if scheduled > 0 {
+			if !started {
+				// This is the first interval for which
+				// we have a sample, so treat the start
+				// of the interval as the overall start
+				// time.
+				tc.start = lastSampleTime
+				started = true
+			}
 			newScheduled := scheduled - lastScheduledCount
 			if newScheduled == 0 {
 				// Throughput would be zero for the last interval.
@@ -338,6 +373,17 @@ func (tc *throughputCollector) run(ctx context.Context) {
 			tc.schedulingThroughputs = append(tc.schedulingThroughputs, throughput)
 			lastScheduledCount = scheduled
 			klog.Infof("%d pods scheduled", lastScheduledCount)
+
+			// Also record the sample.
+			counters, err := testutil.GetCounterValuesFromGatherer(legacyregistry.DefaultGatherer, "scheduler_schedule_attempts_total", map[string]string{"profile": "default-scheduler"}, "result")
+			if err != nil {
+				klog.Error(err)
+			}
+			tc.progress = append(tc.progress, podScheduling{
+				ts:        now,
+				attempts:  int(counters["unschedulable"] + counters["error"] + counters["scheduled"]),
+				completed: int(counters["scheduled"]),
+			})
 		}
 		lastSampleTime = now
 	}
@@ -346,6 +392,7 @@ func (tc *throughputCollector) run(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			doSample()
+			tc.end = lastSampleTime
 			return
 		case <-ticker.C:
 			doSample()
@@ -354,7 +401,11 @@ func (tc *throughputCollector) run(ctx context.Context) {
 }
 
 func (tc *throughputCollector) collect() []DataItem {
-	throughputSummary := DataItem{Labels: tc.labels}
+	throughputSummary := DataItem{Labels: tc.labels,
+		start:    tc.start,
+		end:      tc.end,
+		progress: tc.progress,
+	}
 	if length := len(tc.schedulingThroughputs); length > 0 {
 		sort.Float64s(tc.schedulingThroughputs)
 		sum := 0.0
