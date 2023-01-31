@@ -20,15 +20,13 @@ import (
 	"flag"
 	"testing"
 
-	"k8s.io/klog/v2/ktesting"
-	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestMain(m *testing.M) {
 	// Run with -v=2, this is the default log level in production.
-	ktesting.DefaultConfig = ktesting.NewConfig(ktesting.Verbosity(2))
-	ktesting.DefaultConfig.AddFlags(flag.CommandLine)
+	ktesting.SetDefaultVerbosity(2)
 	flag.Parse()
 
-	framework.EtcdMain(m.Run)
+	m.Run()
 }

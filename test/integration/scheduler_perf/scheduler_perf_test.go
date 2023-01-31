@@ -48,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/utils"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"sigs.k8s.io/yaml"
 )
 
@@ -579,13 +580,39 @@ func BenchmarkPerfScheduling(b *testing.B) {
 		b.Fatal(err)
 	}
 
+	// Because we run sequentially, it is possible to change the global
+	// klog logger and redirect log output. Quite a lot of code still uses
+	// it instead of supporting contextual logging.
+	//
+	// Because we leak one goroutine which calls klog, we cannot restore
+	// the previous state.
+	output, _ := framework.RedirectKlog(b)
+
 	dataItems := DataItems{Version: "v1"}
 	for _, tc := range testCases {
 		b.Run(tc.Name, func(b *testing.B) {
 			for _, w := range tc.Workloads {
 				b.Run(w.Name, func(b *testing.B) {
+					// Ensure that there are no leaked
+					// goroutines.  They could influence
+					// performance of the next benchmark.
+					// This must *after* RedirectKlog
+					// because then during cleanup, the
+					// test will wait for goroutines to
+					// quit *before* restoring klog settings.
+					framework.GoleakCheck(b)
+
+					// In addition to redirection klog
+					// output, also enable contextual
+					// logging.
+					_, ctx := ktesting.NewTestContext(b)
+
+					// Now that we are ready to run, start
+					// etcd.
+					framework.StartEtcd(b, output)
+
 					// 30 minutes should be plenty enough even for the 5000-node tests.
-					ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Minute)
+					ctx, cancel := context.WithTimeout(ctx, 30*time.Minute)
 					b.Cleanup(cancel)
 
 					for feature, flag := range tc.FeatureGates {
