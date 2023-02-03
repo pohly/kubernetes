@@ -760,7 +760,12 @@ func runWorkload(ctx context.Context, b *testing.B, tc *testCase, w *workload) [
 			b.Fatalf("validate scheduler config file failed: %v", err)
 		}
 	}
-	podInformer, client, dynClient := mustSetupScheduler(ctx, b, cfg)
+	informerFactory, client, dynClient := mustSetupScheduler(ctx, b, cfg)
+
+	// Additional informers needed for testing.
+	podInformer := informerFactory.Core().V1().Pods()
+	informerFactory.Start(ctx.Done())
+	informerFactory.WaitForCacheSync(ctx.Done())
 
 	var mu sync.Mutex
 	var dataItems []DataItem
