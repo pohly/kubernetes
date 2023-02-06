@@ -1272,7 +1272,7 @@ func DoCleanupNode(ctx context.Context, client clientset.Interface, nodeName str
 	return nil
 }
 
-type TestPodCreateStrategy func(ctx context.Context, client clientset.Interface, namespace string, podCount int) error
+type TestPodCreateStrategy func(ctx context.Context, client clientset.Interface, namespace string, podOffset, podCount int) error
 
 type CountToPodStrategy struct {
 	Count    int
@@ -1295,6 +1295,9 @@ type TestPodCreator struct {
 	Client clientset.Interface
 	// namespace -> count -> strategy
 	Config *TestPodCreatorConfig
+
+	// Running counter that gets incremented for each created pod.
+	podOffset int
 }
 
 func NewTestPodCreator(client clientset.Interface, config *TestPodCreatorConfig) *TestPodCreator {
@@ -1307,9 +1310,10 @@ func NewTestPodCreator(client clientset.Interface, config *TestPodCreatorConfig)
 func (c *TestPodCreator) CreatePods(ctx context.Context) error {
 	for ns, v := range *(c.Config) {
 		for _, countToStrategy := range v {
-			if err := countToStrategy.Strategy(ctx, c.Client, ns, countToStrategy.Count); err != nil {
+			if err := countToStrategy.Strategy(ctx, c.Client, ns, c.podOffset, countToStrategy.Count); err != nil {
 				return err
 			}
+			c.podOffset += countToStrategy.Count
 		}
 	}
 	return nil
@@ -1362,14 +1366,14 @@ func InjectCounter(counter int, in, out interface{}) error {
 	return nil
 }
 
-func CreatePod(ctx context.Context, client clientset.Interface, namespace string, podCount int, podTemplate *v1.Pod) error {
+func CreatePod(ctx context.Context, client clientset.Interface, namespace string, podOffset, podCount int, podTemplate *v1.Pod) error {
 	var createError error
 	lock := sync.Mutex{}
 	createPodFunc := func(i int) {
 		// client-go writes into the object that is passed to Create,
 		// causing a data race unless we create a new copy for each
 		// parallel call.
-		if err := makeCreatePod(client, namespace, podTemplate.DeepCopy(), i); err != nil {
+		if err := makeCreatePod(client, namespace, podTemplate.DeepCopy(), podOffset+i); err != nil {
 			lock.Lock()
 			defer lock.Unlock()
 			createError = err
@@ -1384,7 +1388,7 @@ func CreatePod(ctx context.Context, client clientset.Interface, namespace string
 	return createError
 }
 
-func CreatePodWithPersistentVolume(ctx context.Context, client clientset.Interface, namespace string, claimTemplate *v1.PersistentVolumeClaim, factory volumeFactory, podTemplate *v1.Pod, count int, bindVolume bool) error {
+func CreatePodWithPersistentVolume(ctx context.Context, client clientset.Interface, namespace string, claimTemplate *v1.PersistentVolumeClaim, factory volumeFactory, podTemplate *v1.Pod, offset, count int, bindVolume bool) error {
 	var createError error
 	lock := sync.Mutex{}
 	createPodFunc := func(i int) {
@@ -1495,8 +1499,8 @@ func createController(client clientset.Interface, controllerName, namespace stri
 }
 
 func NewCustomCreatePodStrategy(podTemplate *v1.Pod) TestPodCreateStrategy {
-	return func(ctx context.Context, client clientset.Interface, namespace string, podCount int) error {
-		return CreatePod(ctx, client, namespace, podCount, podTemplate)
+	return func(ctx context.Context, client clientset.Interface, namespace string, podOffset, podCount int) error {
+		return CreatePod(ctx, client, namespace, podOffset, podCount, podTemplate)
 	}
 }
 
@@ -1504,8 +1508,8 @@ func NewCustomCreatePodStrategy(podTemplate *v1.Pod) TestPodCreateStrategy {
 type volumeFactory func(uniqueID int) *v1.PersistentVolume
 
 func NewCreatePodWithPersistentVolumeStrategy(claimTemplate *v1.PersistentVolumeClaim, factory volumeFactory, podTemplate *v1.Pod) TestPodCreateStrategy {
-	return func(ctx context.Context, client clientset.Interface, namespace string, podCount int) error {
-		return CreatePodWithPersistentVolume(ctx, client, namespace, claimTemplate, factory, podTemplate, podCount, true /* bindVolume */)
+	return func(ctx context.Context, client clientset.Interface, namespace string, podOffset, podCount int) error {
+		return CreatePodWithPersistentVolume(ctx, client, namespace, claimTemplate, factory, podTemplate, podOffset, podCount, true /* bindVolume */)
 	}
 }
 
@@ -1524,7 +1528,7 @@ func makeUnboundPersistentVolumeClaim(storageClass string) *v1.PersistentVolumeC
 }
 
 func NewCreatePodWithPersistentVolumeWithFirstConsumerStrategy(factory volumeFactory, podTemplate *v1.Pod) TestPodCreateStrategy {
-	return func(ctx context.Context, client clientset.Interface, namespace string, podCount int) error {
+	return func(ctx context.Context, client clientset.Interface, namespace string, podOffset, podCount int) error {
 		volumeBindingMode := storagev1.VolumeBindingWaitForFirstConsumer
 		storageClass := &storagev1.StorageClass{
 			ObjectMeta: metav1.ObjectMeta{
@@ -1545,7 +1549,7 @@ func NewCreatePodWithPersistentVolumeWithFirstConsumerStrategy(factory volumeFac
 			return pv
 		}
 
-		return CreatePodWithPersistentVolume(ctx, client, namespace, claimTemplate, factoryWithStorageClass, podTemplate, podCount, false /* bindVolume */)
+		return CreatePodWithPersistentVolume(ctx, client, namespace, claimTemplate, factoryWithStorageClass, podTemplate, podOffset, podCount, false /* bindVolume */)
 	}
 }
 
@@ -1560,7 +1564,7 @@ func NewSimpleCreatePodStrategy() TestPodCreateStrategy {
 }
 
 func NewSimpleWithControllerCreatePodStrategy(controllerName string) TestPodCreateStrategy {
-	return func(ctx context.Context, client clientset.Interface, namespace string, podCount int) error {
+	return func(ctx context.Context, client clientset.Interface, namespace string, podOffset, podCount int) error {
 		basePod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: controllerName + "-pod-",
@@ -1571,7 +1575,7 @@ func NewSimpleWithControllerCreatePodStrategy(controllerName string) TestPodCrea
 		if err := createController(client, controllerName, namespace, podCount, basePod); err != nil {
 			return err
 		}
-		return CreatePod(ctx, client, namespace, podCount, basePod)
+		return CreatePod(ctx, client, namespace, podOffset, podCount, basePod)
 	}
 }
 
