@@ -147,7 +147,7 @@ type frameworkOptions struct {
 	podNominator           framework.PodNominator
 	extenders              []framework.Extender
 	captureProfile         CaptureProfile
-	clusterEventMap        map[framework.ClusterEvent]sets.String
+	clusterEventMap        *framework.ClusterEventMap
 	parallelizer           parallelize.Parallelizer
 }
 
@@ -233,13 +233,14 @@ func WithCaptureProfile(c CaptureProfile) Option {
 func defaultFrameworkOptions(stopCh <-chan struct{}) frameworkOptions {
 	return frameworkOptions{
 		metricsRecorder: newMetricsRecorder(1000, time.Second, stopCh),
-		clusterEventMap: make(map[framework.ClusterEvent]sets.String),
 		parallelizer:    parallelize.NewParallelizer(parallelize.DefaultParallelism),
+		clusterEventMap: new(framework.ClusterEventMap),
 	}
 }
 
 // WithClusterEventMap sets clusterEventMap for the scheduling frameworkImpl.
-func WithClusterEventMap(m map[framework.ClusterEvent]sets.String) Option {
+// The provided instance will get filled out by profile.NewMap.
+func WithClusterEventMap(m *framework.ClusterEventMap) Option {
 	return func(o *frameworkOptions) {
 		o.clusterEventMap = m
 	}
@@ -519,12 +520,12 @@ func (f *frameworkImpl) expandMultiPointPlugins(profile *config.KubeSchedulerPro
 	return nil
 }
 
-func fillEventToPluginMap(p framework.Plugin, eventToPlugins map[framework.ClusterEvent]sets.String) {
+func fillEventToPluginMap(p framework.Plugin, eventToPlugins *framework.ClusterEventMap) {
 	ext, ok := p.(framework.EnqueueExtensions)
 	if !ok {
 		// If interface EnqueueExtensions is not implemented, register the default events
 		// to the plugin. This is to ensure backward compatibility.
-		registerClusterEvents(p.Name(), eventToPlugins, allClusterEvents)
+		eventToPlugins.RegisterClusterEvents(p.Name(), allClusterEvents)
 		return
 	}
 
@@ -537,17 +538,7 @@ func fillEventToPluginMap(p framework.Plugin, eventToPlugins map[framework.Clust
 		return
 	}
 	// The most common case: a plugin implements EnqueueExtensions and returns non-nil result.
-	registerClusterEvents(p.Name(), eventToPlugins, events)
-}
-
-func registerClusterEvents(name string, eventToPlugins map[framework.ClusterEvent]sets.String, evts []framework.ClusterEvent) {
-	for _, evt := range evts {
-		if eventToPlugins[evt] == nil {
-			eventToPlugins[evt] = sets.NewString(name)
-		} else {
-			eventToPlugins[evt].Insert(name)
-		}
-	}
+	eventToPlugins.RegisterClusterEvents(p.Name(), events)
 }
 
 func updatePluginList(pluginList interface{}, pluginSet config.PluginSet, pluginsMap map[string]framework.Plugin) error {

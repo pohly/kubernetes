@@ -82,7 +82,7 @@ const (
 // PreEnqueueCheck is a function type. It's used to build functions that
 // run against a Pod and the caller can choose to enqueue or skip the Pod
 // by the checking result.
-type PreEnqueueCheck func(pod *v1.Pod) bool
+type PreEnqueueCheck func(pod *v1.Pod) framework.IsSchedulableResult
 
 // SchedulingQueue is an interface for a queue to store pods waiting to be scheduled.
 // The interface follows a pattern similar to cache.FIFO and cache.Heap and
@@ -169,7 +169,7 @@ type PriorityQueue struct {
 	// when a pod is popped.
 	schedulingCycle int64
 
-	clusterEventMap map[framework.ClusterEvent]sets.String
+	clusterEventMap framework.ClusterEventMap
 	// preEnqueuePluginMap is keyed with profile name, valued with registered preEnqueue plugins.
 	preEnqueuePluginMap map[string][]framework.PreEnqueuePlugin
 
@@ -186,7 +186,7 @@ type priorityQueueOptions struct {
 	podMaxBackoffDuration             time.Duration
 	podMaxInUnschedulablePodsDuration time.Duration
 	podNominator                      framework.PodNominator
-	clusterEventMap                   map[framework.ClusterEvent]sets.String
+	clusterEventMap                   framework.ClusterEventMap
 	preEnqueuePluginMap               map[string][]framework.PreEnqueuePlugin
 }
 
@@ -222,7 +222,7 @@ func WithPodNominator(pn framework.PodNominator) Option {
 }
 
 // WithClusterEventMap sets clusterEventMap for PriorityQueue.
-func WithClusterEventMap(m map[framework.ClusterEvent]sets.String) Option {
+func WithClusterEventMap(m framework.ClusterEventMap) Option {
 	return func(o *priorityQueueOptions) {
 		o.clusterEventMap = m
 	}
@@ -693,13 +693,50 @@ func (p *PriorityQueue) AssignedPodUpdated(pod *v1.Pod) {
 func (p *PriorityQueue) MoveAllToActiveOrBackoffQueue(event framework.ClusterEvent, preCheck PreEnqueueCheck) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
-	unschedulablePods := make([]*framework.QueuedPodInfo, 0, len(p.unschedulablePods.podInfoMap))
+	activated := false
+
 	for _, pInfo := range p.unschedulablePods.podInfoMap {
-		if preCheck == nil || preCheck(pInfo.Pod) {
-			unschedulablePods = append(unschedulablePods, pInfo)
+		isSchedulable := framework.PodMaybeSchedulable
+		if preCheck != nil {
+			isSchedulable = preCheck(pInfo.Pod)
+		}
+
+		if isSchedulable == framework.PodNotSchedulable {
+			continue
+		}
+
+		// If the event doesn't help making the Pod schedulable, then keep it in its current state.
+		// Note: we don't run the check if pInfo.UnschedulablePlugins is nil, which denotes
+		// either there is some abnormal error, or scheduling the pod failed by plugins other than PreFilter, Filter and Permit.
+		// In that case, it's desired to move it anyways.
+		if len(pInfo.UnschedulablePlugins) != 0 && !p.podMatchesEvent(pInfo, event) {
+			continue
+		}
+
+		pod := pInfo.Pod
+		if isSchedulable != framework.PodImmediatelySchedulable && p.isPodBackingoff(pInfo) {
+			if err := p.podBackoffQ.Add(pInfo); err != nil {
+				klog.ErrorS(err, "Error adding pod to the backoff queue", "pod", klog.KObj(pod))
+			} else {
+				klog.V(5).InfoS("Pod moved to an internal scheduling queue", "pod", klog.KObj(pInfo.Pod), "event", event, "queue", backoffQName)
+				metrics.SchedulerQueueIncomingPods.WithLabelValues("backoff", event.Label).Inc()
+				p.unschedulablePods.delete(pod, pInfo.Gated)
+			}
+		} else {
+			gated := pInfo.Gated
+			if added, _ := p.addToActiveQ(pInfo); added {
+				klog.V(5).InfoS("Pod moved to an internal scheduling queue", "pod", klog.KObj(pInfo.Pod), "event", event, "queue", activeQName)
+				pInfo.MoveRequestCycle = p.schedulingCycle
+				activated = true
+				metrics.SchedulerQueueIncomingPods.WithLabelValues("active", event.Label).Inc()
+				p.unschedulablePods.delete(pod, gated)
+			}
 		}
 	}
-	p.movePodsToActiveOrBackoffQueue(unschedulablePods, event)
+
+	if activated {
+		p.cond.Broadcast()
+	}
 }
 
 // NOTE: this function assumes lock has been acquired in caller
@@ -1075,19 +1112,19 @@ func (p *PriorityQueue) podMatchesEvent(podInfo *framework.QueuedPodInfo, cluste
 		return true
 	}
 
-	for evt, nameSet := range p.clusterEventMap {
+	for _, entry := range p.clusterEventMap {
 		// Firstly verify if the two ClusterEvents match:
 		// - either the registered event from plugin side is a WildCardEvent,
 		// - or the two events have identical Resource fields and *compatible* ActionType.
 		//   Note the ActionTypes don't need to be *identical*. We check if the ANDed value
 		//   is zero or not. In this way, it's easy to tell Update&Delete is not compatible,
 		//   but Update&All is.
-		evtMatch := evt.IsWildCard() ||
-			(evt.Resource == clusterEvent.Resource && evt.ActionType&clusterEvent.ActionType != 0)
+		evtMatch := entry.IsWildCard() ||
+			(entry.Resource == clusterEvent.Resource && entry.ActionType&clusterEvent.ActionType != 0)
 
 		// Secondly verify the plugin name matches.
 		// Note that if it doesn't match, we shouldn't continue to search.
-		if evtMatch && intersect(nameSet, podInfo.UnschedulablePlugins) {
+		if evtMatch && intersect(entry.Names, podInfo.UnschedulablePlugins) {
 			return true
 		}
 	}

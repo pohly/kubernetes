@@ -24,7 +24,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
@@ -284,7 +283,7 @@ func New(client clientset.Interface,
 	// The nominator will be passed all the way to framework instantiation.
 	nominator := internalqueue.NewPodNominator(podLister)
 	snapshot := internalcache.NewEmptySnapshot()
-	clusterEventMap := make(map[framework.ClusterEvent]sets.String)
+	var clusterEventMap framework.ClusterEventMap
 
 	profiles, err := profile.NewMap(options.profiles, registry, recorderFactory, stopCh,
 		frameworkruntime.WithComponentConfigVersion(options.componentConfigVersion),
@@ -294,7 +293,7 @@ func New(client clientset.Interface,
 		frameworkruntime.WithSnapshotSharedLister(snapshot),
 		frameworkruntime.WithPodNominator(nominator),
 		frameworkruntime.WithCaptureProfile(frameworkruntime.CaptureProfile(options.frameworkCapturer)),
-		frameworkruntime.WithClusterEventMap(clusterEventMap),
+		frameworkruntime.WithClusterEventMap(&clusterEventMap),
 		frameworkruntime.WithParallelism(int(options.parallelism)),
 		frameworkruntime.WithExtenders(extenders),
 	)
@@ -340,7 +339,7 @@ func New(client clientset.Interface,
 	}
 	sched.applyDefaultHandlers()
 
-	addAllEventHandlers(sched, informerFactory, dynInformerFactory, unionedGVKs(clusterEventMap))
+	addAllEventHandlers(sched, informerFactory, dynInformerFactory, clusterEventMap)
 
 	return sched, nil
 }
@@ -428,18 +427,6 @@ func buildExtenders(extenders []schedulerapi.Extender, profiles []schedulerapi.K
 }
 
 type FailureHandlerFn func(ctx context.Context, fwk framework.Framework, podInfo *framework.QueuedPodInfo, status *framework.Status, nominatingInfo *framework.NominatingInfo, start time.Time)
-
-func unionedGVKs(m map[framework.ClusterEvent]sets.String) map[framework.GVK]framework.ActionType {
-	gvkMap := make(map[framework.GVK]framework.ActionType)
-	for evt := range m {
-		if _, ok := gvkMap[evt.Resource]; ok {
-			gvkMap[evt.Resource] |= evt.ActionType
-		} else {
-			gvkMap[evt.Resource] = evt.ActionType
-		}
-	}
-	return gvkMap
-}
 
 // newPodInformer creates a shared index informer that returns only non-terminal pods.
 // The PodInformer allows indexers to be added, but note that only non-conflict indexers are allowed.
