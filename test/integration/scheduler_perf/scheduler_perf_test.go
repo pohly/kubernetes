@@ -1097,6 +1097,7 @@ func createPodsSequentially(ctx context.Context, b *testing.B, namespace string,
 		return nil, nil
 	}
 
+	logger := klog.FromContext(ctx)
 	podCreator, err := newPodCreator(namespace, cpo, 1, clientset)
 	if err != nil {
 		return nil, fmt.Errorf("create pod creator: %v", err)
@@ -1129,7 +1130,7 @@ func createPodsSequentially(ctx context.Context, b *testing.B, namespace string,
 	var latencies []time.Duration
 	var total time.Duration
 	for i := 0; i < cpo.Count; i++ {
-		b.Logf("creating pod #%d", i)
+		logger.Info("creating pod", "number", i)
 		start := time.Now()
 		if err := podCreator.CreatePods(ctx); err != nil {
 			return nil, fmt.Errorf("create pod #%d: %v", i, err)
@@ -1140,8 +1141,8 @@ func createPodsSequentially(ctx context.Context, b *testing.B, namespace string,
 			return nil, fmt.Errorf("timed out waiting for scheduling of pod #%d", i)
 		case pod = <-scheduledPods:
 		}
-		b.Logf("pod %s scheduled", pod.Name)
 		latency := time.Now().Sub(start)
+		logger.Info("pod scheduled", "number", i, "pod", pod.Name, "latency", latency)
 		total += latency
 		latencies = append(latencies, latency)
 		if err := clientset.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{}); err != nil {
