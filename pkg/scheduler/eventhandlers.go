@@ -252,7 +252,7 @@ func addAllEventHandlers(
 	sched *Scheduler,
 	informerFactory informers.SharedInformerFactory,
 	dynInformerFactory dynamicinformer.DynamicSharedInformerFactory,
-	gvkMap map[framework.GVK]framework.ActionType,
+	clusterEventMap framework.ClusterEventMap,
 ) {
 	// scheduled pod cache
 	informerFactory.Core().V1().Pods().Informer().AddEventHandler(
@@ -317,44 +317,72 @@ func addAllEventHandlers(
 		},
 	)
 
-	buildEvtResHandler := func(at framework.ActionType, gvk framework.GVK, shortGVK string) cache.ResourceEventHandlerFuncs {
+	buildEvtResHandler := func(at framework.ActionType, gvk framework.GVK, shortGVK string, isSchedulable framework.IsSchedulable) cache.ResourceEventHandlerFuncs {
 		funcs := cache.ResourceEventHandlerFuncs{}
 		if at&framework.Add != 0 {
 			evt := framework.ClusterEvent{Resource: gvk, ActionType: framework.Add, Label: fmt.Sprintf("%vAdd", shortGVK)}
-			funcs.AddFunc = func(_ interface{}) {
-				sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(evt, nil)
+			if isSchedulable != nil {
+				funcs.AddFunc = func(obj interface{}) {
+					sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(evt, func(pod *v1.Pod) framework.IsSchedulableResult {
+						return isSchedulable(nil, obj, pod)
+					})
+				}
+			} else {
+				funcs.AddFunc = func(_ interface{}) {
+					sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(evt, nil)
+				}
 			}
 		}
 		if at&framework.Update != 0 {
 			evt := framework.ClusterEvent{Resource: gvk, ActionType: framework.Update, Label: fmt.Sprintf("%vUpdate", shortGVK)}
-			funcs.UpdateFunc = func(_, _ interface{}) {
-				sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(evt, nil)
+			if isSchedulable != nil {
+				funcs.UpdateFunc = func(oldObj, newObj interface{}) {
+					sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(evt, func(pod *v1.Pod) framework.IsSchedulableResult {
+						return isSchedulable(oldObj, newObj, pod)
+					})
+				}
+			} else {
+				funcs.UpdateFunc = func(_, _ interface{}) {
+					sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(evt, nil)
+				}
 			}
 		}
 		if at&framework.Delete != 0 {
 			evt := framework.ClusterEvent{Resource: gvk, ActionType: framework.Delete, Label: fmt.Sprintf("%vDelete", shortGVK)}
-			funcs.DeleteFunc = func(_ interface{}) {
-				sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(evt, nil)
+			if isSchedulable != nil {
+				funcs.DeleteFunc = func(obj interface{}) {
+					sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(evt, func(pod *v1.Pod) framework.IsSchedulableResult {
+						return isSchedulable(obj, nil, pod)
+					})
+				}
+			} else {
+				funcs.DeleteFunc = func(_ interface{}) {
+					sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(evt, nil)
+				}
 			}
 		}
 		return funcs
 	}
 
-	for gvk, at := range gvkMap {
+	// This drops the name of the plugins that were interested in the events!
+	events := unionedGVKs(clusterEventMap)
+	for _, event := range events {
+		gvk := event.Resource
+		at := event.ActionType
 		switch gvk {
 		case framework.Node, framework.Pod:
 			// Do nothing.
 		case framework.CSINode:
 			informerFactory.Storage().V1().CSINodes().Informer().AddEventHandler(
-				buildEvtResHandler(at, framework.CSINode, "CSINode"),
+				buildEvtResHandler(at, framework.CSINode, "CSINode", event.IsSchedulable),
 			)
 		case framework.CSIDriver:
 			informerFactory.Storage().V1().CSIDrivers().Informer().AddEventHandler(
-				buildEvtResHandler(at, framework.CSIDriver, "CSIDriver"),
+				buildEvtResHandler(at, framework.CSIDriver, "CSIDriver", event.IsSchedulable),
 			)
 		case framework.CSIStorageCapacity:
 			informerFactory.Storage().V1().CSIStorageCapacities().Informer().AddEventHandler(
-				buildEvtResHandler(at, framework.CSIStorageCapacity, "CSIStorageCapacity"),
+				buildEvtResHandler(at, framework.CSIStorageCapacity, "CSIStorageCapacity", event.IsSchedulable),
 			)
 		case framework.PersistentVolume:
 			// MaxPDVolumeCountPredicate: since it relies on the counts of PV.
@@ -371,23 +399,23 @@ func addAllEventHandlers(
 			// parties, then scheduler will add pod back to unschedulable queue. We
 			// need to move pods to active queue on PV update for this scenario.
 			informerFactory.Core().V1().PersistentVolumes().Informer().AddEventHandler(
-				buildEvtResHandler(at, framework.PersistentVolume, "Pv"),
+				buildEvtResHandler(at, framework.PersistentVolume, "Pv", event.IsSchedulable),
 			)
 		case framework.PersistentVolumeClaim:
 			// MaxPDVolumeCountPredicate: add/update PVC will affect counts of PV when it is bound.
 			informerFactory.Core().V1().PersistentVolumeClaims().Informer().AddEventHandler(
-				buildEvtResHandler(at, framework.PersistentVolumeClaim, "Pvc"),
+				buildEvtResHandler(at, framework.PersistentVolumeClaim, "Pvc", event.IsSchedulable),
 			)
 		case framework.PodSchedulingContext:
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 				_, _ = informerFactory.Resource().V1alpha2().PodSchedulingContexts().Informer().AddEventHandler(
-					buildEvtResHandler(at, framework.PodSchedulingContext, "PodSchedulingContext"),
+					buildEvtResHandler(at, framework.PodSchedulingContext, "PodSchedulingContext", event.IsSchedulable),
 				)
 			}
 		case framework.ResourceClaim:
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 				_, _ = informerFactory.Resource().V1alpha2().ResourceClaims().Informer().AddEventHandler(
-					buildEvtResHandler(at, framework.ResourceClaim, "ResourceClaim"),
+					buildEvtResHandler(at, framework.ResourceClaim, "ResourceClaim", event.IsSchedulable),
 				)
 			}
 		case framework.StorageClass:
@@ -428,10 +456,34 @@ func addAllEventHandlers(
 			gvr, _ := schema.ParseResourceArg(string(gvk))
 			dynInformer := dynInformerFactory.ForResource(*gvr).Informer()
 			dynInformer.AddEventHandler(
-				buildEvtResHandler(at, gvk, strings.Title(gvr.Resource)),
+				buildEvtResHandler(at, gvk, strings.Title(gvr.Resource), event.IsSchedulable),
 			)
 		}
 	}
+}
+
+// unionedGVKs combines all entries for the same Resource and no IsSchedulable into
+// a single entry with no label and no names. Entries with IsSchedulable are copied
+// over.
+func unionedGVKs(in framework.ClusterEventMap) []framework.ClusterEvent {
+	var out []framework.ClusterEvent
+	gvkMap := make(map[framework.GVK]framework.ActionType)
+	for _, entry := range in {
+		if entry.IsSchedulable != nil {
+			// Copy completely.
+			out = append(out, entry.ClusterEvent)
+			continue
+		}
+		gvkMap[entry.Resource] |= entry.ActionType
+	}
+	for gvk, actionType := range gvkMap {
+		// Copy combined action type without label, pre-check and names.
+		out = append(out, framework.ClusterEvent{
+			Resource:   gvk,
+			ActionType: actionType,
+		})
+	}
+	return out
 }
 
 func nodeSchedulingPropertiesChange(newNode *v1.Node, oldNode *v1.Node) *framework.ClusterEvent {
@@ -485,15 +537,18 @@ func preCheckForNode(nodeInfo *framework.NodeInfo) queue.PreEnqueueCheck {
 	// Note: the following checks doesn't take preemption into considerations, in very rare
 	// cases (e.g., node resizing), "pod" may still fail a check but preemption helps. We deliberately
 	// chose to ignore those cases as unschedulable pods will be re-queued eventually.
-	return func(pod *v1.Pod) bool {
+	return func(pod *v1.Pod) framework.IsSchedulableResult {
 		admissionResults := AdmissionCheck(pod, nodeInfo, false)
 		if len(admissionResults) != 0 {
-			return false
+			return framework.PodNotAffected
 		}
 		_, isUntolerated := corev1helpers.FindMatchingUntoleratedTaint(nodeInfo.Node().Spec.Taints, pod.Spec.Tolerations, func(t *v1.Taint) bool {
 			return t.Effect == v1.TaintEffectNoSchedule
 		})
-		return !isUntolerated
+		if isUntolerated {
+			return framework.PodNotAffected
+		}
+		return framework.PodMaybeSchedulable
 	}
 }
 

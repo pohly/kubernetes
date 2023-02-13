@@ -903,15 +903,19 @@ func (*fakeNoopRuntimePlugin) Filter(_ context.Context, _ *framework.CycleState,
 func (*fakeNoopRuntimePlugin) EventsToRegister() []framework.ClusterEvent { return nil }
 
 func TestNewFrameworkFillEventToPluginMap(t *testing.T) {
+	type event struct {
+		Resource   framework.GVK
+		ActionType framework.ActionType
+	}
 	tests := []struct {
 		name    string
 		plugins []framework.Plugin
-		want    map[framework.ClusterEvent]sets.Set[string]
+		want    map[event]sets.Set[string]
 	}{
 		{
 			name:    "no-op plugin",
 			plugins: []framework.Plugin{&fakeNoopPlugin{}},
-			want: map[framework.ClusterEvent]sets.Set[string]{
+			want: map[event]sets.Set[string]{
 				{Resource: framework.Pod, ActionType: framework.All}:                   sets.New("fakeNoop", bindPlugin, queueSortPlugin),
 				{Resource: framework.Node, ActionType: framework.All}:                  sets.New("fakeNoop", bindPlugin, queueSortPlugin),
 				{Resource: framework.CSINode, ActionType: framework.All}:               sets.New("fakeNoop", bindPlugin, queueSortPlugin),
@@ -923,7 +927,7 @@ func TestNewFrameworkFillEventToPluginMap(t *testing.T) {
 		{
 			name:    "node plugin",
 			plugins: []framework.Plugin{&fakeNodePlugin{}},
-			want: map[framework.ClusterEvent]sets.Set[string]{
+			want: map[event]sets.Set[string]{
 				{Resource: framework.Pod, ActionType: framework.All}:                           sets.New("fakeNode", bindPlugin, queueSortPlugin),
 				{Resource: framework.Node, ActionType: framework.Delete}:                       sets.New("fakeNode"),
 				{Resource: framework.Node, ActionType: framework.All}:                          sets.New(bindPlugin, queueSortPlugin),
@@ -937,7 +941,7 @@ func TestNewFrameworkFillEventToPluginMap(t *testing.T) {
 		{
 			name:    "pod plugin",
 			plugins: []framework.Plugin{&fakePodPlugin{}},
-			want: map[framework.ClusterEvent]sets.Set[string]{
+			want: map[event]sets.Set[string]{
 				{Resource: framework.Pod, ActionType: framework.All}:                      sets.New("fakePod", bindPlugin, queueSortPlugin),
 				{Resource: framework.Node, ActionType: framework.Add | framework.Delete}:  sets.New("fakePod"),
 				{Resource: framework.Node, ActionType: framework.All}:                     sets.New(bindPlugin, queueSortPlugin),
@@ -951,7 +955,7 @@ func TestNewFrameworkFillEventToPluginMap(t *testing.T) {
 		{
 			name:    "node and pod plugin",
 			plugins: []framework.Plugin{&fakeNodePlugin{}, &fakePodPlugin{}},
-			want: map[framework.ClusterEvent]sets.Set[string]{
+			want: map[event]sets.Set[string]{
 				{Resource: framework.Node, ActionType: framework.Delete}:                       sets.New("fakeNode"),
 				{Resource: framework.Node, ActionType: framework.Add | framework.Delete}:       sets.New("fakePod"),
 				{Resource: framework.Pod, ActionType: framework.All}:                           sets.New("fakeNode", "fakePod", bindPlugin, queueSortPlugin),
@@ -967,7 +971,7 @@ func TestNewFrameworkFillEventToPluginMap(t *testing.T) {
 		{
 			name:    "no-op runtime plugin",
 			plugins: []framework.Plugin{&fakeNoopRuntimePlugin{}},
-			want: map[framework.ClusterEvent]sets.Set[string]{
+			want: map[event]sets.Set[string]{
 				{Resource: framework.Pod, ActionType: framework.All}:                   sets.New(bindPlugin, queueSortPlugin),
 				{Resource: framework.Node, ActionType: framework.All}:                  sets.New(bindPlugin, queueSortPlugin),
 				{Resource: framework.CSINode, ActionType: framework.All}:               sets.New(bindPlugin, queueSortPlugin),
@@ -991,15 +995,22 @@ func TestNewFrameworkFillEventToPluginMap(t *testing.T) {
 				cfgPls.Filter.Enabled = append(cfgPls.Filter.Enabled, config.Plugin{Name: pl.Name()})
 			}
 
-			got := make(map[framework.ClusterEvent]sets.Set[string])
+			var got framework.ClusterEventMap
 			profile := config.KubeSchedulerProfile{Plugins: cfgPls}
 			stopCh := make(chan struct{})
 			defer close(stopCh)
-			_, err := newFrameworkWithQueueSortAndBind(registry, profile, stopCh, WithClusterEventMap(got))
+			_, err := newFrameworkWithQueueSortAndBind(registry, profile, stopCh, WithClusterEventMap(&got))
 			if err != nil {
 				t.Fatal(err)
 			}
-			if diff := cmp.Diff(tt.want, got); diff != "" {
+			gotSimplified := make(map[event]sets.Set[string])
+			for _, entry := range got {
+				if entry.Label != "" || entry.IsSchedulable != nil {
+					t.Errorf("expected ClusterEvent with just Resource and ActionType, got %+v", entry)
+				}
+				gotSimplified[event{Resource: entry.Resource, ActionType: entry.ActionType}] = entry.Names
+			}
+			if diff := cmp.Diff(tt.want, gotSimplified); diff != "" {
 				t.Errorf("Unexpected eventToPlugin map (-want,+got):%s", diff)
 			}
 		})

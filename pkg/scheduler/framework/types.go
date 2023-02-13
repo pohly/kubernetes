@@ -85,11 +85,70 @@ type ClusterEvent struct {
 	Resource   GVK
 	ActionType ActionType
 	Label      string
+
+	IsSchedulable IsSchedulable
 }
+
+// IsSchedulable gets called for each cluster event and for each pod that might
+// get scheduled again because of it. The return value determines if and how
+// scheduling of the pod continues.
+//
+// For updates, both objects are passed. For deletes, only oldObj is set.
+// For adds, only newObj is set.
+type IsSchedulable func(oldObj, newObj interface{}, pod *v1.Pod) IsSchedulableResult
+
+type IsSchedulableResult int
+
+const (
+	// PodNotAffected implies that a cluster event has no impact on
+	// scheduling of a pod.
+	PodNotAffected = IsSchedulableResult(iota)
+
+	// PodMaybeSchedulable implies that it was impossible to determine
+	// whether the cluster event has an impact. An error might have
+	// occurred or there wasn't enough information.
+	PodMaybeSchedulable
+
+	// PodImmediatelySchedulable is returned when it is certain that the
+	// cluster event is related to the pod and made it schedulabele.
+	PodImmediatelySchedulable
+)
 
 // IsWildCard returns true if ClusterEvent follows WildCard semantics
 func (ce ClusterEvent) IsWildCard() bool {
 	return ce.Resource == WildCard && ce.ActionType == All
+}
+
+// ClusterEventMap corresponds to map[ClusterEvent]sets.String where the set
+// contains the name of all plugins that use the the same ClusterEvent. It's
+// implemented as custom type instead of a literal Go map because the IsSchedulable
+// function makes ClusterEvent unsuitable as key. ClusterEvents which have such
+// a function are treated as unique entries in the map.
+type ClusterEventMap []ClusterEventMapEntry
+
+type ClusterEventMapEntry struct {
+	ClusterEvent
+	Names sets.Set[string]
+}
+
+func (m *ClusterEventMap) RegisterClusterEvents(name string, events []ClusterEvent) {
+	for _, event := range events {
+		m.RegisterClusterEvent(name, event)
+	}
+}
+
+func (m *ClusterEventMap) RegisterClusterEvent(name string, event ClusterEvent) {
+	for _, entry := range *m {
+		if entry.Resource == event.Resource &&
+			entry.ActionType == event.ActionType &&
+			entry.Label == event.Label &&
+			entry.IsSchedulable == nil &&
+			event.IsSchedulable == nil {
+			entry.Names.Insert(name)
+			return
+		}
+	}
+	*m = append(*m, ClusterEventMapEntry{ClusterEvent: event, Names: sets.New(name)})
 }
 
 // QueuedPodInfo is a Pod wrapper with additional information related to
