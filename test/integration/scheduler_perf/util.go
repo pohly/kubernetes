@@ -315,8 +315,9 @@ type throughputCollector struct {
 	labels                map[string]string
 	namespaces            []string
 
-	progress   []podScheduling
-	start, end time.Time
+	progress                     []podScheduling
+	start, end                   time.Time
+	startScheduled, endScheduled int
 }
 
 func newThroughputCollector(podInformer coreinformers.PodInformer, labels map[string]string, namespaces []string) *throughputCollector {
@@ -332,6 +333,7 @@ func (tc *throughputCollector) run(ctx context.Context) {
 	if err != nil {
 		klog.Fatalf("%v", err)
 	}
+	tc.startScheduled = len(podsScheduled)
 	lastScheduledCount := len(podsScheduled)
 	ticker := time.NewTicker(throughputSampleInterval)
 	defer ticker.Stop()
@@ -339,7 +341,7 @@ func (tc *throughputCollector) run(ctx context.Context) {
 	started := false
 	doSample := func() {
 		now := time.Now()
-		podsScheduled, err := getScheduledPods(tc.podInformer, tc.namespaces...)
+		podsScheduled, err = getScheduledPods(tc.podInformer, tc.namespaces...)
 		if err != nil {
 			klog.Fatalf("%v", err)
 		}
@@ -396,6 +398,7 @@ func (tc *throughputCollector) run(ctx context.Context) {
 		case <-ctx.Done():
 			doSample()
 			tc.end = lastSampleTime
+			tc.endScheduled = len(podsScheduled)
 			return
 		case <-ticker.C:
 			doSample()
@@ -423,6 +426,7 @@ func (tc *throughputCollector) collect() []DataItem {
 			"Perc90":  tc.schedulingThroughputs[int(math.Ceil(float64(length*90)/100))-1],
 			"Perc95":  tc.schedulingThroughputs[int(math.Ceil(float64(length*95)/100))-1],
 			"Perc99":  tc.schedulingThroughputs[int(math.Ceil(float64(length*99)/100))-1],
+			"Total":   float64(tc.endScheduled-tc.startScheduled) / (tc.end.Sub(tc.start)).Seconds(),
 		}
 		throughputSummary.Unit = "pods/s"
 	}
