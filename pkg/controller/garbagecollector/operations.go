@@ -82,8 +82,7 @@ func (gc *GarbageCollector) patchObject(item objectReference, patch []byte, pt t
 	return gc.metadataClient.Resource(resource).Namespace(resourceDefaultNamespace(namespaced, item.Namespace)).Patch(context.TODO(), item.Name, pt, patch, metav1.PatchOptions{})
 }
 
-func (gc *GarbageCollector) removeFinalizer(ctx context.Context, owner *node, targetFinalizer string) error {
-	logger := klog.FromContext(ctx)
+func (gc *GarbageCollector) removeFinalizer(logger klog.Logger, owner *node, targetFinalizer string) error {
 	logger = klog.LoggerWithValues(logger, "finalizer", targetFinalizer, "object", owner.identity)
 
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {

@@ -46,6 +46,7 @@ import (
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/controller-manager/pkg/informerfactory"
+	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
@@ -200,7 +201,7 @@ func createRandomCustomResourceDefinition(
 }
 
 type testContext struct {
-	ctx                context.Context
+	logger             klog.Logger
 	tearDown           func()
 	gc                 *garbagecollector.GarbageCollector
 	clientSet          clientset.Interface
@@ -260,7 +261,7 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 		t.Fatalf("failed to create garbage collector: %v", err)
 	}
 
-	_, ctx := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	tearDown := func() {
 		cancel()
@@ -283,7 +284,7 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 	}
 
 	return &testContext{
-		ctx:                ctx,
+		logger:             logger,
 		tearDown:           tearDown,
 		gc:                 gc,
 		clientSet:          clientSet,
@@ -1030,7 +1031,7 @@ func TestBlockingOwnerRefDoesBlock(t *testing.T) {
 	timeout := make(chan struct{})
 	time.AfterFunc(5*time.Second, func() { close(timeout) })
 	if !cache.WaitForCacheSync(timeout, func() bool {
-		return gc.IsSynced(ctx.ctx)
+		return gc.IsSynced(ctx.logger)
 	}) {
 		t.Fatalf("failed to wait for garbage collector to be synced")
 	}

@@ -134,7 +134,7 @@ func (m *monitor) Run() {
 
 type monitors map[schema.GroupVersionResource]*monitor
 
-func (gb *GraphBuilder) controllerFor(ctx context.Context, resource schema.GroupVersionResource, kind schema.GroupVersionKind) (cache.Controller, cache.Store, error) {
+func (gb *GraphBuilder) controllerFor(logger klog.Logger, resource schema.GroupVersionResource, kind schema.GroupVersionKind) (cache.Controller, cache.Store, error) {
 	handlers := cache.ResourceEventHandlerFuncs{
 		// add the event to the dependencyGraphBuilder's graphChanges.
 		AddFunc: func(obj interface{}) {
@@ -170,7 +170,6 @@ func (gb *GraphBuilder) controllerFor(ctx context.Context, resource schema.Group
 		},
 	}
 
-	logger := klog.FromContext(ctx)
 	logger = klog.LoggerWithValues(logger, "resource", resource, "kind", kind)
 
 	shared, err := gb.sharedInformers.ForResource(resource)
@@ -190,7 +189,7 @@ func (gb *GraphBuilder) controllerFor(ctx context.Context, resource schema.Group
 // instead of immediately exiting on an error. It may be called before or after
 // Run. Monitors are NOT started as part of the sync. To ensure all existing
 // monitors are started, call startMonitors.
-func (gb *GraphBuilder) syncMonitors(ctx context.Context, resources map[schema.GroupVersionResource]struct{}) error {
+func (gb *GraphBuilder) syncMonitors(logger klog.Logger, resources map[schema.GroupVersionResource]struct{}) error {
 	gb.monitorLock.Lock()
 	defer gb.monitorLock.Unlock()
 
@@ -217,7 +216,7 @@ func (gb *GraphBuilder) syncMonitors(ctx context.Context, resources map[schema.G
 			errs = append(errs, fmt.Errorf("couldn't look up resource %q: %v", resource, err))
 			continue
 		}
-		c, s, err := gb.controllerFor(ctx, resource, kind)
+		c, s, err := gb.controllerFor(logger, resource, kind)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("couldn't start monitor for resource %q: %v", resource, err))
 			continue
@@ -233,7 +232,6 @@ func (gb *GraphBuilder) syncMonitors(ctx context.Context, resources map[schema.G
 		}
 	}
 
-	logger := klog.FromContext(ctx)
 	logger.V(4).Info("synced monitors", "added", added, "kept", kept, "removed", len(toRemove))
 	// NewAggregate returns nil if errs is 0-length
 	return utilerrors.NewAggregate(errs)
@@ -244,7 +242,7 @@ func (gb *GraphBuilder) syncMonitors(ctx context.Context, resources map[schema.G
 //
 // If called before Run, startMonitors does nothing (as there is no stop channel
 // to support monitor/informer execution).
-func (gb *GraphBuilder) startMonitors(ctx context.Context) {
+func (gb *GraphBuilder) startMonitors(logger klog.Logger) {
 	gb.monitorLock.Lock()
 	defer gb.monitorLock.Unlock()
 
@@ -266,7 +264,6 @@ func (gb *GraphBuilder) startMonitors(ctx context.Context) {
 			started++
 		}
 	}
-	logger := klog.FromContext(ctx)
 	logger.V(4).Info("started new monitors", "new", started, "current", len(monitors))
 }
 
@@ -274,11 +271,9 @@ func (gb *GraphBuilder) startMonitors(ctx context.Context) {
 // controllers HasSynced functions return true. This means IsSynced could return
 // true at one time, and then later return false if all monitors were
 // reconstructed.
-func (gb *GraphBuilder) IsSynced(ctx context.Context) bool {
+func (gb *GraphBuilder) IsSynced(logger klog.Logger) bool {
 	gb.monitorLock.Lock()
 	defer gb.monitorLock.Unlock()
-
-	logger := klog.FromContext(ctx)
 
 	if len(gb.monitors) == 0 {
 		logger.V(4).Info("garbage controller monitor not synced: no monitors")
@@ -309,8 +304,8 @@ func (gb *GraphBuilder) Run(ctx context.Context) {
 
 	// Start monitors and begin change processing until the stop channel is
 	// closed.
-	gb.startMonitors(ctx)
-	wait.UntilWithContext(ctx, gb.runProcessGraphChanges, 1*time.Second)
+	gb.startMonitors(logger)
+	wait.Until(func() { gb.runProcessGraphChanges(logger) }, 1*time.Second, ctx.Done())
 
 	// Stop any running monitors.
 	gb.monitorLock.Lock()
@@ -360,9 +355,7 @@ func (gb *GraphBuilder) enqueueVirtualDeleteEvent(ref objectReference) {
 // exist in the gb.uidToNode yet, a "virtual" node will be created to represent
 // the owner. The "virtual" node will be enqueued to the attemptToDelete, so that
 // attemptToDeleteItem() will verify if the owner exists according to the API server.
-func (gb *GraphBuilder) addDependentToOwners(ctx context.Context, n *node, owners []metav1.OwnerReference) {
-	logger := klog.FromContext(ctx)
-
+func (gb *GraphBuilder) addDependentToOwners(logger klog.Logger, n *node, owners []metav1.OwnerReference) {
 	// track if some of the referenced owners already exist in the graph and have been observed,
 	// and the dependent's ownerRef does not match their observed coordinates
 	hasPotentiallyInvalidOwnerReference := false
@@ -459,9 +452,9 @@ func (gb *GraphBuilder) reportInvalidNamespaceOwnerRef(n *node, invalidOwnerUID 
 
 // insertNode insert the node to gb.uidToNode; then it finds all owners as listed
 // in n.owners, and adds the node to their dependents list.
-func (gb *GraphBuilder) insertNode(ctx context.Context, n *node) {
+func (gb *GraphBuilder) insertNode(logger klog.Logger, n *node) {
 	gb.uidToNode.Write(n)
-	gb.addDependentToOwners(ctx, n, n.owners)
+	gb.addDependentToOwners(logger, n, n.owners)
 }
 
 // removeDependentFromOwners remove n from owners' dependents list.
@@ -567,9 +560,7 @@ func startsWaitingForDependentsOrphaned(oldObj interface{}, newAccessor metav1.O
 
 // if an blocking ownerReference points to an object gets removed, or gets set to
 // "BlockOwnerDeletion=false", add the object to the attemptToDelete queue.
-func (gb *GraphBuilder) addUnblockedOwnersToDeleteQueue(ctx context.Context, removed []metav1.OwnerReference, changed []ownerRefPair) {
-	logger := klog.FromContext(ctx)
-
+func (gb *GraphBuilder) addUnblockedOwnersToDeleteQueue(logger klog.Logger, removed []metav1.OwnerReference, changed []ownerRefPair) {
 	for _, ref := range removed {
 		if ref.BlockOwnerDeletion != nil && *ref.BlockOwnerDeletion {
 			node, found := gb.uidToNode.Read(ref.UID)
@@ -594,8 +585,7 @@ func (gb *GraphBuilder) addUnblockedOwnersToDeleteQueue(ctx context.Context, rem
 	}
 }
 
-func (gb *GraphBuilder) processTransitions(ctx context.Context, oldObj interface{}, newAccessor metav1.Object, n *node) {
-	logger := klog.FromContext(ctx)
+func (gb *GraphBuilder) processTransitions(logger klog.Logger, oldObj interface{}, newAccessor metav1.Object, n *node) {
 	logger = klog.LoggerWithValues(logger, "node", n.identity)
 
 	if startsWaitingForDependentsOrphaned(oldObj, newAccessor) {
@@ -614,8 +604,8 @@ func (gb *GraphBuilder) processTransitions(ctx context.Context, oldObj interface
 	}
 }
 
-func (gb *GraphBuilder) runProcessGraphChanges(ctx context.Context) {
-	for gb.processGraphChanges(ctx) {
+func (gb *GraphBuilder) runProcessGraphChanges(logger klog.Logger) {
+	for gb.processGraphChanges(logger) {
 	}
 }
 
@@ -632,7 +622,7 @@ func identityFromEvent(event *event, accessor metav1.Object) objectReference {
 }
 
 // Dequeueing an event from graphChanges, updating graph, populating dirty_queue.
-func (gb *GraphBuilder) processGraphChanges(ctx context.Context) bool {
+func (gb *GraphBuilder) processGraphChanges(logger klog.Logger) bool {
 	item, quit := gb.graphChanges.Get()
 	if quit {
 		return false
@@ -650,17 +640,6 @@ func (gb *GraphBuilder) processGraphChanges(ctx context.Context) bool {
 		return true
 	}
 
-	logger := klog.FromContext(ctx)
-	logger = klog.LoggerWithValues(logger,
-		"apiVersion", event.gvk.GroupVersion().String(),
-		"kind", event.gvk.Kind,
-		"namespace", accessor.GetNamespace(),
-		"name", accessor.GetName(),
-		"uid", string(accessor.GetUID()),
-		"eventType", event.eventType,
-		"virtual", event.virtual,
-	)
-
 	logger.V(5).Info("GraphBuilder process object",
 		"apiVersion", event.gvk.GroupVersion().String(),
 		"kind", event.gvk.Kind,
@@ -670,6 +649,7 @@ func (gb *GraphBuilder) processGraphChanges(ctx context.Context) bool {
 		"eventType", event.eventType,
 		"virtual", event.virtual,
 	)
+
 	// Check if the node already exists
 	existingNode, found := gb.uidToNode.Read(accessor.GetUID())
 	if found && !event.virtual && !existingNode.isObserved() {
@@ -687,13 +667,7 @@ func (gb *GraphBuilder) processGraphChanges(ctx context.Context) bool {
 			for _, dep := range potentiallyInvalidDependents {
 				if len(observedIdentity.Namespace) > 0 && dep.identity.Namespace != observedIdentity.Namespace {
 					// Namespace mismatch, this is definitely wrong
-					logger.V(2).Info("node references an owner but does not match namespaces", "apiVersion", event.gvk.GroupVersion().String(),
-						"kind", event.gvk.Kind,
-						"namespace", accessor.GetNamespace(),
-						"name", accessor.GetName(),
-						"uid", string(accessor.GetUID()),
-						"eventType", event.eventType,
-						"virtual", event.virtual,
+					logger.V(2).Info("node references an owner but does not match namespaces",
 						"node", dep.identity,
 						"owner", observedIdentity,
 					)
@@ -704,13 +678,6 @@ func (gb *GraphBuilder) processGraphChanges(ctx context.Context) bool {
 
 			// make a copy (so we don't modify the existing node in place), store the observed identity, and replace the virtual node
 			logger.V(2).Info("replacing virtual node with observed node",
-				"apiVersion", event.gvk.GroupVersion().String(),
-				"kind", event.gvk.Kind,
-				"namespace", accessor.GetNamespace(),
-				"name", accessor.GetName(),
-				"uid", string(accessor.GetUID()),
-				"eventType", event.eventType,
-				"virtual", event.virtual,
 				"virtual", existingNode.identity,
 				"observed", observedIdentity,
 			)
@@ -729,21 +696,21 @@ func (gb *GraphBuilder) processGraphChanges(ctx context.Context) bool {
 			deletingDependents: beingDeleted(accessor) && hasDeleteDependentsFinalizer(accessor),
 			beingDeleted:       beingDeleted(accessor),
 		}
-		gb.insertNode(ctx, newNode)
+		gb.insertNode(logger, newNode)
 		// the underlying delta_fifo may combine a creation and a deletion into
 		// one event, so we need to further process the event.
-		gb.processTransitions(ctx, event.oldObj, accessor, newNode)
+		gb.processTransitions(logger, event.oldObj, accessor, newNode)
 	case (event.eventType == addEvent || event.eventType == updateEvent) && found:
 		// handle changes in ownerReferences
 		added, removed, changed := referencesDiffs(existingNode.owners, accessor.GetOwnerReferences())
 		if len(added) != 0 || len(removed) != 0 || len(changed) != 0 {
 			// check if the changed dependency graph unblock owners that are
 			// waiting for the deletion of their dependents.
-			gb.addUnblockedOwnersToDeleteQueue(ctx, removed, changed)
+			gb.addUnblockedOwnersToDeleteQueue(logger, removed, changed)
 			// update the node itself
 			existingNode.owners = accessor.GetOwnerReferences()
 			// Add the node to its new owners' dependent lists.
-			gb.addDependentToOwners(ctx, existingNode, added)
+			gb.addDependentToOwners(logger, existingNode, added)
 			// remove the node from the dependent list of node that are no longer in
 			// the node's owners list.
 			gb.removeDependentFromOwners(existingNode, removed)
@@ -752,18 +719,11 @@ func (gb *GraphBuilder) processGraphChanges(ctx context.Context) bool {
 		if beingDeleted(accessor) {
 			existingNode.markBeingDeleted()
 		}
-		gb.processTransitions(ctx, event.oldObj, accessor, existingNode)
+		gb.processTransitions(logger, event.oldObj, accessor, existingNode)
 	case event.eventType == deleteEvent:
 		if !found {
-			logger.V(5).Info("uid doesn't exist in the graph, this shouldn't happen",
-				"apiVersion", event.gvk.GroupVersion().String(),
-				"kind", event.gvk.Kind,
-				"namespace", accessor.GetNamespace(),
-				"name", accessor.GetName(),
-				"uid", string(accessor.GetUID()),
-				"eventType", event.eventType,
-				"virtual", event.virtual,
-				"uid", accessor.GetUID(),
+			logger.V(5).Info("node doesn't exist in the graph, this shouldn't happen",
+				"node", accessor.GetUID(),
 			)
 			return true
 		}
