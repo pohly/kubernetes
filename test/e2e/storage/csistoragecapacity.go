@@ -20,6 +20,9 @@ import (
 	"context"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,8 +32,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
-
-	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = utils.SIGDescribe("CSIStorageCapacity", func() {
@@ -152,29 +153,29 @@ var _ = utils.SIGDescribe("CSIStorageCapacity", func() {
 		ginkgo.By("getting")
 		gottenCSC, err := cscClient.Get(ctx, csc.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(gottenCSC.UID, createdCSC.UID)
+		gomega.Expect(gottenCSC.UID).To(gomega.Equal(createdCSC.UID))
 
 		ginkgo.By("listing in namespace")
 		cscs, err := cscClient.List(ctx, metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(cscs.Items), 3, "filtered list should have 3 items, got: %s", cscs)
+		gomega.Expect(cscs.Items).To(gomega.HaveLen(3), "filtered list should have 3 items, got: %s", cscs)
 
 		ginkgo.By("listing across namespaces")
 		cscs, err = cscClientNoNamespace.List(ctx, metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(cscs.Items), 3, "filtered list should have 3 items, got: %s", cscs)
+		gomega.Expect(cscs.Items).To(gomega.HaveLen(3), "filtered list should have 3 items, got: %s", cscs)
 
 		ginkgo.By("patching")
 		patchedCSC, err := cscClient.Patch(ctx, createdCSC.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"patched":"true"}}}`), metav1.PatchOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(patchedCSC.Annotations["patched"], "true", "patched object should have the applied annotation")
+		gomega.Expect(patchedCSC.Annotations["patched"]).To(gomega.Equal("true"), "patched object should have the applied annotation")
 
 		ginkgo.By("updating")
 		csrToUpdate := patchedCSC.DeepCopy()
 		csrToUpdate.Annotations["updated"] = "true"
 		updatedCSC, err := cscClient.Update(ctx, csrToUpdate, metav1.UpdateOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(updatedCSC.Annotations["updated"], "true", "updated object should have the applied annotation")
+		gomega.Expect(updatedCSC.Annotations["updated"]).To(gomega.Equal("true"), "updated object should have the applied annotation")
 
 		expectWatchResult := func(kind string, w watch.Interface) {
 			framework.Logf("waiting for watch events with expected annotations %s", kind)

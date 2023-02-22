@@ -98,8 +98,8 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 			ginkgo.By("check the mirror pod container image is updated")
 			pod, err = f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
-			framework.ExpectEqual(len(pod.Spec.Containers), 1)
-			framework.ExpectEqual(pod.Spec.Containers[0].Image, image)
+			gomega.Expect(pod.Spec.Containers).To(gomega.HaveLen(1))
+			gomega.Expect(pod.Spec.Containers[0].Image).To(gomega.Equal(image))
 		})
 
 		ginkgo.It("should update a static pod when the static pod is updated multiple times during the graceful termination period [NodeConformance]", func(ctx context.Context) {
@@ -127,8 +127,8 @@ var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 			ginkgo.By("check the mirror pod container image is updated")
 			pod, err = f.ClientSet.CoreV1().Pods(ns).Get(ctx, mirrorPodName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
-			framework.ExpectEqual(len(pod.Spec.Containers), 1)
-			framework.ExpectEqual(pod.Spec.Containers[0].Image, image)
+			gomega.Expect(pod.Spec.Containers).To(gomega.HaveLen(1))
+			gomega.Expect(pod.Spec.Containers[0].Image).To(gomega.Equal(image))
 		})
 
 		ginkgo.AfterEach(func(ctx context.Context) {

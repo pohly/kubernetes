@@ -20,6 +20,8 @@ import (
 	"context"
 	"strings"
 
+	"github.com/onsi/ginkgo/v2"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
@@ -29,8 +31,6 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/utils/crd"
 	admissionapi "k8s.io/pod-security-admission/api"
-
-	"github.com/onsi/ginkgo/v2"
 )
 
 var storageVersionServerVersion = utilversion.MustParseSemantic("v1.13.99")
@@ -152,7 +152,9 @@ var _ = SIGDescribe("Discovery", func() {
 					break
 				}
 			}
-			framework.ExpectEqual(true, match, "failed to find a valid version for PreferredVersion")
+			if !match {
+				ginkgo.Fail("failed to find a valid version for PreferredVersion")
+			}
 		}
 	})
 })

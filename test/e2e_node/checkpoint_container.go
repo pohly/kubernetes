@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
+
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -199,7 +200,9 @@ var _ = SIGDescribe("Checkpoint Container [NodeFeature:CheckpointContainer]", fu
 				}
 			}
 			for fileName := range checkForFiles {
-				framework.ExpectEqual(checkForFiles[fileName], true)
+				if !checkForFiles[fileName] {
+					ginkgo.Fail(fmt.Sprintf("checking file %q failed", fileName))
+				}
 			}
 			// cleanup checkpoint archive
 			os.RemoveAll(item)

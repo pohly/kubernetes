@@ -252,7 +252,7 @@ func logNodeEvents(ctx context.Context, f *framework.Framework) {
 func getLocalNode(ctx context.Context, f *framework.Framework) *v1.Node {
 	nodeList, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
 	framework.ExpectNoError(err)
-	framework.ExpectEqual(len(nodeList.Items), 1, "Unexpected number of node objects for node e2e. Expects only one node.")
+	gomega.Expect(nodeList.Items).To(gomega.HaveLen(1), "Unexpected number of node objects for node e2e. Expects only one node.")
 	return &nodeList.Items[0]
 }
 

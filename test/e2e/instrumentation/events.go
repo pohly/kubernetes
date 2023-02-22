@@ -22,10 +22,14 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+
 	v1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -33,9 +37,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/instrumentation/common"
 	admissionapi "k8s.io/pod-security-admission/api"
-
-	"github.com/onsi/ginkgo/v2"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 func newTestEvent(namespace, name, label string) *eventsv1.Event {
@@ -218,7 +219,7 @@ var _ = common.SIGDescribe("Events API", func() {
 			LabelSelector: "testevent-set=true",
 		})
 		framework.ExpectNoError(err, "failed to get a list of events")
-		framework.ExpectEqual(len(eventList.Items), len(eventNames), fmt.Sprintf("unexpected event list: %#v", eventList))
+		gomega.Expect(eventList.Items).To(gomega.HaveLen(len(eventNames)), fmt.Sprintf("unexpected event list: %#v", eventList))
 
 		ginkgo.By("delete a list of events")
 		framework.Logf("requesting DeleteCollection of events")
@@ -232,6 +233,6 @@ var _ = common.SIGDescribe("Events API", func() {
 			LabelSelector: "testevent-set=true",
 		})
 		framework.ExpectNoError(err, "failed to get a list of events")
-		framework.ExpectEqual(len(eventList.Items), 0, fmt.Sprintf("unexpected event list: %#v", eventList))
+		gomega.Expect(eventList.Items).To(gomega.BeEmpty(), fmt.Sprintf("unexpected event list: %#v", eventList))
 	})
 })

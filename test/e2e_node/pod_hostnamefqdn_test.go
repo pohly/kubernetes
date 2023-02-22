@@ -27,19 +27,19 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubelet/events"
-	admissionapi "k8s.io/pod-security-admission/api"
-
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-
-	"github.com/onsi/ginkgo/v2"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 func generatePodName(base string) string {
@@ -143,7 +143,7 @@ var _ = SIGDescribe("Hostname of Pod [NodeConformance]", func() {
 		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.%s", pod.ObjectMeta.Name, subdomain, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
 		// Fail if FQDN is longer than 64 characters, otherwise the Pod will remain pending until test timeout.
 		// In Linux, 64 characters is the limit of the hostname kernel field, which this test sets to the pod FQDN.
-		framework.ExpectEqual(len(hostFQDN) < 65, true, fmt.Sprintf("The FQDN of the Pod cannot be longer than 64 characters, requested %s which is %d characters long.", hostFQDN, len(hostFQDN)))
+		gomega.Expect(hostFQDN).To(gomega.BeNumerically("<=", 64), "The FQDN of the Pod cannot be longer than 64 characters.")
 		output := []string{fmt.Sprintf("%s;%s;", hostFQDN, hostFQDN)}
 		// Create Pod
 		e2eoutput.TestContainerOutput(ctx, f, "fqdn and fqdn", pod, 0, output)

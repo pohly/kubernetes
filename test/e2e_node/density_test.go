@@ -379,7 +379,7 @@ func runDensityBatchTest(ctx context.Context, f *framework.Framework, rc *Resour
 
 	for name, create := range createTimes {
 		watch, ok := watchTimes[name]
-		framework.ExpectEqual(ok, true)
+		gomega.Expect(ok).To(gomega.BeTrue())
 
 		e2eLags = append(e2eLags,
 			e2emetrics.PodLatencyData{Name: name, Latency: watch.Time.Sub(create.Time)})
@@ -513,12 +513,12 @@ func newInformerWatchPod(ctx context.Context, f *framework.Framework, mutex *syn
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				p, ok := obj.(*v1.Pod)
-				framework.ExpectEqual(ok, true)
+				gomega.Expect(ok).To(gomega.BeTrue())
 				go checkPodRunning(p)
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
 				p, ok := newObj.(*v1.Pod)
-				framework.ExpectEqual(ok, true)
+				gomega.Expect(ok).To(gomega.BeTrue())
 				go checkPodRunning(p)
 			},
 		},
@@ -555,7 +555,7 @@ func createBatchPodSequential(ctx context.Context, f *framework.Framework, pods 
 
 	for name, create := range createTimes {
 		watch, ok := watchTimes[name]
-		framework.ExpectEqual(ok, true)
+		gomega.Expect(ok).To(gomega.BeTrue())
 		if !init {
 			if firstCreate.Time.After(create.Time) {
 				firstCreate = create
@@ -635,8 +635,7 @@ func logAndVerifyLatency(ctx context.Context, batchLag time.Duration, e2eLags []
 
 		// check bactch pod creation latency
 		if podBatchStartupLimit > 0 {
-			framework.ExpectEqual(batchLag <= podBatchStartupLimit, true, "Batch creation startup time %v exceed limit %v",
-				batchLag, podBatchStartupLimit)
+			gomega.Expect(batchLag).To(gomega.BeNumerically("<=", podBatchStartupLimit, "Batch creation startup time exceed limit"))
 		}
 	}
 }

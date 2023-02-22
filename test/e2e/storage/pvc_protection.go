@@ -18,17 +18,16 @@ package storage
 
 import (
 	"context"
-
-	"github.com/onsi/ginkgo/v2"
-
 	"fmt"
 	"time"
+
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/util/slice"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -105,7 +104,7 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 		ginkgo.By("Checking that PVC Protection finalizer is set")
 		pvc, err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(ctx, pvc.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "While getting PVC status")
-		framework.ExpectEqual(slice.ContainsString(pvc.ObjectMeta.Finalizers, volumeutil.PVCProtectionFinalizer, nil), true, "PVC Protection finalizer(%v) is not set in %v", volumeutil.PVCProtectionFinalizer, pvc.ObjectMeta.Finalizers)
+		gomega.Expect(pvc.ObjectMeta.Finalizers).To(gomega.ContainElement(volumeutil.PVCProtectionFinalizer), "PVC Protection finalizer is not set")
 	})
 
 	ginkgo.AfterEach(func(ctx context.Context) {

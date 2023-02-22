@@ -21,14 +21,15 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
-
-	"github.com/onsi/ginkgo/v2"
 )
 
 type testCase struct {
@@ -82,7 +83,7 @@ func verifyReasonForOOMKilledContainer(pod *v1.Pod, oomTargetContainerName strin
 	if container.State.Terminated == nil {
 		framework.Failf("OOM target pod %q, container %q is not in the terminated state", pod.Name, container.Name)
 	}
-	framework.ExpectEqual(container.State.Terminated.ExitCode, int32(137),
+	gomega.Expect(container.State.Terminated.ExitCode).To(gomega.Equal(int32(137)),
 		fmt.Sprintf("pod: %q, container: %q has unexpected exitCode: %q", pod.Name, container.Name, container.State.Terminated.ExitCode))
 	framework.ExpectEqual(container.State.Terminated.Reason, "OOMKilled",
 		fmt.Sprintf("pod: %q, container: %q has unexpected reason: %q", pod.Name, container.Name, container.State.Terminated.Reason))

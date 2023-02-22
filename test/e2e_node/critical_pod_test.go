@@ -20,6 +20,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,8 +33,6 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
-
-	"github.com/onsi/ginkgo/v2"
 )
 
 const (
@@ -81,9 +82,9 @@ var _ = SIGDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:CriticalPod]
 			framework.ExpectNoError(err)
 			for _, p := range updatedPodList.Items {
 				if p.Name == nonCriticalBestEffort.Name {
-					framework.ExpectEqual(p.Status.Phase, v1.PodRunning, fmt.Sprintf("pod: %v should not be preempted with status: %#v", p.Name, p.Status))
+					gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodRunning), fmt.Sprintf("pod: %v should not be preempted with status: %#v", p.Name, p.Status))
 				} else {
-					framework.ExpectEqual(p.Status.Phase, v1.PodFailed, fmt.Sprintf("pod: %v should be preempted with status: %#v", p.Name, p.Status))
+					gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodFailed), fmt.Sprintf("pod: %v should be preempted with status: %#v", p.Name, p.Status))
 				}
 			}
 		})
@@ -105,7 +106,7 @@ func getNodeCPUAndMemoryCapacity(ctx context.Context, f *framework.Framework) v1
 	nodeList, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	framework.ExpectNoError(err)
 	// Assuming that there is only one node, because this is a node e2e test.
-	framework.ExpectEqual(len(nodeList.Items), 1)
+	gomega.Expect(nodeList.Items).To(gomega.HaveLen(1))
 	capacity := nodeList.Items[0].Status.Allocatable
 	return v1.ResourceList{
 		v1.ResourceCPU:    capacity[v1.ResourceCPU],
@@ -117,7 +118,7 @@ func getNodeName(ctx context.Context, f *framework.Framework) string {
 	nodeList, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	framework.ExpectNoError(err)
 	// Assuming that there is only one node, because this is a node e2e test.
-	framework.ExpectEqual(len(nodeList.Items), 1)
+	gomega.Expect(nodeList.Items).To(gomega.HaveLen(1))
 	return nodeList.Items[0].GetName()
 }
 
@@ -146,9 +147,13 @@ func getTestPod(critical bool, name string, resources v1.ResourceRequirements, n
 		}
 		pod.Spec.PriorityClassName = scheduling.SystemNodeCritical
 
-		framework.ExpectEqual(kubelettypes.IsCriticalPod(pod), true, "pod should be a critical pod")
+		if !kubelettypes.IsCriticalPod(pod) {
+			ginkgo.Fail("pod should be a critical pod")
+		}
 	} else {
-		framework.ExpectEqual(kubelettypes.IsCriticalPod(pod), false, "pod should not be a critical pod")
+		if kubelettypes.IsCriticalPod(pod) {
+			ginkgo.Fail("pod should not be a critical pod")
+		}
 	}
 	return pod
 }

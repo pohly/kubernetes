@@ -192,9 +192,9 @@ var _ = SIGDescribe("StatefulSet", func() {
 			pod := pods.Items[0]
 			controllerRef := metav1.GetControllerOf(&pod)
 			gomega.Expect(controllerRef).ToNot(gomega.BeNil())
-			framework.ExpectEqual(controllerRef.Kind, ss.Kind)
-			framework.ExpectEqual(controllerRef.Name, ss.Name)
-			framework.ExpectEqual(controllerRef.UID, ss.UID)
+			gomega.Expect(controllerRef.Kind).To(gomega.Equal(ss.Kind))
+			gomega.Expect(controllerRef.Name).To(gomega.Equal(ss.Name))
+			gomega.Expect(controllerRef.UID).To(gomega.Equal(ss.UID))
 
 			ginkgo.By("Orphaning one of the stateful set's pods")
 			e2epod.NewPodClient(f).Update(ctx, pod.Name, func(pod *v1.Pod) {
@@ -859,8 +859,8 @@ var _ = SIGDescribe("StatefulSet", func() {
 			if err != nil {
 				framework.Failf("Failed to get scale subresource: %v", err)
 			}
-			framework.ExpectEqual(scale.Spec.Replicas, int32(1))
-			framework.ExpectEqual(scale.Status.Replicas, int32(1))
+			gomega.Expect(scale.Spec.Replicas).To(gomega.Equal(int32(1)))
+			gomega.Expect(scale.Status.Replicas).To(gomega.Equal(int32(1)))
 
 			ginkgo.By("updating a scale subresource")
 			scale.ResourceVersion = "" // indicate the scale update should be unconditional
@@ -869,14 +869,14 @@ var _ = SIGDescribe("StatefulSet", func() {
 			if err != nil {
 				framework.Failf("Failed to put scale subresource: %v", err)
 			}
-			framework.ExpectEqual(scaleResult.Spec.Replicas, int32(2))
+			gomega.Expect(scaleResult.Spec.Replicas).To(gomega.Equal(int32(2)))
 
 			ginkgo.By("verifying the statefulset Spec.Replicas was modified")
 			ss, err = c.AppsV1().StatefulSets(ns).Get(ctx, ssName, metav1.GetOptions{})
 			if err != nil {
 				framework.Failf("Failed to get statefulset resource: %v", err)
 			}
-			framework.ExpectEqual(*(ss.Spec.Replicas), int32(2))
+			gomega.Expect(*(ss.Spec.Replicas)).To(gomega.Equal(int32(2)))
 
 			ginkgo.By("Patch a scale subresource")
 			scale.ResourceVersion = "" // indicate the scale update should be unconditional
@@ -894,7 +894,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ginkgo.By("verifying the statefulset Spec.Replicas was modified")
 			ss, err = c.AppsV1().StatefulSets(ns).Get(ctx, ssName, metav1.GetOptions{})
 			framework.ExpectNoError(err, "Failed to get statefulset resource: %v", err)
-			framework.ExpectEqual(*(ss.Spec.Replicas), int32(4), "statefulset should have 4 replicas")
+			gomega.Expect(*(ss.Spec.Replicas)).To(gomega.Equal(int32(4)), "statefulset should have 4 replicas")
 		})
 
 		/*
@@ -947,15 +947,15 @@ var _ = SIGDescribe("StatefulSet", func() {
 			framework.ExpectNoError(err, "failed to patch Set")
 			ss, err = c.AppsV1().StatefulSets(ns).Get(ctx, ssName, metav1.GetOptions{})
 			framework.ExpectNoError(err, "Failed to get statefulset resource: %v", err)
-			framework.ExpectEqual(*(ss.Spec.Replicas), ssPatchReplicas, "statefulset should have 2 replicas")
-			framework.ExpectEqual(ss.Spec.Template.Spec.Containers[0].Image, ssPatchImage, "statefulset not using ssPatchImage. Is using %v", ss.Spec.Template.Spec.Containers[0].Image)
+			gomega.Expect(*(ss.Spec.Replicas)).To(gomega.Equal(ssPatchReplicas), "statefulset should have 2 replicas")
+			gomega.Expect(ss.Spec.Template.Spec.Containers[0].Image).To(gomega.Equal(ssPatchImage), "statefulset not using ssPatchImage. Is using %v", ss.Spec.Template.Spec.Containers[0].Image)
 			e2estatefulset.WaitForRunningAndReady(ctx, c, *ss.Spec.Replicas, ss)
 			waitForStatus(ctx, c, ss)
 
 			ginkgo.By("Listing all StatefulSets")
 			ssList, err := c.AppsV1().StatefulSets("").List(ctx, metav1.ListOptions{LabelSelector: "test-ss=patched"})
 			framework.ExpectNoError(err, "failed to list StatefulSets")
-			framework.ExpectEqual(len(ssList.Items), 1, "filtered list wasn't found")
+			gomega.Expect(ssList.Items).To(gomega.HaveLen(1), "filtered list wasn't found")
 
 			ginkgo.By("Delete all of the StatefulSets")
 			err = c.AppsV1().StatefulSets(ns).DeleteCollection(ctx, metav1.DeleteOptions{GracePeriodSeconds: &one}, metav1.ListOptions{LabelSelector: "test-ss=patched"})
@@ -964,7 +964,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ginkgo.By("Verify that StatefulSets have been deleted")
 			ssList, err = c.AppsV1().StatefulSets("").List(ctx, metav1.ListOptions{LabelSelector: "test-ss=patched"})
 			framework.ExpectNoError(err, "failed to list StatefulSets")
-			framework.ExpectEqual(len(ssList.Items), 0, "filtered list should have no Statefulsets")
+			gomega.Expect(ssList.Items).To(gomega.BeEmpty(), "filtered list should have no Statefulsets")
 		})
 
 		/*
@@ -1634,7 +1634,7 @@ func rollbackTest(ctx context.Context, c clientset.Interface, ns string, ss *app
 	framework.ExpectNoError(err)
 	ss = waitForStatus(ctx, c, ss)
 	currentRevision, updateRevision = ss.Status.CurrentRevision, ss.Status.UpdateRevision
-	framework.ExpectEqual(priorRevision, updateRevision, "Prior revision should equal update revision during roll back")
+	gomega.Expect(priorRevision).To(gomega.Equal(updateRevision), "Prior revision should equal update revision during roll back")
 	framework.ExpectNotEqual(currentRevision, updateRevision, "Current revision should not equal update revision during roll back")
 
 	ginkgo.By("Rolling back update in reverse ordinal order")

@@ -95,7 +95,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 				if len(lastRV) == 0 {
 					lastRV = list.ResourceVersion
 				}
-				framework.ExpectEqual(list.ResourceVersion, lastRV)
+				gomega.Expect(list.ResourceVersion).To(gomega.Equal(lastRV))
 				if shouldCheckRemainingItem() {
 					if list.GetContinue() == "" {
 						gomega.Expect(list.GetRemainingItemCount()).To(gomega.BeNil())
@@ -105,7 +105,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 					}
 				}
 				for _, item := range list.Items {
-					framework.ExpectEqual(item.Name, fmt.Sprintf("template-%04d", found))
+					gomega.Expect(item.Name).To(gomega.Equal(fmt.Sprintf("template-%04d", found)))
 					found++
 				}
 				if len(list.Continue) == 0 {
@@ -188,7 +188,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 			}
 		}
 		for _, item := range list.Items {
-			framework.ExpectEqual(item.Name, fmt.Sprintf("template-%04d", found))
+			gomega.Expect(item.Name).To(gomega.Equal(fmt.Sprintf("template-%04d", found)))
 			found++
 		}
 
@@ -208,9 +208,9 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 			}
 			framework.Logf("Retrieved %d/%d results with rv %s and continue %s", len(list.Items), opts.Limit, list.ResourceVersion, list.Continue)
 			gomega.Expect(len(list.Items)).To(gomega.BeNumerically("<=", opts.Limit))
-			framework.ExpectEqual(list.ResourceVersion, lastRV)
+			gomega.Expect(list.ResourceVersion).To(gomega.Equal(lastRV))
 			for _, item := range list.Items {
-				framework.ExpectEqual(item.Name, fmt.Sprintf("template-%04d", found))
+				gomega.Expect(item.Name).To(gomega.Equal(fmt.Sprintf("template-%04d", found)))
 				found++
 			}
 			if len(list.Continue) == 0 {

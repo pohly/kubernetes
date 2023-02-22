@@ -21,6 +21,8 @@ import (
 	"fmt"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+
 	authenticationv1alpha1 "k8s.io/api/authentication/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -115,16 +117,16 @@ var _ = SIGDescribe("SelfSubjectReview [Feature:APISelfSubjectReview]", func() {
 			res, err := ssrClient.Create(ctx, &authenticationv1alpha1.SelfSubjectReview{}, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
-			framework.ExpectEqual(config.Impersonate.UserName, res.Status.UserInfo.Username)
-			framework.ExpectEqual(config.Impersonate.UID, res.Status.UserInfo.UID)
-			framework.ExpectEqual(config.Impersonate.Groups, res.Status.UserInfo.Groups)
+			gomega.Expect(config.Impersonate.UserName).To(gomega.Equal(res.Status.UserInfo.Username))
+			gomega.Expect(config.Impersonate.UID).To(gomega.Equal(res.Status.UserInfo.UID))
+			gomega.Expect(config.Impersonate.Groups).To(gomega.Equal(res.Status.UserInfo.Groups))
 
 			extra := make(map[string][]string, len(res.Status.UserInfo.Extra))
 			for k, v := range res.Status.UserInfo.Extra {
 				extra[k] = v
 			}
 
-			framework.ExpectEqual(config.Impersonate.Extra, extra)
+			gomega.Expect(config.Impersonate.Extra).To(gomega.Equal(extra))
 		}
 	})
 })

@@ -166,7 +166,7 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 					framework.ExpectNoError(err, "while waiting for PVC resize to finish")
 
 					pvcConditions := pvc.Status.Conditions
-					framework.ExpectEqual(len(pvcConditions), 0, "pvc should not have conditions")
+					gomega.Expect(pvcConditions).To(gomega.BeEmpty(), "pvc should not have conditions")
 				}
 
 				// if node expansion is not required PVC should be resized as well
@@ -180,7 +180,7 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 
 					inProgressConditions := pvc.Status.Conditions
 					if len(inProgressConditions) > 0 {
-						framework.ExpectEqual(inProgressConditions[0].Type, v1.PersistentVolumeClaimFileSystemResizePending, "pvc must have fs resizing condition")
+						gomega.Expect(inProgressConditions[0].Type).To(gomega.Equal(v1.PersistentVolumeClaimFileSystemResizePending), "pvc must have fs resizing condition")
 					}
 
 					ginkgo.By("Deleting the previously created pod")
@@ -258,7 +258,7 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 				framework.ExpectNoError(err, "while waiting for PVC to finish")
 
 				pvcConditions := pvc.Status.Conditions
-				framework.ExpectEqual(len(pvcConditions), 0, "pvc should not have conditions")
+				gomega.Expect(pvcConditions).To(gomega.BeEmpty(), "pvc should not have conditions")
 
 			})
 		}
@@ -396,7 +396,7 @@ func validateExpansionSuccess(ctx context.Context, pvc *v1.PersistentVolumeClaim
 	framework.ExpectNoError(err, "while waiting for PVC to finish")
 
 	pvcConditions := pvc.Status.Conditions
-	framework.ExpectEqual(len(pvcConditions), 0, "pvc should not have conditions")
+	gomega.Expect(pvcConditions).To(gomega.BeEmpty(), "pvc should not have conditions")
 	allocatedResource := pvc.Status.AllocatedResources.Storage()
 	gomega.Expect(allocatedResource).NotTo(gomega.BeNil())
 	expectedAllocatedResource := resource.MustParse(expectedAllocatedSize)
@@ -406,7 +406,7 @@ func validateExpansionSuccess(ctx context.Context, pvc *v1.PersistentVolumeClaim
 
 	resizeStatus := pvc.Status.ResizeStatus
 	gomega.Expect(resizeStatus).NotTo(gomega.BeNil(), "resize status should not be nil")
-	framework.ExpectEqual(*resizeStatus, v1.PersistentVolumeClaimNoExpansionInProgress, "resize status should be empty")
+	gomega.Expect(*resizeStatus).To(gomega.Equal(v1.PersistentVolumeClaimNoExpansionInProgress), "resize status should be empty")
 }
 
 func waitForResizeStatus(pvc *v1.PersistentVolumeClaim, c clientset.Interface, expectedStates ...v1.PersistentVolumeClaimResizeStatus) error {

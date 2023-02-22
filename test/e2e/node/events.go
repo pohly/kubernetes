@@ -21,6 +21,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -30,8 +33,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
-
-	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = SIGDescribe("Events", func() {
@@ -81,7 +82,7 @@ var _ = SIGDescribe("Events", func() {
 		options := metav1.ListOptions{LabelSelector: selector.String()}
 		pods, err := podClient.List(ctx, options)
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(pods.Items), 1)
+		gomega.Expect(pods.Items).To(gomega.HaveLen(1))
 
 		ginkgo.By("retrieving the pod")
 		podWithUID, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})

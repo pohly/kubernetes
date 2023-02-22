@@ -21,6 +21,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+	"github.com/onsi/gomega/gmeasure"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -28,9 +32,6 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	admissionapi "k8s.io/pod-security-admission/api"
-
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega/gmeasure"
 )
 
 var _ = SIGDescribe("[Feature:ClusterSizeAutoscalingScaleUp] [Slow] Autoscaling", func() {
@@ -73,7 +74,7 @@ var _ = SIGDescribe("[Feature:ClusterSizeAutoscalingScaleUp] [Slow] Autoscaling"
 				nodes, err = e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
 				framework.ExpectNoError(err)
 				schedulableCount := len(nodes.Items)
-				framework.ExpectEqual(schedulableCount, nodeGroupSize, "not all nodes are schedulable")
+				gomega.Expect(schedulableCount).To(gomega.Equal(nodeGroupSize), "not all nodes are schedulable")
 			})
 
 			ginkgo.AfterEach(func(ctx context.Context) {

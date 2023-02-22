@@ -24,7 +24,8 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/utils/pointer"
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -49,8 +50,7 @@ import (
 	"k8s.io/kubernetes/test/utils/crd"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
-
-	"github.com/onsi/ginkgo/v2"
+	"k8s.io/utils/pointer"
 
 	// ensure libs have a chance to initialize
 	_ "github.com/stretchr/testify/assert"
@@ -148,7 +148,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 			group := &metav1.APIGroup{}
 			err := client.Discovery().RESTClient().Get().AbsPath("/apis/admissionregistration.k8s.io").Do(ctx).Into(group)
 			framework.ExpectNoError(err, "fetching /apis/admissionregistration.k8s.io")
-			framework.ExpectEqual(group.Name, admissionregistrationv1.GroupName, "verifying API group name in /apis/admissionregistration.k8s.io discovery document")
+			gomega.Expect(group.Name).To(gomega.Equal(admissionregistrationv1.GroupName), "verifying API group name in /apis/admissionregistration.k8s.io discovery document")
 
 			ginkgo.By("finding the admissionregistration.k8s.io/v1 API group/version in the /apis/admissionregistration.k8s.io discovery document")
 			var version *metav1.GroupVersionForDiscovery
@@ -166,7 +166,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 			apiResourceList := &metav1.APIResourceList{}
 			err := client.Discovery().RESTClient().Get().AbsPath("/apis/admissionregistration.k8s.io/v1").Do(ctx).Into(apiResourceList)
 			framework.ExpectNoError(err, "fetching /apis/admissionregistration.k8s.io/v1")
-			framework.ExpectEqual(apiResourceList.GroupVersion, admissionregistrationv1.SchemeGroupVersion.String(), "verifying API group/version in /apis/admissionregistration.k8s.io/v1 discovery document")
+			gomega.Expect(apiResourceList.GroupVersion).To(gomega.Equal(admissionregistrationv1.SchemeGroupVersion.String()), "verifying API group/version in /apis/admissionregistration.k8s.io/v1 discovery document")
 
 			ginkgo.By("finding mutatingwebhookconfigurations and validatingwebhookconfigurations resources in the /apis/admissionregistration.k8s.io/v1 discovery document")
 			var (
@@ -591,7 +591,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		ginkgo.By("Listing all of the created validation webhooks")
 		list, err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().List(ctx, selectorListOpts)
 		framework.ExpectNoError(err, "Listing validating webhook configurations")
-		framework.ExpectEqual(len(list.Items), testListSize)
+		gomega.Expect(list.Items).To(gomega.HaveLen(testListSize))
 
 		// ensure backend is ready before proceeding
 		err = waitWebhookConfigurationReady(ctx, f, markersNamespaceName)
@@ -665,7 +665,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		ginkgo.By("Listing all of the created validation webhooks")
 		list, err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().List(ctx, selectorListOpts)
 		framework.ExpectNoError(err, "Listing mutating webhook configurations")
-		framework.ExpectEqual(len(list.Items), testListSize)
+		gomega.Expect(list.Items).To(gomega.HaveLen(testListSize))
 
 		// ensure backend is ready before proceeding
 		err = waitWebhookConfigurationReady(ctx, f, markersNamespaceName)

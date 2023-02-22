@@ -21,6 +21,9 @@ import (
 	"fmt"
 	"path"
 
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -32,8 +35,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
-
-	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = utils.SIGDescribe("HostPathType Directory [Slow]", func() {
@@ -478,7 +479,7 @@ func verifyPodHostPathTypeFailure(ctx context.Context, f *framework.Framework, n
 	// Check the pod is still not running
 	p, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "could not re-read the pod after event (or timeout)")
-	framework.ExpectEqual(p.Status.Phase, v1.PodPending, "Pod phase isn't pending")
+	gomega.Expect(p.Status.Phase).To(gomega.Equal(v1.PodPending), "Pod phase isn't pending")
 
 	f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(ctx, pod.Name, *metav1.NewDeleteOptions(0))
 }

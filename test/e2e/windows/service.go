@@ -22,6 +22,9 @@ import (
 	"net"
 	"strconv"
 
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+
 	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 
@@ -31,8 +34,6 @@ import (
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	admissionapi "k8s.io/pod-security-admission/api"
-
-	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = SIGDescribe("Services", func() {
@@ -79,7 +80,7 @@ var _ = SIGDescribe("Services", func() {
 
 		ginkgo.By("verifying that pod has the correct nodeSelector")
 		// Admission controllers may sometimes do the wrong thing
-		framework.ExpectEqual(testPod.Spec.NodeSelector["kubernetes.io/os"], "windows")
+		gomega.Expect(testPod.Spec.NodeSelector["kubernetes.io/os"]).To(gomega.Equal("windows"))
 
 		ginkgo.By(fmt.Sprintf("checking connectivity Pod to curl http://%s:%d", nodeIP, nodePort))
 		assertConsistentConnectivity(ctx, f, testPod.ObjectMeta.Name, windowsOS, windowsCheck(fmt.Sprintf("http://%s", net.JoinHostPort(nodeIP, strconv.Itoa(nodePort)))))

@@ -448,7 +448,7 @@ var _ = ginkgo.Describe("[sig-node] DRA [Feature:DynamicResourceAllocation]", fu
 					framework.Fail("first pod should be running on node, was not scheduled")
 				}
 				framework.ExpectNotEqual(pod1.Spec.NodeName, node, "first pod should run on different node than second one")
-				framework.ExpectEqual(driver.Controller.GetNumDeallocations(), int64(1), "number of deallocations")
+				gomega.Expect(driver.Controller.GetNumDeallocations()).To(gomega.Equal(int64(1)), "number of deallocations")
 			})
 		})
 	})

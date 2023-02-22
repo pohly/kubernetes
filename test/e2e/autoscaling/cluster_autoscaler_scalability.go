@@ -24,6 +24,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -38,8 +41,6 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
-
-	"github.com/onsi/ginkgo/v2"
 )
 
 const (
@@ -102,7 +103,7 @@ var _ = SIGDescribe("Cluster size autoscaler scalability [Slow]", func() {
 		coresPerNode = int((&cpu).MilliValue() / 1000)
 		memCapacityMb = int((&mem).Value() / 1024 / 1024)
 
-		framework.ExpectEqual(nodeCount, sum)
+		gomega.Expect(nodeCount).To(gomega.Equal(sum))
 
 		if framework.ProviderIs("gke") {
 			val, err := isAutoscalerEnabled(3)
@@ -329,7 +330,7 @@ var _ = SIGDescribe("Cluster size autoscaler scalability [Slow]", func() {
 		nodes, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
 		framework.ExpectNoError(err)
 		klog.Infof("Nodes: %v, expected: %v", len(nodes.Items), totalNodes)
-		framework.ExpectEqual(len(nodes.Items), totalNodes)
+		gomega.Expect(nodes.Items).To(gomega.HaveLen(totalNodes))
 	})
 
 	ginkgo.It("CA ignores unschedulable pods while scheduling schedulable pods [Feature:ClusterAutoscalerScalability6]", func(ctx context.Context) {
@@ -353,7 +354,7 @@ var _ = SIGDescribe("Cluster size autoscaler scalability [Slow]", func() {
 
 		// Ensure that no new nodes have been added so far.
 		readyNodeCount, _ := e2enode.TotalReady(ctx, f.ClientSet)
-		framework.ExpectEqual(readyNodeCount, nodeCount)
+		gomega.Expect(readyNodeCount).To(gomega.Equal(nodeCount))
 
 		// Start a number of schedulable pods to ensure CA reacts.
 		additionalNodes := maxNodes - nodeCount

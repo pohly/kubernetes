@@ -19,8 +19,10 @@ package node
 import (
 	"context"
 	"encoding/json"
-
 	"time"
+
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,8 +34,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
-
-	"github.com/onsi/ginkgo/v2"
 )
 
 const (
@@ -59,7 +59,7 @@ var _ = SIGDescribe("PodTemplates", func() {
 			LabelSelector: "podtemplate-static=true",
 		})
 		framework.ExpectNoError(err, "failed to list all PodTemplates")
-		framework.ExpectEqual(len(podTemplateList.Items), 0, "unable to find templates")
+		gomega.Expect(podTemplateList.Items).To(gomega.BeEmpty(), "got unexpected templates")
 
 		// create a PodTemplate
 		_, err = f.ClientSet.CoreV1().PodTemplates(testNamespaceName).Create(ctx, &v1.PodTemplate{
@@ -82,7 +82,7 @@ var _ = SIGDescribe("PodTemplates", func() {
 		// get template
 		podTemplateRead, err := f.ClientSet.CoreV1().PodTemplates(testNamespaceName).Get(ctx, podTemplateName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to get created PodTemplate")
-		framework.ExpectEqual(podTemplateRead.ObjectMeta.Name, podTemplateName)
+		gomega.Expect(podTemplateRead.ObjectMeta.Name).To(gomega.Equal(podTemplateName))
 
 		// patch template
 		podTemplatePatch, err := json.Marshal(map[string]interface{}{
@@ -99,7 +99,7 @@ var _ = SIGDescribe("PodTemplates", func() {
 		// get template (ensure label is there)
 		podTemplateRead, err = f.ClientSet.CoreV1().PodTemplates(testNamespaceName).Get(ctx, podTemplateName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to get PodTemplate")
-		framework.ExpectEqual(podTemplateRead.ObjectMeta.Labels["podtemplate"], "patched", "failed to patch template, new label not found")
+		gomega.Expect(podTemplateRead.ObjectMeta.Labels["podtemplate"]).To(gomega.Equal("patched"), "failed to patch template, new label not found")
 
 		// delete the PodTemplate
 		err = f.ClientSet.CoreV1().PodTemplates(testNamespaceName).Delete(ctx, podTemplateName, metav1.DeleteOptions{})
@@ -110,7 +110,7 @@ var _ = SIGDescribe("PodTemplates", func() {
 			LabelSelector: "podtemplate-static=true",
 		})
 		framework.ExpectNoError(err, "failed to list PodTemplate")
-		framework.ExpectEqual(len(podTemplateList.Items), 0, "PodTemplate list returned items, failed to delete PodTemplate")
+		gomega.Expect(podTemplateList.Items).To(gomega.BeEmpty(), "PodTemplate list returned items, failed to delete PodTemplate")
 	})
 
 	/*
@@ -149,7 +149,7 @@ var _ = SIGDescribe("PodTemplates", func() {
 		})
 		framework.ExpectNoError(err, "failed to get a list of pod templates")
 
-		framework.ExpectEqual(len(podTemplateList.Items), len(podTemplateNames), "looking for expected number of pod templates")
+		gomega.Expect(podTemplateList.Items).To(gomega.HaveLen(len(podTemplateNames)), "looking for expected number of pod templates")
 
 		ginkgo.By("delete collection of pod templates")
 		// delete collection
@@ -205,7 +205,7 @@ var _ = SIGDescribe("PodTemplates", func() {
 			return err
 		})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(updatedPT.Annotations["updated"], "true", "updated object should have the applied annotation")
+		gomega.Expect(updatedPT.Annotations["updated"]).To(gomega.Equal("true"), "updated object should have the applied annotation")
 		framework.Logf("Found updated podtemplate annotation: %#v\n", updatedPT.Annotations["updated"])
 	})
 

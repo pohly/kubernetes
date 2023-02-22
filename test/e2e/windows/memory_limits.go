@@ -96,7 +96,7 @@ func checkNodeAllocatableTest(ctx context.Context, f *framework.Framework) {
 	ginkgo.By(fmt.Sprintf("Checking stated allocatable memory %v against calculated allocatable memory %v", &nodeMem.allocatable, calculatedNodeAlloc))
 
 	// sanity check against stated allocatable
-	framework.ExpectEqual(calculatedNodeAlloc.Cmp(nodeMem.allocatable), 0)
+	gomega.Expect(calculatedNodeAlloc.Cmp(nodeMem.allocatable)).To(gomega.Equal(0))
 }
 
 // Deploys `allocatablePods + 1` pods, each with a memory limit of `1/allocatablePods` of the total allocatable

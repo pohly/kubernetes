@@ -19,6 +19,9 @@ package storage
 import (
 	"context"
 
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -29,8 +32,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
-
-	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = utils.SIGDescribe("CSIInlineVolumes", func() {
@@ -94,15 +95,15 @@ var _ = utils.SIGDescribe("CSIInlineVolumes", func() {
 		ginkgo.By("getting")
 		retrievedDriver1, err := client.Get(ctx, createdDriver1.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(retrievedDriver1.UID, createdDriver1.UID)
+		gomega.Expect(retrievedDriver1.UID).To(gomega.Equal(createdDriver1.UID))
 		retrievedDriver2, err := client.Get(ctx, createdDriver2.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(retrievedDriver2.UID, createdDriver2.UID)
+		gomega.Expect(retrievedDriver2.UID).To(gomega.Equal(createdDriver2.UID))
 
 		ginkgo.By("listing")
 		driverList, err := client.List(ctx, metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(driverList.Items), 2, "filtered list should have 2 items, got: %s", driverList)
+		gomega.Expect(driverList.Items).To(gomega.HaveLen(2), "filtered list should have 2 items, got: %s", driverList)
 
 		ginkgo.By("deleting")
 		for _, driver := range driverList.Items {
@@ -198,17 +199,17 @@ var _ = utils.SIGDescribe("CSIInlineVolumes", func() {
 		ginkgo.By("getting")
 		retrievedPod, err := client.Get(ctx, podName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(retrievedPod.UID, createdPod.UID)
+		gomega.Expect(retrievedPod.UID).To(gomega.Equal(createdPod.UID))
 
 		ginkgo.By("listing in namespace")
 		podList, err := client.List(ctx, metav1.ListOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(podList.Items), 1, "list should have 1 items, got: %s", podList)
+		gomega.Expect(podList.Items).To(gomega.HaveLen(1), "list should have 1 items, got: %s", podList)
 
 		ginkgo.By("patching")
 		patchedPod, err := client.Patch(ctx, createdPod.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"patched":"true"}}}`), metav1.PatchOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(patchedPod.Annotations["patched"], "true", "patched object should have the applied annotation")
+		gomega.Expect(patchedPod.Annotations["patched"]).To(gomega.Equal("true"), "patched object should have the applied annotation")
 
 		ginkgo.By("deleting")
 		err = client.Delete(ctx, createdPod.Name, metav1.DeleteOptions{})

@@ -22,6 +22,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+
 	v1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -38,8 +41,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/network/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
-
-	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = common.SIGDescribe("EndpointSlice", func() {
@@ -433,12 +434,12 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		ginkgo.By("getting")
 		queriedEPS, err := epsClient.Get(ctx, createdEPS.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(queriedEPS.UID, createdEPS.UID)
+		gomega.Expect(queriedEPS.UID).To(gomega.Equal(createdEPS.UID))
 
 		ginkgo.By("listing")
 		epsList, err := epsClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(epsList.Items), 3, "filtered list should have 3 items")
+		gomega.Expect(epsList.Items).To(gomega.HaveLen(3), "filtered list should have 3 items")
 
 		ginkgo.By("watching")
 		framework.Logf("starting watch")
@@ -450,7 +451,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		ginkgo.By("cluster-wide listing")
 		clusterEPSList, err := clusterEPSClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(clusterEPSList.Items), 3, "filtered list should have 3 items")
+		gomega.Expect(clusterEPSList.Items).To(gomega.HaveLen(3), "filtered list should have 3 items")
 
 		ginkgo.By("cluster-wide watching")
 		framework.Logf("starting watch")
@@ -460,7 +461,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		ginkgo.By("patching")
 		patchedEPS, err := epsClient.Patch(ctx, createdEPS.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"patched":"true"}}}`), metav1.PatchOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(patchedEPS.Annotations["patched"], "true", "patched object should have the applied annotation")
+		gomega.Expect(patchedEPS.Annotations["patched"]).To(gomega.Equal("true"), "patched object should have the applied annotation")
 
 		ginkgo.By("updating")
 		var epsToUpdate, updatedEPS *discoveryv1.EndpointSlice
@@ -474,7 +475,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 			return err
 		})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(updatedEPS.Annotations["updated"], "true", "updated object should have the applied annotation")
+		gomega.Expect(updatedEPS.Annotations["updated"]).To(gomega.Equal("true"), "updated object should have the applied annotation")
 
 		framework.Logf("waiting for watch events with expected annotations")
 		for sawAnnotations := false; !sawAnnotations; {
@@ -483,7 +484,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 				if !ok {
 					framework.Fail("watch channel should not close")
 				}
-				framework.ExpectEqual(evt.Type, watch.Modified)
+				gomega.Expect(evt.Type).To(gomega.Equal(watch.Modified))
 				watchedEPS, isEPS := evt.Object.(*discoveryv1.EndpointSlice)
 				if !isEPS {
 					framework.Failf("expected EndpointSlice, got %T", evt.Object)
@@ -510,7 +511,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		}
 		epsList, err = epsClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(epsList.Items), 2, "filtered list should have 2 items")
+		gomega.Expect(epsList.Items).To(gomega.HaveLen(2), "filtered list should have 2 items")
 		for _, eps := range epsList.Items {
 			if eps.Namespace == createdEPS.Namespace && eps.Name == createdEPS.Name {
 				framework.Fail("listing after deleting createdEPS")
@@ -522,7 +523,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		framework.ExpectNoError(err)
 		epsList, err = epsClient.List(ctx, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(epsList.Items), 0, "filtered list should have 0 items")
+		gomega.Expect(epsList.Items).To(gomega.BeEmpty(), "filtered list should have 0 items")
 	})
 })
 

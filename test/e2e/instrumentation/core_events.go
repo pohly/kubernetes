@@ -21,17 +21,18 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/instrumentation/common"
 	admissionapi "k8s.io/pod-security-admission/api"
-
-	"github.com/onsi/ginkgo/v2"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 const (
@@ -114,7 +115,7 @@ var _ = common.SIGDescribe("Events", func() {
 		// get event by name
 		event, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).Get(ctx, eventCreatedName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to fetch the test event")
-		framework.ExpectEqual(event.Message, eventPatchMessage, "test event message does not match patch message")
+		gomega.Expect(event.Message).To(gomega.Equal(eventPatchMessage), "test event message does not match patch message")
 
 		ginkgo.By("updating the test event")
 
@@ -204,7 +205,7 @@ var _ = common.SIGDescribe("Events", func() {
 		})
 		framework.ExpectNoError(err, "failed to get a list of events")
 
-		framework.ExpectEqual(len(eventList.Items), len(eventTestNames), "looking for expected number of pod templates events")
+		gomega.Expect(eventList.Items).To(gomega.HaveLen(len(eventTestNames)), "looking for expected number of pod templates events")
 
 		ginkgo.By("delete collection of events")
 		// delete collection

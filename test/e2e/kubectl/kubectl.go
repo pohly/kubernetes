@@ -430,7 +430,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 				veryLongData[i] = 'a'
 			}
 			execOutput = e2ekubectl.RunKubectlOrDie(ns, "exec", podRunningTimeoutArg, simplePodName, "--", "echo", string(veryLongData))
-			framework.ExpectEqual(string(veryLongData), strings.TrimSpace(execOutput), "Unexpected kubectl exec output")
+			gomega.Expect(string(veryLongData)).To(gomega.Equal(strings.TrimSpace(execOutput)), "Unexpected kubectl exec output")
 
 			ginkgo.By("executing a command in the container with noninteractive stdin")
 			execOutput = e2ekubectl.NewKubectlCommand(ns, "exec", "-i", podRunningTimeoutArg, simplePodName, "--", "cat").
@@ -541,7 +541,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 				if !ok {
 					framework.Failf("Got unexpected error type, expected uexec.ExitError, got %T: %v", err, err)
 				}
-				framework.ExpectEqual(ee.ExitStatus(), 42)
+				gomega.Expect(ee.ExitStatus()).To(gomega.Equal(42))
 			})
 
 			ginkgo.It("should support port-forward", func(ctx context.Context) {
@@ -707,7 +707,7 @@ metadata:
 				if !ok {
 					framework.Failf("Got unexpected error type, expected uexec.ExitError, got %T: %v", err, err)
 				}
-				framework.ExpectEqual(ee.ExitStatus(), 42)
+				gomega.Expect(ee.ExitStatus()).To(gomega.Equal(42))
 			})
 
 			ginkgo.It("[Slow] running a failing command without --restart=Never", func(ctx context.Context) {

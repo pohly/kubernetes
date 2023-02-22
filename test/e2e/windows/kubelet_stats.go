@@ -21,6 +21,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -32,8 +35,6 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
-
-	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats [Serial]", func() {
@@ -97,7 +98,7 @@ var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats [Serial]", func() {
 							}
 						}
 					}
-					framework.ExpectEqual(statsChecked, 10, "Should find stats for 10 pods in kubelet stats")
+					gomega.Expect(statsChecked).To(gomega.Equal(10), "Should find stats for 10 pods in kubelet stats")
 
 					time.Sleep(5 * time.Second)
 				}
@@ -188,7 +189,7 @@ var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats", func() {
 							}
 						}
 					}
-					framework.ExpectEqual(statsChecked, 3, "Should find stats for 10 pods in kubelet stats")
+					gomega.Expect(statsChecked).To(gomega.Equal(3), "Should find stats for 10 pods in kubelet stats")
 
 					time.Sleep(5 * time.Second)
 				}

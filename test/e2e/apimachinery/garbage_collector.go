@@ -23,6 +23,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
@@ -43,10 +46,8 @@ import (
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	admissionapi "k8s.io/pod-security-admission/api"
-
-	"github.com/onsi/ginkgo/v2"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 // estimateMaximumPods estimates how many pods the cluster can handle
@@ -926,7 +927,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		if err != nil {
 			framework.Failf("failed to create CustomResourceDefinition: %v", err)
 		}
-		framework.ExpectEqual(len(definition.Spec.Versions), 1, "custom resource definition should have one version")
+		gomega.Expect(definition.Spec.Versions).To(gomega.HaveLen(1), "custom resource definition should have one version")
 		version := definition.Spec.Versions[0]
 
 		// Get a client for the custom resource.
@@ -1061,7 +1062,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		if err != nil {
 			framework.Failf("failed to create CustomResourceDefinition: %v", err)
 		}
-		framework.ExpectEqual(len(definition.Spec.Versions), 1, "custom resource definition should have one version")
+		gomega.Expect(definition.Spec.Versions).To(gomega.HaveLen(1), "custom resource definition should have one version")
 		version := definition.Spec.Versions[0]
 
 		// Get a client for the custom resource.
