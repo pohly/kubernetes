@@ -148,7 +148,7 @@ var _ = SIGDescribe("Sysctls [LinuxOnly] [NodeConformance]", func() {
 		client := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
 		_, err := client.Create(ctx, pod, metav1.CreateOptions{})
 
-		gomega.Expect(err).NotTo(gomega.BeNil())
+		framework.ExpectNoError(err)
 		gomega.Expect(err.Error()).To(gomega.ContainSubstring(`Invalid value: "foo-"`))
 		gomega.Expect(err.Error()).To(gomega.ContainSubstring(`Invalid value: "bar.."`))
 		gomega.Expect(err.Error()).NotTo(gomega.ContainSubstring(`safe-and-unsafe`))
