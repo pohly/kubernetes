@@ -170,8 +170,6 @@ func (gb *GraphBuilder) controllerFor(logger klog.Logger, resource schema.GroupV
 		},
 	}
 
-	logger = klog.LoggerWithValues(logger, "resource", resource, "kind", kind)
-
 	shared, err := gb.sharedInformers.ForResource(resource)
 	if err != nil {
 		logger.V(4).Error(err, "unable to use a shared informer", "resource", resource, "kind", kind)
@@ -586,8 +584,6 @@ func (gb *GraphBuilder) addUnblockedOwnersToDeleteQueue(logger klog.Logger, remo
 }
 
 func (gb *GraphBuilder) processTransitions(logger klog.Logger, oldObj interface{}, newAccessor metav1.Object, n *node) {
-	logger = klog.LoggerWithValues(logger, "node", n.identity)
-
 	if startsWaitingForDependentsOrphaned(oldObj, newAccessor) {
 		logger.V(5).Info("add node to attemptToOrphan", "node", n.identity)
 		gb.attemptToOrphan.Add(n)

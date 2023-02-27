@@ -83,8 +83,6 @@ func (gc *GarbageCollector) patchObject(item objectReference, patch []byte, pt t
 }
 
 func (gc *GarbageCollector) removeFinalizer(logger klog.Logger, owner *node, targetFinalizer string) error {
-	logger = klog.LoggerWithValues(logger, "finalizer", targetFinalizer, "object", owner.identity)
-
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		ownerObject, err := gc.getObject(owner.identity)
 		if errors.IsNotFound(err) {
@@ -108,7 +106,7 @@ func (gc *GarbageCollector) removeFinalizer(logger klog.Logger, owner *node, tar
 			newFinalizers = append(newFinalizers, f)
 		}
 		if !found {
-			logger.V(5).Info("finalizer already removed from object")
+			logger.V(5).Info("finalizer already removed from object", "finalizer", targetFinalizer, "object", owner.identity)
 			return nil
 		}
 
