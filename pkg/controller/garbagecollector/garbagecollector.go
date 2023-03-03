@@ -152,8 +152,8 @@ func (gc *GarbageCollector) Run(ctx context.Context, workers int) {
 	defer gc.eventBroadcaster.Shutdown()
 
 	logger := klog.FromContext(ctx)
-	logger.Info("Starting controller", "controller", "garbage-collector")
-	defer logger.Info("Shutting down controller", "controller", "garbage-collector")
+	logger.Info("Starting controller", "controller", "garbagecollector")
+	defer logger.Info("Shutting down controller", "controller", "garbagecollector")
 
 	graphLogger := klog.LoggerWithName(logger, "graphbuilder")
 	go gc.dependencyGraphBuilder.Run(klog.NewContext(ctx, graphLogger))
@@ -361,13 +361,13 @@ func (gc *GarbageCollector) attemptToDeleteWorker(ctx context.Context, item inte
 		if !existsInGraph {
 			// this can happen if attemptToDelete loops on a requeued virtual node because attemptToDeleteItem returned an error,
 			// and in the meantime a deletion of the real object associated with that uid was observed
-			logger.V(5).Info("item no longer in the graph, skipping attemptToDeleteItem", "item", n)
+			logger.V(5).Info("item no longer in the graph, skipping attemptToDeleteItem", "item", n.identity)
 			return forgetItem
 		}
 		if nodeFromGraph.isObserved() {
 			// this can happen if attemptToDelete loops on a requeued virtual node because attemptToDeleteItem returned an error,
 			// and in the meantime the real object associated with that uid was observed
-			logger.V(5).Info("item no longer virtual in the graph, skipping attemptToDeleteItem on virtual node", "item", n)
+			logger.V(5).Info("item no longer virtual in the graph, skipping attemptToDeleteItem on virtual node", "item", n.identity)
 			return forgetItem
 		}
 	}
@@ -388,7 +388,7 @@ func (gc *GarbageCollector) attemptToDeleteWorker(ctx context.Context, item inte
 			//    have a way to distinguish this from a valid type we will recognize
 			//    after the next discovery sync.
 			// For now, record the error and retry.
-			logger.V(5).Error(err, "error syncing item", "item", n)
+			logger.V(5).Error(err, "error syncing item", "item", n.identity)
 		} else {
 			utilruntime.HandleError(fmt.Errorf("error syncing item %s: %v", n, err))
 		}
@@ -477,7 +477,7 @@ func (gc *GarbageCollector) isDangling(ctx context.Context, reference metav1.Own
 	if owner.GetUID() != reference.UID {
 		logger.V(5).Info("object's owner is not found, UID mismatch",
 			"objectUID", item.identity.UID,
-			"reference", reference,
+			"owner", reference,
 		)
 		gc.absentOwnerCache.Add(absentOwnerCacheKey)
 		return true, nil, nil

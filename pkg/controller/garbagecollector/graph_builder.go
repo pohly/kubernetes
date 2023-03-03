@@ -585,12 +585,12 @@ func (gb *GraphBuilder) addUnblockedOwnersToDeleteQueue(logger klog.Logger, remo
 
 func (gb *GraphBuilder) processTransitions(logger klog.Logger, oldObj interface{}, newAccessor metav1.Object, n *node) {
 	if startsWaitingForDependentsOrphaned(oldObj, newAccessor) {
-		logger.V(5).Info("add node to attemptToOrphan", "node", n.identity)
+		logger.V(5).Info("add item to attemptToOrphan", "item", n.identity)
 		gb.attemptToOrphan.Add(n)
 		return
 	}
 	if startsWaitingForDependentsDeleted(oldObj, newAccessor) {
-		logger.V(2).Info("add node to attemptToDelete, because it's waiting for its dependents to be deleted", "node", n.identity)
+		logger.V(2).Info("add item to attemptToDelete, because it's waiting for its dependents to be deleted", "item", n.identity)
 		// if the n is added as a "virtual" node, its deletingDependents field is not properly set, so always set it here.
 		n.markDeletingDependents()
 		for dep := range n.dependents {
@@ -639,8 +639,7 @@ func (gb *GraphBuilder) processGraphChanges(logger klog.Logger) bool {
 	logger.V(5).Info("GraphBuilder process object",
 		"apiVersion", event.gvk.GroupVersion().String(),
 		"kind", event.gvk.Kind,
-		"namespace", accessor.GetNamespace(),
-		"name", accessor.GetName(),
+		"object", klog.KObj(accessor),
 		"uid", string(accessor.GetUID()),
 		"eventType", event.eventType,
 		"virtual", event.virtual,
@@ -663,8 +662,8 @@ func (gb *GraphBuilder) processGraphChanges(logger klog.Logger) bool {
 			for _, dep := range potentiallyInvalidDependents {
 				if len(observedIdentity.Namespace) > 0 && dep.identity.Namespace != observedIdentity.Namespace {
 					// Namespace mismatch, this is definitely wrong
-					logger.V(2).Info("node references an owner but does not match namespaces",
-						"node", dep.identity,
+					logger.V(2).Info("item references an owner but does not match namespaces",
+						"item", dep.identity,
 						"owner", observedIdentity,
 					)
 					gb.reportInvalidNamespaceOwnerRef(dep, observedIdentity.UID)
@@ -718,8 +717,8 @@ func (gb *GraphBuilder) processGraphChanges(logger klog.Logger) bool {
 		gb.processTransitions(logger, event.oldObj, accessor, existingNode)
 	case event.eventType == deleteEvent:
 		if !found {
-			logger.V(5).Info("node doesn't exist in the graph, this shouldn't happen",
-				"node", accessor.GetUID(),
+			logger.V(5).Info("item doesn't exist in the graph, this shouldn't happen",
+				"item", accessor.GetUID(),
 			)
 			return true
 		}
