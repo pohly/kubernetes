@@ -18,22 +18,22 @@ limitations under the License.
 
 package v1alpha2
 
-// PodSchedulingStatusApplyConfiguration represents an declarative configuration of the PodSchedulingStatus type for use
+// PodSchedulingHintsStatusApplyConfiguration represents an declarative configuration of the PodSchedulingHintsStatus type for use
 // with apply.
-type PodSchedulingStatusApplyConfiguration struct {
+type PodSchedulingHintsStatusApplyConfiguration struct {
 	ResourceClaims []ResourceClaimSchedulingStatusApplyConfiguration `json:"resourceClaims,omitempty"`
 }
 
-// PodSchedulingStatusApplyConfiguration constructs an declarative configuration of the PodSchedulingStatus type for use with
+// PodSchedulingHintsStatusApplyConfiguration constructs an declarative configuration of the PodSchedulingHintsStatus type for use with
 // apply.
-func PodSchedulingStatus() *PodSchedulingStatusApplyConfiguration {
-	return &PodSchedulingStatusApplyConfiguration{}
+func PodSchedulingHintsStatus() *PodSchedulingHintsStatusApplyConfiguration {
+	return &PodSchedulingHintsStatusApplyConfiguration{}
 }
 
 // WithResourceClaims adds the given value to the ResourceClaims field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the ResourceClaims field.
-func (b *PodSchedulingStatusApplyConfiguration) WithResourceClaims(values ...*ResourceClaimSchedulingStatusApplyConfiguration) *PodSchedulingStatusApplyConfiguration {
+func (b *PodSchedulingHintsStatusApplyConfiguration) WithResourceClaims(values ...*ResourceClaimSchedulingStatusApplyConfiguration) *PodSchedulingHintsStatusApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithResourceClaims")
