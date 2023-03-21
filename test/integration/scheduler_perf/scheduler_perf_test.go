@@ -45,6 +45,7 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/restmapper"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -413,6 +414,11 @@ type createPodsOp struct {
 	// Optional
 	PersistentVolumeTemplatePath      *string
 	PersistentVolumeClaimTemplatePath *string
+	// When true, the given number of pods get created, scheduled and
+	// deleted one after the other. This can be used to determine
+	// the latency for getting a single pod running instead of
+	// pod scheduling throughput.
+	Sequentially bool
 }
 
 func (cpo *createPodsOp) isValid(allowParameterization bool) error {
@@ -899,20 +905,28 @@ func runWorkload(ctx context.Context, b *testing.B, tc *testCase, w *workload) [
 					}()
 				}
 			}
-			if err := createPods(ctx, b, namespace, concreteOp, client); err != nil {
-				b.Fatalf("op %d: %v", opIndex, err)
-			}
-			if concreteOp.SkipWaitToCompletion {
-				// Only record those namespaces that may potentially require barriers
-				// in the future.
-				if _, ok := numPodsScheduledPerNamespace[namespace]; ok {
-					numPodsScheduledPerNamespace[namespace] += concreteOp.Count
-				} else {
-					numPodsScheduledPerNamespace[namespace] = concreteOp.Count
+			if concreteOp.Sequentially {
+				data, err := createPodsSequentially(ctx, b, namespace, concreteOp, client, podInformer)
+				if err != nil {
+					b.Fatalf("op %d: %v", opIndex, err)
 				}
+				dataItems = append(dataItems, data...)
 			} else {
-				if err := waitUntilPodsScheduledInNamespace(ctx, b, podInformer, namespace, concreteOp.Count); err != nil {
-					b.Fatalf("op %d: error in waiting for pods to get scheduled: %v", opIndex, err)
+				if err := createPods(ctx, b, namespace, concreteOp, client); err != nil {
+					b.Fatalf("op %d: %v", opIndex, err)
+				}
+				if concreteOp.SkipWaitToCompletion {
+					// Only record those namespaces that may potentially require barriers
+					// in the future.
+					if _, ok := numPodsScheduledPerNamespace[namespace]; ok {
+						numPodsScheduledPerNamespace[namespace] += concreteOp.Count
+					} else {
+						numPodsScheduledPerNamespace[namespace] = concreteOp.Count
+					}
+				} else {
+					if err := waitUntilPodsScheduledInNamespace(ctx, b, podInformer, namespace, concreteOp.Count); err != nil {
+						b.Fatalf("op %d: error in waiting for pods to get scheduled: %v", opIndex, err)
+					}
 				}
 			}
 			if concreteOp.CollectMetrics {
@@ -1136,15 +1150,77 @@ func getNodePreparer(prefix string, cno *createNodesOp, clientset clientset.Inte
 }
 
 func createPods(ctx context.Context, b *testing.B, namespace string, cpo *createPodsOp, clientset clientset.Interface) error {
-	strategy, err := getPodStrategy(cpo)
+	b.Logf("creating %d pods in namespace %q", cpo.Count, namespace)
+	podCreator, err := newPodCreator(namespace, cpo, cpo.Count, clientset)
 	if err != nil {
 		return err
 	}
-	b.Logf("creating %d pods in namespace %q", cpo.Count, namespace)
-	config := testutils.NewTestPodCreatorConfig()
-	config.AddStrategy(namespace, cpo.Count, strategy)
-	podCreator := testutils.NewTestPodCreator(clientset, config)
 	return podCreator.CreatePods(ctx)
+}
+
+func newPodCreator(namespace string, cpo *createPodsOp, count int, clientset clientset.Interface) (*testutils.TestPodCreator, error) {
+	strategy, err := getPodStrategy(cpo)
+	if err != nil {
+		return nil, err
+	}
+	config := testutils.NewTestPodCreatorConfig()
+	config.AddStrategy(namespace, count, strategy)
+	podCreator := testutils.NewTestPodCreator(clientset, config)
+	return podCreator, nil
+}
+
+func createPodsSequentially(ctx context.Context, b *testing.B, namespace string, cpo *createPodsOp, clientset clientset.Interface, podInformer coreinformers.PodInformer) ([]DataItem, error) {
+	if cpo.Count <= 0 {
+		return nil, nil
+	}
+
+	podCreator, err := newPodCreator(namespace, cpo, 1, clientset)
+	if err != nil {
+		return nil, fmt.Errorf("create pod creator: %v", err)
+	}
+
+	// React to pod changes immediately instead of polling.
+	scheduledPods := make(chan *v1.Pod)
+	seen := make(map[string]bool)
+	checkPod := func(obj interface{}) {
+		if pod, ok := obj.(*v1.Pod); ok && pod.Namespace == namespace && pod.Spec.NodeName != "" && !seen[pod.Name] {
+			scheduledPods <- pod
+			seen[pod.Name] = true
+		}
+	}
+	// We cannot close the channel: even if the event handler gets removed
+	// first, the callback might still get invoked.
+	handle, err := podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			checkPod(obj)
+		},
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			checkPod(newObj)
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("add pod event handler: %v", err)
+	}
+	defer podInformer.Informer().RemoveEventHandler(handle)
+
+	for i := 0; i < cpo.Count; i++ {
+		b.Logf("creating pod #%d", i)
+		if err := podCreator.CreatePods(ctx); err != nil {
+			return nil, fmt.Errorf("create pod #%d: %v", i, err)
+		}
+		var pod *v1.Pod
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("timed out waiting for scheduling of pod #%d", i)
+		case pod = <-scheduledPods:
+		}
+		b.Logf("pod %s scheduled", pod.Name)
+		if err := clientset.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{}); err != nil {
+			return nil, fmt.Errorf("delete pod #%d: %v", i, err)
+		}
+	}
+
+	return nil, nil
 }
 
 // waitUntilPodsScheduledInNamespace blocks until all pods in the given
