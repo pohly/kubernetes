@@ -122,6 +122,10 @@ func StartFakePVController(ctx context.Context, clientSet clientset.Interface, i
 	pvInformer := informerFactory.Core().V1().PersistentVolumes()
 
 	syncPV := func(obj *v1.PersistentVolume) {
+		if ctx.Err() != nil {
+			// We can stop...
+			return
+		}
 		if obj.Spec.ClaimRef != nil {
 			claimRef := obj.Spec.ClaimRef
 			pvc, err := clientSet.CoreV1().PersistentVolumeClaims(claimRef.Namespace).Get(ctx, claimRef.Name, metav1.GetOptions{})
