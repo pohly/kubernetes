@@ -82,11 +82,11 @@ func newDefaultComponentConfig() (*config.KubeSchedulerConfiguration, error) {
 // remove resources after finished.
 // Notes on rate limiter:
 //   - client rate limit is set to 5000.
-func mustSetupScheduler(ctx context.Context, b *testing.B, config *config.KubeSchedulerConfiguration, enabledFeatures map[featuregate.Feature]bool) (informers.SharedInformerFactory, clientset.Interface, dynamic.Interface) {
+func mustSetupScheduler(ctx context.Context, tb testing.TB, config *config.KubeSchedulerConfiguration, enabledFeatures map[featuregate.Feature]bool) (informers.SharedInformerFactory, clientset.Interface, dynamic.Interface) {
 	// Run API server with minimimal logging by default. Can be raised with -v.
 	framework.MinVerbosity = 0
 
-	_, kubeConfig, tearDownFn := framework.StartTestServer(b, framework.TestServerSetup{
+	_, kubeConfig, tearDownFn := framework.StartTestServer(tb, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition", "Priority"}
@@ -99,12 +99,12 @@ func mustSetupScheduler(ctx context.Context, b *testing.B, config *config.KubeSc
 			}
 		},
 	})
-	b.Cleanup(tearDownFn)
+	tb.Cleanup(tearDownFn)
 
 	// Cleanup will be in reverse order: first the clients get cancelled,
 	// then the apiserver is torn down.
 	ctx, cancel := context.WithCancel(ctx)
-	b.Cleanup(cancel)
+	tb.Cleanup(cancel)
 
 	// TODO: client connection configuration, such as QPS or Burst is configurable in theory, this could be derived from the `config`, need to
 	// support this when there is any testcase that depends on such configuration.
@@ -117,7 +117,7 @@ func mustSetupScheduler(ctx context.Context, b *testing.B, config *config.KubeSc
 		var err error
 		config, err = newDefaultComponentConfig()
 		if err != nil {
-			b.Fatalf("Error creating default component config: %v", err)
+			tb.Fatalf("Error creating default component config: %v", err)
 		}
 	}
 
@@ -128,14 +128,14 @@ func mustSetupScheduler(ctx context.Context, b *testing.B, config *config.KubeSc
 	// be applied to start a scheduler, most of them are defined in `scheduler.schedulerOptions`.
 	_, informerFactory := util.StartScheduler(ctx, client, cfg, config)
 	util.StartFakePVController(ctx, client, informerFactory)
-	runGC := util.CreateGCController(ctx, b, *cfg, informerFactory)
-	runNS := util.CreateNamespaceController(ctx, b, *cfg, informerFactory)
+	runGC := util.CreateGCController(ctx, tb, *cfg, informerFactory)
+	runNS := util.CreateNamespaceController(ctx, tb, *cfg, informerFactory)
 
 	runResourceClaimController := func() {}
 	if enabledFeatures[features.DynamicResourceAllocation] {
 		// Testing of DRA with inline resource claims depends on this
 		// controller for creating and removing ResourceClaims.
-		runResourceClaimController = util.CreateResourceClaimController(ctx, b, client, informerFactory)
+		runResourceClaimController = util.CreateResourceClaimController(ctx, tb, client, informerFactory)
 	}
 
 	informerFactory.Start(ctx.Done())

@@ -11,7 +11,7 @@
     collectMetrics: true
   workloads:
   - name: 500Nodes
-    labels: [fast]
+    labels: [fast,integration-test]
     params:
       initNodes: 500
       initPods: 500
@@ -40,7 +40,7 @@
     namespace: sched-1
   workloads:
   - name: 500Nodes
-    labels: [fast]
+    labels: [fast,integration-test]
     params:
       initNodes: 500
       initPods: 100
@@ -64,7 +64,7 @@
     collectMetrics: true
   workloads:
   - name: 500Nodes
-    labels: [fast]
+    labels: [fast,integration-test]
     params:
       initNodes: 500
       initPods: 500
@@ -91,7 +91,7 @@
     collectMetrics: true
   workloads:
   - name: 500Nodes
-    labels: [fast]
+    labels: [fast,integration-test]
     params:
       initNodes: 500
       initPods: 500
@@ -127,7 +127,7 @@
     collectMetrics: true
   workloads:
   - name: 500Nodes
-    labels: [fast]
+    labels: [fast,integration-test]
     params:
       initNodes: 500
       initPods: 500
@@ -161,7 +161,7 @@
     collectMetrics: true
   workloads:
   - name: 500Nodes
-    labels: [fast]
+    labels: [fast,integration-test]
     params:
       initNodes: 500
       initPods: 500
@@ -194,7 +194,7 @@
     collectMetrics: true
   workloads:
   - name: 500Nodes
-    labels: [fast]
+    labels: [fast,integration-test]
     params:
       initNodes: 500
       initPods: 500
@@ -223,7 +223,7 @@
     collectMetrics: true
   workloads:
   - name: 500Nodes
-    labels: [fast]
+    labels: [fast,integration-test]
     params:
       initNodes: 500
       initPods: 500
@@ -252,7 +252,7 @@
     collectMetrics: true
   workloads:
   - name: 500Nodes
-    labels: [fast]
+    labels: [fast,integration-test]
     params:
       initNodes: 500
       initPods: 500
@@ -280,7 +280,7 @@
     collectMetrics: true
   workloads:
   - name: 500Nodes
-    labels: [fast]
+    labels: [fast,integration-test]
     params:
       initNodes: 500
       initPods: 500
@@ -309,7 +309,7 @@
     collectMetrics: true
   workloads:
   - name: 500Nodes
-    labels: [fast]
+    labels: [fast,integration-test]
     params:
       initNodes: 500
       initPods: 1000
@@ -338,7 +338,7 @@
     collectMetrics: true
   workloads:
   - name: 500Nodes
-    labels: [fast]
+    labels: [fast,integration-test]
     params:
       initNodes: 500
       initPods: 1000
@@ -386,7 +386,7 @@
     collectMetrics: true
   workloads:
   - name: 500Nodes
-    labels: [fast]
+    labels: [fast,integration-test]
     params:
       initNodes: 500
       initPods: 200
@@ -411,6 +411,7 @@
     collectMetrics: true
   workloads:
   - name: 500Nodes
+    labels: [integration-test]
     params:
       initNodes: 500
       initPods: 2000
@@ -469,7 +470,7 @@
     collectMetrics: true
   workloads:
   - name: 500Nodes/200InitPods
-    labels: [fast]
+    labels: [fast,integration-test]
     params:
       initNodes: 500
       initPods: 200
@@ -503,7 +504,7 @@
     collectMetrics: true
   workloads:
   - name: 1000Nodes
-    labels: [fast]
+    labels: [fast,integration-test]
     params:
       initNodes: 1000
       measurePods: 1000
@@ -654,7 +655,7 @@
     collectMetrics: true
   workloads:
   - name: 500Nodes
-    labels: [fast]
+    labels: [fast,integration-test]
     params:
       taintNodes: 100
       normalNodes: 400
@@ -702,7 +703,7 @@
     collectMetrics: true
   workloads:
   - name: base
-    labels: [fast]
+    labels: [fast,integration-test]
     params:
       nodesWithDRA: 1
       nodesWithoutDRA: 1
