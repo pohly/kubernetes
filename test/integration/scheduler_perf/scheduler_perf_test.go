@@ -31,6 +31,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onsi/gomega"
+
 	v1 "k8s.io/api/core/v1"
 	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -49,6 +51,7 @@ import (
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
@@ -833,13 +836,59 @@ func runWorkload(ctx context.Context, b *testing.B, tc *testCase, w *workload, c
 	numPodsScheduledPerNamespace := make(map[string]int)
 
 	if cleanup {
-		b.Cleanup(func() {
+		// This must run before controllers get cleaned up.
+		defer func() {
+			deleteNow := *metav1.NewDeleteOptions(0)
 			for namespace := range numPodsScheduledPerNamespace {
-				if err := client.CoreV1().Namespaces().Delete(ctx, namespace, metav1.DeleteOptions{}); err != nil {
-					b.Errorf("Deleting Namespace in numPodsScheduledPerNamespace: %v", err)
+				// Pods have to be deleted explicitly, with no grace period. Normally
+				// kubelet will set the DeletionGracePeriodSeconds to zero when it's okay
+				// to remove a deleted pod, but we don't run kubelet...
+				pods, err := client.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
+				if err != nil {
+					b.Fatalf("failed to list pods in %q: %v", namespace, err)
+				}
+				for _, pod := range pods.Items {
+					if err := client.CoreV1().Pods(namespace).Delete(ctx, pod.Name, deleteNow); err != nil {
+						b.Fatalf("failed to delete pod %q in namespace %q: %v", pod.Name, namespace, err)
+					}
+				}
+				if err := client.CoreV1().Namespaces().Delete(ctx, namespace, deleteNow); err != nil {
+					b.Fatalf("Deleting Namespace in numPodsScheduledPerNamespace: %v", err)
 				}
 			}
-		})
+			gomega.NewGomegaWithT(b).Eventually(ctx, func(ctx context.Context) ([]interface{}, error) {
+				var objects []interface{}
+				namespaces, err := client.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
+				if err != nil {
+					return nil, err
+				}
+				for namespace := range numPodsScheduledPerNamespace {
+					for _, n := range namespaces.Items {
+						if n.Name == namespace {
+							pods, err := client.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
+							if err != nil {
+								return nil, err
+							}
+							if len(pods.Items) > 0 {
+								// Record one pod per namespace - that's usually enough information.
+								objects = append(objects, pods.Items[0])
+							}
+							if tc.FeatureGates[features.DynamicResourceAllocation] {
+								claims, err := client.ResourceV1alpha2().ResourceClaims(namespace).List(ctx, metav1.ListOptions{})
+								if err != nil {
+									return nil, err
+								}
+								if len(claims.Items) > 0 {
+									objects = append(objects, claims.Items[0])
+								}
+							}
+							objects = append(objects, n)
+						}
+					}
+				}
+				return objects, nil
+			}).WithTimeout(5*time.Minute).Should(gomega.BeEmpty(), "deleting namespace")
+		}()
 	}
 
 	for opIndex, op := range unrollWorkloadTemplate(b, tc.WorkloadTemplate, w) {

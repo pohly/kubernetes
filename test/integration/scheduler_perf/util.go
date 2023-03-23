@@ -128,6 +128,8 @@ func mustSetupScheduler(ctx context.Context, b *testing.B, config *config.KubeSc
 	// be applied to start a scheduler, most of them are defined in `scheduler.schedulerOptions`.
 	_, informerFactory := util.StartScheduler(ctx, client, cfg, config)
 	util.StartFakePVController(ctx, client, informerFactory)
+	runGC := util.CreateGCController(ctx, b, *cfg, informerFactory)
+	runNS := util.CreateNamespaceController(ctx, b, *cfg, informerFactory)
 
 	runResourceClaimController := func() {}
 	if enabledFeatures[features.DynamicResourceAllocation] {
@@ -138,6 +140,8 @@ func mustSetupScheduler(ctx context.Context, b *testing.B, config *config.KubeSc
 
 	informerFactory.Start(ctx.Done())
 	informerFactory.WaitForCacheSync(ctx.Done())
+	go runGC()
+	go runNS()
 	go runResourceClaimController()
 
 	return informerFactory, client, dynClient
