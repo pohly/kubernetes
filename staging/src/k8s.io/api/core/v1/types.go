@@ -4191,7 +4191,7 @@ type PodStatus struct {
 	// +listMapKey=name
 	// +featureGate=DynamicResourceAllocation
 	// +optional
-	ResourceClaimStatuses []PodResourceClaimStatus `json:"resourceClaimStatuses,omitempty" protobuf:"bytes,15,rep,name=resourceClaimStatuses"`
+	ResourceClaimStatuses []PodResourceClaimStatus `json:"resourceClaimStatuses,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name" protobuf:"bytes,15,rep,name=resourceClaimStatuses"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
