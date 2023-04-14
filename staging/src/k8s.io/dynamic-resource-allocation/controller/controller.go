@@ -566,6 +566,9 @@ func (ctrl *controller) allocateClaim(ctx context.Context,
 
 func (ctrl *controller) checkPodClaim(ctx context.Context, pod *v1.Pod, podClaim v1.PodResourceClaim) (*ClaimAllocation, error) {
 	claimName := resourceclaim.Name(pod, &podClaim)
+	if claimName == "" {
+		return nil, fmt.Errorf("ResourceClaim for claim %s in pod %s not known yet", podClaim.Name, pod.Name)
+	}
 	key := pod.Namespace + "/" + claimName
 	claim, err := ctrl.getCachedClaim(ctx, key)
 	if claim == nil || err != nil {

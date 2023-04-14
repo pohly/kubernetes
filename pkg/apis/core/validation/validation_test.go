@@ -13359,6 +13359,80 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 		},
 		"",
 		"Container statuses all containers terminated",
+	}, {
+		core.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+			},
+			Status: core.PodStatus{
+				ResourceClaimStatuses: []core.PodResourceClaimStatus{
+					{Name: "no-such-claim", ResourceClaimName: "my-claim"},
+				},
+			},
+		},
+		core.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+			},
+		},
+		`status.resourceClaimStatuses[0].name: Invalid value: "no-such-claim": must match the name of an entry in pod.spec.resourceClaims`,
+		"Non-existent PodResourceClaim",
+	}, {
+		core.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+			},
+			Spec: core.PodSpec{
+				ResourceClaims: []core.PodResourceClaim{
+					{Name: "my-claim"},
+				},
+			},
+			Status: core.PodStatus{
+				ResourceClaimStatuses: []core.PodResourceClaimStatus{
+					{Name: "my-claim", ResourceClaimName: "%$!#"},
+				},
+			},
+		},
+		core.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+			},
+			Spec: core.PodSpec{
+				ResourceClaims: []core.PodResourceClaim{
+					{Name: "my-claim"},
+				},
+			},
+		},
+		`status.resourceClaimStatuses[0].name: Invalid value: "%$!#": a lowercase RFC 1123 subdomain must consist of`,
+		"Invalid ResourceClaim name",
+	}, {
+		core.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+			},
+			Spec: core.PodSpec{
+				ResourceClaims: []core.PodResourceClaim{
+					{Name: "my-claim"},
+				},
+			},
+			Status: core.PodStatus{
+				ResourceClaimStatuses: []core.PodResourceClaimStatus{
+					{Name: "my-claim", ResourceClaimName: "foo-my-claim-12345"},
+				},
+			},
+		},
+		core.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+			},
+			Spec: core.PodSpec{
+				ResourceClaims: []core.PodResourceClaim{
+					{Name: "my-claim"},
+				},
+			},
+		},
+		"",
+		"ResourceClaimStatuses okay",
 	},
 	}
 

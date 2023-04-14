@@ -69,6 +69,9 @@ func (m *ManagerImpl) PrepareResources(pod *v1.Pod) error {
 	for i := range pod.Spec.ResourceClaims {
 		claimName := resourceclaim.Name(pod, &pod.Spec.ResourceClaims[i])
 		klog.V(3).InfoS("Processing resource", "claim", claimName, "pod", pod.Name)
+		if claimName == "" {
+			return fmt.Errorf("ResourceClaim for claim %s in pod %s not known yet", pod.Spec.ResourceClaims[i].Name, pod.Name)
+		}
 
 		// Resource is already prepared, add pod UID to it
 		if claimInfo := m.cache.get(claimName, pod.Namespace); claimInfo != nil {
@@ -186,6 +189,9 @@ func (m *ManagerImpl) GetResources(pod *v1.Pod, container *v1.Container) (*Conta
 
 	for i, podResourceClaim := range pod.Spec.ResourceClaims {
 		claimName := resourceclaim.Name(pod, &pod.Spec.ResourceClaims[i])
+		if claimName == "" {
+			return nil, fmt.Errorf("ResourceClaim for claim %s in pod %s not known yet", pod.Spec.ResourceClaims[i].Name, pod.Name)
+		}
 
 		for _, claim := range container.Resources.Claims {
 			if podResourceClaim.Name != claim.Name {
@@ -218,6 +224,9 @@ func (m *ManagerImpl) UnprepareResources(pod *v1.Pod) error {
 	// Call NodeUnprepareResource RPC for every resource claim referenced by the pod
 	for i := range pod.Spec.ResourceClaims {
 		claimName := resourceclaim.Name(pod, &pod.Spec.ResourceClaims[i])
+		if claimName == "" {
+			return fmt.Errorf("ResourceClaim for claim %s in pod %s not known yet", pod.Spec.ResourceClaims[i].Name, pod.Name)
+		}
 		claimInfo := m.cache.get(claimName, pod.Namespace)
 
 		// Skip calling NodeUnprepareResource if claim info is not cached
@@ -316,6 +325,9 @@ func (m *ManagerImpl) GetContainerClaimInfos(pod *v1.Pod, container *v1.Containe
 
 	for i, podResourceClaim := range pod.Spec.ResourceClaims {
 		claimName := resourceclaim.Name(pod, &pod.Spec.ResourceClaims[i])
+		if claimName == "" {
+			return nil, fmt.Errorf("ResourceClaim for claim %s in pod %s not known yet", pod.Spec.ResourceClaims[i].Name, pod.Name)
+		}
 
 		for _, claim := range container.Resources.Claims {
 			if podResourceClaim.Name != claim.Name {

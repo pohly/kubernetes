@@ -76,6 +76,16 @@ var (
 				UID(podUID).
 				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, Source: v1.ClaimSource{ResourceClaimTemplateName: &claimName}}).
 				Obj()
+	podWithClaimTemplateInStatus = func() *v1.Pod {
+		pod := podWithClaimTemplate.DeepCopy()
+		pod.Status.ResourceClaimStatuses = []v1.PodResourceClaimStatus{
+			{
+				Name:              pod.Spec.ResourceClaims[0].Name,
+				ResourceClaimName: claimName,
+			},
+		}
+		return pod
+	}()
 	podWithTwoClaimNames = st.MakePod().Name(podName).Namespace(namespace).
 				UID(podUID).
 				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, Source: v1.ClaimSource{ResourceClaimName: &claimName}}).
@@ -216,14 +226,15 @@ func TestPlugin(t *testing.T) {
 			claims: []*resourcev1alpha2.ResourceClaim{allocatedClaim, otherClaim},
 		},
 		"claim-template": {
-			pod:    podWithClaimTemplate,
+			pod:    podWithClaimTemplateInStatus,
 			claims: []*resourcev1alpha2.ResourceClaim{allocatedClaim, otherClaim},
 		},
 		"missing-claim": {
-			pod: podWithClaimTemplate,
+			pod:    podWithClaimTemplate, // status not set
+			claims: []*resourcev1alpha2.ResourceClaim{allocatedClaim, otherClaim},
 			want: want{
 				prefilter: result{
-					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `waiting for dynamic resource controller to create the resourceclaim "my-pod-my-resource"`),
+					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `waiting for dynamic resource controller to create the resourceclaim`),
 				},
 				postfilter: result{
 					status: framework.NewStatus(framework.Unschedulable, `no new claims to deallocate`),

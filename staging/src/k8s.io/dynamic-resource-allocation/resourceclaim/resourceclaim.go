@@ -32,9 +32,9 @@ import (
 )
 
 // Name returns the name of the ResourceClaim object that gets referenced by or
-// created for the PodResourceClaim. The name is deterministic and therefore
-// this function does not need any additional information and it will never
-// fail.
+// created for the PodResourceClaim. The name will be empty if it is not known
+// yet for a ResourceClaim that still needs to be generated from a
+// ResourceClaimTemplate.
 //
 // Either podClaim.ResourceClaimName or podClaim.Template must be non-nil, but not
 // both. This is enforced by API validation.
@@ -46,7 +46,12 @@ func Name(pod *v1.Pod, podClaim *v1.PodResourceClaim) string {
 	if podClaim.Source.ResourceClaimName != nil {
 		return *podClaim.Source.ResourceClaimName
 	}
-	return pod.Name + "-" + podClaim.Name
+	for _, status := range pod.Status.ResourceClaimStatuses {
+		if status.Name == podClaim.Name {
+			return status.ResourceClaimName
+		}
+	}
+	return ""
 }
 
 // IsForPod checks that the ResourceClaim is the ephemeral volume that

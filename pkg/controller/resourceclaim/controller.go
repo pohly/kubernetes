@@ -26,8 +26,10 @@ import (
 	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	corev1apply "k8s.io/client-go/applyconfigurations/core/v1"
 	v1informers "k8s.io/client-go/informers/core/v1"
 	resourcev1alpha2informers "k8s.io/client-go/informers/resource/v1alpha2"
 	clientset "k8s.io/client-go/kubernetes"
@@ -47,6 +49,15 @@ import (
 const (
 	// podResourceClaimIndex is the lookup name for the index function which indexes by pod ResourceClaim templates.
 	podResourceClaimIndex = "pod-resource-claim-index"
+
+	// podResourceClaimAnnotation is the special annotation that generated
+	// ResourceClaims get. Its value is the pod.spec.resourceClaims[].name
+	// for which it was generated. This is used only inside the controller
+	// and not documented as part of the Kubernetes API.
+	podResourceClaimAnnotation = "resource.kubernetes.io/pod-claim-name"
+
+	// Field manager used to update the pod status.
+	fieldManager = "ResourceClaimController"
 
 	maxUIDCacheEntries = 500
 )
@@ -314,8 +325,9 @@ func (ec *Controller) syncPod(ctx context.Context, namespace, name string) error
 		return nil
 	}
 
+	var newPodClaims map[string]string
 	for _, podClaim := range pod.Spec.ResourceClaims {
-		if err := ec.handleClaim(ctx, pod, podClaim); err != nil {
+		if err := ec.handleClaim(ctx, pod, podClaim, &newPodClaims); err != nil {
 			if ec.recorder != nil {
 				ec.recorder.Event(pod, v1.EventTypeWarning, "FailedResourceClaimCreation", fmt.Sprintf("PodResourceClaim %s: %v", podClaim.Name, err))
 			}
@@ -323,11 +335,24 @@ func (ec *Controller) syncPod(ctx context.Context, namespace, name string) error
 		}
 	}
 
+	if newPodClaims != nil {
+		// Patch the pod status with the new information about
+		// generated ResourceClaims.
+		statuses := make([]*corev1apply.PodResourceClaimStatusApplyConfiguration, 0, len(newPodClaims))
+		for podClaimName, resourceClaimName := range newPodClaims {
+			statuses = append(statuses, corev1apply.PodResourceClaimStatus().WithName(podClaimName).WithResourceClaimName(resourceClaimName))
+		}
+		podApply := corev1apply.Pod(name, namespace).WithStatus(corev1apply.PodStatus().WithResourceClaimStatuses(statuses...))
+		if _, err := ec.kubeClient.CoreV1().Pods(namespace).ApplyStatus(ctx, podApply, metav1.ApplyOptions{FieldManager: fieldManager, Force: true}); err != nil {
+			return fmt.Errorf("update pod %s/%s ResourceClaimStatuses: %v", namespace, name, err)
+		}
+	}
+
 	return nil
 }
 
 // handleResourceClaim is invoked for each volume of a pod.
-func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podClaim v1.PodResourceClaim) error {
+func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podClaim v1.PodResourceClaim, newPodClaims *map[string]string) error {
 	logger := klog.LoggerWithValues(klog.FromContext(ctx), "podClaim", podClaim.Name)
 	ctx = klog.NewContext(ctx, logger)
 	logger.V(5).Info("checking", "podClaim", podClaim.Name)
@@ -337,51 +362,114 @@ func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podClaim v1.
 	}
 
 	claimName := resourceclaim.Name(pod, &podClaim)
-	claim, err := ec.claimLister.ResourceClaims(pod.Namespace).Get(claimName)
-	if err != nil && !errors.IsNotFound(err) {
-		return err
-	}
-	if claim != nil {
-		if err := resourceclaim.IsForPod(pod, claim); err != nil {
+	if claimName != "" {
+		// The ResourceClaim should exist because it is recorded in the pod.status.resourceClaimStatuses,
+		// but perhaps it was deleted accidentally. In that case we re-create it.
+		claim, err := ec.claimLister.ResourceClaims(pod.Namespace).Get(claimName)
+		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}
-		// Already created, nothing more to do.
-		logger.V(5).Info("claim already created", "podClaim", podClaim.Name, "resourceClaim", claimName)
-		return nil
+		if claim != nil {
+			err := resourceclaim.IsForPod(pod, claim)
+			if err == nil {
+				// Already created, nothing more to do.
+				logger.V(5).Info("claim already created", "podClaim", podClaim.Name, "resourceClaim", claimName)
+				return nil
+			}
+			logger.Error(err, "claim that was created for the pod is no longer owned by the pod, creating a new one", "podClaim", podClaim.Name, "resourceClaim", claimName)
+		}
 	}
 
-	template, err := ec.templateLister.ResourceClaimTemplates(pod.Namespace).Get(*templateName)
+	// Before we create a new ResourceClaim, check if there is an orphaned one.
+	// This covers the case that the controller has created it, but then fails
+	// before it can update the pod status.
+	claim, err := ec.findPodResourceClaim(pod, podClaim)
 	if err != nil {
-		return fmt.Errorf("resource claim template %q: %v", *templateName, err)
+		return fmt.Errorf("finding ResourceClaim for claim %s in pod %s/%s failed: %v", podClaim.Name, pod.Namespace, pod.Name, err)
 	}
 
-	// Create the ResourceClaim with pod as owner.
-	isTrue := true
-	claim = &resourcev1alpha2.ResourceClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: claimName,
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					APIVersion:         "v1",
-					Kind:               "Pod",
-					Name:               pod.Name,
-					UID:                pod.UID,
-					Controller:         &isTrue,
-					BlockOwnerDeletion: &isTrue,
+	if claim == nil {
+		template, err := ec.templateLister.ResourceClaimTemplates(pod.Namespace).Get(*templateName)
+		if err != nil {
+			return fmt.Errorf("resource claim template %q: %v", *templateName, err)
+		}
+
+		// Create the ResourceClaim with pod as owner, with a generated name that uses
+		// <pod>-<claim name> as base.
+		isTrue := true
+		annotations := template.Spec.ObjectMeta.Annotations
+		if annotations == nil {
+			annotations = make(map[string]string)
+		}
+		annotations[podResourceClaimAnnotation] = podClaim.Name
+		claim = &resourcev1alpha2.ResourceClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: pod.Name + "-" + podClaim.Name,
+				OwnerReferences: []metav1.OwnerReference{
+					{
+						APIVersion:         "v1",
+						Kind:               "Pod",
+						Name:               pod.Name,
+						UID:                pod.UID,
+						Controller:         &isTrue,
+						BlockOwnerDeletion: &isTrue,
+					},
 				},
+				Annotations: annotations,
+				Labels:      template.Spec.ObjectMeta.Labels,
 			},
-			Annotations: template.Spec.ObjectMeta.Annotations,
-			Labels:      template.Spec.ObjectMeta.Labels,
-		},
-		Spec: template.Spec.Spec,
+			Spec: template.Spec.Spec,
+		}
+		metrics.ResourceClaimCreateAttempts.Inc()
+		claim, err = ec.kubeClient.ResourceV1alpha2().ResourceClaims(pod.Namespace).Create(ctx, claim, metav1.CreateOptions{})
+		if err != nil {
+			metrics.ResourceClaimCreateFailures.Inc()
+			return fmt.Errorf("create ResourceClaim %s: %v", claimName, err)
+		}
 	}
-	metrics.ResourceClaimCreateAttempts.Inc()
-	_, err = ec.kubeClient.ResourceV1alpha2().ResourceClaims(pod.Namespace).Create(ctx, claim, metav1.CreateOptions{})
-	if err != nil {
-		metrics.ResourceClaimCreateFailures.Inc()
-		return fmt.Errorf("create ResourceClaim %s: %v", claimName, err)
+
+	// Remember the new ResourceClaim for a batch PodStatus update in our caller.
+	if *newPodClaims == nil {
+		*newPodClaims = make(map[string]string)
 	}
+	(*newPodClaims)[podClaim.Name] = claim.Name
+
 	return nil
+}
+
+// findPodResourceClaim looks for an existing ResourceClaim with the right
+// annotation (ties it to the pod claim) and the right ownership (ties it to
+// the pod).
+func (ec *Controller) findPodResourceClaim(pod *v1.Pod, podClaim v1.PodResourceClaim) (*resourcev1alpha2.ResourceClaim, error) {
+	claims, err := ec.claimLister.List(labels.Everything())
+	if err != nil {
+		return nil, err
+	}
+	deterministicName := pod.Name + "-" + podClaim.Name // Kubernetes <= 1.27 behavior.
+	for _, claim := range claims {
+		if err := resourceclaim.IsForPod(pod, claim); err != nil {
+			continue
+		}
+		podClaimName, ok := claim.Annotations[podResourceClaimAnnotation]
+		if ok && podClaimName != podClaim.Name {
+			continue
+		}
+
+		// No annotation? It might a ResourceClaim created for
+		// the pod with a previous Kubernetes release where the
+		// ResourceClaim name was deterministic, in which case
+		// we have to use it and update the new pod status
+		// field accordingly.
+		if !ok && claim.Name != deterministicName {
+			continue
+		}
+
+		// Pick the first one that matches. There shouldn't be more than one. If there is,
+		// then all others will be ignored until the pod gets deleted. Then they also get
+		// cleaned up.
+		return claim, nil
+	}
+	return nil, nil
 }
 
 func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) error {

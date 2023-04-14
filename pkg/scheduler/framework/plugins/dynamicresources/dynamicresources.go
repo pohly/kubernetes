@@ -270,15 +270,12 @@ func (pl *dynamicResources) podResourceClaims(pod *v1.Pod) ([]*resourcev1alpha2.
 	claims := make([]*resourcev1alpha2.ResourceClaim, 0, len(pod.Spec.ResourceClaims))
 	for _, resource := range pod.Spec.ResourceClaims {
 		claimName := resourceclaim.Name(pod, &resource)
+		if claimName == "" {
+			return nil, fmt.Errorf("waiting for dynamic resource controller to create the resourceclaim")
+		}
 		isEphemeral := resource.Source.ResourceClaimTemplateName != nil
 		claim, err := pl.claimLister.ResourceClaims(pod.Namespace).Get(claimName)
 		if err != nil {
-			// The error usually has already enough context ("resourcevolumeclaim "myclaim" not found"),
-			// but we can do better for generic ephemeral inline volumes where that situation
-			// is normal directly after creating a pod.
-			if isEphemeral && apierrors.IsNotFound(err) {
-				err = fmt.Errorf("waiting for dynamic resource controller to create the resourceclaim %q", claimName)
-			}
 			return nil, err
 		}
 

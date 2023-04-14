@@ -822,6 +822,11 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 				},
 			},
 		},
+		Status: api.PodStatus{
+			ResourceClaimStatuses: []api.PodResourceClaimStatus{
+				{Name: "my-claim", ResourceClaimName: "pod-my-claim"},
+			},
+		},
 	}
 	podWithoutClaims := &api.Pod{
 		Spec: api.PodSpec{
