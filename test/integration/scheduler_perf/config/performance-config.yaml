@@ -727,3 +727,51 @@
       initPods: 1000
       measurePods: 1000
       maxClaimsPerNode: 10
+
+# This test case schedules one pod after the other and thus is dominated by the
+# time that it takes to complete the scheduling of a single pod. The other test
+# case measure throughput. There parallelism can hide the effect of delays per
+# pod.
+- name: LatencyWithInlineResourceClaims
+  labels: [performance]
+  featureGates:
+    DynamicResourceAllocation: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $nodesWithoutDRA
+  - opcode: createNodes
+    nodeTemplatePath: config/dra/node-with-dra-test-driver.yaml
+    countParam: $nodesWithDRA
+  - opcode: createResourceDriver
+    driverName: test-driver.cdi.k8s.io
+    nodes: scheduler-perf-dra-*
+    maxClaimsPerNodeParam: $maxClaimsPerNode
+  - opcode: createResourceClass
+    templatePath: config/dra/resourceclass.yaml
+  - opcode: createResourceClaimTemplate
+    templatePath: config/dra/resourceclaimtemplate.yaml
+    namespace: init
+  - opcode: createPods
+    namespace: init
+    countParam: $initPods
+    podTemplatePath: config/dra/pod-with-claim-template.yaml
+  - opcode: createResourceClaimTemplate
+    templatePath: config/dra/resourceclaimtemplate.yaml
+    namespace: test
+  - opcode: createPods
+    namespace: test
+    countParam: $measurePods
+    podTemplatePath: config/dra/pod-with-claim-template.yaml
+    sequentially: true
+    collectMetrics: true
+  workloads:
+  - name: 50pods
+    labels: [fast]
+    params:
+      nodesWithDRA: 1
+      nodesWithoutDRA: 0
+      initPods: 0
+      measurePods: 20
+      # TODO: reduce to 1 and ensure that claims get deleted
+      # https://github.com/kubernetes/kubernetes/issues/113890
+      maxClaimsPerNode: 10000
