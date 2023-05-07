@@ -138,6 +138,9 @@ type KubeSchedulerProfile struct {
 // Enabled plugins are called in the order specified here, after default plugins. If they need to
 // be invoked before default plugins, default plugins must be disabled and re-enabled here in desired order.
 type Plugins struct {
+	// Requeue is a list of plugins that should be invoked before Pods gets moved from unschedulableQ to backoffQ or activeQ.
+	Requeue PluginSet
+
 	// PreEnqueue is a list of plugins that should be invoked before adding pods to the scheduling queue.
 	PreEnqueue PluginSet
 
@@ -235,6 +238,7 @@ func (p *Plugins) Names() []string {
 	}
 	extensions := []PluginSet{
 		p.PreEnqueue,
+		p.Requeue,
 		p.PreFilter,
 		p.Filter,
 		p.PostFilter,

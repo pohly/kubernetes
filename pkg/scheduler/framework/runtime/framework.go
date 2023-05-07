@@ -61,6 +61,7 @@ type frameworkImpl struct {
 	waitingPods          *waitingPodsMap
 	scorePluginWeight    map[string]int
 	preEnqueuePlugins    []framework.PreEnqueuePlugin
+	requeuePlugins       []framework.RequeuePlugin
 	queueSortPlugins     []framework.QueueSortPlugin
 	preFilterPlugins     []framework.PreFilterPlugin
 	filterPlugins        []framework.FilterPlugin
@@ -112,6 +113,7 @@ func (f *frameworkImpl) getExtensionPoints(plugins *config.Plugins) []extensionP
 		{&plugins.PostBind, &f.postBindPlugins},
 		{&plugins.Permit, &f.permitPlugins},
 		{&plugins.PreEnqueue, &f.preEnqueuePlugins},
+		{&plugins.Requeue, &f.requeuePlugins},
 		{&plugins.QueueSort, &f.queueSortPlugins},
 	}
 }
@@ -587,9 +589,14 @@ func updatePluginList(pluginList interface{}, pluginSet config.PluginSet, plugin
 	return nil
 }
 
-// EnqueuePlugins returns the registered enqueue plugins.
+// PreEnqueuePlugins returns the registered preenqueue plugins.
 func (f *frameworkImpl) PreEnqueuePlugins() []framework.PreEnqueuePlugin {
 	return f.preEnqueuePlugins
+}
+
+// RequeuePlugins returns the registered reenqueue plugins.
+func (f *frameworkImpl) RequeuePlugins() []framework.RequeuePlugin {
+	return f.requeuePlugins
 }
 
 // QueueSortFunc returns the function to sort pods in scheduling queue

@@ -714,6 +714,9 @@ func Convert_config_PluginSet_To_v1_PluginSet(in *config.PluginSet, out *v1.Plug
 }
 
 func autoConvert_v1_Plugins_To_config_Plugins(in *v1.Plugins, out *config.Plugins, s conversion.Scope) error {
+	if err := Convert_v1_PluginSet_To_config_PluginSet(&in.Requeue, &out.Requeue, s); err != nil {
+		return err
+	}
 	if err := Convert_v1_PluginSet_To_config_PluginSet(&in.PreEnqueue, &out.PreEnqueue, s); err != nil {
 		return err
 	}
@@ -762,6 +765,9 @@ func Convert_v1_Plugins_To_config_Plugins(in *v1.Plugins, out *config.Plugins, s
 }
 
 func autoConvert_config_Plugins_To_v1_Plugins(in *config.Plugins, out *v1.Plugins, s conversion.Scope) error {
+	if err := Convert_config_PluginSet_To_v1_PluginSet(&in.Requeue, &out.Requeue, s); err != nil {
+		return err
+	}
 	if err := Convert_config_PluginSet_To_v1_PluginSet(&in.PreEnqueue, &out.PreEnqueue, s); err != nil {
 		return err
 	}

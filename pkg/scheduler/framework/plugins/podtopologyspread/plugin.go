@@ -17,6 +17,7 @@ limitations under the License.
 package podtopologyspread
 
 import (
+	"context"
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
@@ -127,6 +128,57 @@ func (pl *PodTopologySpread) setListers(factory informers.SharedInformerFactory)
 	pl.replicationCtrls = factory.Core().V1().ReplicationControllers().Lister()
 	pl.replicaSets = factory.Apps().V1().ReplicaSets().Lister()
 	pl.statefulSets = factory.Apps().V1().StatefulSets().Lister()
+}
+
+func (pl *PodTopologySpread) Requeue(ctx context.Context, p *v1.Pod, event *framework.ClusterEvent, oldObj, obj interface{}) *framework.Status {
+	if !event.In(pl.EventsToRegister()) {
+		// not interested event.
+		return framework.NewStatus(framework.Unschedulable)
+	}
+
+	switch event.Resource {
+	case framework.Pod:
+		// TODO(sanposhiho): implement it
+	case framework.Node:
+		return pl.requeueByNodeEvent(ctx, p, event, oldObj, obj)
+	case framework.WildCard:
+		// could be periodically flush.
+		return nil
+	}
+
+	return framework.NewStatus(framework.Unschedulable)
+}
+func (pl *PodTopologySpread) requeueByNodeEvent(ctx context.Context, p *v1.Pod, event *framework.ClusterEvent, oldObj, obj interface{}) *framework.Status {
+	newNode, ok := obj.(*v1.Node)
+	if !ok {
+		return framework.AsStatus(fmt.Errorf("expected Node, but got %T", obj))
+	}
+
+	for _, c := range p.Spec.TopologySpreadConstraints {
+		_, ok := newNode.Labels[c.TopologyKey]
+		if ok {
+			if event.ActionType&framework.UpdateNodeLabel != 0 {
+				oldNode, ok := oldObj.(*v1.Node)
+				if !ok {
+					return framework.AsStatus(fmt.Errorf("expected Node, but got %T", obj))
+				}
+
+				_, ok = oldNode.Labels[c.TopologyKey]
+				if ok {
+					// This Node originally has the label.
+					// So, this update doesn't make Pod schedulable from this TopologySpread prospective.
+					continue
+				}
+			}
+
+			// Add or UpdateNodeLabel: This Node is going to be new domain for this Pod's topology spread. So, this event may make Pod schedulable.
+			// Delete: The deletion of Node with TopologyKey label may make Pod schedulable.
+			return nil
+		}
+	}
+
+	// This Node isn't related to this Pod's topology spread.
+	return framework.NewStatus(framework.Unschedulable)
 }
 
 // EventsToRegister returns the possible events that may make a Pod

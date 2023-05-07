@@ -66,6 +66,17 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 		return
 	}
 	pod := podInfo.Pod
+
+	breakFromSchedulingCycle := true
+	defer func() {
+		// scheduleOne must call DonePod regardless how it returns,
+		// with one exception: when the pod is ready for PreBind, the
+		// goroutine below takes over.
+		if breakFromSchedulingCycle {
+			sched.DonePod(pod.UID)
+		}
+	}()
+
 	fwk, err := sched.frameworkForPod(pod)
 	if err != nil {
 		// This shouldn't happen, because we only accept for scheduling the pods
@@ -98,9 +109,13 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 	}
 
 	// bind the pod to its host asynchronously (we can do this b/c of the assumption step above).
+	//
+	// This goroutine becomes responsible for calling DonePod.
+	breakFromSchedulingCycle = false
 	go func() {
 		bindingCycleCtx, cancel := context.WithCancel(ctx)
 		defer cancel()
+		defer sched.DonePod(assumedPodInfo.Pod.UID)
 
 		metrics.Goroutines.WithLabelValues(metrics.Binding).Inc()
 		defer metrics.Goroutines.WithLabelValues(metrics.Binding).Dec()
@@ -287,11 +302,11 @@ func (sched *Scheduler) handleBindingCycleError(
 		// It's intentional to "defer" this operation; otherwise MoveAllToActiveOrBackoffQueue() would
 		// update `q.moveRequest` and thus move the assumed pod to backoffQ anyways.
 		if status.IsUnschedulable() {
-			defer sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(internalqueue.AssignedPodDelete, func(pod *v1.Pod) bool {
+			defer sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(internalqueue.AssignedPodDelete, nil, assumedPod, func(pod *v1.Pod) bool {
 				return assumedPod.UID != pod.UID
 			})
 		} else {
-			sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(internalqueue.AssignedPodDelete, nil)
+			sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(internalqueue.AssignedPodDelete, nil, assumedPod, nil)
 		}
 	}
 

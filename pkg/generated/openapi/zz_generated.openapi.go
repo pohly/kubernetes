@@ -54871,6 +54871,13 @@ func schema_k8sio_kube_scheduler_config_v1_Plugins(ref common.ReferenceCallback)
 				Description: "Plugins include multiple extension points. When specified, the list of plugins for a particular extension point are the only ones enabled. If an extension point is omitted from the config, then the default set of plugins is used for that extension point. Enabled plugins are called in the order specified here, after default plugins. If they need to be invoked before default plugins, default plugins must be disabled and re-enabled here in desired order.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
+					"requeue": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Requeue is a list of plugins that should be invoked before Pods gets moved from unschedulableQ to backoffQ or activeQ.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/kube-scheduler/config/v1.PluginSet"),
+						},
+					},
 					"preEnqueue": {
 						SchemaProps: spec.SchemaProps{
 							Description: "PreEnqueue is a list of plugins that should be invoked before adding pods to the scheduling queue.",
@@ -55977,6 +55984,13 @@ func schema_k8sio_kube_scheduler_config_v1beta3_Plugins(ref common.ReferenceCall
 				Description: "Plugins include multiple extension points. When specified, the list of plugins for a particular extension point are the only ones enabled. If an extension point is omitted from the config, then the default set of plugins is used for that extension point. Enabled plugins are called in the order specified here, after default plugins. If they need to be invoked before default plugins, default plugins must be disabled and re-enabled here in desired order.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
+					"requeue": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Requeue is a list of plugins that should be invoked before Pods gets moved from unschedulableQ to backoffQ or activeQ.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/kube-scheduler/config/v1beta3.PluginSet"),
+						},
+					},
 					"preEnqueue": {
 						SchemaProps: spec.SchemaProps{
 							Description: "PreEnqueue is a list of plugins that should be invoked before adding pods to the scheduling queue.",

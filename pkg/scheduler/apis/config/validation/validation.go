@@ -202,6 +202,7 @@ func validatePluginConfig(path *field.Path, apiVersion string, profile *config.K
 	if profile.Plugins != nil {
 		stagesToPluginSet := map[string]config.PluginSet{
 			"preEnqueue": profile.Plugins.PreEnqueue,
+			"requeue":    profile.Plugins.Requeue,
 			"queueSort":  profile.Plugins.QueueSort,
 			"preFilter":  profile.Plugins.PreFilter,
 			"filter":     profile.Plugins.Filter,

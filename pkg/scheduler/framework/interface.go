@@ -295,6 +295,25 @@ type Plugin interface {
 	Name() string
 }
 
+// RequeuePlugin is an interface that must be implemented by "Requeue" plugins.
+//
+// Note: an Requeue plugin is expected to be lightweight and efficient, so it's not expected to
+// involve expensive calls like accessing external endpoints; otherwise it'd block other
+// Pods' enqueuing in event handlers.
+type RequeuePlugin interface {
+	Plugin
+	// Requeue returns status meaning whether the event can make a Pod, which is rejected by this plugin in the past scheduling cycle, schedulable or not.
+	// It's called before a Pod gets moved from unschedulableQ to backoffQ or activeQ.
+	//
+	// - `event`: By which event the pod will be moved back to schedQ/backoffQ.
+	//   - It can be nil when Pod is moved by priodically flush or activate.
+	// - `oldObj` `obj`: the object involved in that event.
+	//   - For example, the given event is "Node deleted", the `obj` will be that deleted Node.
+	//   - `oldObj` is nil if the event isn't update event.
+	//   - Both can be nil when Pod is moved by priodically flush or activate.
+	Requeue(ctx context.Context, p *v1.Pod, event *ClusterEvent, oldObj, obj interface{}) *Status
+}
+
 // PreEnqueuePlugin is an interface that must be implemented by "PreEnqueue" plugins.
 // These plugins are called prior to adding Pods to activeQ.
 // Note: an preEnqueue plugin is expected to be lightweight and efficient, so it's not expected to
@@ -511,6 +530,9 @@ type Framework interface {
 
 	// PreEnqueuePlugins returns the registered preEnqueue plugins.
 	PreEnqueuePlugins() []PreEnqueuePlugin
+
+	// RequeuePlugin returns the registered Requeue plugins.
+	RequeuePlugins() []RequeuePlugin
 
 	// QueueSortFunc returns the function to sort pods in scheduling queue
 	QueueSortFunc() LessFunc

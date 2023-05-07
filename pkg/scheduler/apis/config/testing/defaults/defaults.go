@@ -23,6 +23,11 @@ import (
 
 // PluginsV1beta2 default set of v1beta2 plugins.
 var PluginsV1beta2 = &config.Plugins{
+	Requeue: config.PluginSet{
+		Enabled: []config.Plugin{
+			{Name: names.PodTopologySpread},
+		},
+	},
 	PreEnqueue: config.PluginSet{
 		Enabled: []config.Plugin{
 			{Name: names.SchedulingGates},
@@ -194,6 +199,11 @@ var PluginsV1beta3 = &config.Plugins{
 
 // ExpandedPluginsV1beta3 default set of v1beta3 plugins after MultiPoint expansion
 var ExpandedPluginsV1beta3 = &config.Plugins{
+	Requeue: config.PluginSet{
+		Enabled: []config.Plugin{
+			{Name: names.PodTopologySpread},
+		},
+	},
 	PreEnqueue: config.PluginSet{
 		Enabled: []config.Plugin{
 			{Name: names.SchedulingGates},
@@ -377,6 +387,11 @@ var PluginsV1 = &config.Plugins{
 
 // ExpandedPluginsV1 default set of v1 plugins after MultiPoint expansion
 var ExpandedPluginsV1 = &config.Plugins{
+	Requeue: config.PluginSet{
+		Enabled: []config.Plugin{
+			{Name: names.PodTopologySpread},
+		},
+	},
 	PreEnqueue: config.PluginSet{
 		Enabled: []config.Plugin{
 			{Name: names.SchedulingGates},

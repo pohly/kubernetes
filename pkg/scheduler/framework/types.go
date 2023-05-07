@@ -87,9 +87,36 @@ type ClusterEvent struct {
 	Label      string
 }
 
+func (ce ClusterEvent) In(events []ClusterEvent) bool {
+	for _, e := range events {
+		if e.IsWildCard() {
+			return true
+		}
+		if e.Resource != ce.Resource {
+			continue
+		}
+		if e.ActionType&ce.ActionType != 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // IsWildCard returns true if ClusterEvent follows WildCard semantics
 func (ce ClusterEvent) IsWildCard() bool {
 	return ce.Resource == WildCard && ce.ActionType == All
+}
+
+// ClusterEventMap corresponds to map[ClusterEvent]sets.String where the set
+// contains the name of all plugins that use the the same ClusterEvent. It's
+// implemented as custom type instead of a literal Go map because the IsSchedulable
+// function makes ClusterEvent unsuitable as key. ClusterEvents which have such
+// a function are treated as unique entries in the map.
+type ClusterEventMap []ClusterEventMapEntry
+
+type ClusterEventMapEntry struct {
+	ClusterEvent
+	Names sets.Set[string]
 }
 
 // QueuedPodInfo is a Pod wrapper with additional information related to
@@ -111,6 +138,21 @@ type QueuedPodInfo struct {
 	UnschedulablePlugins sets.Set[string]
 	// Whether the Pod is scheduling gated (by PreEnqueuePlugins) or not.
 	Gated bool
+
+	// MoveRequestCycle is used by the PriorityQueue. Other queue
+	// implementations can ignore it.
+	//
+	// It caches the sequence number of scheduling cycle when we received a
+	// move request, typically because of a cluster event. When a pod
+	// scheduling attempt fails with "Unschedulable" in or before this
+	// cycle, it is placed in the backoff queue instead of the normal queue
+	// of unschedulable pods. This causes additional delays due to
+	// timeouts, but is necessary because the event that would have moved
+	// them out of the normal queue was already processed and thus the pod
+	// would be stuck in that queue unless some other event activates it.
+	// In the backoff queue it will be considered again without a cluster
+	// event.
+	MoveRequestCycle int64
 }
 
 // DeepCopy returns a deep copy of the QueuedPodInfo object.

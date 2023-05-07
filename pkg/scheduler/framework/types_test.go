@@ -1561,3 +1561,48 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 		})
 	}
 }
+
+func Test_ClusterEventIn(t *testing.T) {
+	tests := []struct {
+		name   string
+		events []ClusterEvent
+		event  ClusterEvent
+		want   bool
+	}{
+		{
+			name: "specific event correctly matches with the same event",
+			events: []ClusterEvent{
+				{Resource: Node, ActionType: Update},
+				{Resource: Pod, ActionType: Update},
+			},
+			event: ClusterEvent{Resource: Pod, ActionType: Update},
+			want:  true,
+		},
+		{
+			name: "no match",
+			events: []ClusterEvent{
+				{Resource: Node, ActionType: Update},
+				{Resource: Pod, ActionType: Update},
+			},
+			event: ClusterEvent{Resource: Pod, ActionType: Delete},
+			want:  false,
+		},
+		{
+			name: "All matches with all events in that resource",
+			events: []ClusterEvent{
+				{Resource: Node, ActionType: All},
+				{Resource: Pod, ActionType: All},
+			},
+			event: ClusterEvent{Resource: Pod, ActionType: Update},
+			want:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.event.In(tt.events); got != tt.want {
+				t.Errorf("unexpected result: want: %v got: %v", tt.want, got)
+			}
+		})
+	}
+}

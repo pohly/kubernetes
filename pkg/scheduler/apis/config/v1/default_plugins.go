@@ -90,6 +90,7 @@ func mergePlugins(logger klog.Logger, defaultPlugins, customPlugins *v1.Plugins)
 
 	defaultPlugins.MultiPoint = mergePluginSet(logger, defaultPlugins.MultiPoint, customPlugins.MultiPoint)
 	defaultPlugins.PreEnqueue = mergePluginSet(logger, defaultPlugins.PreEnqueue, customPlugins.PreEnqueue)
+	defaultPlugins.Requeue = mergePluginSet(logger, defaultPlugins.Requeue, customPlugins.Requeue)
 	defaultPlugins.QueueSort = mergePluginSet(logger, defaultPlugins.QueueSort, customPlugins.QueueSort)
 	defaultPlugins.PreFilter = mergePluginSet(logger, defaultPlugins.PreFilter, customPlugins.PreFilter)
 	defaultPlugins.Filter = mergePluginSet(logger, defaultPlugins.Filter, customPlugins.Filter)
