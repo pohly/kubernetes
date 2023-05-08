@@ -23,14 +23,18 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
 	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes"
 	resourcev1alpha2listers "k8s.io/client-go/listers/resource/v1alpha2"
+	"k8s.io/client-go/tools/cache"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
@@ -207,11 +211,16 @@ func statusForClaim(schedulingCtx *resourcev1alpha2.PodSchedulingContext, podCla
 
 // dynamicResources is a plugin that ensures that ResourceClaims are allocated.
 type dynamicResources struct {
-	enabled                    bool
-	clientset                  kubernetes.Interface
-	claimLister                resourcev1alpha2listers.ResourceClaimLister
-	classLister                resourcev1alpha2listers.ResourceClassLister
-	podSchedulingContextLister resourcev1alpha2listers.PodSchedulingContextLister
+	enabled             bool
+	fh                  framework.Handle
+	clientset           kubernetes.Interface
+	claimLister         resourcev1alpha2listers.ResourceClaimLister
+	classLister         resourcev1alpha2listers.ResourceClassLister
+	podSchedulingLister resourcev1alpha2listers.PodSchedulingContextLister
+
+	// logger is only meant to be used by background activities which don't
+	// have some other logger in their parent callstack.
+	logger klog.Logger
 }
 
 // New initializes a new plugin and returns it.
@@ -221,13 +230,17 @@ func New(plArgs runtime.Object, fh framework.Handle, fts feature.Features) (fram
 		return &dynamicResources{}, nil
 	}
 
-	return &dynamicResources{
-		enabled:                    true,
-		clientset:                  fh.ClientSet(),
-		claimLister:                fh.SharedInformerFactory().Resource().V1alpha2().ResourceClaims().Lister(),
-		classLister:                fh.SharedInformerFactory().Resource().V1alpha2().ResourceClasses().Lister(),
-		podSchedulingContextLister: fh.SharedInformerFactory().Resource().V1alpha2().PodSchedulingContexts().Lister(),
-	}, nil
+	pl := &dynamicResources{
+		enabled:             true,
+		fh:                  fh,
+		clientset:           fh.ClientSet(),
+		claimLister:         fh.SharedInformerFactory().Resource().V1alpha2().ResourceClaims().Lister(),
+		classLister:         fh.SharedInformerFactory().Resource().V1alpha2().ResourceClasses().Lister(),
+		podSchedulingLister: fh.SharedInformerFactory().Resource().V1alpha2().PodSchedulingContexts().Lister(),
+		logger:              klog.LoggerWithName(klog.TODO(), Name),
+	}
+
+	return pl, nil
 }
 
 var _ framework.PreFilterPlugin = &dynamicResources{}
@@ -236,6 +249,7 @@ var _ framework.PostFilterPlugin = &dynamicResources{}
 var _ framework.PreScorePlugin = &dynamicResources{}
 var _ framework.ReservePlugin = &dynamicResources{}
 var _ framework.EnqueueExtensions = &dynamicResources{}
+var _ framework.RequeuePlugin = &dynamicResources{}
 var _ framework.PostBindPlugin = &dynamicResources{}
 
 // Name returns name of the plugin. It is used in logs, etc.
@@ -243,7 +257,7 @@ func (pl *dynamicResources) Name() string {
 	return Name
 }
 
-// EventsToRegister returns the possible events that may make a Pod
+// EventsToRegisterWithHints returns the possible events that may make a Pod
 // failed by this plugin schedulable.
 func (pl *dynamicResources) EventsToRegister() []framework.ClusterEvent {
 	if !pl.enabled {
@@ -253,11 +267,11 @@ func (pl *dynamicResources) EventsToRegister() []framework.ClusterEvent {
 	events := []framework.ClusterEvent{
 		// Allocation is tracked in ResourceClaims, so any changes may make the pods schedulable.
 		{Resource: framework.ResourceClaim, ActionType: framework.Add | framework.Update},
+
 		// When a driver has provided additional information, a pod waiting for that information
 		// may be schedulable.
-		// TODO (#113702): can we change this so that such an event does not trigger *all* pods?
-		// Yes: https://github.com/kubernetes/kubernetes/blob/abcbaed0784baf5ed2382aae9705a8918f2daa18/pkg/scheduler/eventhandlers.go#L70
-		{Resource: framework.PodSchedulingContext, ActionType: framework.Add | framework.Update},
+		{Resource: framework.PodSchedulingContext, ActionType: framework.Add | framework.Update | framework.Delete},
+
 		// A resource might depend on node labels for topology filtering.
 		// A new or updated node may make pods schedulable.
 		{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeLabel},
@@ -265,9 +279,200 @@ func (pl *dynamicResources) EventsToRegister() []framework.ClusterEvent {
 	return events
 }
 
+func (pl *dynamicResources) Requeue(ctx context.Context, pod *v1.Pod, event *framework.ClusterEvent, oldObj, obj interface{}) *framework.Status {
+	if !pl.enabled {
+		return nil
+	}
+
+	if !event.In(pl.EventsToRegister()) {
+		// Event not of interest.
+		return framework.NewStatus(framework.Unschedulable)
+	}
+
+	isDelete := false
+	if obj == nil {
+		// Delete event.
+		isDelete = true
+		obj = oldObj
+	}
+	if delUnknownObj, ok := obj.(cache.DeletedFinalStateUnknown); ok {
+		obj = delUnknownObj.Obj
+	}
+
+	if obj == nil {
+		// Must be some other kind of cluster event that we don't care about.
+		return framework.NewStatus(framework.Unschedulable)
+	}
+
+	logger := klog.FromContext(ctx)
+	switch obj := obj.(type) {
+	case *resourcev1alpha2.PodSchedulingContext:
+		if obj.Name == pod.Name && obj.Namespace == pod.Namespace {
+			// Deleted? That can happen because we ourselves delete the PodSchedulingContext while
+			// working on the pod. This can be ignored.
+			if isDelete {
+				logger.V(4).Info("PodSchedulingContext for pod got deleted", "pod", klog.KObj(pod))
+				return framework.NewStatus(framework.Unschedulable)
+			}
+
+			// If the drivers have provided information about all
+			// unallocated claims with delayed allocation, then the next
+			// scheduling attempt is able to pick a node, so we let it run
+			// immediately.
+			pendingDelayedClaims := 0
+			if err := pl.foreachPodResourceClaim(pod, func(podResourceName string, claim *resourcev1alpha2.ResourceClaim) {
+				if claim.Spec.AllocationMode == resourcev1alpha2.AllocationModeWaitForFirstConsumer &&
+					claim.Status.Allocation == nil &&
+					!podSchedulingHasClaimInfo(obj, podResourceName) {
+					pendingDelayedClaims++
+				}
+			}); err != nil {
+				// This is not an unexpected error: we know that
+				// foreachPodResourceClaim only returns errors for "not
+				// schedulable".
+				logger.V(4).Info("pod is not schedulable", "pod", klog.KObj(pod), "reason", err.Error())
+				return framework.NewStatus(framework.Unschedulable)
+			}
+			if pendingDelayedClaims == 0 {
+				logger.V(4).Info("PodSchedulingContext for pod got completed", "pod", klog.KObj(pod))
+				return nil
+			}
+
+			// The other situation where the scheduler needs to do
+			// something immediately is when the selected node doesn't
+			// work: waiting in the backoff queue only helps eventually
+			// resources on the selected node become available again. It's
+			// much more likely, in particular when trying to fill up the
+			// cluster, that the choice simply didn't work out. The risk
+			// here is that in a situation where the cluster really is
+			// full, backoff won't be used because the scheduler keeps
+			// trying different nodes. This should not happen when it has
+			// full knowledge about resource availablity (=
+			// PodSchedulingContext.*.UnsuitableNodes is complete) but may happen
+			// when it doesn't (= PodSchedulingContext.*.UnsuitableNodes had to be
+			// truncated).
+			if obj.Spec.SelectedNode != "" {
+				for _, claimStatus := range obj.Status.ResourceClaims {
+					if sliceContains(claimStatus.UnsuitableNodes, obj.Spec.SelectedNode) {
+						logger.V(5).Info("PodSchedulingContext has unsuitable selected node", "pod", klog.KObj(pod), "selectedNode", obj.Spec.SelectedNode, "podResourceName", claimStatus.Name)
+						return nil
+					}
+				}
+			}
+			// We could start a pod scheduling attempt to refresh the
+			// potential nodes list.  But pod scheduling attempts are
+			// expensive and doing them too often causes the pod to enter
+			// backoff. Let's wait instead for all drivers to reply.
+			logger.V(5).Info("PodSchedulingContext for pod still incomplete", "pod", klog.KObj(pod))
+			return framework.NewStatus(framework.Unschedulable)
+		}
+
+		logger.V(7).Info("PodSchedulingContext for unrelated pod got modified", "pod", klog.KObj(pod), "obj", klog.KObj(obj))
+		return framework.NewStatus(framework.Unschedulable)
+
+	case *resourcev1alpha2.ResourceClaim:
+		usesClaim := false
+		if err := pl.foreachPodResourceClaim(pod, func(_ string, claim *resourcev1alpha2.ResourceClaim) {
+			if claim.UID == obj.UID {
+				usesClaim = true
+			}
+		}); err != nil {
+			// This is not an unexpected error: we know that
+			// foreachPodResourceClaim only returns errors for "not
+			// schedulable".
+			logger.V(4).Info("pod is not schedulable", "pod", klog.KObj(pod), "claim", klog.KObj(obj), "reason", err.Error())
+			return framework.NewStatus(framework.Unschedulable)
+		}
+
+		if usesClaim {
+			if oldObj == nil {
+				logger.V(4).Info("claim for pod got created", "pod", klog.KObj(pod), "claim", klog.KObj(obj))
+				return nil
+			}
+
+			// Modifications may or may not be relevant. If the entire
+			// status is as before, then something else must have changed
+			// and we don't care. What happens in practice is that the
+			// resource driver adds the finalizer.
+			originalClaim, ok := oldObj.(*resourcev1alpha2.ResourceClaim)
+			if !ok {
+				// Shouldn't happen.
+				logger.Error(nil, "unexpected old object in isSchedulableAfterClaimAddOrUpdate", "obj", oldObj)
+				return nil /* maybe? */
+			}
+			if apiequality.Semantic.DeepEqual(&originalClaim.Status, &obj.Status) {
+				if loggerV := logger.V(7); loggerV.Enabled() {
+					// Log more information.
+					loggerV.Info("claim for pod got modified where the pod doesn't care", "pod", klog.KObj(pod), "claim", klog.KObj(obj), "diff", cmp.Diff(originalClaim, obj))
+				} else {
+					logger.V(6).Info("claim for pod got modified where the pod doesn't care", "pod", klog.KObj(pod), "claim", klog.KObj(obj))
+				}
+				return framework.NewStatus(framework.Unschedulable)
+			}
+
+			logger.V(4).Info("status of claim for pod got updated", "pod", klog.KObj(pod), "claim", klog.KObj(obj))
+			return nil
+		}
+
+		// This was not the claim the pod was waiting for.
+		logger.V(6).Info("unrelated claim got modified", "pod", klog.KObj(pod), "claim", klog.KObj(obj))
+		return framework.NewStatus(framework.Unschedulable)
+	default:
+		logger.Error(nil, "unexpected object type %T in dynamicResources.Requeue", obj)
+		return framework.NewStatus(framework.Unschedulable)
+	}
+}
+
+func podSchedulingHasClaimInfo(podScheduling *resourcev1alpha2.PodSchedulingContext, podResourceName string) bool {
+	for _, claimStatus := range podScheduling.Status.ResourceClaims {
+		if claimStatus.Name == podResourceName {
+			return true
+		}
+	}
+	return false
+}
+
+func sliceContains(hay []string, needle string) bool {
+	for _, item := range hay {
+		if item == needle {
+			return true
+		}
+	}
+	return false
+}
+
+// PreEnqueue checks if there are known reasons why a pod currently cannot be
+// scheduled. When this fails, one of the registered events can trigger another
+// attempt.
+func (pl *dynamicResources) PreEnqueue(ctx context.Context, pod *v1.Pod) (status *framework.Status) {
+	logger := klog.FromContext(ctx)
+	defer func() {
+		logger.V(5).Info("PreEnqueue", "pod", klog.KObj(pod), "status", status)
+	}()
+	if err := pl.foreachPodResourceClaim(pod, nil); err != nil {
+		return statusUnschedulable(logger, err.Error())
+	}
+	return nil
+}
+
 // podResourceClaims returns the ResourceClaims for all pod.Spec.PodResourceClaims.
 func (pl *dynamicResources) podResourceClaims(pod *v1.Pod) ([]*resourcev1alpha2.ResourceClaim, error) {
 	claims := make([]*resourcev1alpha2.ResourceClaim, 0, len(pod.Spec.ResourceClaims))
+	if err := pl.foreachPodResourceClaim(pod, func(_ string, claim *resourcev1alpha2.ResourceClaim) {
+		// We store the pointer as returned by the lister. The
+		// assumption is that if a claim gets modified while our code
+		// runs, the cache will store a new pointer, not mutate the
+		// existing object that we point to here.
+		claims = append(claims, claim)
+	}); err != nil {
+		return nil, err
+	}
+	return claims, nil
+}
+
+// foreachPodResourceClaim checks that each ResourceClaim for the pod exists.
+// It calls an optional handler for those claims that it finds.
+func (pl *dynamicResources) foreachPodResourceClaim(pod *v1.Pod, cb func(podResourceName string, claim *resourcev1alpha2.ResourceClaim)) error {
 	for _, resource := range pod.Spec.ResourceClaims {
 		claimName := resourceclaim.Name(pod, &resource)
 		isEphemeral := resource.Source.ResourceClaimTemplateName != nil
@@ -279,25 +484,23 @@ func (pl *dynamicResources) podResourceClaims(pod *v1.Pod) ([]*resourcev1alpha2.
 			if isEphemeral && apierrors.IsNotFound(err) {
 				err = fmt.Errorf("waiting for dynamic resource controller to create the resourceclaim %q", claimName)
 			}
-			return nil, err
+			return err
 		}
 
 		if claim.DeletionTimestamp != nil {
-			return nil, fmt.Errorf("resourceclaim %q is being deleted", claim.Name)
+			return fmt.Errorf("resourceclaim %q is being deleted", claim.Name)
 		}
 
 		if isEphemeral {
 			if err := resourceclaim.IsForPod(pod, claim); err != nil {
-				return nil, err
+				return err
 			}
 		}
-		// We store the pointer as returned by the lister. The
-		// assumption is that if a claim gets modified while our code
-		// runs, the cache will store a new pointer, not mutate the
-		// existing object that we point to here.
-		claims = append(claims, claim)
+		if cb != nil {
+			cb(resource.Name, claim)
+		}
 	}
-	return claims, nil
+	return nil
 }
 
 // PreFilter invoked at the prefilter extension point to check if pod has all
@@ -436,7 +639,7 @@ func (pl *dynamicResources) Filter(ctx context.Context, cs *framework.CycleState
 			}
 
 			// Now we need information from drivers.
-			schedulingCtx, err := state.initializePodSchedulingContexts(ctx, pod, pl.podSchedulingContextLister)
+			schedulingCtx, err := state.initializePodSchedulingContexts(ctx, pod, pl.podSchedulingLister)
 			if err != nil {
 				return statusError(logger, err)
 			}
@@ -530,7 +733,7 @@ func (pl *dynamicResources) PreScore(ctx context.Context, cs *framework.CycleSta
 	}
 
 	logger := klog.FromContext(ctx)
-	schedulingCtx, err := state.initializePodSchedulingContexts(ctx, pod, pl.podSchedulingContextLister)
+	schedulingCtx, err := state.initializePodSchedulingContexts(ctx, pod, pl.podSchedulingLister)
 	if err != nil {
 		return statusError(logger, err)
 	}
@@ -614,7 +817,7 @@ func (pl *dynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 	numDelayedAllocationPending := 0
 	numClaimsWithStatusInfo := 0
 	logger := klog.FromContext(ctx)
-	schedulingCtx, err := state.initializePodSchedulingContexts(ctx, pod, pl.podSchedulingContextLister)
+	schedulingCtx, err := state.initializePodSchedulingContexts(ctx, pod, pl.podSchedulingLister)
 	if err != nil {
 		return statusError(logger, err)
 	}
