@@ -36,6 +36,7 @@ import (
 	"github.com/onsi/gomega"
 	gomegaformat "github.com/onsi/gomega/format"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	cliflag "k8s.io/component-base/cli/flag"
@@ -93,6 +94,8 @@ type TestContextType struct {
 	RepoRoot string
 	// ListImages will list off all images that are used then quit
 	ListImages bool
+
+	listTests, listLabels bool
 
 	// ListConformanceTests will list off all conformance tests that are available then quit
 	ListConformanceTests bool
@@ -356,6 +359,8 @@ func RegisterCommonFlags(flags *flag.FlagSet) {
 	flags.StringVar(&TestContext.NonblockingTaints, "non-blocking-taints", `node-role.kubernetes.io/control-plane`, "Nodes with taints in this comma-delimited list will not block the test framework from starting tests.")
 
 	flags.BoolVar(&TestContext.ListImages, "list-images", false, "If true, will show list of images used for running tests.")
+	flags.BoolVar(&TestContext.listLabels, "list-labels", false, "If true, will show the list of labels that can be used to select tests via -ginkgo.label-filter.")
+	flags.BoolVar(&TestContext.listTests, "list-tests", false, "If true, will show the full names of all tests (aka specs) that can be used to select test via -ginkgo.focus/skip.")
 	flags.StringVar(&TestContext.KubectlPath, "kubectl-path", "kubectl", "The kubectl binary to use. For development, you might use 'cluster/kubectl.sh' here.")
 
 	flags.StringVar(&TestContext.ProgressReportURL, "progress-report-url", "", "The URL to POST progress updates to as the suite runs to assist in aiding integrations. If empty, no messages sent.")
@@ -376,6 +381,17 @@ func CreateGinkgoConfig() (types.SuiteConfig, types.ReporterConfig) {
 	suiteConfig, reporterConfig := ginkgo.GinkgoConfiguration()
 	// Randomize specs as well as suites
 	suiteConfig.RandomizeAllSpecs = true
+	if TestContext.listLabels || TestContext.listTests {
+		suiteConfig.EmitSpecProgress = false
+		reporterConfig.NoColor = true
+		reporterConfig.Succinct = true
+		reporterConfig.Verbose = false
+		reporterConfig.VeryVerbose = false
+		suiteConfig.DryRun = true
+	} else {
+		// Turn on verbose by default to get spec names
+		reporterConfig.Verbose = true
+	}
 	// Disable skipped tests unless they are explicitly requested.
 	if len(suiteConfig.FocusStrings) == 0 && len(suiteConfig.SkipStrings) == 0 {
 		suiteConfig.SkipStrings = []string{`\[Flaky\]|\[Feature:.+\]`}
@@ -494,6 +510,14 @@ func AfterReadingAllFlags(t *TestContextType) {
 	gomega.SetDefaultEventuallyTimeout(t.timeouts.PodStart)
 	gomega.SetDefaultConsistentlyDuration(t.timeouts.PodStartShort)
 
+	if t.listLabels || t.listTests {
+		ginkgo.ReportAfterSuite("Kubernetes e2e test statistics", listTestInformation, ginkgo.SuppressProgressReporting)
+		// Will continue in listTestInformation.
+		// TODO (https://github.com/onsi/ginkgo/issues/1225): extract the information with the new Ginkgo API call
+		// once it is available.
+		return
+	}
+
 	// Only set a default host if one won't be supplied via kubeconfig
 	if len(t.Host) == 0 && len(t.KubeConfig) == 0 {
 		// Check if we can use the in-cluster config
@@ -598,5 +622,32 @@ func AfterReadingAllFlags(t *TestContextType) {
 			// (https://github.com/kubernetes/kubernetes/issues/111510).
 			ExpectNoError(junit.WriteJUnitReport(report, junitReport))
 		})
+	}
+}
+
+func listTestInformation(report ginkgo.Report) {
+	indent := strings.Repeat(" ", 4)
+
+	if TestContext.listLabels || TestContext.listTests {
+		fmt.Print("\n\n")
+	}
+	if TestContext.listLabels {
+		labels := sets.New[string]()
+		for _, spec := range report.SpecReports {
+			if spec.LeafNodeType == types.NodeTypeIt {
+				labels.Insert(spec.Labels()...)
+			}
+		}
+		fmt.Printf("The following labels can be used with `gingko run --label-filter`:\n%s%s\n\n", indent, strings.Join(sets.List(labels), "\n"+indent))
+	}
+	if TestContext.listTests {
+		names := make([]string, 0, len(report.SpecReports))
+		for _, spec := range report.SpecReports {
+			if spec.LeafNodeType == types.NodeTypeIt {
+				names = append(names, spec.FullText())
+			}
+		}
+		sort.Strings(names)
+		fmt.Printf("The following spec names can be used with `ginkgo run --focus/skip`:\n%s%s\n\n", indent, strings.Join(names, "\n"+indent))
 	}
 }
