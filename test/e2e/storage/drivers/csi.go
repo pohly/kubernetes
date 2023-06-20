@@ -61,6 +61,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -855,8 +856,10 @@ func (g *gcePDCSIDriver) SkipUnsupportedTest(pattern storageframework.TestPatter
 	if pattern.FsType == "xfs" {
 		e2eskipper.SkipUnlessNodeOSDistroIs("ubuntu", "custom")
 	}
-	if pattern.FeatureTag == "[Feature:Windows]" {
-		e2eskipper.Skipf("Skipping tests for windows since CSI does not support it yet")
+	for _, tag := range pattern.TestTags {
+		if tag == feature.Windows {
+			e2eskipper.Skipf("Skipping tests for windows since CSI does not support it yet")
+		}
 	}
 }
 

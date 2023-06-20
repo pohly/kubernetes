@@ -51,6 +51,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eauth "k8s.io/kubernetes/test/e2e/framework/auth"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -1083,8 +1084,10 @@ func (g *gcePdDriver) GetDriverInfo() *storageframework.DriverInfo {
 
 func (g *gcePdDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
 	e2eskipper.SkipUnlessProviderIs("gce", "gke")
-	if pattern.FeatureTag == "[Feature:Windows]" {
-		e2eskipper.SkipUnlessNodeOSDistroIs("windows")
+	for _, tag := range pattern.TestTags {
+		if tag == feature.Windows {
+			e2eskipper.SkipUnlessNodeOSDistroIs("windows")
+		}
 	}
 }
 
