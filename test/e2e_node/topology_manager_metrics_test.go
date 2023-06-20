@@ -31,10 +31,11 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	"k8s.io/kubernetes/test/e2e/nodefeature"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-var _ = SIGDescribe("Topology Manager Metrics [Serial] [Feature:TopologyManager]", func() {
+var _ = SIGDescribe("Topology Manager Metrics", framework.WithSerial(), nodefeature.TopologyManager, func() {
 	f := framework.NewDefaultFramework("topologymanager-metrics")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 

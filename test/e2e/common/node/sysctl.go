@@ -32,7 +32,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("Sysctls [LinuxOnly] [NodeConformance]", func() {
+var _ = SIGDescribe("Sysctls [LinuxOnly]", framework.WithNodeConformance(), func() {
 
 	ginkgo.BeforeEach(func() {
 		// sysctl is not supported on Windows.

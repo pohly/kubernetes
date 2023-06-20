@@ -41,6 +41,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
+	"k8s.io/kubernetes/test/e2e/nodefeature"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	"github.com/onsi/ginkgo/v2"
@@ -944,7 +945,7 @@ func hostPrecheck() (int, int) {
 }
 
 // Serial because the test updates kubelet configuration.
-var _ = SIGDescribe("Topology Manager [Serial] [Feature:TopologyManager]", func() {
+var _ = SIGDescribe("Topology Manager", framework.WithSerial(), nodefeature.TopologyManager, func() {
 	f := framework.NewDefaultFramework("topology-manager-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 

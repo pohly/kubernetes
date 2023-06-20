@@ -331,7 +331,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 
 			// Create 4 PVs and 2 PVCs.
 			// Note: PVs are created before claims and no pre-binding.
-			ginkgo.It("should create 4 PVs and 2 PVCs: test write access [Slow]", func(ctx context.Context) {
+			f.It("should create 4 PVs and 2 PVCs: test write access", f.WithSlow(), func(ctx context.Context) {
 				numPVs, numPVCs := 4, 2
 				pvols, claims, err = e2epv.CreatePVsPVCs(ctx, numPVs, numPVCs, c, f.Timeouts, ns, pvConfig, pvcConfig)
 				framework.ExpectNoError(err)
@@ -779,7 +779,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				e2estatefulset.DeleteAllStatefulSets(ctx, c, ns)
 			})
 
-			ginkgo.It("should be reschedulable [Slow]", func(ctx context.Context) {
+			f.It("should be reschedulable", f.WithSlow(), func(ctx context.Context) {
 				// Only run on providers with default storageclass
 				e2epv.SkipIfNoDefaultStorageClass(ctx, c)
 

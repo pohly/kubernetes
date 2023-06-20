@@ -590,7 +590,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		   Testname: StatefulSet, Scaling
 		   Description: StatefulSet MUST create Pods in ascending order by ordinal index when scaling up, and delete Pods in descending order when scaling down. Scaling up or down MUST pause if any Pods belonging to the StatefulSet are unhealthy. This test does not depend on a preexisting default StorageClass or a dynamic provisioner.
 		*/
-		framework.ConformanceIt("Scaling should happen in predictable order and halt if any stateful pod is unhealthy [Slow]", func(ctx context.Context) {
+		framework.ConformanceIt("Scaling should happen in predictable order and halt if any stateful pod is unhealthy", framework.WithSlow(), func(ctx context.Context) {
 			psLabels := klabels.Set(labels)
 			w := &cache.ListWatch{
 				WatchFunc: func(options metav1.ListOptions) (i watch.Interface, e error) {
@@ -700,7 +700,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		   Testname: StatefulSet, Burst Scaling
 		   Description: StatefulSet MUST support the Parallel PodManagementPolicy for burst scaling. This test does not depend on a preexisting default StorageClass or a dynamic provisioner.
 		*/
-		framework.ConformanceIt("Burst scaling should run to completion even with unhealthy pods [Slow]", func(ctx context.Context) {
+		framework.ConformanceIt("Burst scaling should run to completion even with unhealthy pods", framework.WithSlow(), func(ctx context.Context) {
 			psLabels := klabels.Set(labels)
 
 			ginkgo.By("Creating stateful set " + ssName + " in namespace " + ns)
@@ -1377,7 +1377,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			e2estatefulset.DeleteAllStatefulSets(ctx, c, ns)
 		})
 
-		ginkgo.It("PVC should be recreated when pod is pending due to missing PVC [Disruptive][Serial]", func(ctx context.Context) {
+		f.It("PVC should be recreated when pod is pending due to missing PVC", f.WithDisruptive(), f.WithSerial(), func(ctx context.Context) {
 			e2epv.SkipIfNoDefaultStorageClass(ctx, c)
 
 			readyNode, err := e2enode.GetRandomReadySchedulableNode(ctx, c)

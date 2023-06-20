@@ -26,6 +26,7 @@ import (
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eautoscaling "k8s.io/kubernetes/test/e2e/framework/autoscaling"
 )
@@ -42,7 +43,7 @@ const (
 )
 
 // These tests don't seem to be running properly in parallel: issue: #20338.
-var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: CPU)", func() {
+var _ = SIGDescribe("Horizontal pod autoscaling (scale resource: CPU)", feature.HPA, func() {
 	f := framework.NewDefaultFramework("horizontal-pod-autoscaling")
 	f.NamespacePodSecurityLevel = api.LevelBaseline
 
@@ -101,7 +102,7 @@ var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: C
 			}
 			st.run(ctx, "rc-light", e2eautoscaling.KindRC, f)
 		})
-		ginkgo.It("[Slow] Should scale from 2 pods to 1 pod", func(ctx context.Context) {
+		f.It("Should scale from 2 pods to 1 pod", f.WithSlow(), func(ctx context.Context) {
 			st := &HPAScaleTest{
 				initPods:         2,
 				initCPUTotal:     50,
@@ -147,7 +148,7 @@ var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: C
 	})
 })
 
-var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: Memory)", func() {
+var _ = SIGDescribe("Horizontal pod autoscaling (scale resource: Memory)", feature.HPA, func() {
 	f := framework.NewDefaultFramework("horizontal-pod-autoscaling")
 	f.NamespacePodSecurityLevel = api.LevelBaseline
 

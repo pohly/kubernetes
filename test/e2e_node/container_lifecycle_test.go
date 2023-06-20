@@ -44,7 +44,7 @@ func prefixedName(namePrefix string, name string) string {
 	return fmt.Sprintf("%s-%s", namePrefix, name)
 }
 
-var _ = SIGDescribe("[NodeConformance] Containers Lifecycle", func() {
+var _ = SIGDescribe("Containers Lifecycle", framework.WithNodeConformance(), func() {
 	f := framework.NewDefaultFramework("containers-lifecycle-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 

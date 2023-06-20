@@ -708,7 +708,7 @@ metadata:
 				gomega.Expect(ee.ExitStatus()).To(gomega.Equal(42))
 			})
 
-			ginkgo.It("[Slow] running a failing command without --restart=Never", func(ctx context.Context) {
+			f.It("running a failing command without --restart=Never", f.WithSlow(), func(ctx context.Context) {
 				_, err := e2ekubectl.NewKubectlCommand(ns, "run", "-i", "--image="+busyboxImage, "--restart=OnFailure", podRunningTimeoutArg, "failure-2", "--", "/bin/sh", "-c", "cat && exit 42").
 					WithStdinData("abcd1234").
 					Exec()
@@ -721,7 +721,7 @@ metadata:
 				}
 			})
 
-			ginkgo.It("[Slow] running a failing command without --restart=Never, but with --rm", func(ctx context.Context) {
+			f.It("running a failing command without --restart=Never, but with --rm", f.WithSlow(), func(ctx context.Context) {
 				_, err := e2ekubectl.NewKubectlCommand(ns, "run", "-i", "--image="+busyboxImage, "--restart=OnFailure", "--rm", podRunningTimeoutArg, "failure-3", "--", "/bin/sh", "-c", "cat && exit 42").
 					WithStdinData("abcd1234").
 					Exec()
@@ -735,7 +735,7 @@ metadata:
 				framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, "failure-3", ns, 2*v1.DefaultTerminationGracePeriodSeconds*time.Second))
 			})
 
-			ginkgo.It("[Slow] running a failing command with --leave-stdin-open", func(ctx context.Context) {
+			f.It("running a failing command with --leave-stdin-open", f.WithSlow(), func(ctx context.Context) {
 				_, err := e2ekubectl.NewKubectlCommand(ns, "run", "-i", "--image="+busyboxImage, "--restart=Never", podRunningTimeoutArg, "failure-4", "--leave-stdin-open", "--", "/bin/sh", "-c", "exit 42").
 					WithStdinData("abcd1234").
 					Exec()

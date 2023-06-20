@@ -35,7 +35,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("[Disruptive]NodeLease", func() {
+var _ = SIGDescribe("NodeLease", framework.WithDisruptive(), func() {
 	f := framework.NewDefaultFramework("node-lease-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var systemPodsNo int32

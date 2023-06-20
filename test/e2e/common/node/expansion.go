@@ -44,7 +44,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		Testname: Environment variables, expansion
 		Description: Create a Pod with environment variables. Environment variables defined using previously defined environment variables MUST expand to proper values.
 	*/
-	framework.ConformanceIt("should allow composing env vars into new env vars [NodeConformance]", func(ctx context.Context) {
+	framework.ConformanceIt("should allow composing env vars into new env vars", framework.WithNodeConformance(), func(ctx context.Context) {
 		envVars := []v1.EnvVar{
 			{
 				Name:  "FOO",
@@ -73,7 +73,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		Testname: Environment variables, command expansion
 		Description: Create a Pod with environment variables and container command using them. Container command using the  defined environment variables MUST expand to proper values.
 	*/
-	framework.ConformanceIt("should allow substituting values in a container's command [NodeConformance]", func(ctx context.Context) {
+	framework.ConformanceIt("should allow substituting values in a container's command", framework.WithNodeConformance(), func(ctx context.Context) {
 		envVars := []v1.EnvVar{
 			{
 				Name:  "TEST_VAR",
@@ -92,7 +92,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		Testname: Environment variables, command argument expansion
 		Description: Create a Pod with environment variables and container command arguments using them. Container command arguments using the  defined environment variables MUST expand to proper values.
 	*/
-	framework.ConformanceIt("should allow substituting values in a container's args [NodeConformance]", func(ctx context.Context) {
+	framework.ConformanceIt("should allow substituting values in a container's args", framework.WithNodeConformance(), func(ctx context.Context) {
 		envVars := []v1.EnvVar{
 			{
 				Name:  "TEST_VAR",

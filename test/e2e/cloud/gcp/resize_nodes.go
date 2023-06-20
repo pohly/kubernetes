@@ -44,7 +44,7 @@ func resizeRC(ctx context.Context, c clientset.Interface, ns, name string, repli
 	return err
 }
 
-var _ = SIGDescribe("Nodes [Disruptive]", func() {
+var _ = SIGDescribe("Nodes", framework.WithDisruptive(), func() {
 	f := framework.NewDefaultFramework("resize-nodes")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var systemPodsNo int32

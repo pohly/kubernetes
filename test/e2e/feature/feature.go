@@ -114,7 +114,7 @@ var (
 	TopologyHints                      = framework.WithFeature(framework.ValidFeatures.Add("Topology Hints"))
 	UDP                                = framework.WithFeature(framework.ValidFeatures.Add("UDP"))
 	Upgrade                            = framework.WithFeature(framework.ValidFeatures.Add("Upgrade"))
-	UserNamespacesStatelessPodsSupport = framework.WithFeature(framework.ValidFeatures.Add("UserNamespacesStatelessPodsSupport"))
+	UserNamespacesSupport              = framework.WithFeature(framework.ValidFeatures.Add("UserNamespacesSupport"))
 	ValidatingAdmissionPolicy          = framework.WithFeature(framework.ValidFeatures.Add("ValidatingAdmissionPolicy"))
 	Volumes                            = framework.WithFeature(framework.ValidFeatures.Add("Volumes"))
 	VolumeSnapshotDataSource           = framework.WithFeature(framework.ValidFeatures.Add("VolumeSnapshotDataSource"))
