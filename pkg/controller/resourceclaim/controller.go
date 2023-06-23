@@ -18,18 +18,19 @@ package resourceclaim
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	corev1apply "k8s.io/client-go/applyconfigurations/core/v1"
 	v1informers "k8s.io/client-go/informers/core/v1"
 	resourcev1alpha2informers "k8s.io/client-go/informers/resource/v1alpha2"
 	clientset "k8s.io/client-go/kubernetes"
@@ -44,6 +45,7 @@ import (
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/resourceclaim/metrics"
+	"k8s.io/utils/pointer"
 )
 
 const (
@@ -55,9 +57,6 @@ const (
 	// for which it was generated. This is used only inside the controller
 	// and not documented as part of the Kubernetes API.
 	podResourceClaimAnnotation = "resource.kubernetes.io/pod-claim-name"
-
-	// Field manager used to update the pod status.
-	fieldManager = "ResourceClaimController"
 
 	maxUIDCacheEntries = 500
 )
@@ -183,8 +182,18 @@ func (ec *Controller) enqueuePod(obj interface{}, deleted bool) {
 		// Deleted and not scheduled:
 		pod.DeletionTimestamp != nil && pod.Spec.NodeName == "" {
 		for _, podClaim := range pod.Spec.ResourceClaims {
-			claimName := resourceclaim.Name(pod, &podClaim)
-			ec.queue.Add(claimKeyPrefix + pod.Namespace + "/" + claimName)
+			claimName, _, err := resourceclaim.Name(pod, &podClaim)
+			switch {
+			case err != nil:
+				// Either the claim was not created (nothing to do here) or
+				// the API changed. The later will also get reported elsewhere,
+				// so here it's just a debug message.
+				klog.TODO().V(5).Info("Nothing to do for claim during pod change", "err", err)
+			case claimName != nil:
+				ec.queue.Add(claimKeyPrefix + pod.Namespace + "/" + *claimName)
+			default:
+				// Nothing to do, claim wasn't generated.
+			}
 		}
 	}
 
@@ -312,7 +321,7 @@ func (ec *Controller) syncPod(ctx context.Context, namespace, name string) error
 	ctx = klog.NewContext(ctx, logger)
 	pod, err := ec.podLister.Pods(namespace).Get(name)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			logger.V(5).Info("nothing to do for pod, it is gone")
 			return nil
 		}
@@ -337,13 +346,39 @@ func (ec *Controller) syncPod(ctx context.Context, namespace, name string) error
 
 	if newPodClaims != nil {
 		// Patch the pod status with the new information about
-		// generated ResourceClaims.
-		statuses := make([]*corev1apply.PodResourceClaimStatusApplyConfiguration, 0, len(newPodClaims))
-		for podClaimName, resourceClaimName := range newPodClaims {
-			statuses = append(statuses, corev1apply.PodResourceClaimStatus().WithName(podClaimName).WithResourceClaimName(resourceClaimName))
+		// generated ResourceClaims. We have to update the entire field
+		// because it's a set, not a map.
+		updatedPod := &v1.Pod{
+			ObjectMeta: pod.ObjectMeta,
 		}
-		podApply := corev1apply.Pod(name, namespace).WithStatus(corev1apply.PodStatus().WithResourceClaimStatuses(statuses...))
-		if _, err := ec.kubeClient.CoreV1().Pods(namespace).ApplyStatus(ctx, podApply, metav1.ApplyOptions{FieldManager: fieldManager, Force: true}); err != nil {
+		for podClaimName, claimName := range newPodClaims {
+			podClaimName, claimName := podClaimName, claimName
+			updatedPod.Status.ResourceClaimStatuses = append(updatedPod.Status.ResourceClaimStatuses,
+				v1.PodResourceClaimStatus{
+					SourceRef: v1.PodResourceClaimReference{
+						Name: &podClaimName,
+					},
+					ResourceClaimName: &claimName,
+				})
+		}
+		for _, status := range pod.Status.ResourceClaimStatuses {
+			if status.SourceRef.Name == nil || newPodClaims[*status.SourceRef.Name] == "" {
+				updatedPod.Status.ResourceClaimStatuses = append(updatedPod.Status.ResourceClaimStatuses, status)
+			}
+		}
+
+		// Sorting is not strictly necessary, but nicer.
+		sort.Slice(updatedPod.Status.ResourceClaimStatuses, func(i, j int) bool {
+			return pointer.StringDeref(updatedPod.Status.ResourceClaimStatuses[i].SourceRef.Name, "") <
+				pointer.StringDeref(updatedPod.Status.ResourceClaimStatuses[j].SourceRef.Name, "")
+		})
+
+		// No one else is currently setting this field, so there's no
+		// reason to worry about overwriting information stored by
+		// someone else.
+		//
+		// TODO: tests...
+		if _, err := ec.kubeClient.CoreV1().Pods(namespace).UpdateStatus(ctx, updatedPod, metav1.UpdateOptions{}); err != nil {
 			return fmt.Errorf("update pod %s/%s ResourceClaimStatuses: %v", namespace, name, err)
 		}
 	}
@@ -356,21 +391,33 @@ func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podClaim v1.
 	logger := klog.LoggerWithValues(klog.FromContext(ctx), "podClaim", podClaim.Name)
 	ctx = klog.NewContext(ctx, logger)
 	logger.V(5).Info("checking", "podClaim", podClaim.Name)
-	templateName := podClaim.Source.ResourceClaimTemplateName
-	if templateName == nil {
-		return nil
-	}
 
-	claimName := resourceclaim.Name(pod, &podClaim)
-	if claimName != "" {
+	// resourceclaim.Name checks for the situation that the client doesn't
+	// know some future addition to the API. Therefore it gets called here
+	// even if there is no template to work on, because if some new field
+	// gets added, the expectation might be that the controller does
+	// something for it.
+	claimName, mustCheckOwner, err := resourceclaim.Name(pod, &podClaim)
+	switch {
+	case errors.Is(err, resourceclaim.ErrClaimNotFound):
+		// Continue below.
+	case err != nil:
+		return fmt.Errorf("checking for claim before creating it: %v", err)
+	case claimName == nil:
+		// Nothing to do, no claim needed.
+	case *claimName != "":
+		claimName := *claimName
 		// The ResourceClaim should exist because it is recorded in the pod.status.resourceClaimStatuses,
 		// but perhaps it was deleted accidentally. In that case we re-create it.
 		claim, err := ec.claimLister.ResourceClaims(pod.Namespace).Get(claimName)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
 		if claim != nil {
-			err := resourceclaim.IsForPod(pod, claim)
+			var err error
+			if mustCheckOwner {
+				err = resourceclaim.IsForPod(pod, claim)
+			}
 			if err == nil {
 				// Already created, nothing more to do.
 				logger.V(5).Info("claim already created", "podClaim", podClaim.Name, "resourceClaim", claimName)
@@ -378,6 +425,12 @@ func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podClaim v1.
 			}
 			logger.Error(err, "claim that was created for the pod is no longer owned by the pod, creating a new one", "podClaim", podClaim.Name, "resourceClaim", claimName)
 		}
+	}
+
+	templateName := podClaim.Source.ResourceClaimTemplateName
+	if templateName == nil {
+		// Nothing to do.
+		return nil
 	}
 
 	// Before we create a new ResourceClaim, check if there is an orphaned one.
@@ -421,6 +474,7 @@ func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podClaim v1.
 			Spec: template.Spec.Spec,
 		}
 		metrics.ResourceClaimCreateAttempts.Inc()
+		claimName := claim.Name
 		claim, err = ec.kubeClient.ResourceV1alpha2().ResourceClaims(pod.Namespace).Create(ctx, claim, metav1.CreateOptions{})
 		if err != nil {
 			metrics.ResourceClaimCreateFailures.Inc()
@@ -477,7 +531,7 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 	ctx = klog.NewContext(ctx, logger)
 	claim, err := ec.claimLister.ResourceClaims(namespace).Get(name)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			logger.V(5).Info("nothing to do for claim, it is gone")
 			return nil
 		}
@@ -508,7 +562,7 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 				keepEntry = false
 			} else {
 				pod, err := ec.podLister.Pods(claim.Namespace).Get(reservedFor.Name)
-				if err != nil && !errors.IsNotFound(err) {
+				if err != nil && !apierrors.IsNotFound(err) {
 					return err
 				}
 				if pod == nil {
@@ -518,7 +572,7 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 					// absolutely sure and thus have to check with
 					// the API server.
 					pod, err := ec.kubeClient.CoreV1().Pods(claim.Namespace).Get(ctx, reservedFor.Name, metav1.GetOptions{})
-					if err != nil && !errors.IsNotFound(err) {
+					if err != nil && !apierrors.IsNotFound(err) {
 						return err
 					}
 					if pod == nil || pod.UID != reservedFor.UID {
@@ -563,8 +617,14 @@ func podResourceClaimIndexFunc(obj interface{}) ([]string, error) {
 	keys := []string{}
 	for _, podClaim := range pod.Spec.ResourceClaims {
 		if podClaim.Source.ResourceClaimTemplateName != nil {
-			claimName := resourceclaim.Name(pod, &podClaim)
-			keys = append(keys, fmt.Sprintf("%s/%s", pod.Namespace, claimName))
+			claimName, _, err := resourceclaim.Name(pod, &podClaim)
+			if err != nil {
+				// Index functions are not supposed to fail, the caller will panic.
+				// For both error reasons (claim not created yet, unknown API)
+				// we simply don't index.
+				continue
+			}
+			keys = append(keys, fmt.Sprintf("%s/%s", pod.Namespace, *claimName))
 		}
 	}
 	return keys, nil

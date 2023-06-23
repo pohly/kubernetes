@@ -269,12 +269,15 @@ func (pl *dynamicResources) EventsToRegister() []framework.ClusterEvent {
 func (pl *dynamicResources) podResourceClaims(pod *v1.Pod) ([]*resourcev1alpha2.ResourceClaim, error) {
 	claims := make([]*resourcev1alpha2.ResourceClaim, 0, len(pod.Spec.ResourceClaims))
 	for _, resource := range pod.Spec.ResourceClaims {
-		claimName := resourceclaim.Name(pod, &resource)
-		if claimName == "" {
-			return nil, fmt.Errorf("waiting for dynamic resource controller to create the resourceclaim")
+		claimName, mustCheckOwner, err := resourceclaim.Name(pod, &resource)
+		if err != nil {
+			return nil, err
 		}
-		isEphemeral := resource.Source.ResourceClaimTemplateName != nil
-		claim, err := pl.claimLister.ResourceClaims(pod.Namespace).Get(claimName)
+		if claimName == nil {
+			// Not needed, continue without it.
+			continue
+		}
+		claim, err := pl.claimLister.ResourceClaims(pod.Namespace).Get(*claimName)
 		if err != nil {
 			return nil, err
 		}
@@ -283,7 +286,7 @@ func (pl *dynamicResources) podResourceClaims(pod *v1.Pod) ([]*resourcev1alpha2.
 			return nil, fmt.Errorf("resourceclaim %q is being deleted", claim.Name)
 		}
 
-		if isEphemeral {
+		if mustCheckOwner {
 			if err := resourceclaim.IsForPod(pod, claim); err != nil {
 				return nil, err
 			}

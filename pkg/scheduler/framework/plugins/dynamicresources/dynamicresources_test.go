@@ -80,8 +80,10 @@ var (
 		pod := podWithClaimTemplate.DeepCopy()
 		pod.Status.ResourceClaimStatuses = []v1.PodResourceClaimStatus{
 			{
-				Name:              pod.Spec.ResourceClaims[0].Name,
-				ResourceClaimName: claimName,
+				SourceRef: v1.PodResourceClaimReference{
+					Name: &pod.Spec.ResourceClaims[0].Name,
+				},
+				ResourceClaimName: &claimName,
 			},
 		}
 		return pod
@@ -234,7 +236,7 @@ func TestPlugin(t *testing.T) {
 			claims: []*resourcev1alpha2.ResourceClaim{allocatedClaim, otherClaim},
 			want: want{
 				prefilter: result{
-					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `waiting for dynamic resource controller to create the resourceclaim`),
+					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `pod "default/my-pod": ResourceClaim not created yet`),
 				},
 				postfilter: result{
 					status: framework.NewStatus(framework.Unschedulable, `no new claims to deallocate`),

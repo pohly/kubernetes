@@ -2584,6 +2584,33 @@ const (
 	PodResizeStatusInfeasible PodResizeStatus = "Infeasible"
 )
 
+// PodResourceClaimStatus is stored in the PodStatus for each PodResourceClaim
+// which references a ResourceClaimTemplate. It stores the generated name for
+// the corresponding ResourceClaim.
+type PodResourceClaimStatus struct {
+	// SourceRef connects a generated ResourceClaim to the fields that
+	// triggered creation of that ResourceClaim.
+	SourceRef PodResourceClaimReference
+
+	// ResourceClaimName is the name of the ResourceClaim that was
+	// generated for the Pod in the namespace of the Pod. It this is
+	// unset, then generating a ResourceClaim was not necessary. The
+	// pod.spec.resourceClaims can be ignored in this case.
+	ResourceClaimName *string
+}
+
+// PodResourceClaimReference connects a generated ResourceClaim to the fields
+// that triggered creation of that ResourceClaim.
+//
+// Exactly one of these fields should be set. Consumers of this type must
+// treat an empty object as if it has an unknown value.
+type PodResourceClaimReference struct {
+	// Name uniquely identifies this resource claim inside the pod.
+	// This must match the name of an entry in pod.spec.resourceClaims,
+	// which implies that the string must be a DNS_LABEL.
+	Name *string
+}
+
 // RestartPolicy describes how the container should be restarted.
 // Only one of the following restart policies may be specified.
 // If none of the following policies is specified, the default one
@@ -3193,20 +3220,6 @@ type ClaimSource struct {
 	// corresponding ResourceClaim by the control plane after creating the
 	// ResourceClaim.
 	ResourceClaimTemplateName *string
-}
-
-// PodResourceClaimStatus is stored in the PodStatus for each PodResourceClaim
-// which references a ResourceClaimTemplate. It stores the generated name for
-// the corresponding ResourceClaim.
-type PodResourceClaimStatus struct {
-	// Name uniquely identifies this resource claim inside the pod.
-	// This must match the name of an entry in pod.spec.resourceClaims,
-	// which implies that the string must be a DNS_LABEL.
-	Name string
-
-	// ResourceClaimName is the name of the ResourceClaim that was
-	// generated for the Pod in the namespace of the Pod.
-	ResourceClaimName string
 }
 
 // OSName is the set of OS'es that can be used in OS.

@@ -4823,13 +4823,20 @@ func validatePodResourceClaimStatuses(statuses []core.PodResourceClaimStatus, po
 
 	for i, status := range statuses {
 		idxPath := fldPath.Index(i)
+		namePath := idxPath.Child("sourceRef", "name")
+		if status.SourceRef.Name == nil {
+			allErrs = append(allErrs, field.Required(namePath, ""))
+			continue
+		}
 		// There's no need to check the content of the name. If it matches an entry,
 		// then it is valid, otherwise we reject it here.
-		if !havePodClaim(podClaims, status.Name) {
-			allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), status.Name, "must match the name of an entry in pod.spec.resourceClaims"))
+		if !havePodClaim(podClaims, *status.SourceRef.Name) {
+			allErrs = append(allErrs, field.Invalid(namePath, *status.SourceRef.Name, "must match the name of an entry in pod.spec.resourceClaims"))
 		}
-		for _, detail := range ValidateResourceClaimName(status.ResourceClaimName, false) {
-			allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), status.ResourceClaimName, detail))
+		if status.ResourceClaimName != nil {
+			for _, detail := range ValidateResourceClaimName(*status.ResourceClaimName, false) {
+				allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), status.ResourceClaimName, detail))
+			}
 		}
 	}
 

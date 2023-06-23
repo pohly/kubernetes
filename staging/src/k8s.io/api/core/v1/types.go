@@ -577,6 +577,31 @@ const (
 	PersistentVolumeClaimNodeExpansionFailed PersistentVolumeClaimResizeStatus = "NodeExpansionFailed"
 )
 
+// the corresponding ResourceClaim.
+type PodResourceClaimStatus struct {
+	// SourceRef connects a generated ResourceClaim to the fields that
+	// triggered creation of that ResourceClaim.
+	SourceRef PodResourceClaimReference `json:"sourceRef" protobuf:"bytes,1,name=sourceRef"`
+
+	// ResourceClaimName is the name of the ResourceClaim that was
+	// generated for the Pod in the namespace of the Pod. It this is
+	// unset, then generating a ResourceClaim was not necessary. The
+	// pod.spec.resourceClaims can be ignored in this case.
+	ResourceClaimName *string `json:"resourceClaimName,omitempty" protobuf:"bytes,2,opt,name=resourceClaimName"`
+}
+
+// PodResourceClaimReference connects a generated ResourceClaim to the fields
+// that triggered creation of that ResourceClaim.
+//
+// Exactly one of these fields should be set. Consumers of this type must
+// treat an empty object as if it has an unknown value.
+type PodResourceClaimReference struct {
+	// Name uniquely identifies this resource claim inside the pod.
+	// This must match the name of an entry in pod.spec.resourceClaims,
+	// which implies that the string must be a DNS_LABEL.
+	Name *string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
+}
+
 // PersistentVolumeClaimCondition contains details about state of pvc
 type PersistentVolumeClaimCondition struct {
 	Type   PersistentVolumeClaimConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=PersistentVolumeClaimConditionType"`
@@ -3535,20 +3560,6 @@ type ClaimSource struct {
 	ResourceClaimTemplateName *string `json:"resourceClaimTemplateName,omitempty" protobuf:"bytes,2,opt,name=resourceClaimTemplateName"`
 }
 
-// PodResourceClaimStatus is stored in the PodStatus for each PodResourceClaim
-// which references a ResourceClaimTemplate. It stores the generated name for
-// the corresponding ResourceClaim.
-type PodResourceClaimStatus struct {
-	// Name uniquely identifies this resource claim inside the pod.
-	// This must match the name of an entry in pod.spec.resourceClaims,
-	// which implies that the string must be a DNS_LABEL.
-	Name string `json:"name" protobuf:"bytes,1,name=name"`
-
-	// ResourceClaimName is the name of the ResourceClaim that was
-	// generated for the Pod in the namespace of the Pod.
-	ResourceClaimName string `json:"resourceClaimName" protobuf:"bytes,2,name=resourceClaimName"`
-}
-
 // OSName is the set of OS'es that can be used in OS.
 type OSName string
 
@@ -4185,13 +4196,10 @@ type PodStatus struct {
 	Resize PodResizeStatus `json:"resize,omitempty" protobuf:"bytes,14,opt,name=resize,casttype=PodResizeStatus"`
 
 	// Status of resource claims.
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=name
+	// +listType=atomic
 	// +featureGate=DynamicResourceAllocation
 	// +optional
-	ResourceClaimStatuses []PodResourceClaimStatus `json:"resourceClaimStatuses,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name" protobuf:"bytes,15,rep,name=resourceClaimStatuses"`
+	ResourceClaimStatuses []PodResourceClaimStatus `json:"resourceClaimStatuses,omitempty" protobuf:"bytes,15,rep,name=resourceClaimStatuses"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
