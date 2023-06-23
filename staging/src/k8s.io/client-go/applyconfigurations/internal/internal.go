@@ -6102,17 +6102,22 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.core.v1.ClaimSource
       default: {}
-- name: io.k8s.api.core.v1.PodResourceClaimStatus
+- name: io.k8s.api.core.v1.PodResourceClaimReference
   map:
     fields:
     - name: name
       type:
         scalar: string
-      default: ""
+- name: io.k8s.api.core.v1.PodResourceClaimStatus
+  map:
+    fields:
     - name: resourceClaimName
       type:
         scalar: string
-      default: ""
+    - name: sourceRef
+      type:
+        namedType: io.k8s.api.core.v1.PodResourceClaimReference
+      default: {}
 - name: io.k8s.api.core.v1.PodSchedulingGate
   map:
     fields:
@@ -6402,9 +6407,7 @@ var schemaYAML = typed.YAMLObject(`types:
         list:
           elementType:
             namedType: io.k8s.api.core.v1.PodResourceClaimStatus
-          elementRelationship: associative
-          keys:
-          - name
+          elementRelationship: atomic
     - name: startTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time

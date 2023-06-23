@@ -21,8 +21,8 @@ package v1
 // PodResourceClaimStatusApplyConfiguration represents an declarative configuration of the PodResourceClaimStatus type for use
 // with apply.
 type PodResourceClaimStatusApplyConfiguration struct {
-	Name              *string `json:"name,omitempty"`
-	ResourceClaimName *string `json:"resourceClaimName,omitempty"`
+	SourceRef         *PodResourceClaimReferenceApplyConfiguration `json:"sourceRef,omitempty"`
+	ResourceClaimName *string                                      `json:"resourceClaimName,omitempty"`
 }
 
 // PodResourceClaimStatusApplyConfiguration constructs an declarative configuration of the PodResourceClaimStatus type for use with
@@ -31,11 +31,11 @@ func PodResourceClaimStatus() *PodResourceClaimStatusApplyConfiguration {
 	return &PodResourceClaimStatusApplyConfiguration{}
 }
 
-// WithName sets the Name field in the declarative configuration to the given value
+// WithSourceRef sets the SourceRef field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Name field is set to the value of the last call.
-func (b *PodResourceClaimStatusApplyConfiguration) WithName(value string) *PodResourceClaimStatusApplyConfiguration {
-	b.Name = &value
+// If called multiple times, the SourceRef field is set to the value of the last call.
+func (b *PodResourceClaimStatusApplyConfiguration) WithSourceRef(value *PodResourceClaimReferenceApplyConfiguration) *PodResourceClaimStatusApplyConfiguration {
+	b.SourceRef = value
 	return b
 }
 
