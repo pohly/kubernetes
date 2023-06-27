@@ -6112,7 +6112,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: resourceClaimName
       type:
         scalar: string
-      default: ""
 - name: io.k8s.api.core.v1.PodSchedulingGate
   map:
     fields:

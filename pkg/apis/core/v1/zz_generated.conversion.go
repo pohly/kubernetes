@@ -6219,7 +6219,7 @@ func Convert_core_PodResourceClaim_To_v1_PodResourceClaim(in *core.PodResourceCl
 
 func autoConvert_v1_PodResourceClaimStatus_To_core_PodResourceClaimStatus(in *v1.PodResourceClaimStatus, out *core.PodResourceClaimStatus, s conversion.Scope) error {
 	out.Name = in.Name
-	out.ResourceClaimName = in.ResourceClaimName
+	out.ResourceClaimName = (*string)(unsafe.Pointer(in.ResourceClaimName))
 	return nil
 }
 
@@ -6230,7 +6230,7 @@ func Convert_v1_PodResourceClaimStatus_To_core_PodResourceClaimStatus(in *v1.Pod
 
 func autoConvert_core_PodResourceClaimStatus_To_v1_PodResourceClaimStatus(in *core.PodResourceClaimStatus, out *v1.PodResourceClaimStatus, s conversion.Scope) error {
 	out.Name = in.Name
-	out.ResourceClaimName = in.ResourceClaimName
+	out.ResourceClaimName = (*string)(unsafe.Pointer(in.ResourceClaimName))
 	return nil
 }
 
