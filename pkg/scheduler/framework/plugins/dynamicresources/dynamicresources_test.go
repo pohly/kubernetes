@@ -80,9 +80,7 @@ var (
 		pod := podWithClaimTemplate.DeepCopy()
 		pod.Status.ResourceClaimStatuses = []v1.PodResourceClaimStatus{
 			{
-				SourceRef: v1.PodResourceClaimReference{
-					Name: &pod.Spec.ResourceClaims[0].Name,
-				},
+				Name:              pod.Spec.ResourceClaims[0].Name,
 				ResourceClaimName: &claimName,
 			},
 		}

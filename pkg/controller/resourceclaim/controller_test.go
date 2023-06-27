@@ -40,28 +40,22 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	ephemeralvolumemetrics "k8s.io/kubernetes/pkg/controller/resourceclaim/metrics"
-	"k8s.io/utils/pointer"
 )
 
 var (
-	testPodName           = "test-pod"
-	testNamespace         = "my-namespace"
-	testPodUID            = types.UID("uidpod1")
-	otherNamespace        = "not-my-namespace"
-	podResourceClaimName  = "acme-resource"
-	podResourceClaimName2 = "acme-resource-2"
-	templateName          = "my-template"
-	className             = "my-resource-class"
+	testPodName          = "test-pod"
+	testNamespace        = "my-namespace"
+	testPodUID           = types.UID("uidpod1")
+	otherNamespace       = "not-my-namespace"
+	podResourceClaimName = "acme-resource"
+	templateName         = "my-template"
+	className            = "my-resource-class"
 
 	testPod             = makePod(testPodName, testNamespace, testPodUID)
 	testPodWithResource = makePod(testPodName, testNamespace, testPodUID, *makePodResourceClaim(podResourceClaimName, templateName))
-	testPodTwoResources = makePod(testPodName, testNamespace, testPodUID, *makePodResourceClaim(podResourceClaimName, templateName), *makePodResourceClaim(podResourceClaimName2, templateName))
 	otherTestPod        = makePod(testPodName+"-II", testNamespace, testPodUID+"-II")
 	testClaim           = makeClaim(testPodName+"-"+podResourceClaimName, testNamespace, className, makeOwnerReference(testPodWithResource, true))
 	generatedTestClaim  = makeGeneratedClaim(podResourceClaimName, testPodName+"-"+podResourceClaimName, testNamespace, className, 1, makeOwnerReference(testPodWithResource, true))
-	generatedTestClaim1 = makeGeneratedClaim(podResourceClaimName, testPodName+"-"+podResourceClaimName, testNamespace, className, 1, makeOwnerReference(testPodTwoResources, true))
-
-	generatedTestClaim2 = makeGeneratedClaim(podResourceClaimName2, testPodName+"-"+podResourceClaimName2, testNamespace, className, 2, makeOwnerReference(testPodTwoResources, true))
 	testClaimReserved   = func() *resourcev1alpha2.ResourceClaim {
 		claim := testClaim.DeepCopy()
 		claim.Status.ReservedFor = append(claim.Status.ReservedFor,
@@ -114,31 +108,17 @@ func TestSyncHandler(t *testing.T) {
 			expectedClaims: []resourcev1alpha2.ResourceClaim{*generatedTestClaim},
 			expectedStatuses: map[string][]v1.PodResourceClaimStatus{
 				testPodWithResource.Name: {
-					{SourceRef: v1.PodResourceClaimReference{Name: &testPodWithResource.Spec.ResourceClaims[0].Name}, ResourceClaimName: &generatedTestClaim.Name},
+					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &generatedTestClaim.Name},
 				},
 			},
 			expectedMetrics: expectedMetrics{1, 0},
-		},
-		{
-			name:           "create-2",
-			pods:           []*v1.Pod{testPodTwoResources},
-			templates:      []*resourcev1alpha2.ResourceClaimTemplate{template},
-			key:            podKey(testPodTwoResources),
-			expectedClaims: []resourcev1alpha2.ResourceClaim{*generatedTestClaim1, *generatedTestClaim2},
-			expectedStatuses: map[string][]v1.PodResourceClaimStatus{
-				testPodWithResource.Name: {
-					{SourceRef: v1.PodResourceClaimReference{Name: &testPodTwoResources.Spec.ResourceClaims[0].Name}, ResourceClaimName: &generatedTestClaim1.Name},
-					{SourceRef: v1.PodResourceClaimReference{Name: &testPodTwoResources.Spec.ResourceClaims[1].Name}, ResourceClaimName: &generatedTestClaim2.Name},
-				},
-			},
-			expectedMetrics: expectedMetrics{2, 0},
 		},
 		{
 			name: "nop",
 			pods: []*v1.Pod{func() *v1.Pod {
 				pod := testPodWithResource.DeepCopy()
 				pod.Status.ResourceClaimStatuses = []v1.PodResourceClaimStatus{
-					{SourceRef: v1.PodResourceClaimReference{Name: &testPodWithResource.Spec.ResourceClaims[0].Name}, ResourceClaimName: &generatedTestClaim.Name},
+					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &generatedTestClaim.Name},
 				}
 				return pod
 			}()},
@@ -148,7 +128,7 @@ func TestSyncHandler(t *testing.T) {
 			expectedClaims: []resourcev1alpha2.ResourceClaim{*generatedTestClaim},
 			expectedStatuses: map[string][]v1.PodResourceClaimStatus{
 				testPodWithResource.Name: {
-					{SourceRef: v1.PodResourceClaimReference{Name: &testPodWithResource.Spec.ResourceClaims[0].Name}, ResourceClaimName: &generatedTestClaim.Name},
+					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &generatedTestClaim.Name},
 				},
 			},
 			expectedMetrics: expectedMetrics{0, 0},
@@ -158,7 +138,7 @@ func TestSyncHandler(t *testing.T) {
 			pods: []*v1.Pod{func() *v1.Pod {
 				pod := testPodWithResource.DeepCopy()
 				pod.Status.ResourceClaimStatuses = []v1.PodResourceClaimStatus{
-					{SourceRef: v1.PodResourceClaimReference{Name: &testPodWithResource.Spec.ResourceClaims[0].Name}, ResourceClaimName: &generatedTestClaim.Name},
+					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &generatedTestClaim.Name},
 				}
 				return pod
 			}()},
@@ -167,29 +147,7 @@ func TestSyncHandler(t *testing.T) {
 			expectedClaims: []resourcev1alpha2.ResourceClaim{*generatedTestClaim},
 			expectedStatuses: map[string][]v1.PodResourceClaimStatus{
 				testPodWithResource.Name: {
-					{SourceRef: v1.PodResourceClaimReference{Name: &testPodWithResource.Spec.ResourceClaims[0].Name}, ResourceClaimName: &generatedTestClaim.Name},
-				},
-			},
-			expectedMetrics: expectedMetrics{1, 0},
-		},
-		{
-			name: "recreate-2",
-			pods: []*v1.Pod{func() *v1.Pod {
-				pod := testPodTwoResources.DeepCopy()
-				pod.Status.ResourceClaimStatuses = []v1.PodResourceClaimStatus{
-					{SourceRef: v1.PodResourceClaimReference{Name: &testPodTwoResources.Spec.ResourceClaims[0].Name}, ResourceClaimName: pointer.String("some-other-name")},
-					{SourceRef: v1.PodResourceClaimReference{Name: &testPodTwoResources.Spec.ResourceClaims[1].Name}, ResourceClaimName: &generatedTestClaim2.Name},
-				}
-				return pod
-			}()},
-			templates:      []*resourcev1alpha2.ResourceClaimTemplate{template},
-			key:            podKey(testPodTwoResources),
-			claims:         []*resourcev1alpha2.ResourceClaim{generatedTestClaim2},
-			expectedClaims: []resourcev1alpha2.ResourceClaim{*generatedTestClaim1, *generatedTestClaim2},
-			expectedStatuses: map[string][]v1.PodResourceClaimStatus{
-				testPodTwoResources.Name: {
-					{SourceRef: v1.PodResourceClaimReference{Name: &testPodTwoResources.Spec.ResourceClaims[0].Name}, ResourceClaimName: &generatedTestClaim1.Name},
-					{SourceRef: v1.PodResourceClaimReference{Name: &testPodTwoResources.Spec.ResourceClaims[1].Name}, ResourceClaimName: &generatedTestClaim2.Name},
+					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &generatedTestClaim.Name},
 				},
 			},
 			expectedMetrics: expectedMetrics{1, 0},
@@ -209,7 +167,7 @@ func TestSyncHandler(t *testing.T) {
 			expectedClaims: []resourcev1alpha2.ResourceClaim{*generatedTestClaim},
 			expectedStatuses: map[string][]v1.PodResourceClaimStatus{
 				testPodWithResource.Name: {
-					{SourceRef: v1.PodResourceClaimReference{Name: &testPodWithResource.Spec.ResourceClaims[0].Name}, ResourceClaimName: &generatedTestClaim.Name},
+					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &generatedTestClaim.Name},
 				},
 			},
 			expectedMetrics: expectedMetrics{0, 0},
@@ -222,7 +180,7 @@ func TestSyncHandler(t *testing.T) {
 			expectedClaims: []resourcev1alpha2.ResourceClaim{*testClaim},
 			expectedStatuses: map[string][]v1.PodResourceClaimStatus{
 				testPodWithResource.Name: {
-					{SourceRef: v1.PodResourceClaimReference{Name: &testPodWithResource.Spec.ResourceClaims[0].Name}, ResourceClaimName: &testClaim.Name},
+					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &testClaim.Name},
 				},
 			},
 			expectedMetrics: expectedMetrics{0, 0},
@@ -255,7 +213,7 @@ func TestSyncHandler(t *testing.T) {
 			expectedClaims: []resourcev1alpha2.ResourceClaim{*otherNamespaceClaim, *generatedTestClaim},
 			expectedStatuses: map[string][]v1.PodResourceClaimStatus{
 				testPodWithResource.Name: {
-					{SourceRef: v1.PodResourceClaimReference{Name: &testPodWithResource.Spec.ResourceClaims[0].Name}, ResourceClaimName: &generatedTestClaim.Name},
+					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &generatedTestClaim.Name},
 				},
 			},
 			expectedMetrics: expectedMetrics{1, 0},

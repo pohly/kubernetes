@@ -13366,7 +13366,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 			},
 			Status: core.PodStatus{
 				ResourceClaimStatuses: []core.PodResourceClaimStatus{
-					{SourceRef: core.PodResourceClaimReference{Name: utilpointer.String("no-such-claim")}, ResourceClaimName: utilpointer.String("my-claim")},
+					{Name: "no-such-claim", ResourceClaimName: utilpointer.String("my-claim")},
 				},
 			},
 		},
@@ -13375,7 +13375,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 				Name: "foo",
 			},
 		},
-		`status.resourceClaimStatuses[0].sourceRef.name: Invalid value: "no-such-claim": must match the name of an entry in pod.spec.resourceClaims`,
+		`status.resourceClaimStatuses[0].name: Invalid value: "no-such-claim": must match the name of an entry in pod.spec.resourceClaims`,
 		"Non-existent PodResourceClaim",
 	}, {
 		core.Pod{
@@ -13389,7 +13389,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 			},
 			Status: core.PodStatus{
 				ResourceClaimStatuses: []core.PodResourceClaimStatus{
-					{SourceRef: core.PodResourceClaimReference{Name: utilpointer.String("my-claim")}, ResourceClaimName: utilpointer.String("%$!#")},
+					{Name: "my-claim", ResourceClaimName: utilpointer.String("%$!#")},
 				},
 			},
 		},
@@ -13413,11 +13413,13 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 			Spec: core.PodSpec{
 				ResourceClaims: []core.PodResourceClaim{
 					{Name: "my-claim"},
+					{Name: "my-other-claim"},
 				},
 			},
 			Status: core.PodStatus{
 				ResourceClaimStatuses: []core.PodResourceClaimStatus{
-					{SourceRef: core.PodResourceClaimReference{Name: utilpointer.String("my-claim")}, ResourceClaimName: utilpointer.String("foo-my-claim-12345")},
+					{Name: "my-claim", ResourceClaimName: utilpointer.String("foo-my-claim-12345")},
+					{Name: "my-other-claim", ResourceClaimName: nil},
 				},
 			},
 		},

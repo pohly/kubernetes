@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 
@@ -31,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	corev1apply "k8s.io/client-go/applyconfigurations/core/v1"
 	v1informers "k8s.io/client-go/informers/core/v1"
 	resourcev1alpha2informers "k8s.io/client-go/informers/resource/v1alpha2"
 	clientset "k8s.io/client-go/kubernetes"
@@ -45,7 +45,6 @@ import (
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/resourceclaim/metrics"
-	"k8s.io/utils/pointer"
 )
 
 const (
@@ -57,6 +56,9 @@ const (
 	// for which it was generated. This is used only inside the controller
 	// and not documented as part of the Kubernetes API.
 	podResourceClaimAnnotation = "resource.kubernetes.io/pod-claim-name"
+
+	// Field manager used to update the pod status.
+	fieldManager = "ResourceClaimController"
 
 	maxUIDCacheEntries = 500
 )
@@ -346,39 +348,13 @@ func (ec *Controller) syncPod(ctx context.Context, namespace, name string) error
 
 	if newPodClaims != nil {
 		// Patch the pod status with the new information about
-		// generated ResourceClaims. We have to update the entire field
-		// because it's a set, not a map.
-		updatedPod := &v1.Pod{
-			ObjectMeta: pod.ObjectMeta,
+		// generated ResourceClaims.
+		statuses := make([]*corev1apply.PodResourceClaimStatusApplyConfiguration, 0, len(newPodClaims))
+		for podClaimName, resourceClaimName := range newPodClaims {
+			statuses = append(statuses, corev1apply.PodResourceClaimStatus().WithName(podClaimName).WithResourceClaimName(resourceClaimName))
 		}
-		for podClaimName, claimName := range newPodClaims {
-			podClaimName, claimName := podClaimName, claimName
-			updatedPod.Status.ResourceClaimStatuses = append(updatedPod.Status.ResourceClaimStatuses,
-				v1.PodResourceClaimStatus{
-					SourceRef: v1.PodResourceClaimReference{
-						Name: &podClaimName,
-					},
-					ResourceClaimName: &claimName,
-				})
-		}
-		for _, status := range pod.Status.ResourceClaimStatuses {
-			if status.SourceRef.Name == nil || newPodClaims[*status.SourceRef.Name] == "" {
-				updatedPod.Status.ResourceClaimStatuses = append(updatedPod.Status.ResourceClaimStatuses, status)
-			}
-		}
-
-		// Sorting is not strictly necessary, but nicer.
-		sort.Slice(updatedPod.Status.ResourceClaimStatuses, func(i, j int) bool {
-			return pointer.StringDeref(updatedPod.Status.ResourceClaimStatuses[i].SourceRef.Name, "") <
-				pointer.StringDeref(updatedPod.Status.ResourceClaimStatuses[j].SourceRef.Name, "")
-		})
-
-		// No one else is currently setting this field, so there's no
-		// reason to worry about overwriting information stored by
-		// someone else.
-		//
-		// TODO: tests...
-		if _, err := ec.kubeClient.CoreV1().Pods(namespace).UpdateStatus(ctx, updatedPod, metav1.UpdateOptions{}); err != nil {
+		podApply := corev1apply.Pod(name, namespace).WithStatus(corev1apply.PodStatus().WithResourceClaimStatuses(statuses...))
+		if _, err := ec.kubeClient.CoreV1().Pods(namespace).ApplyStatus(ctx, podApply, metav1.ApplyOptions{FieldManager: fieldManager, Force: true}); err != nil {
 			return fmt.Errorf("update pod %s/%s ResourceClaimStatuses: %v", namespace, name, err)
 		}
 	}

@@ -68,13 +68,8 @@ func Name(pod *v1.Pod, podClaim *v1.PodResourceClaim) (name *string, mustCheckOw
 		return podClaim.Source.ResourceClaimName, false, nil
 	case podClaim.Source.ResourceClaimTemplateName != nil:
 		for _, status := range pod.Status.ResourceClaimStatuses {
-			switch {
-			case status.SourceRef.Name != nil:
-				if *status.SourceRef.Name == podClaim.Name {
-					return status.ResourceClaimName, true, nil
-				}
-			default:
-				return nil, false, fmt.Errorf(`pod "%s/%s" status.resourceClaimStatuses: %w`, pod.Namespace, pod.Name, ErrAPIUnsupported)
+			if status.Name == podClaim.Name {
+				return status.ResourceClaimName, true, nil
 			}
 		}
 		return nil, false, fmt.Errorf(`pod "%s/%s": %w`, pod.Namespace, pod.Name, ErrClaimNotFound)
