@@ -1640,19 +1640,10 @@ func (PodResourceClaim) SwaggerDoc() map[string]string {
 	return map_PodResourceClaim
 }
 
-var map_PodResourceClaimReference = map[string]string{
-	"":     "PodResourceClaimReference connects a generated ResourceClaim to the fields that triggered creation of that ResourceClaim.\n\nExactly one of these fields should be set. Consumers of this type must treat an empty object as if it has an unknown value.",
-	"name": "Name uniquely identifies this resource claim inside the pod. This must match the name of an entry in pod.spec.resourceClaims, which implies that the string must be a DNS_LABEL.",
-}
-
-func (PodResourceClaimReference) SwaggerDoc() map[string]string {
-	return map_PodResourceClaimReference
-}
-
 var map_PodResourceClaimStatus = map[string]string{
-	"":                  "the corresponding ResourceClaim.",
-	"sourceRef":         "SourceRef connects a generated ResourceClaim to the fields that triggered creation of that ResourceClaim.",
-	"resourceClaimName": "ResourceClaimName is the name of the ResourceClaim that was generated for the Pod in the namespace of the Pod. It this is unset, then generating a ResourceClaim was not necessary. The pod.spec.resourceClaims can be ignored in this case.",
+	"":                  "PodResourceClaimStatus is stored in the PodStatus for each PodResourceClaim which references a ResourceClaimTemplate. It stores the generated name for the corresponding ResourceClaim.",
+	"name":              "Name uniquely identifies this resource claim inside the pod. This must match the name of an entry in pod.spec.resourceClaims, which implies that the string must be a DNS_LABEL.",
+	"resourceClaimName": "ResourceClaimName is the name of the ResourceClaim that was generated for the Pod in the namespace of the Pod.",
 }
 
 func (PodResourceClaimStatus) SwaggerDoc() map[string]string {

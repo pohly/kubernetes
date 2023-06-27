@@ -3464,28 +3464,17 @@ message PodResourceClaim {
   optional ClaimSource source = 2;
 }
 
-// PodResourceClaimReference connects a generated ResourceClaim to the fields
-// that triggered creation of that ResourceClaim.
-//
-// Exactly one of these fields should be set. Consumers of this type must
-// treat an empty object as if it has an unknown value.
-message PodResourceClaimReference {
+// PodResourceClaimStatus is stored in the PodStatus for each PodResourceClaim
+// which references a ResourceClaimTemplate. It stores the generated name for
+// the corresponding ResourceClaim.
+message PodResourceClaimStatus {
   // Name uniquely identifies this resource claim inside the pod.
   // This must match the name of an entry in pod.spec.resourceClaims,
   // which implies that the string must be a DNS_LABEL.
   optional string name = 1;
-}
-
-// the corresponding ResourceClaim.
-message PodResourceClaimStatus {
-  // SourceRef connects a generated ResourceClaim to the fields that
-  // triggered creation of that ResourceClaim.
-  optional PodResourceClaimReference sourceRef = 1;
 
   // ResourceClaimName is the name of the ResourceClaim that was
-  // generated for the Pod in the namespace of the Pod. It this is
-  // unset, then generating a ResourceClaim was not necessary. The
-  // pod.spec.resourceClaims can be ignored in this case.
+  // generated for the Pod in the namespace of the Pod.
   optional string resourceClaimName = 2;
 }
 
@@ -4031,7 +4020,10 @@ message PodStatus {
   optional string resize = 14;
 
   // Status of resource claims.
-  // +listType=atomic
+  // +patchMergeKey=name
+  // +patchStrategy=merge,retainKeys
+  // +listType=map
+  // +listMapKey=name
   // +featureGate=DynamicResourceAllocation
   // +optional
   repeated PodResourceClaimStatus resourceClaimStatuses = 15;

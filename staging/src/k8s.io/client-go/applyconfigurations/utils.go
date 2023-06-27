@@ -789,8 +789,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.PodReadinessGateApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PodResourceClaim"):
 		return &applyconfigurationscorev1.PodResourceClaimApplyConfiguration{}
-	case corev1.SchemeGroupVersion.WithKind("PodResourceClaimReference"):
-		return &applyconfigurationscorev1.PodResourceClaimReferenceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PodResourceClaimStatus"):
 		return &applyconfigurationscorev1.PodResourceClaimStatusApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PodSchedulingGate"):
