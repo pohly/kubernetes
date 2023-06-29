@@ -1,0 +1,2 @@
+# Each non-blank line is a regular expression. All tests in directories
+# matched by one of them run without race detection.
