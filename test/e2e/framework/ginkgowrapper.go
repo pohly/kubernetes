@@ -201,8 +201,10 @@ func registerInSuite(ginkgoCall func(text string, args ...interface{}) bool, tex
 	var ginkgoArgs []interface{}
 	var offset ginkgo.Offset
 	var texts []string
+	var bugs []string
 	if text != "" {
 		texts = append(texts, text)
+		bugs = append(bugs, validateText(text)...)
 	}
 
 	addLabel := func(label string) {
@@ -210,7 +212,6 @@ func registerInSuite(ginkgoCall func(text string, args ...interface{}) bool, tex
 		ginkgoArgs = append(ginkgoArgs, ginkgo.Label(label))
 	}
 
-	haveEmptyStrings := false
 	for _, arg := range args {
 		switch arg := arg.(type) {
 		case label:
@@ -225,10 +226,8 @@ func registerInSuite(ginkgoCall func(text string, args ...interface{}) bool, tex
 		case ginkgo.Offset:
 			offset = arg
 		case string:
-			if arg == "" {
-				haveEmptyStrings = true
-			}
 			texts = append(texts, arg)
+			bugs = append(bugs, validateText(arg)...)
 		default:
 			ginkgoArgs = append(ginkgoArgs, arg)
 		}
@@ -236,8 +235,8 @@ func registerInSuite(ginkgoCall func(text string, args ...interface{}) bool, tex
 	offset += 2 // This function and its direct caller.
 
 	// Now that we have the final offset, we can record bugs.
-	if haveEmptyStrings {
-		RecordBug(NewBug("empty strings as separators are unnecessary and need to be removed", int(offset)))
+	for _, bug := range bugs {
+		RecordBug(NewBug(bug, int(offset)))
 	}
 
 	// Enforce that text snippets to not start or end with spaces because
@@ -251,6 +250,45 @@ func registerInSuite(ginkgoCall func(text string, args ...interface{}) bool, tex
 	ginkgoArgs = append(ginkgoArgs, offset)
 	text = strings.Join(texts, " ")
 	return ginkgoCall(text, ginkgoArgs...)
+}
+
+var (
+	tagRe                 = regexp.MustCompile(`\[.*?\]`)
+	deprecatedTags        = sets.New("Conformance", "NodeConformance", "Disruptive", "Serial")
+	deprecatedTagPrefixes = sets.New("Environment", "Feature", "NodeFeature", "FeatureGate")
+	deprecatedStability   = sets.New("Alpha", "Beta")
+)
+
+// validateText checks for some known tags that should not be added through the
+// plain text strings anymore. Eventually, all such tags should get replaced
+// with the new APIs.
+func validateText(text string) []string {
+	var bugs []string
+	if text == "" {
+		bugs = append(bugs, "empty strings as separators are unnecessary and need to be removed")
+	}
+
+	for _, tag := range tagRe.FindAllString(text, -1) {
+		if tag == "[]" {
+			bugs = append(bugs, "[] in plain text is invalid")
+		}
+		// Strip square brackets.
+		tag = tag[1 : len(tag)-1]
+		if deprecatedTags.Has(tag) {
+			bugs = append(bugs, fmt.Sprintf("[%s] in plain text is deprecated and must be added through With%s instead", tag, tag))
+		}
+		if deprecatedStability.Has(tag) {
+			bugs = append(bugs, fmt.Sprintf("[%s] in plain text is deprecated and must be added by defining the feature gate through WithFeatureGate instead", tag))
+		}
+		if index := strings.Index(tag, ":"); index > 0 {
+			prefix := tag[:index]
+			if deprecatedTagPrefixes.Has(prefix) {
+				bugs = append(bugs, fmt.Sprintf("[%s] in plain text is deprecated and must be added through With%s(%s) instead", tag, prefix, tag[index+1:]))
+			}
+		}
+	}
+
+	return bugs
 }
 
 // WithEnvironment specifies that a certain test or group of tests only works
