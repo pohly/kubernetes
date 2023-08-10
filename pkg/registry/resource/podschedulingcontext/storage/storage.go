@@ -84,7 +84,12 @@ func (r *REST) ApplyPatchToCurrentObject(requestContext context.Context, current
 	return podScheduling, nil
 }
 
+func (r *REST) SkipManagedFields() bool {
+	return true
+}
+
 var _ rest.PatchHandler = &REST{}
+var _ rest.ManagedFieldsSkipper = &REST{}
 
 // NewREST returns a RESTStorage object that will work against PodSchedulingContext.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
@@ -212,4 +217,9 @@ func findClaimStatus(claimStatuses []resource.ResourceClaimSchedulingStatus, nam
 	return nil
 }
 
+func (r *StatusREST) SkipManagedFields() bool {
+	return true
+}
+
 var _ rest.PatchHandler = &StatusREST{}
+var _ rest.ManagedFieldsSkipper = &StatusREST{}

@@ -51,6 +51,12 @@ import (
 var namespaceGVR = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "namespaces"}
 
 func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Interface, includeName bool) http.HandlerFunc {
+	// Some resources might not need managed fields.
+	skipManagedFields := false
+	if skipper, ok := r.(rest.ManagedFieldsSkipper); ok {
+		skipManagedFields = skipper.SkipManagedFields()
+	}
+
 	return func(w http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
 		// For performance tracking purposes.
@@ -195,8 +201,10 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 			if err != nil {
 				return nil, fmt.Errorf("failed to create new object (Create for %v): %v", scope.Kind, err)
 			}
-			obj = scope.FieldManager.UpdateNoErrors(liveObj, obj, managerOrUserAgent(options.FieldManager, req.UserAgent()))
-			admit = fieldmanager.NewManagedFieldsValidatingAdmissionController(admit)
+			if !skipManagedFields {
+				obj = scope.FieldManager.UpdateNoErrors(liveObj, obj, managerOrUserAgent(options.FieldManager, req.UserAgent()))
+				admit = fieldmanager.NewManagedFieldsValidatingAdmissionController(admit)
+			}
 
 			if mutatingAdmission, ok := admit.(admission.MutationInterface); ok && mutatingAdmission.Handles(admission.Create) {
 				if err := mutatingAdmission.Admit(ctx, admissionAttributes, scope); err != nil {
@@ -208,7 +216,7 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 			result, err := requestFunc()
 			// If the object wasn't committed to storage because it's serialized size was too large,
 			// it is safe to remove managedFields (which can be large) and try again.
-			if isTooLargeError(err) {
+			if !skipManagedFields && isTooLargeError(err) {
 				if accessor, accessorErr := meta.Accessor(obj); accessorErr == nil {
 					accessor.SetManagedFields(nil)
 					result, err = requestFunc()
