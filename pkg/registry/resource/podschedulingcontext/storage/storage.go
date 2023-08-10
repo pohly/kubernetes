@@ -37,6 +37,10 @@ type REST struct {
 	*genericregistry.Store
 }
 
+func (r *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
+	return r.Store.Update(ctx, name, objInfo, createValidation, updateValidation, true, options)
+}
+
 // NewREST returns a RESTStorage object that will work against PodSchedulingContext.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	store := &genericregistry.Store{
