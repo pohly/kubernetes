@@ -41,6 +41,12 @@ func (r *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObje
 	return r.Store.Update(ctx, name, objInfo, createValidation, updateValidation, true, options)
 }
 
+func (r *REST) SkipManagedFields() bool {
+	return true
+}
+
+var _ rest.ManagedFieldsSkipper = &REST{}
+
 // NewREST returns a RESTStorage object that will work against PodSchedulingContext.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	store := &genericregistry.Store{
@@ -103,3 +109,9 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	return r.store.GetResetFields()
 }
+
+func (r *StatusREST) SkipManagedFields() bool {
+	return true
+}
+
+var _ rest.ManagedFieldsSkipper = &StatusREST{}
