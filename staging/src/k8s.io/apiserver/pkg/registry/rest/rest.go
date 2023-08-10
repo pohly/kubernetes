@@ -390,3 +390,12 @@ type UpdateResetFieldsStrategy interface {
 	RESTUpdateStrategy
 	ResetFieldsStrategy
 }
+
+// ManagedFieldsSkipper is an optional interface that can be implemented to
+// communicate that a storage doesn't care about calculating the managed
+// fields.
+type ManagedFieldsSkipper interface {
+	// SkipManagedFields may return false to indicate that calculating the
+	// managed fields can be skipped.
+	SkipManagedFields() bool
+}
