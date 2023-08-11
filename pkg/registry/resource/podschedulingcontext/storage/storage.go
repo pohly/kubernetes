@@ -21,10 +21,13 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/apis/resource"
+	"k8s.io/kubernetes/pkg/apis/resource/v1alpha2"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
@@ -36,6 +39,52 @@ import (
 type REST struct {
 	*genericregistry.Store
 }
+
+func (r *REST) ApplyPatchToCurrentObject(requestContext context.Context, currentObject runtime.Object, patch []byte, patchType types.PatchType) (runtime.Object, error) {
+	// Below we need to decode. Only input for server-side-apply is
+	// supported because it clearly indicates what the client wants to
+	// update.
+	if patchType != types.ApplyPatchType {
+		return nil, rest.PatchNotHandledErr
+	}
+
+	// There's only one kind of object in the storage, check anyway.
+	podScheduling, ok := currentObject.(*resource.PodSchedulingContext)
+	if !ok {
+		return nil, rest.PatchNotHandledErr
+	}
+
+	// Decode directly into a type which has exactly those
+	// fields which the code below knows to handle. If any
+	// other field is present, we fall back to normal apply
+	// handling.
+	patchObj := struct {
+		metav1.TypeMeta   `json:",inline"`
+		metav1.ObjectMeta `json:"metadata"`
+		Spec              struct {
+			SelectedNode   string   `json:"selectedNode"`
+			PotentialNodes []string `json:"potentialNodes"`
+		} `json:"spec"`
+	}{}
+	if err := yaml.UnmarshalStrict(patch, &patchObj); err != nil {
+		return nil, rest.PatchNotHandledErr
+	}
+
+	// k8s.io/apimachinery/pkg/util/managedfields/internal/versioncheck.go:51
+	if patchObj.Kind != "PodSchedulingContext" ||
+		patchObj.APIVersion != v1alpha2.SchemeGroupVersion.String() {
+		return nil, rest.PatchNotHandledErr
+	}
+	// ObjectMeta was validated earlier, otherwise we wouldn't have a matching
+	// current object.
+
+	// Update values.
+	podScheduling.Spec.SelectedNode = patchObj.Spec.SelectedNode
+	podScheduling.Spec.PotentialNodes = patchObj.Spec.PotentialNodes
+	return podScheduling, nil
+}
+
+var _ rest.PatchHandler = &REST{}
 
 // NewREST returns a RESTStorage object that will work against PodSchedulingContext.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
@@ -99,3 +148,68 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	return r.store.GetResetFields()
 }
+
+func (r *StatusREST) ApplyPatchToCurrentObject(requestContext context.Context, currentObject runtime.Object, patch []byte, patchType types.PatchType) (runtime.Object, error) {
+	// Below we need to decode. Only input for server-side-apply is
+	// supported because it clearly indicates what the client wants to
+	// update.
+	if patchType != types.ApplyPatchType {
+		return nil, rest.PatchNotHandledErr
+	}
+
+	// There's only one kind of object in the storage, check anyway.
+	podScheduling, ok := currentObject.(*resource.PodSchedulingContext)
+	if !ok {
+		return nil, rest.PatchNotHandledErr
+	}
+
+	// Decode directly into a type which has exactly those
+	// fields which the code below knows to handle. If any
+	// other field is present, we fall back to normal apply
+	// handling.
+	patchObj := struct {
+		metav1.TypeMeta   `json:",inline"`
+		metav1.ObjectMeta `json:"metadata"`
+		Status            struct {
+			ResourceClaims []struct {
+				Name            string   `json:"name"`
+				UnsuitableNodes []string `json:"unsuitableNodes"`
+			} `json:"resourceClaims"`
+		} `json:"status"`
+	}{}
+	if err := yaml.UnmarshalStrict(patch, &patchObj); err != nil {
+		return nil, rest.PatchNotHandledErr
+	}
+
+	if patchObj.Kind != "PodSchedulingContext" ||
+		patchObj.APIVersion != v1alpha2.SchemeGroupVersion.String() {
+		return nil, rest.PatchNotHandledErr
+	}
+	// ObjectMeta was validated earlier, otherwise we wouldn't have a matching
+	// current object.
+
+	// Update values.
+	for _, claimStatus := range patchObj.Status.ResourceClaims {
+		if existingClaimStatus := findClaimStatus(podScheduling.Status.ResourceClaims, claimStatus.Name); existingClaimStatus != nil {
+			existingClaimStatus.UnsuitableNodes = claimStatus.UnsuitableNodes
+			continue
+		}
+		podScheduling.Status.ResourceClaims = append(podScheduling.Status.ResourceClaims,
+			resource.ResourceClaimSchedulingStatus{
+				Name:            claimStatus.Name,
+				UnsuitableNodes: claimStatus.UnsuitableNodes,
+			})
+	}
+	return podScheduling, nil
+}
+
+func findClaimStatus(claimStatuses []resource.ResourceClaimSchedulingStatus, name string) *resource.ResourceClaimSchedulingStatus {
+	for i := range claimStatuses {
+		if claimStatuses[i].Name == name {
+			return &claimStatuses[i]
+		}
+	}
+	return nil
+}
+
+var _ rest.PatchHandler = &StatusREST{}
