@@ -18,6 +18,7 @@ package rest
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/url"
@@ -26,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
@@ -276,6 +278,15 @@ type Patcher interface {
 	Getter
 	Updater
 }
+
+// PatchHandler is a storage object which implements its own patch mechanism for updates.
+type PatchHandler interface {
+	ApplyPatchToCurrentObject(requestContext context.Context, currentObject runtime.Object, patch []byte, patchType types.PatchType) (runtime.Object, error)
+}
+
+// PatchNotHandledErr is a special error that PatchHandler.ApplyPatchToCurrentObject may return
+// to fall back to the normal patch handling.
+var PatchNotHandledErr = errors.New("patch not handled")
 
 // Watcher should be implemented by all Storage objects that
 // want to offer the ability to watch for changes through the watch api.
