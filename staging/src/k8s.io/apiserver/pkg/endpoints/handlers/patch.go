@@ -18,6 +18,7 @@ package handlers
 
 import (
 	"context"
+	stderrors "errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -224,6 +225,10 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 			userAgent:   req.UserAgent(),
 		}
 
+		if patchHandler, ok := r.(rest.PatchHandler); ok {
+			p.restPatchHandler = patchHandler
+		}
+
 		result, wasCreated, err := p.patchResource(ctx, scope)
 		if err != nil {
 			scope.err(err, w, req)
@@ -276,11 +281,12 @@ type patcher struct {
 	options *metav1.PatchOptions
 
 	// Operation information
-	restPatcher rest.Patcher
-	name        string
-	patchType   types.PatchType
-	patchBytes  []byte
-	userAgent   string
+	restPatcher      rest.Patcher
+	restPatchHandler rest.PatchHandler
+	name             string
+	patchType        types.PatchType
+	patchBytes       []byte
+	userAgent        string
 
 	// Set at invocation-time (by applyPatch) and immutable thereafter
 	namespace         string
@@ -550,6 +556,14 @@ func (p *patcher) applyPatch(ctx context.Context, _, currentObject runtime.Objec
 		return nil, err
 	} else if !currentObjectHasUID {
 		objToUpdate, patchErr = p.mechanism.createNewObject(ctx)
+	} else if p.restPatchHandler != nil {
+		objToUpdate, patchErr = p.restPatchHandler.ApplyPatchToCurrentObject(ctx, currentObject, p.patchBytes, p.patchType)
+		if patchErr != nil {
+			if !stderrors.Is(patchErr, rest.PatchNotHandledErr) {
+				return nil, patchErr
+			}
+			objToUpdate, patchErr = p.mechanism.applyPatchToCurrentObject(ctx, currentObject)
+		}
 	} else {
 		objToUpdate, patchErr = p.mechanism.applyPatchToCurrentObject(ctx, currentObject)
 	}
