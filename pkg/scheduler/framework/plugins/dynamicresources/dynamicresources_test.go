@@ -35,6 +35,7 @@ import (
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	cgotesting "k8s.io/client-go/testing"
@@ -398,8 +399,8 @@ func TestPlugin(t *testing.T) {
 				reserve: change{
 					scheduling: func(in *resourcev1alpha2.PodSchedulingContext) *resourcev1alpha2.PodSchedulingContext {
 						// This does not actually conflict with setting the
-						// selected node, but because the plugin is not using
-						// patching yet, Update nonetheless fails.
+						// selected node. Because the plugin uses patching,
+						// it can update the object despite this.
 						return st.FromPodSchedulingContexts(in).
 							Label("hello", "world").
 							Obj()
@@ -408,7 +409,14 @@ func TestPlugin(t *testing.T) {
 			},
 			want: want{
 				reserve: result{
-					status: framework.AsStatus(errors.New(`ResourceVersion must match the object that gets updated`)),
+					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `waiting for resource driver to allocate resource`),
+					changes: change{
+						scheduling: func(in *resourcev1alpha2.PodSchedulingContext) *resourcev1alpha2.PodSchedulingContext {
+							return st.FromPodSchedulingContexts(in).
+								SelectedNode(workerNode.Name).
+								Obj()
+						},
+					},
 				},
 			},
 		},
@@ -833,19 +841,19 @@ func createReactor(tracker cgotesting.ObjectTracker) func(action cgotesting.Acti
 	var mutex sync.Mutex
 
 	return func(action cgotesting.Action) (handled bool, ret apiruntime.Object, err error) {
-		createAction, ok := action.(cgotesting.CreateAction)
-		if !ok {
-			return false, nil, nil
-		}
-		obj, ok := createAction.GetObject().(metav1.Object)
-		if !ok {
-			return false, nil, nil
-		}
-
 		mutex.Lock()
 		defer mutex.Unlock()
-		switch action.GetVerb() {
-		case "create":
+
+		// Here we need to switch on implementation types, not on
+		// interfaces, as some interfaces are identical
+		// (e.g. UpdateAction and CreateAction), so if we use them,
+		// updates and creates end up matching the same case branch.
+		switch action := action.(type) {
+		case cgotesting.CreateActionImpl:
+			obj, ok := action.GetObject().(metav1.Object)
+			if !ok {
+				return false, nil, nil
+			}
 			if obj.GetUID() != "" {
 				return true, nil, errors.New("UID must not be set on create")
 			}
@@ -856,7 +864,12 @@ func createReactor(tracker cgotesting.ObjectTracker) func(action cgotesting.Acti
 			uidCounter++
 			obj.SetResourceVersion(fmt.Sprintf("REV-%d", resourceVersionCounter))
 			resourceVersionCounter++
-		case "update":
+
+		case cgotesting.UpdateActionImpl:
+			obj, ok := action.GetObject().(metav1.Object)
+			if !ok {
+				return false, nil, nil
+			}
 			uid := obj.GetUID()
 			resourceVersion := obj.GetResourceVersion()
 			if uid == "" {
@@ -880,6 +893,50 @@ func createReactor(tracker cgotesting.ObjectTracker) func(action cgotesting.Acti
 
 			obj.SetResourceVersion(fmt.Sprintf("REV-%d", resourceVersionCounter))
 			resourceVersionCounter++
+
+		case cgotesting.PatchActionImpl:
+			if action.GetPatchType() != types.ApplyPatchType {
+				// Handled by staging/src/k8s.io/client-go/testing/fixture.go.
+				return false, nil, nil
+			}
+			ns := action.GetNamespace()
+			gvr := action.GetResource()
+			obj, err := tracker.Get(gvr, ns, action.GetName())
+			if err != nil {
+				return true, nil, err
+			}
+			podScheduling, ok := obj.(*resourcev1alpha2.PodSchedulingContext)
+			if !ok {
+				// No support for SSA for other types.
+				return false, nil, nil
+			}
+
+			// Decode directly into a type which has exactly those
+			// fields which the code below knows to handle.
+			patchObj := struct {
+				metav1.TypeMeta   `json:",inline"`
+				metav1.ObjectMeta `json:"metadata"`
+				Spec              struct {
+					SelectedNode   string   `json:"selectedNode"`
+					PotentialNodes []string `json:"potentialNodes"`
+				} `json:"spec"`
+			}{}
+			if err := yaml.UnmarshalStrict(action.GetPatch(), &patchObj); err != nil {
+				// If this fails, the code under test must have
+				// been changed such that it updates additional
+				// fields and this reactor also needs to be
+				// updated.
+				return true, nil, err
+			}
+			podScheduling.Spec.SelectedNode = patchObj.Spec.SelectedNode
+			podScheduling.Spec.PotentialNodes = patchObj.Spec.PotentialNodes
+			podScheduling.SetResourceVersion(fmt.Sprintf("REV-%d", resourceVersionCounter))
+			resourceVersionCounter++
+
+			if err = tracker.Update(gvr, podScheduling, ns); err != nil {
+				return true, nil, err
+			}
+			return true, podScheduling, nil
 		}
 		return false, nil, nil
 	}
