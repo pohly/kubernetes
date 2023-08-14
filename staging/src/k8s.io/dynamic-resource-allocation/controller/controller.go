@@ -33,6 +33,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	resourcev1alpha2apply "k8s.io/client-go/applyconfigurations/resource/v1alpha2"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -790,29 +791,22 @@ func (ctrl *controller) syncPodSchedulingContexts(ctx context.Context, schedulin
 
 	// Now update unsuitable nodes. This is useful information for the scheduler even if
 	// we managed to allocate because we might have to undo that.
-	// TODO: replace with patching the array. We can do that without race conditions
-	// because each driver is responsible for its own entries.
-	modified := false
-	schedulingCtx = schedulingCtx.DeepCopy()
+	var claimsApply []*resourcev1alpha2apply.ResourceClaimSchedulingStatusApplyConfiguration
 	for _, delayed := range claims {
 		i := findClaim(schedulingCtx.Status.ResourceClaims, delayed.PodClaimName)
-		if i < 0 {
-			// Add new entry.
-			schedulingCtx.Status.ResourceClaims = append(schedulingCtx.Status.ResourceClaims,
-				resourcev1alpha2.ResourceClaimSchedulingStatus{
-					Name:            delayed.PodClaimName,
-					UnsuitableNodes: delayed.UnsuitableNodes,
-				})
-			modified = true
-		} else if stringsDiffer(schedulingCtx.Status.ResourceClaims[i].UnsuitableNodes, delayed.UnsuitableNodes) {
-			// Update existing entry.
-			schedulingCtx.Status.ResourceClaims[i].UnsuitableNodes = delayed.UnsuitableNodes
-			modified = true
+		if i < 0 || stringsDiffer(schedulingCtx.Status.ResourceClaims[i].UnsuitableNodes, delayed.UnsuitableNodes) {
+			// Add new entry or update an existing one because values changed.
+			claimsApply = append(claimsApply, &resourcev1alpha2apply.ResourceClaimSchedulingStatusApplyConfiguration{
+				Name:            &delayed.PodClaimName,
+				UnsuitableNodes: delayed.UnsuitableNodes,
+			})
 		}
 	}
-	if modified {
+	if len(claimsApply) > 0 {
 		logger.V(6).Info("Updating pod scheduling with modified unsuitable nodes", "podSchedulingCtx", schedulingCtx)
-		if _, err := ctrl.kubeClient.ResourceV1alpha2().PodSchedulingContexts(schedulingCtx.Namespace).UpdateStatus(ctx, schedulingCtx, metav1.UpdateOptions{}); err != nil {
+		schedulingCtxApply := resourcev1alpha2apply.PodSchedulingContext(schedulingCtx.Name, schedulingCtx.Namespace).
+			WithStatus(resourcev1alpha2apply.PodSchedulingContextStatus().WithResourceClaims(claimsApply...))
+		if _, err := ctrl.kubeClient.ResourceV1alpha2().PodSchedulingContexts(schedulingCtx.Namespace).ApplyStatus(ctx, schedulingCtxApply, metav1.ApplyOptions{FieldManager: ctrl.name, Force: true}); err != nil {
 			return fmt.Errorf("update unsuitable node status: %v", err)
 		}
 	}
