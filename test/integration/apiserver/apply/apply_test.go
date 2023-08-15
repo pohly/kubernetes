@@ -32,6 +32,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,10 +40,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
+	resourcev1alpha2apply "k8s.io/client-go/applyconfigurations/resource/v1alpha2"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/format"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func setup(t testing.TB) (clientset.Interface, kubeapiservertesting.TearDownFunc) {
@@ -3669,4 +3673,63 @@ func TestApplyFormerlyAtomicFields(t *testing.T) {
 	if !reflect.DeepEqual(expectedManagedFields, managedFields) {
 		t.Fatalf("unexpected managed fields: %v", cmp.Diff(expectedManagedFields, managedFields))
 	}
+}
+
+func TestApplyLists(t *testing.T) {
+	client, closeFn := setup(t)
+	defer closeFn()
+	_, ctx := ktesting.NewTestContext(t)
+
+	applyOptions := metav1.ApplyOptions{
+		FieldManager: "TestApplyLists",
+		Force:        true,
+	}
+	namespace := "default"
+	schedulingCtx := &resourcev1alpha2.PodSchedulingContext{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo",
+			Namespace: namespace,
+		},
+	}
+
+	current, err := client.ResourceV1alpha2().PodSchedulingContexts(namespace).Create(ctx, schedulingCtx, metav1.CreateOptions{})
+	require.NoError(t, err, "create")
+	t.Logf("Initial object:\n%s", format.Object(schedulingCtx, 1))
+
+	apply := func(step string,
+		spec *resourcev1alpha2apply.PodSchedulingContextSpecApplyConfiguration,
+		change func(*resourcev1alpha2.PodSchedulingContext) *resourcev1alpha2.PodSchedulingContext,
+	) {
+		expected := change(current.DeepCopy())
+		applyConfig := resourcev1alpha2apply.PodSchedulingContext(schedulingCtx.Name, schedulingCtx.Namespace).
+			WithSpec(spec)
+		actual, err := client.ResourceV1alpha2().PodSchedulingContexts(namespace).Apply(ctx, applyConfig, applyOptions)
+		require.NoError(t, err, step)
+		t.Logf("%s:\n%s\nResulting changes:\n%s", step, format.Object(applyConfig, 1), cmp.Diff(current, actual))
+		current = actual.DeepCopy()
+		actual.ManagedFields = nil
+		actual.ResourceVersion = ""
+		expected.ManagedFields = nil
+		expected.ResourceVersion = ""
+		require.Equal(t, expected, actual, step)
+	}
+
+	apply("add a", resourcev1alpha2apply.PodSchedulingContextSpec().WithPotentialNodes("a"),
+		func(s *resourcev1alpha2.PodSchedulingContext) *resourcev1alpha2.PodSchedulingContext {
+			s.Spec.PotentialNodes = []string{"a"}
+			return s
+		})
+
+	apply("add b", resourcev1alpha2apply.PodSchedulingContextSpec().WithPotentialNodes("b"),
+		func(s *resourcev1alpha2.PodSchedulingContext) *resourcev1alpha2.PodSchedulingContext {
+			s.Spec.PotentialNodes = []string{"b"} // Overwritten completely?!
+			return s
+		})
+
+	apply("select node", resourcev1alpha2apply.PodSchedulingContextSpec().WithSelectedNode("node"),
+		func(s *resourcev1alpha2.PodSchedulingContext) *resourcev1alpha2.PodSchedulingContext {
+			s.Spec.SelectedNode = "node"
+			s.Spec.PotentialNodes = nil // Cleared?!
+			return s
+		})
 }
