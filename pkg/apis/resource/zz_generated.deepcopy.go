@@ -23,6 +23,7 @@ package resource
 
 import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	sets "k8s.io/apimachinery/pkg/util/sets"
 	core "k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -118,8 +119,10 @@ func (in *PodSchedulingContextSpec) DeepCopyInto(out *PodSchedulingContextSpec) 
 	*out = *in
 	if in.PotentialNodes != nil {
 		in, out := &in.PotentialNodes, &out.PotentialNodes
-		*out = make([]string, len(*in))
-		copy(*out, *in)
+		*out = make(sets.Set[string], len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
 	}
 	return
 }
@@ -255,8 +258,10 @@ func (in *ResourceClaimSchedulingStatus) DeepCopyInto(out *ResourceClaimScheduli
 	*out = *in
 	if in.UnsuitableNodes != nil {
 		in, out := &in.UnsuitableNodes, &out.UnsuitableNodes
-		*out = make([]string, len(*in))
-		copy(*out, *in)
+		*out = make(sets.Set[string], len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
 	}
 	return
 }
