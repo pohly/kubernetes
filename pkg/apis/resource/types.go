@@ -19,6 +19,7 @@ package resource
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -238,7 +239,7 @@ type PodSchedulingContextSpec struct {
 	// that suits all pending resources. This may get increased in the
 	// future, but not reduced.
 	// +optional
-	PotentialNodes []string
+	PotentialNodes sets.Set[string]
 }
 
 // PodSchedulingContextStatus describes where resources for the Pod can be allocated.
@@ -267,7 +268,7 @@ type ResourceClaimSchedulingStatus struct {
 	// PodSchedulingSpec.PotentialNodes. This may get increased in the
 	// future, but not reduced.
 	// +optional
-	UnsuitableNodes []string
+	UnsuitableNodes sets.Set[string]
 }
 
 // PodSchedulingNodeListMaxSize defines the maximum number of entries in the
