@@ -35,6 +35,7 @@ import (
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -917,8 +918,8 @@ func createReactor(tracker cgotesting.ObjectTracker) func(action cgotesting.Acti
 				metav1.TypeMeta   `json:",inline"`
 				metav1.ObjectMeta `json:"metadata"`
 				Spec              struct {
-					SelectedNode   string   `json:"selectedNode"`
-					PotentialNodes []string `json:"potentialNodes"`
+					SelectedNode   string      `json:"selectedNode"`
+					PotentialNodes sets.String `json:"potentialNodes"`
 				} `json:"spec"`
 			}{}
 			if err := yaml.UnmarshalStrict(action.GetPatch(), &patchObj); err != nil {
@@ -1115,7 +1116,7 @@ func Test_isSchedulableAfterPodSchedulingContextChange(t *testing.T) {
 			newObj: func() *resourcev1alpha2.PodSchedulingContext {
 				scheduling := schedulingInfo.DeepCopy()
 				scheduling.Spec.SelectedNode = workerNode.Name
-				scheduling.Status.ResourceClaims[0].UnsuitableNodes = append(scheduling.Status.ResourceClaims[0].UnsuitableNodes, scheduling.Spec.SelectedNode)
+				scheduling.Status.ResourceClaims[0].UnsuitableNodes = sets.NewString(scheduling.Spec.SelectedNode)
 				return scheduling
 			}(),
 			expectedHint: framework.QueueImmediately,

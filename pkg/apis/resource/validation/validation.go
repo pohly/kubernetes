@@ -224,8 +224,8 @@ func validateResourceClaimUserReference(ref resource.ResourceClaimConsumerRefere
 	return allErrs
 }
 
-// validateSliceIsASet ensures that a slice contains no duplicates and does not exceed a certain maximum size.
-func validateSet[T comparable](set sets.Set[T], maxSize int, validateItem func(item T, fldPath *field.Path) field.ErrorList, fldPath *field.Path) field.ErrorList {
+// validateSet ensures that a slice contains no duplicates and does not exceed a certain maximum size.
+func validateSet(set sets.String, maxSize int, validateItem func(item string, fldPath *field.Path) field.ErrorList, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	for item := range set {
 		allErrs = append(allErrs, validateItem(item, fldPath)...)

@@ -31,6 +31,7 @@ import (
 	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/dynamic-resource-allocation/controller"
@@ -288,7 +289,7 @@ func (c *ExampleController) Deallocate(ctx context.Context, claim *resourcev1alp
 	return nil
 }
 
-func (c *ExampleController) UnsuitableNodes(ctx context.Context, pod *v1.Pod, claims []*controller.ClaimAllocation, potentialNodes []string) (finalErr error) {
+func (c *ExampleController) UnsuitableNodes(ctx context.Context, pod *v1.Pod, claims []*controller.ClaimAllocation, potentialNodes sets.String) (finalErr error) {
 	logger := klog.LoggerWithValues(klog.LoggerWithName(klog.FromContext(ctx), "UnsuitableNodes"), "pod", klog.KObj(pod))
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
@@ -306,7 +307,7 @@ func (c *ExampleController) UnsuitableNodes(ctx context.Context, pod *v1.Pod, cl
 	if c.resources.NodeLocal {
 		for _, claim := range claims {
 			claim.UnsuitableNodes = nil
-			for _, node := range potentialNodes {
+			for node := range potentialNodes {
 				// If we have more than one claim, then a
 				// single pod wants to use all of them.  That
 				// can only work if a node has capacity left
@@ -314,7 +315,11 @@ func (c *ExampleController) UnsuitableNodes(ctx context.Context, pod *v1.Pod, cl
 				// doesn't run on cannot be used.
 				if !contains(c.resources.Nodes, node) ||
 					c.claimsPerNode[node]+len(claims) > c.resources.MaxAllocations {
-					claim.UnsuitableNodes = append(claim.UnsuitableNodes, node)
+					if claim.UnsuitableNodes == nil {
+						claim.UnsuitableNodes = sets.NewString(node)
+					} else {
+						claim.UnsuitableNodes.Insert(node)
+					}
 				}
 			}
 		}
@@ -324,10 +329,14 @@ func (c *ExampleController) UnsuitableNodes(ctx context.Context, pod *v1.Pod, cl
 	allocations := c.claimsPerNode[""]
 	for _, claim := range claims {
 		claim.UnsuitableNodes = nil
-		for _, node := range potentialNodes {
+		for node := range potentialNodes {
 			if !contains(c.resources.Nodes, node) ||
 				allocations+len(claims) > c.resources.MaxAllocations {
-				claim.UnsuitableNodes = append(claim.UnsuitableNodes, node)
+				if claim.UnsuitableNodes == nil {
+					claim.UnsuitableNodes = sets.NewString(node)
+				} else {
+					claim.UnsuitableNodes.Insert(node)
+				}
 			}
 		}
 	}

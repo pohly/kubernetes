@@ -16,4 +16,6 @@ limitations under the License.
 
 // Package sets has generic set and specified sets. Generic set will
 // replace specified ones over time. And specific ones are deprecated.
+//
+// +k8s:protobuf-gen=package
 package sets

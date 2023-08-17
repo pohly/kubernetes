@@ -18,6 +18,7 @@ package sets
 
 import (
 	"sort"
+	"encoding/json"
 )
 
 // Set is a set of the same type elements, implemented via map[comparable]struct{} for minimal memory consumption.
@@ -239,3 +240,25 @@ func (s Set[T]) Len() int {
 func less[T ordered](lhs, rhs T) bool {
 	return lhs < rhs
 }
+
+func (s Set[T]) MarshalJSON() ([]byte, error) {
+	keys := s.UnsortedList()
+	return json.Marshal(keys)
+}
+
+func (s *Set[T]) UnmarshalJSON(data []byte) error {
+	var keys []T
+	if err := json.Unmarshal(data, &keys); err != nil {
+		return err
+	}
+	if len(keys) > 0 {
+		if *s == nil {
+			*s = New[T]()
+		}
+		s.Insert(keys...)
+	}
+	return nil
+}
+
+var _ json.Marshaler = Set[string]{}
+var _ json.Unmarshaler = &Set[string]{}
