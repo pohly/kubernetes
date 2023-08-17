@@ -16,12 +16,18 @@ limitations under the License.
 
 package sets
 
+import (
+	"encoding/json"
+)
+
 // String is a set of strings, implemented via map[string]struct{} for minimal memory consumption.
 //
 // Deprecated: use generic Set instead.
 // new ways:
 // s1 := Set[string]{}
 // s2 := New[string]()
+//
+// +protobuf=true
 type String map[string]Empty
 
 // NewString creates a String from a list of values.
@@ -135,3 +141,25 @@ func (s String) PopAny() (string, bool) {
 func (s String) Len() int {
 	return len(s)
 }
+
+func (s String) MarshalJSON() ([]byte, error) {
+	keys := s.UnsortedList()
+	return json.Marshal(keys)
+}
+
+func (s *String) UnmarshalJSON(data []byte) error {
+	var keys []string
+	if err := json.Unmarshal(data, &keys); err != nil {
+		return err
+	}
+	if len(keys) > 0 {
+		if *s == nil {
+			*s = NewString()
+		}
+		s.Insert(keys...)
+	}
+	return nil
+}
+
+var _ json.Marshaler = String{}
+var _ json.Unmarshaler = &String{}

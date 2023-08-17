@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/utils/pointer"
 )
@@ -994,7 +995,7 @@ func (wrapper *PodSchedulingWrapper) SelectedNode(s string) *PodSchedulingWrappe
 
 // PotentialNodes sets that field of the inner object.
 func (wrapper *PodSchedulingWrapper) PotentialNodes(nodes ...string) *PodSchedulingWrapper {
-	wrapper.Spec.PotentialNodes = nodes
+	wrapper.Spec.PotentialNodes = sets.NewString(nodes...)
 	return wrapper
 }
 

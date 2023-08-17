@@ -18,11 +18,15 @@ limitations under the License.
 
 package v1alpha2
 
+import (
+	sets "k8s.io/apimachinery/pkg/util/sets"
+)
+
 // ResourceClaimSchedulingStatusApplyConfiguration represents an declarative configuration of the ResourceClaimSchedulingStatus type for use
 // with apply.
 type ResourceClaimSchedulingStatusApplyConfiguration struct {
-	Name            *string  `json:"name,omitempty"`
-	UnsuitableNodes []string `json:"unsuitableNodes,omitempty"`
+	Name            *string      `json:"name,omitempty"`
+	UnsuitableNodes *sets.String `json:"unsuitableNodes,omitempty"`
 }
 
 // ResourceClaimSchedulingStatusApplyConfiguration constructs an declarative configuration of the ResourceClaimSchedulingStatus type for use with
@@ -39,12 +43,10 @@ func (b *ResourceClaimSchedulingStatusApplyConfiguration) WithName(value string)
 	return b
 }
 
-// WithUnsuitableNodes adds the given value to the UnsuitableNodes field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the UnsuitableNodes field.
-func (b *ResourceClaimSchedulingStatusApplyConfiguration) WithUnsuitableNodes(values ...string) *ResourceClaimSchedulingStatusApplyConfiguration {
-	for i := range values {
-		b.UnsuitableNodes = append(b.UnsuitableNodes, values[i])
-	}
+// WithUnsuitableNodes sets the UnsuitableNodes field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the UnsuitableNodes field is set to the value of the last call.
+func (b *ResourceClaimSchedulingStatusApplyConfiguration) WithUnsuitableNodes(value sets.String) *ResourceClaimSchedulingStatusApplyConfiguration {
+	b.UnsuitableNodes = &value
 	return b
 }

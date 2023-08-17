@@ -1034,6 +1034,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/apimachinery/pkg/runtime.TypeMeta":                                                              schema_k8sio_apimachinery_pkg_runtime_TypeMeta(ref),
 		"k8s.io/apimachinery/pkg/runtime.Unknown":                                                               schema_k8sio_apimachinery_pkg_runtime_Unknown(ref),
 		"k8s.io/apimachinery/pkg/util/intstr.IntOrString":                                                       schema_apimachinery_pkg_util_intstr_IntOrString(ref),
+		"k8s.io/apimachinery/pkg/util/sets.Empty":                                                               schema_apimachinery_pkg_util_sets_Empty(ref),
 		"k8s.io/apimachinery/pkg/version.Info":                                                                  schema_k8sio_apimachinery_pkg_version_Info(ref),
 		"k8s.io/apiserver/pkg/apis/audit/v1.Event":                                                              schema_pkg_apis_audit_v1_Event(ref),
 		"k8s.io/apiserver/pkg/apis/audit/v1.EventList":                                                          schema_pkg_apis_audit_v1_EventList(ref),
@@ -43053,13 +43054,13 @@ func schema_k8sio_api_resource_v1alpha2_PodSchedulingContextSpec(ref common.Refe
 						},
 						SchemaProps: spec.SchemaProps{
 							Description: "PotentialNodes lists nodes where the Pod might be able to run.\n\nThe size of this field is limited to 128. This is large enough for many clusters. Larger clusters may need more attempts to find a node that suits all pending resources. This may get increased in the future, but not reduced.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/apimachinery/pkg/util/sets.Empty"),
 									},
 								},
 							},
@@ -43068,6 +43069,8 @@ func schema_k8sio_api_resource_v1alpha2_PodSchedulingContextSpec(ref common.Refe
 				},
 			},
 		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/util/sets.Empty"},
 	}
 }
 
@@ -43314,13 +43317,13 @@ func schema_k8sio_api_resource_v1alpha2_ResourceClaimSchedulingStatus(ref common
 						},
 						SchemaProps: spec.SchemaProps{
 							Description: "UnsuitableNodes lists nodes that the ResourceClaim cannot be allocated for.\n\nThe size of this field is limited to 128, the same as for PodSchedulingSpec.PotentialNodes. This may get increased in the future, but not reduced.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/apimachinery/pkg/util/sets.Empty"),
 									},
 								},
 							},
@@ -43329,6 +43332,8 @@ func schema_k8sio_api_resource_v1alpha2_ResourceClaimSchedulingStatus(ref common
 				},
 			},
 		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/util/sets.Empty"},
 	}
 }
 
@@ -51585,6 +51590,17 @@ func schema_apimachinery_pkg_util_intstr_IntOrString(ref common.ReferenceCallbac
 			},
 		},
 	})
+}
+
+func schema_apimachinery_pkg_util_sets_Empty(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Empty is public since it is used by some internal API objects for conversions between external string arrays and internal sets, and conversion logic requires public types today.",
+				Type:        []string{"object"},
+			},
+		},
+	}
 }
 
 func schema_k8sio_apimachinery_pkg_version_Info(ref common.ReferenceCallback) common.OpenAPIDefinition {

@@ -18,11 +18,15 @@ limitations under the License.
 
 package v1alpha2
 
+import (
+	sets "k8s.io/apimachinery/pkg/util/sets"
+)
+
 // PodSchedulingContextSpecApplyConfiguration represents an declarative configuration of the PodSchedulingContextSpec type for use
 // with apply.
 type PodSchedulingContextSpecApplyConfiguration struct {
-	SelectedNode   *string  `json:"selectedNode,omitempty"`
-	PotentialNodes []string `json:"potentialNodes,omitempty"`
+	SelectedNode   *string      `json:"selectedNode,omitempty"`
+	PotentialNodes *sets.String `json:"potentialNodes,omitempty"`
 }
 
 // PodSchedulingContextSpecApplyConfiguration constructs an declarative configuration of the PodSchedulingContextSpec type for use with
@@ -39,12 +43,10 @@ func (b *PodSchedulingContextSpecApplyConfiguration) WithSelectedNode(value stri
 	return b
 }
 
-// WithPotentialNodes adds the given value to the PotentialNodes field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the PotentialNodes field.
-func (b *PodSchedulingContextSpecApplyConfiguration) WithPotentialNodes(values ...string) *PodSchedulingContextSpecApplyConfiguration {
-	for i := range values {
-		b.PotentialNodes = append(b.PotentialNodes, values[i])
-	}
+// WithPotentialNodes sets the PotentialNodes field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the PotentialNodes field is set to the value of the last call.
+func (b *PodSchedulingContextSpecApplyConfiguration) WithPotentialNodes(value sets.String) *PodSchedulingContextSpecApplyConfiguration {
+	b.PotentialNodes = &value
 	return b
 }

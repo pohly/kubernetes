@@ -25,6 +25,7 @@ import "k8s.io/api/core/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
+import "k8s.io/apimachinery/pkg/util/sets/generated.proto";
 
 // Package-wide variables from generator "generated".
 option go_package = "k8s.io/api/resource/v1alpha2";
@@ -109,7 +110,7 @@ message PodSchedulingContextSpec {
   //
   // +listType=atomic
   // +optional
-  repeated string potentialNodes = 2;
+  map<string, k8s.io.apimachinery.pkg.util.sets.Empty> potentialNodes = 2;
 }
 
 // PodSchedulingContextStatus describes where resources for the Pod can be allocated.
@@ -210,7 +211,7 @@ message ResourceClaimSchedulingStatus {
   //
   // +listType=atomic
   // +optional
-  repeated string unsuitableNodes = 2;
+  map<string, k8s.io.apimachinery.pkg.util.sets.Empty> unsuitableNodes = 2;
 }
 
 // ResourceClaimSpec defines how a resource is to be allocated.

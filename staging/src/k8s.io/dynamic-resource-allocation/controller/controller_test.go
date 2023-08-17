@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -66,8 +67,8 @@ func TestController(t *testing.T) {
 	podWithClaim := createPod(podName, claimNamespace, map[string]string{podClaimName: claimName})
 	nodeName := "worker"
 	otherNodeName := "worker-2"
-	unsuitableNodes := []string{otherNodeName}
-	potentialNodes := []string{nodeName, otherNodeName}
+	unsuitableNodes := sets.NewString(otherNodeName)
+	potentialNodes := sets.NewString(nodeName, otherNodeName)
 	withDeletionTimestamp := func(claim *resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim {
 		var deleted metav1.Time
 		claim = claim.DeepCopy()
@@ -349,7 +350,7 @@ func TestController(t *testing.T) {
 			schedulingCtx: withPotentialNodes(podSchedulingCtx),
 			driver: m.expectClassParameters(map[string]interface{}{className: 1}).
 				expectClaimParameters(map[string]interface{}{claimName: 2}).
-				expectUnsuitableNodes(map[string][]string{podClaimName: unsuitableNodes}, nil),
+				expectUnsuitableNodes(map[string]sets.String{podClaimName: unsuitableNodes}, nil),
 			expectedSchedulingCtx: withUnsuitableNodes(withPotentialNodes(podSchedulingCtx)),
 			expectedError:         errPeriodic.Error(),
 		},
@@ -375,7 +376,7 @@ func TestController(t *testing.T) {
 			schedulingCtx: withSelectedNode(withPotentialNodes(podSchedulingCtx)),
 			driver: m.expectClassParameters(map[string]interface{}{className: 1}).
 				expectClaimParameters(map[string]interface{}{claimName: 2}).
-				expectUnsuitableNodes(map[string][]string{podClaimName: unsuitableNodes}, nil).
+				expectUnsuitableNodes(map[string]sets.String{podClaimName: unsuitableNodes}, nil).
 				expectAllocate(map[string]allocate{claimName: {allocResult: &allocation, selectedNode: nodeName, allocErr: nil}}),
 			expectedSchedulingCtx: withUnsuitableNodes(withSelectedNode(withPotentialNodes(podSchedulingCtx))),
 			expectedError:         errPeriodic.Error(),
@@ -477,7 +478,7 @@ type mockDriver struct {
 	claimParameters      map[string]interface{}
 	allocate             map[string]allocate
 	deallocate           map[string]error
-	unsuitableNodes      map[string][]string
+	unsuitableNodes      map[string]sets.String
 	unsuitableNodesError error
 }
 
@@ -507,14 +508,14 @@ func (m mockDriver) expectDeallocate(expected map[string]error) mockDriver {
 	return m
 }
 
-func (m mockDriver) expectUnsuitableNodes(expected map[string][]string, err error) mockDriver {
+func (m mockDriver) expectUnsuitableNodes(expected map[string]sets.String, err error) mockDriver {
 	m.unsuitableNodes = expected
 	m.unsuitableNodesError = err
 	return m
 }
 
 func (m mockDriver) GetClassParameters(ctx context.Context, class *resourcev1alpha2.ResourceClass) (interface{}, error) {
-	m.t.Logf("GetClassParameters(%s)", class)
+	m.t.Logf("GetClassParameters %v", class)
 	result, ok := m.classParameters[class.Name]
 	if !ok {
 		m.t.Fatal("unexpected GetClassParameters call")
@@ -526,7 +527,7 @@ func (m mockDriver) GetClassParameters(ctx context.Context, class *resourcev1alp
 }
 
 func (m mockDriver) GetClaimParameters(ctx context.Context, claim *resourcev1alpha2.ResourceClaim, class *resourcev1alpha2.ResourceClass, classParameters interface{}) (interface{}, error) {
-	m.t.Logf("GetClaimParameters(%s)", claim)
+	m.t.Logf("GetClaimParameters %v", claim)
 	result, ok := m.claimParameters[claim.Name]
 	if !ok {
 		m.t.Fatal("unexpected GetClaimParameters call")
@@ -553,7 +554,7 @@ func (m mockDriver) Allocate(ctx context.Context, claims []*ClaimAllocation, sel
 }
 
 func (m mockDriver) Deallocate(ctx context.Context, claim *resourcev1alpha2.ResourceClaim) error {
-	m.t.Logf("Deallocate(%s)", claim)
+	m.t.Logf("Deallocate %v", claim)
 	err, ok := m.deallocate[claim.Name]
 	if !ok {
 		m.t.Fatal("unexpected Deallocate call")
@@ -561,7 +562,7 @@ func (m mockDriver) Deallocate(ctx context.Context, claim *resourcev1alpha2.Reso
 	return err
 }
 
-func (m mockDriver) UnsuitableNodes(ctx context.Context, pod *corev1.Pod, claims []*ClaimAllocation, potentialNodes []string) error {
+func (m mockDriver) UnsuitableNodes(ctx context.Context, pod *corev1.Pod, claims []*ClaimAllocation, potentialNodes sets.String) error {
 	m.t.Logf("UnsuitableNodes(%s, %v, %v)", pod, claims, potentialNodes)
 	if len(m.unsuitableNodes) == 0 {
 		m.t.Fatal("unexpected UnsuitableNodes call")
@@ -690,8 +691,8 @@ func createReactor(tracker cgotesting.ObjectTracker) func(action cgotesting.Acti
 				metav1.ObjectMeta `json:"metadata"`
 				Status            struct {
 					ResourceClaims []struct {
-						Name            string   `json:"name"`
-						UnsuitableNodes []string `json:"unsuitableNodes"`
+						Name            string      `json:"name"`
+						UnsuitableNodes sets.String `json:"unsuitableNodes"`
 					} `json:"resourceClaims"`
 				} `json:"status"`
 			}{}

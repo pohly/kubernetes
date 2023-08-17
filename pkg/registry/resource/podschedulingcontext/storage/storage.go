@@ -71,8 +71,8 @@ func (r *REST) ApplyPatchToCurrentObject(requestContext context.Context, current
 		metav1.TypeMeta   `json:",inline"`
 		metav1.ObjectMeta `json:"metadata"`
 		Spec              struct {
-			SelectedNode   string           `json:"selectedNode"`
-			PotentialNodes sets.Set[string] `json:"potentialNodes"`
+			SelectedNode   string      `json:"selectedNode"`
+			PotentialNodes sets.String `json:"potentialNodes"`
 		} `json:"spec"`
 	}{}
 	if err := yaml.UnmarshalStrict(patch, &patchObj); err != nil {
@@ -186,8 +186,8 @@ func (r *StatusREST) ApplyPatchToCurrentObject(requestContext context.Context, c
 		metav1.ObjectMeta `json:"metadata"`
 		Status            struct {
 			ResourceClaims []struct {
-				Name            string           `json:"name"`
-				UnsuitableNodes sets.Set[string] `json:"unsuitableNodes"`
+				Name            string      `json:"name"`
+				UnsuitableNodes sets.String `json:"unsuitableNodes"`
 			} `json:"resourceClaims"`
 		} `json:"status"`
 	}{}
