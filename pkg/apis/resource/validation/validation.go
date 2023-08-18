@@ -225,16 +225,23 @@ func validateResourceClaimUserReference(ref resource.ResourceClaimConsumerRefere
 }
 
 // validateSliceIsASet ensures that a slice contains no duplicates and does not exceed a certain maximum size.
-func validateSet[T comparable](set sets.Set[T], maxSize int, validateItem func(item T, fldPath *field.Path) field.ErrorList, fldPath *field.Path) field.ErrorList {
+func validateSliceIsASet[T comparable](slice []T, maxSize int, validateItem func(item T, fldPath *field.Path) field.ErrorList, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
-	for item := range set {
-		allErrs = append(allErrs, validateItem(item, fldPath)...)
+	allItems := sets.New[T]()
+	for i, item := range slice {
+		idxPath := fldPath.Index(i)
+		if allItems.Has(item) {
+			allErrs = append(allErrs, field.Duplicate(idxPath, item))
+		} else {
+			allErrs = append(allErrs, validateItem(item, idxPath)...)
+			allItems.Insert(item)
+		}
 	}
-	if set.Len() > maxSize {
+	if len(slice) > maxSize {
 		// Dumping the entire field into the error message is likely to be too long,
 		// in particular when it is already beyond the maximum size. Instead this
 		// just shows the number of entries.
-		allErrs = append(allErrs, field.TooLongMaxLength(fldPath, set.Len(), maxSize))
+		allErrs = append(allErrs, field.TooLongMaxLength(fldPath, len(slice), maxSize))
 	}
 	return allErrs
 }
@@ -269,7 +276,7 @@ func ValidatePodSchedulingContexts(schedulingCtx *resource.PodSchedulingContext)
 }
 
 func validatePodSchedulingSpec(spec *resource.PodSchedulingContextSpec, fldPath *field.Path) field.ErrorList {
-	allErrs := validateSet(spec.PotentialNodes, resource.PodSchedulingNodeListMaxSize, validateNodeName, fldPath.Child("potentialNodes"))
+	allErrs := validateSliceIsASet(spec.PotentialNodes, resource.PodSchedulingNodeListMaxSize, validateNodeName, fldPath.Child("potentialNodes"))
 	return allErrs
 }
 
@@ -306,7 +313,7 @@ func validatePodSchedulingClaims(claimStatuses []resource.ResourceClaimSchedulin
 }
 
 func validatePodSchedulingClaim(status resource.ResourceClaimSchedulingStatus, fldPath *field.Path) field.ErrorList {
-	allErrs := validateSet(status.UnsuitableNodes, resource.PodSchedulingNodeListMaxSize, validateNodeName, fldPath.Child("unsuitableNodes"))
+	allErrs := validateSliceIsASet(status.UnsuitableNodes, resource.PodSchedulingNodeListMaxSize, validateNodeName, fldPath.Child("unsuitableNodes"))
 	return allErrs
 }
 

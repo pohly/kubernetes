@@ -22,7 +22,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
@@ -71,8 +70,8 @@ func (r *REST) ApplyPatchToCurrentObject(requestContext context.Context, current
 		metav1.TypeMeta   `json:",inline"`
 		metav1.ObjectMeta `json:"metadata"`
 		Spec              struct {
-			SelectedNode   string           `json:"selectedNode"`
-			PotentialNodes sets.Set[string] `json:"potentialNodes"`
+			SelectedNode   string   `json:"selectedNode"`
+			PotentialNodes []string `json:"potentialNodes"`
 		} `json:"spec"`
 	}{}
 	if err := yaml.UnmarshalStrict(patch, &patchObj); err != nil {
@@ -186,8 +185,8 @@ func (r *StatusREST) ApplyPatchToCurrentObject(requestContext context.Context, c
 		metav1.ObjectMeta `json:"metadata"`
 		Status            struct {
 			ResourceClaims []struct {
-				Name            string           `json:"name"`
-				UnsuitableNodes sets.Set[string] `json:"unsuitableNodes"`
+				Name            string   `json:"name"`
+				UnsuitableNodes []string `json:"unsuitableNodes"`
 			} `json:"resourceClaims"`
 		} `json:"status"`
 	}{}

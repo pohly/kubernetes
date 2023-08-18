@@ -23,7 +23,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/utils/pointer"
@@ -194,7 +193,7 @@ func TestValidatePodSchedulingContexts(t *testing.T) {
 }
 
 func TestValidatePodSchedulingUpdate(t *testing.T) {
-	validScheduling := testPodSchedulingContexts("foo", "ns", resource.PodSchedulingContextSpec{PotentialNodes: sets.New[string]()})
+	validScheduling := testPodSchedulingContexts("foo", "ns", resource.PodSchedulingContextSpec{})
 	badName := "!@#$%^"
 
 	scenarios := map[string]struct {
@@ -219,7 +218,7 @@ func TestValidatePodSchedulingUpdate(t *testing.T) {
 			oldScheduling: validScheduling,
 			update: func(schedulingCtx *resource.PodSchedulingContext) *resource.PodSchedulingContext {
 				for i := 0; i < resource.PodSchedulingNodeListMaxSize; i++ {
-					schedulingCtx.Spec.PotentialNodes.Insert(fmt.Sprintf("worker%d", i))
+					schedulingCtx.Spec.PotentialNodes = append(schedulingCtx.Spec.PotentialNodes, fmt.Sprintf("worker%d", i))
 				}
 				return schedulingCtx
 			},
@@ -229,16 +228,16 @@ func TestValidatePodSchedulingUpdate(t *testing.T) {
 			oldScheduling: validScheduling,
 			update: func(schedulingCtx *resource.PodSchedulingContext) *resource.PodSchedulingContext {
 				for i := 0; i < resource.PodSchedulingNodeListMaxSize+1; i++ {
-					schedulingCtx.Spec.PotentialNodes.Insert(fmt.Sprintf("worker%d", i))
+					schedulingCtx.Spec.PotentialNodes = append(schedulingCtx.Spec.PotentialNodes, fmt.Sprintf("worker%d", i))
 				}
 				return schedulingCtx
 			},
 		},
 		"invalid-potential-nodes-name": {
-			wantFailures:  field.ErrorList{field.Invalid(field.NewPath("spec", "potentialNodes"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
+			wantFailures:  field.ErrorList{field.Invalid(field.NewPath("spec", "potentialNodes").Index(0), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
 			oldScheduling: validScheduling,
 			update: func(schedulingCtx *resource.PodSchedulingContext) *resource.PodSchedulingContext {
-				schedulingCtx.Spec.PotentialNodes.Insert(badName)
+				schedulingCtx.Spec.PotentialNodes = append(schedulingCtx.Spec.PotentialNodes, badName)
 				return schedulingCtx
 			},
 		},
@@ -273,12 +272,14 @@ func TestValidatePodSchedulingStatusUpdate(t *testing.T) {
 			update: func(schedulingCtx *resource.PodSchedulingContext) *resource.PodSchedulingContext {
 				schedulingCtx.Status.ResourceClaims = append(schedulingCtx.Status.ResourceClaims,
 					resource.ResourceClaimSchedulingStatus{
-						Name:            "my-claim",
-						UnsuitableNodes: sets.New[string](),
+						Name: "my-claim",
 					},
 				)
 				for i := 0; i < resource.PodSchedulingNodeListMaxSize; i++ {
-					schedulingCtx.Status.ResourceClaims[0].UnsuitableNodes.Insert(fmt.Sprintf("worker%d", i))
+					schedulingCtx.Status.ResourceClaims[0].UnsuitableNodes = append(
+						schedulingCtx.Status.ResourceClaims[0].UnsuitableNodes,
+						fmt.Sprintf("worker%d", i),
+					)
 				}
 				return schedulingCtx
 			},
@@ -301,27 +302,31 @@ func TestValidatePodSchedulingStatusUpdate(t *testing.T) {
 			update: func(schedulingCtx *resource.PodSchedulingContext) *resource.PodSchedulingContext {
 				schedulingCtx.Status.ResourceClaims = append(schedulingCtx.Status.ResourceClaims,
 					resource.ResourceClaimSchedulingStatus{
-						Name:            "my-claim",
-						UnsuitableNodes: sets.New[string](),
+						Name: "my-claim",
 					},
 				)
 				for i := 0; i < resource.PodSchedulingNodeListMaxSize+1; i++ {
-					schedulingCtx.Status.ResourceClaims[0].UnsuitableNodes.Insert(fmt.Sprintf("worker%d", i))
+					schedulingCtx.Status.ResourceClaims[0].UnsuitableNodes = append(
+						schedulingCtx.Status.ResourceClaims[0].UnsuitableNodes,
+						fmt.Sprintf("worker%d", i),
+					)
 				}
 				return schedulingCtx
 			},
 		},
 		"invalid-node-name": {
-			wantFailures:  field.ErrorList{field.Invalid(field.NewPath("status", "claims").Index(0).Child("unsuitableNodes"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
+			wantFailures:  field.ErrorList{field.Invalid(field.NewPath("status", "claims").Index(0).Child("unsuitableNodes").Index(0), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
 			oldScheduling: validScheduling,
 			update: func(schedulingCtx *resource.PodSchedulingContext) *resource.PodSchedulingContext {
 				schedulingCtx.Status.ResourceClaims = append(schedulingCtx.Status.ResourceClaims,
 					resource.ResourceClaimSchedulingStatus{
-						Name:            "my-claim",
-						UnsuitableNodes: sets.New[string](),
+						Name: "my-claim",
 					},
 				)
-				schedulingCtx.Status.ResourceClaims[0].UnsuitableNodes.Insert(badName)
+				schedulingCtx.Status.ResourceClaims[0].UnsuitableNodes = append(
+					schedulingCtx.Status.ResourceClaims[0].UnsuitableNodes,
+					badName,
+				)
 				return schedulingCtx
 			},
 		},

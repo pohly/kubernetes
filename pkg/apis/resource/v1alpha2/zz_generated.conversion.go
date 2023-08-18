@@ -70,6 +70,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha2.PodSchedulingContextSpec)(nil), (*resource.PodSchedulingContextSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha2_PodSchedulingContextSpec_To_resource_PodSchedulingContextSpec(a.(*v1alpha2.PodSchedulingContextSpec), b.(*resource.PodSchedulingContextSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resource.PodSchedulingContextSpec)(nil), (*v1alpha2.PodSchedulingContextSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_PodSchedulingContextSpec_To_v1alpha2_PodSchedulingContextSpec(a.(*resource.PodSchedulingContextSpec), b.(*v1alpha2.PodSchedulingContextSpec), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*v1alpha2.PodSchedulingContextStatus)(nil), (*resource.PodSchedulingContextStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1alpha2_PodSchedulingContextStatus_To_resource_PodSchedulingContextStatus(a.(*v1alpha2.PodSchedulingContextStatus), b.(*resource.PodSchedulingContextStatus), scope)
 	}); err != nil {
@@ -117,6 +127,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*resource.ResourceClaimParametersReference)(nil), (*v1alpha2.ResourceClaimParametersReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_resource_ResourceClaimParametersReference_To_v1alpha2_ResourceClaimParametersReference(a.(*resource.ResourceClaimParametersReference), b.(*v1alpha2.ResourceClaimParametersReference), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha2.ResourceClaimSchedulingStatus)(nil), (*resource.ResourceClaimSchedulingStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha2_ResourceClaimSchedulingStatus_To_resource_ResourceClaimSchedulingStatus(a.(*v1alpha2.ResourceClaimSchedulingStatus), b.(*resource.ResourceClaimSchedulingStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resource.ResourceClaimSchedulingStatus)(nil), (*v1alpha2.ResourceClaimSchedulingStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_ResourceClaimSchedulingStatus_To_v1alpha2_ResourceClaimSchedulingStatus(a.(*resource.ResourceClaimSchedulingStatus), b.(*v1alpha2.ResourceClaimSchedulingStatus), scope)
 	}); err != nil {
 		return err
 	}
@@ -210,26 +230,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*resource.PodSchedulingContextSpec)(nil), (*v1alpha2.PodSchedulingContextSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_resource_PodSchedulingContextSpec_To_v1alpha2_PodSchedulingContextSpec(a.(*resource.PodSchedulingContextSpec), b.(*v1alpha2.PodSchedulingContextSpec), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddConversionFunc((*resource.ResourceClaimSchedulingStatus)(nil), (*v1alpha2.ResourceClaimSchedulingStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_resource_ResourceClaimSchedulingStatus_To_v1alpha2_ResourceClaimSchedulingStatus(a.(*resource.ResourceClaimSchedulingStatus), b.(*v1alpha2.ResourceClaimSchedulingStatus), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddConversionFunc((*v1alpha2.PodSchedulingContextSpec)(nil), (*resource.PodSchedulingContextSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha2_PodSchedulingContextSpec_To_resource_PodSchedulingContextSpec(a.(*v1alpha2.PodSchedulingContextSpec), b.(*resource.PodSchedulingContextSpec), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddConversionFunc((*v1alpha2.ResourceClaimSchedulingStatus)(nil), (*resource.ResourceClaimSchedulingStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha2_ResourceClaimSchedulingStatus_To_resource_ResourceClaimSchedulingStatus(a.(*v1alpha2.ResourceClaimSchedulingStatus), b.(*resource.ResourceClaimSchedulingStatus), scope)
-	}); err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -291,17 +291,7 @@ func Convert_resource_PodSchedulingContext_To_v1alpha2_PodSchedulingContext(in *
 
 func autoConvert_v1alpha2_PodSchedulingContextList_To_resource_PodSchedulingContextList(in *v1alpha2.PodSchedulingContextList, out *resource.PodSchedulingContextList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]resource.PodSchedulingContext, len(*in))
-		for i := range *in {
-			if err := Convert_v1alpha2_PodSchedulingContext_To_resource_PodSchedulingContext(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]resource.PodSchedulingContext)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -312,17 +302,7 @@ func Convert_v1alpha2_PodSchedulingContextList_To_resource_PodSchedulingContextL
 
 func autoConvert_resource_PodSchedulingContextList_To_v1alpha2_PodSchedulingContextList(in *resource.PodSchedulingContextList, out *v1alpha2.PodSchedulingContextList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items != nil {
-		in, out := &in.Items, &out.Items
-		*out = make([]v1alpha2.PodSchedulingContext, len(*in))
-		for i := range *in {
-			if err := Convert_resource_PodSchedulingContext_To_v1alpha2_PodSchedulingContext(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.Items = nil
-	}
+	out.Items = *(*[]v1alpha2.PodSchedulingContext)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
@@ -333,28 +313,28 @@ func Convert_resource_PodSchedulingContextList_To_v1alpha2_PodSchedulingContextL
 
 func autoConvert_v1alpha2_PodSchedulingContextSpec_To_resource_PodSchedulingContextSpec(in *v1alpha2.PodSchedulingContextSpec, out *resource.PodSchedulingContextSpec, s conversion.Scope) error {
 	out.SelectedNode = in.SelectedNode
-	// WARNING: in.PotentialNodes requires manual conversion: inconvertible types ([]string vs k8s.io/apimachinery/pkg/util/sets.Set[string])
+	out.PotentialNodes = *(*[]string)(unsafe.Pointer(&in.PotentialNodes))
 	return nil
+}
+
+// Convert_v1alpha2_PodSchedulingContextSpec_To_resource_PodSchedulingContextSpec is an autogenerated conversion function.
+func Convert_v1alpha2_PodSchedulingContextSpec_To_resource_PodSchedulingContextSpec(in *v1alpha2.PodSchedulingContextSpec, out *resource.PodSchedulingContextSpec, s conversion.Scope) error {
+	return autoConvert_v1alpha2_PodSchedulingContextSpec_To_resource_PodSchedulingContextSpec(in, out, s)
 }
 
 func autoConvert_resource_PodSchedulingContextSpec_To_v1alpha2_PodSchedulingContextSpec(in *resource.PodSchedulingContextSpec, out *v1alpha2.PodSchedulingContextSpec, s conversion.Scope) error {
 	out.SelectedNode = in.SelectedNode
-	// WARNING: in.PotentialNodes requires manual conversion: inconvertible types (k8s.io/apimachinery/pkg/util/sets.Set[string] vs []string)
+	out.PotentialNodes = *(*[]string)(unsafe.Pointer(&in.PotentialNodes))
 	return nil
 }
 
+// Convert_resource_PodSchedulingContextSpec_To_v1alpha2_PodSchedulingContextSpec is an autogenerated conversion function.
+func Convert_resource_PodSchedulingContextSpec_To_v1alpha2_PodSchedulingContextSpec(in *resource.PodSchedulingContextSpec, out *v1alpha2.PodSchedulingContextSpec, s conversion.Scope) error {
+	return autoConvert_resource_PodSchedulingContextSpec_To_v1alpha2_PodSchedulingContextSpec(in, out, s)
+}
+
 func autoConvert_v1alpha2_PodSchedulingContextStatus_To_resource_PodSchedulingContextStatus(in *v1alpha2.PodSchedulingContextStatus, out *resource.PodSchedulingContextStatus, s conversion.Scope) error {
-	if in.ResourceClaims != nil {
-		in, out := &in.ResourceClaims, &out.ResourceClaims
-		*out = make([]resource.ResourceClaimSchedulingStatus, len(*in))
-		for i := range *in {
-			if err := Convert_v1alpha2_ResourceClaimSchedulingStatus_To_resource_ResourceClaimSchedulingStatus(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.ResourceClaims = nil
-	}
+	out.ResourceClaims = *(*[]resource.ResourceClaimSchedulingStatus)(unsafe.Pointer(&in.ResourceClaims))
 	return nil
 }
 
@@ -364,17 +344,7 @@ func Convert_v1alpha2_PodSchedulingContextStatus_To_resource_PodSchedulingContex
 }
 
 func autoConvert_resource_PodSchedulingContextStatus_To_v1alpha2_PodSchedulingContextStatus(in *resource.PodSchedulingContextStatus, out *v1alpha2.PodSchedulingContextStatus, s conversion.Scope) error {
-	if in.ResourceClaims != nil {
-		in, out := &in.ResourceClaims, &out.ResourceClaims
-		*out = make([]v1alpha2.ResourceClaimSchedulingStatus, len(*in))
-		for i := range *in {
-			if err := Convert_resource_ResourceClaimSchedulingStatus_To_v1alpha2_ResourceClaimSchedulingStatus(&(*in)[i], &(*out)[i], s); err != nil {
-				return err
-			}
-		}
-	} else {
-		out.ResourceClaims = nil
-	}
+	out.ResourceClaims = *(*[]v1alpha2.ResourceClaimSchedulingStatus)(unsafe.Pointer(&in.ResourceClaims))
 	return nil
 }
 
@@ -489,14 +459,24 @@ func Convert_resource_ResourceClaimParametersReference_To_v1alpha2_ResourceClaim
 
 func autoConvert_v1alpha2_ResourceClaimSchedulingStatus_To_resource_ResourceClaimSchedulingStatus(in *v1alpha2.ResourceClaimSchedulingStatus, out *resource.ResourceClaimSchedulingStatus, s conversion.Scope) error {
 	out.Name = in.Name
-	// WARNING: in.UnsuitableNodes requires manual conversion: inconvertible types ([]string vs k8s.io/apimachinery/pkg/util/sets.Set[string])
+	out.UnsuitableNodes = *(*[]string)(unsafe.Pointer(&in.UnsuitableNodes))
 	return nil
+}
+
+// Convert_v1alpha2_ResourceClaimSchedulingStatus_To_resource_ResourceClaimSchedulingStatus is an autogenerated conversion function.
+func Convert_v1alpha2_ResourceClaimSchedulingStatus_To_resource_ResourceClaimSchedulingStatus(in *v1alpha2.ResourceClaimSchedulingStatus, out *resource.ResourceClaimSchedulingStatus, s conversion.Scope) error {
+	return autoConvert_v1alpha2_ResourceClaimSchedulingStatus_To_resource_ResourceClaimSchedulingStatus(in, out, s)
 }
 
 func autoConvert_resource_ResourceClaimSchedulingStatus_To_v1alpha2_ResourceClaimSchedulingStatus(in *resource.ResourceClaimSchedulingStatus, out *v1alpha2.ResourceClaimSchedulingStatus, s conversion.Scope) error {
 	out.Name = in.Name
-	// WARNING: in.UnsuitableNodes requires manual conversion: inconvertible types (k8s.io/apimachinery/pkg/util/sets.Set[string] vs []string)
+	out.UnsuitableNodes = *(*[]string)(unsafe.Pointer(&in.UnsuitableNodes))
 	return nil
+}
+
+// Convert_resource_ResourceClaimSchedulingStatus_To_v1alpha2_ResourceClaimSchedulingStatus is an autogenerated conversion function.
+func Convert_resource_ResourceClaimSchedulingStatus_To_v1alpha2_ResourceClaimSchedulingStatus(in *resource.ResourceClaimSchedulingStatus, out *v1alpha2.ResourceClaimSchedulingStatus, s conversion.Scope) error {
+	return autoConvert_resource_ResourceClaimSchedulingStatus_To_v1alpha2_ResourceClaimSchedulingStatus(in, out, s)
 }
 
 func autoConvert_v1alpha2_ResourceClaimSpec_To_resource_ResourceClaimSpec(in *v1alpha2.ResourceClaimSpec, out *resource.ResourceClaimSpec, s conversion.Scope) error {
