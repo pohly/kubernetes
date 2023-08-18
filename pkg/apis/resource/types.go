@@ -239,7 +239,7 @@ type PodSchedulingContextSpec struct {
 	// that suits all pending resources. This may get increased in the
 	// future, but not reduced.
 	// +optional
-	PotentialNodes sets.String
+	PotentialNodes sets.Set[string]
 }
 
 // PodSchedulingContextStatus describes where resources for the Pod can be allocated.
@@ -268,7 +268,7 @@ type ResourceClaimSchedulingStatus struct {
 	// PodSchedulingSpec.PotentialNodes. This may get increased in the
 	// future, but not reduced.
 	// +optional
-	UnsuitableNodes sets.String
+	UnsuitableNodes sets.Set[string]
 }
 
 // PodSchedulingNodeListMaxSize defines the maximum number of entries in the

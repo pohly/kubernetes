@@ -20,7 +20,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // +genclient
@@ -251,7 +250,7 @@ type PodSchedulingContextSpec struct {
 	//
 	// +listType=atomic
 	// +optional
-	PotentialNodes sets.String `json:"potentialNodes,omitempty" protobuf:"bytes,2,opt,name=potentialNodes"`
+	PotentialNodes []string `json:"potentialNodes,omitempty" protobuf:"bytes,2,opt,name=potentialNodes"`
 }
 
 // PodSchedulingContextStatus describes where resources for the Pod can be allocated.
@@ -286,7 +285,7 @@ type ResourceClaimSchedulingStatus struct {
 	//
 	// +listType=atomic
 	// +optional
-	UnsuitableNodes sets.String `json:"unsuitableNodes,omitempty" protobuf:"bytes,2,opt,name=unsuitableNodes"`
+	UnsuitableNodes []string `json:"unsuitableNodes,omitempty" protobuf:"bytes,2,opt,name=unsuitableNodes"`
 }
 
 // PodSchedulingNodeListMaxSize defines the maximum number of entries in the

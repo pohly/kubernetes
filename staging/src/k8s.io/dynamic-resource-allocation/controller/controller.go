@@ -32,7 +32,6 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	resourcev1alpha2apply "k8s.io/client-go/applyconfigurations/resource/v1alpha2"
 	"k8s.io/client-go/informers"
@@ -126,7 +125,7 @@ type Driver interface {
 	//
 	// The result of the check is in ClaimAllocation.UnsuitableNodes.
 	// An error indicates that the entire check must be repeated.
-	UnsuitableNodes(ctx context.Context, pod *v1.Pod, claims []*ClaimAllocation, potentialNodes sets.String) error
+	UnsuitableNodes(ctx context.Context, pod *v1.Pod, claims []*ClaimAllocation, potentialNodes []string) error
 }
 
 // ClaimAllocation represents information about one particular
@@ -140,7 +139,7 @@ type ClaimAllocation struct {
 
 	// UnsuitableNodes needs to be filled in by the driver when
 	// Driver.UnsuitableNodes gets called.
-	UnsuitableNodes sets.String
+	UnsuitableNodes []string
 
 	// Driver must populate this field with resources that were
 	// allocated for the claim in case of successful allocation.
@@ -758,7 +757,7 @@ func (ctrl *controller) syncPodSchedulingContexts(ctx context.Context, schedulin
 	if selectedNode != "" {
 		unsuitable := false
 		for _, delayed := range claims {
-			if delayed.UnsuitableNodes.Has(selectedNode) {
+			if hasString(delayed.UnsuitableNodes, selectedNode) {
 				unsuitable = true
 				break
 			}
@@ -799,7 +798,7 @@ func (ctrl *controller) syncPodSchedulingContexts(ctx context.Context, schedulin
 			// Add new entry or update an existing one because values changed.
 			claimsApply = append(claimsApply, &resourcev1alpha2apply.ResourceClaimSchedulingStatusApplyConfiguration{
 				Name:            &delayed.PodClaimName,
-				UnsuitableNodes: &delayed.UnsuitableNodes,
+				UnsuitableNodes: delayed.UnsuitableNodes,
 			})
 		}
 	}
@@ -851,13 +850,13 @@ func hasString(strings []string, str string) bool {
 	return false
 }
 
-// stringsDiffer does a strict comparison of two string sets.
-func stringsDiffer(a, b sets.String) bool {
+// stringsDiffer does a strict comparison of two string arrays, order of entries matters.
+func stringsDiffer(a, b []string) bool {
 	if len(a) != len(b) {
 		return true
 	}
 	for i := range a {
-		if !b.Has(i) {
+		if a[i] != b[i] {
 			return true
 		}
 	}

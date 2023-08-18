@@ -11690,9 +11690,10 @@ var schemaYAML = typed.YAMLObject(`types:
     fields:
     - name: potentialNodes
       type:
-        map:
+        list:
           elementType:
-            namedType: io.k8s.apimachinery.pkg.util.sets.Empty
+            scalar: string
+          elementRelationship: atomic
     - name: selectedNode
       type:
         scalar: string
@@ -11768,9 +11769,10 @@ var schemaYAML = typed.YAMLObject(`types:
         scalar: string
     - name: unsuitableNodes
       type:
-        map:
+        list:
           elementType:
-            namedType: io.k8s.apimachinery.pkg.util.sets.Empty
+            scalar: string
+          elementRelationship: atomic
 - name: io.k8s.api.resource.v1alpha2.ResourceClaimSpec
   map:
     fields:
@@ -12810,18 +12812,6 @@ var schemaYAML = typed.YAMLObject(`types:
         elementRelationship: separable
 - name: io.k8s.apimachinery.pkg.util.intstr.IntOrString
   scalar: untyped
-- name: io.k8s.apimachinery.pkg.util.sets.Empty
-  map:
-    elementType:
-      scalar: untyped
-      list:
-        elementType:
-          namedType: __untyped_atomic_
-        elementRelationship: atomic
-      map:
-        elementType:
-          namedType: __untyped_deduced_
-        elementRelationship: separable
 - name: __untyped_atomic_
   scalar: untyped
   list:

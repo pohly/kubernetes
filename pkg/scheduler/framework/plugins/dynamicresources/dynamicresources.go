@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"sync"
 
 	"github.com/google/go-cmp/cmp"
@@ -127,7 +128,7 @@ type podSchedulingState struct {
 
 	// potentialNodes is set if (and only if) the potential nodes field
 	// needs to be updated or set.
-	potentialNodes *sets.String
+	potentialNodes *[]string
 }
 
 func (p *podSchedulingState) isDirty() bool {
@@ -168,12 +169,12 @@ func (p *podSchedulingState) publish(ctx context.Context, pod *v1.Pod, clientset
 		spec := resourcev1alpha2apply.PodSchedulingContextSpec()
 		spec.SelectedNode = p.selectedNode
 		if p.potentialNodes != nil {
-			spec.PotentialNodes = p.potentialNodes
+			spec.PotentialNodes = *p.potentialNodes
 		} else {
 			// Unchanged. Has to be set because the object that we send
 			// must represent the "fully specified intent". Not sending
 			// the list would clear it.
-			spec.PotentialNodes = &p.schedulingCtx.Spec.PotentialNodes
+			spec.PotentialNodes = p.schedulingCtx.Spec.PotentialNodes
 		}
 		schedulingCtxApply := resourcev1alpha2apply.PodSchedulingContext(pod.Name, pod.Namespace).WithSpec(spec)
 
@@ -457,7 +458,7 @@ func (pl *dynamicResources) isSchedulableAfterPodSchedulingContextChange(logger 
 	// before moving DRA to beta.
 	if podScheduling.Spec.SelectedNode != "" {
 		for _, claimStatus := range podScheduling.Status.ResourceClaims {
-			if claimStatus.UnsuitableNodes.Has(podScheduling.Spec.SelectedNode) {
+			if sliceContains(claimStatus.UnsuitableNodes, podScheduling.Spec.SelectedNode) {
 				logger.V(5).Info("PodSchedulingContext has unsuitable selected node, schedule immediately", "pod", klog.KObj(pod), "selectedNode", podScheduling.Spec.SelectedNode, "podResourceName", claimStatus.Name)
 				return framework.QueueImmediately
 			}
@@ -696,7 +697,7 @@ func (pl *dynamicResources) Filter(ctx context.Context, cs *framework.CycleState
 			// Now we need information from drivers.
 			status := statusForClaim(state.podSchedulingState.schedulingCtx, pod.Spec.ResourceClaims[index].Name)
 			if status != nil {
-				for unsuitableNode := range status.UnsuitableNodes {
+				for _, unsuitableNode := range status.UnsuitableNodes {
 					if node.Name == unsuitableNode {
 						return statusUnschedulable(logger, "resourceclaim cannot be allocated for the node (unsuitable)", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim), "unsuitablenodes", status.UnsuitableNodes)
 					}
@@ -808,11 +809,11 @@ func (pl *dynamicResources) PreScore(ctx context.Context, cs *framework.CycleSta
 	if numNodes > resourcev1alpha2.PodSchedulingNodeListMaxSize {
 		numNodes = resourcev1alpha2.PodSchedulingNodeListMaxSize
 	}
-	potentialNodes := sets.NewString() // TODO: pre-allocate?
+	potentialNodes := make([]string, 0, numNodes)
 	if numNodes == len(nodes) {
 		// Copy all node names.
 		for _, node := range nodes {
-			potentialNodes.Insert(node.Name)
+			potentialNodes = append(potentialNodes, node.Name)
 		}
 	} else {
 		// Select a random subset of the nodes to comply with
@@ -827,9 +828,10 @@ func (pl *dynamicResources) PreScore(ctx context.Context, cs *framework.CycleSta
 			if len(potentialNodes) >= resourcev1alpha2.PodSchedulingNodeListMaxSize {
 				break
 			}
-			potentialNodes.Insert(nodeName)
+			potentialNodes = append(potentialNodes, nodeName)
 		}
 	}
+	sort.Strings(potentialNodes)
 	state.podSchedulingState.potentialNodes = &potentialNodes
 	state.preScored = true
 	return nil
@@ -840,11 +842,20 @@ func haveAllPotentialNodes(schedulingCtx *resourcev1alpha2.PodSchedulingContext,
 		return false
 	}
 	for _, node := range nodes {
-		if !schedulingCtx.Spec.PotentialNodes.Has(node.Name) {
+		if !haveNode(schedulingCtx.Spec.PotentialNodes, node.Name) {
 			return false
 		}
 	}
 	return true
+}
+
+func haveNode(nodeNames []string, nodeName string) bool {
+	for _, n := range nodeNames {
+		if n == nodeName {
+			return true
+		}
+	}
+	return false
 }
 
 // Reserve reserves claims for the pod.
@@ -908,7 +919,7 @@ func (pl *dynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 		// only one candidate. We need to ask whether that
 		// node is suitable, otherwise the scheduler will pick
 		// it forever even when it cannot satisfy the claim.
-		potentialNodes := sets.NewString(nodeName)
+		potentialNodes := []string{nodeName}
 		state.podSchedulingState.potentialNodes = &potentialNodes
 		logger.V(5).Info("asking for information about single potential node", "pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName})
 	}
