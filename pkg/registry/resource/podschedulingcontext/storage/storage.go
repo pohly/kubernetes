@@ -22,12 +22,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
+	resourcev1alpha2apply "k8s.io/client-go/applyconfigurations/resource/v1alpha2"
 	"k8s.io/kubernetes/pkg/apis/resource"
-	"k8s.io/kubernetes/pkg/apis/resource/v1alpha2"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
@@ -52,7 +51,7 @@ func (r *REST) ApplyPatchToCurrentObject(requestContext context.Context, current
 	// Below we need to decode. Only input for server-side-apply is
 	// supported because it clearly indicates what the client wants to
 	// update.
-	if patchType != types.ApplyPatchType {
+	if patchType != types.StrategicMergePatchType {
 		return nil, rest.PatchNotHandledErr
 	}
 
@@ -66,28 +65,18 @@ func (r *REST) ApplyPatchToCurrentObject(requestContext context.Context, current
 	// fields which the code below knows to handle. If any
 	// other field is present, we fall back to normal apply
 	// handling.
-	patchObj := struct {
-		metav1.TypeMeta   `json:",inline"`
-		metav1.ObjectMeta `json:"metadata"`
-		Spec              struct {
-			SelectedNode   string   `json:"selectedNode"`
-			PotentialNodes []string `json:"potentialNodes"`
-		} `json:"spec"`
-	}{}
-	if err := yaml.UnmarshalStrict(patch, &patchObj); err != nil {
+	var patchObj resourcev1alpha2apply.PodSchedulingContextApplyConfiguration
+	if err := patchObj.Unmarshal(patch); err != nil {
 		return nil, rest.PatchNotHandledErr
 	}
 
-	// k8s.io/apimachinery/pkg/util/managedfields/internal/versioncheck.go:51
-	if patchObj.Kind != "PodSchedulingContext" ||
-		patchObj.APIVersion != v1alpha2.SchemeGroupVersion.String() {
-		return nil, rest.PatchNotHandledErr
-	}
 	// ObjectMeta was validated earlier, otherwise we wouldn't have a matching
 	// current object.
 
 	// Update values.
-	podScheduling.Spec.SelectedNode = patchObj.Spec.SelectedNode
+	if patchObj.Spec.SelectedNode != nil {
+		podScheduling.Spec.SelectedNode = *patchObj.Spec.SelectedNode
+	}
 	podScheduling.Spec.PotentialNodes = patchObj.Spec.PotentialNodes
 	return podScheduling, nil
 }
@@ -166,7 +155,9 @@ func (r *StatusREST) ApplyPatchToCurrentObject(requestContext context.Context, c
 	// Below we need to decode. Only input for server-side-apply is
 	// supported because it clearly indicates what the client wants to
 	// update.
-	if patchType != types.ApplyPatchType {
+	//
+	// TODO: jsr311Router.detectRoute for GRPC
+	if patchType != types.StrategicMergePatchType /* types.ApplyPatchTypeGRPC */ {
 		return nil, rest.PatchNotHandledErr
 	}
 
@@ -180,36 +171,23 @@ func (r *StatusREST) ApplyPatchToCurrentObject(requestContext context.Context, c
 	// fields which the code below knows to handle. If any
 	// other field is present, we fall back to normal apply
 	// handling.
-	patchObj := struct {
-		metav1.TypeMeta   `json:",inline"`
-		metav1.ObjectMeta `json:"metadata"`
-		Status            struct {
-			ResourceClaims []struct {
-				Name            string   `json:"name"`
-				UnsuitableNodes []string `json:"unsuitableNodes"`
-			} `json:"resourceClaims"`
-		} `json:"status"`
-	}{}
-	if err := yaml.UnmarshalStrict(patch, &patchObj); err != nil {
+	var patchObj resourcev1alpha2apply.PodSchedulingContextApplyConfiguration
+	if err := patchObj.Unmarshal(patch); err != nil {
 		return nil, rest.PatchNotHandledErr
 	}
 
-	if patchObj.Kind != "PodSchedulingContext" ||
-		patchObj.APIVersion != v1alpha2.SchemeGroupVersion.String() {
-		return nil, rest.PatchNotHandledErr
-	}
 	// ObjectMeta was validated earlier, otherwise we wouldn't have a matching
 	// current object.
 
 	// Update values.
 	for _, claimStatus := range patchObj.Status.ResourceClaims {
-		if existingClaimStatus := findClaimStatus(podScheduling.Status.ResourceClaims, claimStatus.Name); existingClaimStatus != nil {
+		if existingClaimStatus := findClaimStatus(podScheduling.Status.ResourceClaims, *claimStatus.Name); existingClaimStatus != nil {
 			existingClaimStatus.UnsuitableNodes = claimStatus.UnsuitableNodes
 			continue
 		}
 		podScheduling.Status.ResourceClaims = append(podScheduling.Status.ResourceClaims,
 			resource.ResourceClaimSchedulingStatus{
-				Name:            claimStatus.Name,
+				Name:            *claimStatus.Name,
 				UnsuitableNodes: claimStatus.UnsuitableNodes,
 			})
 	}

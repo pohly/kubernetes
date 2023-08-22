@@ -21,7 +21,7 @@ package v1
 // NodeDaemonEndpointsApplyConfiguration represents an declarative configuration of the NodeDaemonEndpoints type for use
 // with apply.
 type NodeDaemonEndpointsApplyConfiguration struct {
-	KubeletEndpoint *DaemonEndpointApplyConfiguration `json:"kubeletEndpoint,omitempty"`
+	KubeletEndpoint *DaemonEndpointApplyConfiguration `json:"kubeletEndpoint,omitempty" protobuf:"bytes,1,opt,name=kubeletEndpoint"`
 }
 
 // NodeDaemonEndpointsApplyConfiguration constructs an declarative configuration of the NodeDaemonEndpoints type for use with

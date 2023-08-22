@@ -21,7 +21,7 @@ package v1
 // EphemeralVolumeSourceApplyConfiguration represents an declarative configuration of the EphemeralVolumeSource type for use
 // with apply.
 type EphemeralVolumeSourceApplyConfiguration struct {
-	VolumeClaimTemplate *PersistentVolumeClaimTemplateApplyConfiguration `json:"volumeClaimTemplate,omitempty"`
+	VolumeClaimTemplate *PersistentVolumeClaimTemplateApplyConfiguration `json:"volumeClaimTemplate,omitempty" protobuf:"bytes,1,opt,name=volumeClaimTemplate"`
 }
 
 // EphemeralVolumeSourceApplyConfiguration constructs an declarative configuration of the EphemeralVolumeSource type for use with

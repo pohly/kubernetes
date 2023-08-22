@@ -21,10 +21,10 @@ package v1
 // DownwardAPIVolumeFileApplyConfiguration represents an declarative configuration of the DownwardAPIVolumeFile type for use
 // with apply.
 type DownwardAPIVolumeFileApplyConfiguration struct {
-	Path             *string                                  `json:"path,omitempty"`
-	FieldRef         *ObjectFieldSelectorApplyConfiguration   `json:"fieldRef,omitempty"`
-	ResourceFieldRef *ResourceFieldSelectorApplyConfiguration `json:"resourceFieldRef,omitempty"`
-	Mode             *int32                                   `json:"mode,omitempty"`
+	Path             *string                                  `json:"path,omitempty" protobuf:"bytes,1,opt,name=path"`
+	FieldRef         *ObjectFieldSelectorApplyConfiguration   `json:"fieldRef,omitempty" protobuf:"bytes,2,opt,name=fieldRef"`
+	ResourceFieldRef *ResourceFieldSelectorApplyConfiguration `json:"resourceFieldRef,omitempty" protobuf:"bytes,3,opt,name=resourceFieldRef"`
+	Mode             *int32                                   `json:"mode,omitempty" protobuf:"varint,4,opt,name=mode"`
 }
 
 // DownwardAPIVolumeFileApplyConfiguration constructs an declarative configuration of the DownwardAPIVolumeFile type for use with

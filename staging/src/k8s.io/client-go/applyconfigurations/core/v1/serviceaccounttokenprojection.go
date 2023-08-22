@@ -21,9 +21,9 @@ package v1
 // ServiceAccountTokenProjectionApplyConfiguration represents an declarative configuration of the ServiceAccountTokenProjection type for use
 // with apply.
 type ServiceAccountTokenProjectionApplyConfiguration struct {
-	Audience          *string `json:"audience,omitempty"`
-	ExpirationSeconds *int64  `json:"expirationSeconds,omitempty"`
-	Path              *string `json:"path,omitempty"`
+	Audience          *string `json:"audience,omitempty" protobuf:"bytes,1,opt,name=audience"`
+	ExpirationSeconds *int64  `json:"expirationSeconds,omitempty" protobuf:"varint,2,opt,name=expirationSeconds"`
+	Path              *string `json:"path,omitempty" protobuf:"bytes,3,opt,name=path"`
 }
 
 // ServiceAccountTokenProjectionApplyConfiguration constructs an declarative configuration of the ServiceAccountTokenProjection type for use with

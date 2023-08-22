@@ -25,9 +25,9 @@ import (
 // NodeSelectorRequirementApplyConfiguration represents an declarative configuration of the NodeSelectorRequirement type for use
 // with apply.
 type NodeSelectorRequirementApplyConfiguration struct {
-	Key      *string                  `json:"key,omitempty"`
-	Operator *v1.NodeSelectorOperator `json:"operator,omitempty"`
-	Values   []string                 `json:"values,omitempty"`
+	Key      *string                  `json:"key,omitempty" protobuf:"bytes,1,opt,name=key"`
+	Operator *v1.NodeSelectorOperator `json:"operator,omitempty" protobuf:"bytes,2,opt,name=operator,casttype=k8s.io/api/core/v1.NodeSelectorOperator"`
+	Values   []string                 `json:"values,omitempty" protobuf:"bytes,3,rep,name=values"`
 }
 
 // NodeSelectorRequirementApplyConfiguration constructs an declarative configuration of the NodeSelectorRequirement type for use with

@@ -25,11 +25,11 @@ import (
 // ContainerPortApplyConfiguration represents an declarative configuration of the ContainerPort type for use
 // with apply.
 type ContainerPortApplyConfiguration struct {
-	Name          *string      `json:"name,omitempty"`
-	HostPort      *int32       `json:"hostPort,omitempty"`
-	ContainerPort *int32       `json:"containerPort,omitempty"`
-	Protocol      *v1.Protocol `json:"protocol,omitempty"`
-	HostIP        *string      `json:"hostIP,omitempty"`
+	Name          *string      `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
+	HostPort      *int32       `json:"hostPort,omitempty" protobuf:"varint,2,opt,name=hostPort"`
+	ContainerPort *int32       `json:"containerPort,omitempty" protobuf:"varint,3,opt,name=containerPort"`
+	Protocol      *v1.Protocol `json:"protocol,omitempty" protobuf:"bytes,4,opt,name=protocol,casttype=k8s.io/api/core/v1.Protocol"`
+	HostIP        *string      `json:"hostIP,omitempty" protobuf:"bytes,5,opt,name=hostIP"`
 }
 
 // ContainerPortApplyConfiguration constructs an declarative configuration of the ContainerPort type for use with

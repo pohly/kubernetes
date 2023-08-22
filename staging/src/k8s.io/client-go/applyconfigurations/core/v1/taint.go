@@ -26,10 +26,10 @@ import (
 // TaintApplyConfiguration represents an declarative configuration of the Taint type for use
 // with apply.
 type TaintApplyConfiguration struct {
-	Key       *string         `json:"key,omitempty"`
-	Value     *string         `json:"value,omitempty"`
-	Effect    *v1.TaintEffect `json:"effect,omitempty"`
-	TimeAdded *metav1.Time    `json:"timeAdded,omitempty"`
+	Key       *string         `json:"key,omitempty" protobuf:"bytes,1,opt,name=key"`
+	Value     *string         `json:"value,omitempty" protobuf:"bytes,2,opt,name=value"`
+	Effect    *v1.TaintEffect `json:"effect,omitempty" protobuf:"bytes,3,opt,name=effect,casttype=k8s.io/api/core/v1.TaintEffect"`
+	TimeAdded *metav1.Time    `json:"timeAdded,omitempty" protobuf:"bytes,4,opt,name=timeAdded"`
 }
 
 // TaintApplyConfiguration constructs an declarative configuration of the Taint type for use with

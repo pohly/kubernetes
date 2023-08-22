@@ -21,13 +21,13 @@ package v1
 // ProbeApplyConfiguration represents an declarative configuration of the Probe type for use
 // with apply.
 type ProbeApplyConfiguration struct {
-	ProbeHandlerApplyConfiguration `json:",inline"`
-	InitialDelaySeconds            *int32 `json:"initialDelaySeconds,omitempty"`
-	TimeoutSeconds                 *int32 `json:"timeoutSeconds,omitempty"`
-	PeriodSeconds                  *int32 `json:"periodSeconds,omitempty"`
-	SuccessThreshold               *int32 `json:"successThreshold,omitempty"`
-	FailureThreshold               *int32 `json:"failureThreshold,omitempty"`
-	TerminationGracePeriodSeconds  *int64 `json:"terminationGracePeriodSeconds,omitempty"`
+	ProbeHandlerApplyConfiguration `json:",inline" protobuf:"bytes,1,opt,name=probeHandlerApplyConfiguration"`
+	InitialDelaySeconds            *int32 `json:"initialDelaySeconds,omitempty" protobuf:"varint,2,opt,name=initialDelaySeconds"`
+	TimeoutSeconds                 *int32 `json:"timeoutSeconds,omitempty" protobuf:"varint,3,opt,name=timeoutSeconds"`
+	PeriodSeconds                  *int32 `json:"periodSeconds,omitempty" protobuf:"varint,4,opt,name=periodSeconds"`
+	SuccessThreshold               *int32 `json:"successThreshold,omitempty" protobuf:"varint,5,opt,name=successThreshold"`
+	FailureThreshold               *int32 `json:"failureThreshold,omitempty" protobuf:"varint,6,opt,name=failureThreshold"`
+	TerminationGracePeriodSeconds  *int64 `json:"terminationGracePeriodSeconds,omitempty" protobuf:"varint,7,opt,name=terminationGracePeriodSeconds"`
 }
 
 // ProbeApplyConfiguration constructs an declarative configuration of the Probe type for use with

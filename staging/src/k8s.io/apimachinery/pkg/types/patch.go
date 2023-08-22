@@ -26,4 +26,5 @@ const (
 	MergePatchType          PatchType = "application/merge-patch+json"
 	StrategicMergePatchType PatchType = "application/strategic-merge-patch+json"
 	ApplyPatchType          PatchType = "application/apply-patch+yaml"
+	ApplyPatchTypeGRPC      PatchType = "application/apply-patch+grpc"
 )

@@ -25,10 +25,10 @@ import (
 // ComponentConditionApplyConfiguration represents an declarative configuration of the ComponentCondition type for use
 // with apply.
 type ComponentConditionApplyConfiguration struct {
-	Type    *v1.ComponentConditionType `json:"type,omitempty"`
-	Status  *v1.ConditionStatus        `json:"status,omitempty"`
-	Message *string                    `json:"message,omitempty"`
-	Error   *string                    `json:"error,omitempty"`
+	Type    *v1.ComponentConditionType `json:"type,omitempty" protobuf:"bytes,1,opt,name=type,casttype=k8s.io/api/core/v1.ComponentConditionType"`
+	Status  *v1.ConditionStatus        `json:"status,omitempty" protobuf:"bytes,2,opt,name=status,casttype=k8s.io/api/core/v1.ConditionStatus"`
+	Message *string                    `json:"message,omitempty" protobuf:"bytes,3,opt,name=message"`
+	Error   *string                    `json:"error,omitempty" protobuf:"bytes,4,opt,name=error"`
 }
 
 // ComponentConditionApplyConfiguration constructs an declarative configuration of the ComponentCondition type for use with

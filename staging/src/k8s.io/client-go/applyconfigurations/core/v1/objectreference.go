@@ -25,13 +25,13 @@ import (
 // ObjectReferenceApplyConfiguration represents an declarative configuration of the ObjectReference type for use
 // with apply.
 type ObjectReferenceApplyConfiguration struct {
-	Kind            *string    `json:"kind,omitempty"`
-	Namespace       *string    `json:"namespace,omitempty"`
-	Name            *string    `json:"name,omitempty"`
-	UID             *types.UID `json:"uid,omitempty"`
-	APIVersion      *string    `json:"apiVersion,omitempty"`
-	ResourceVersion *string    `json:"resourceVersion,omitempty"`
-	FieldPath       *string    `json:"fieldPath,omitempty"`
+	Kind            *string    `json:"kind,omitempty" protobuf:"bytes,1,opt,name=kind"`
+	Namespace       *string    `json:"namespace,omitempty" protobuf:"bytes,2,opt,name=namespace"`
+	Name            *string    `json:"name,omitempty" protobuf:"bytes,3,opt,name=name"`
+	UID             *types.UID `json:"uid,omitempty" protobuf:"bytes,4,opt,name=uid,casttype=k8s.io/apimachinery/pkg/types.UID"`
+	APIVersion      *string    `json:"apiVersion,omitempty" protobuf:"bytes,5,opt,name=apiVersion"`
+	ResourceVersion *string    `json:"resourceVersion,omitempty" protobuf:"bytes,6,opt,name=resourceVersion"`
+	FieldPath       *string    `json:"fieldPath,omitempty" protobuf:"bytes,7,opt,name=fieldPath"`
 }
 
 // ObjectReferenceApplyConfiguration constructs an declarative configuration of the ObjectReference type for use with

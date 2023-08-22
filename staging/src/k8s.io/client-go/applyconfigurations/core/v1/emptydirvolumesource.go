@@ -26,8 +26,8 @@ import (
 // EmptyDirVolumeSourceApplyConfiguration represents an declarative configuration of the EmptyDirVolumeSource type for use
 // with apply.
 type EmptyDirVolumeSourceApplyConfiguration struct {
-	Medium    *v1.StorageMedium  `json:"medium,omitempty"`
-	SizeLimit *resource.Quantity `json:"sizeLimit,omitempty"`
+	Medium    *v1.StorageMedium  `json:"medium,omitempty" protobuf:"bytes,1,opt,name=medium,casttype=k8s.io/api/core/v1.StorageMedium"`
+	SizeLimit *resource.Quantity `json:"sizeLimit,omitempty" protobuf:"bytes,2,opt,name=sizeLimit"`
 }
 
 // EmptyDirVolumeSourceApplyConfiguration constructs an declarative configuration of the EmptyDirVolumeSource type for use with

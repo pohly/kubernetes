@@ -26,10 +26,10 @@ import (
 // PersistentVolumeStatusApplyConfiguration represents an declarative configuration of the PersistentVolumeStatus type for use
 // with apply.
 type PersistentVolumeStatusApplyConfiguration struct {
-	Phase                   *v1.PersistentVolumePhase `json:"phase,omitempty"`
-	Message                 *string                   `json:"message,omitempty"`
-	Reason                  *string                   `json:"reason,omitempty"`
-	LastPhaseTransitionTime *metav1.Time              `json:"lastPhaseTransitionTime,omitempty"`
+	Phase                   *v1.PersistentVolumePhase `json:"phase,omitempty" protobuf:"bytes,1,opt,name=phase,casttype=k8s.io/api/core/v1.PersistentVolumePhase"`
+	Message                 *string                   `json:"message,omitempty" protobuf:"bytes,2,opt,name=message"`
+	Reason                  *string                   `json:"reason,omitempty" protobuf:"bytes,3,opt,name=reason"`
+	LastPhaseTransitionTime *metav1.Time              `json:"lastPhaseTransitionTime,omitempty" protobuf:"bytes,4,opt,name=lastPhaseTransitionTime"`
 }
 
 // PersistentVolumeStatusApplyConfiguration constructs an declarative configuration of the PersistentVolumeStatus type for use with

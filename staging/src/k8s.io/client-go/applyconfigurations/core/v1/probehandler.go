@@ -21,10 +21,10 @@ package v1
 // ProbeHandlerApplyConfiguration represents an declarative configuration of the ProbeHandler type for use
 // with apply.
 type ProbeHandlerApplyConfiguration struct {
-	Exec      *ExecActionApplyConfiguration      `json:"exec,omitempty"`
-	HTTPGet   *HTTPGetActionApplyConfiguration   `json:"httpGet,omitempty"`
-	TCPSocket *TCPSocketActionApplyConfiguration `json:"tcpSocket,omitempty"`
-	GRPC      *GRPCActionApplyConfiguration      `json:"grpc,omitempty"`
+	Exec      *ExecActionApplyConfiguration      `json:"exec,omitempty" protobuf:"bytes,1,opt,name=exec"`
+	HTTPGet   *HTTPGetActionApplyConfiguration   `json:"httpGet,omitempty" protobuf:"bytes,2,opt,name=httpGet"`
+	TCPSocket *TCPSocketActionApplyConfiguration `json:"tcpSocket,omitempty" protobuf:"bytes,3,opt,name=tcpSocket"`
+	GRPC      *GRPCActionApplyConfiguration      `json:"grpc,omitempty" protobuf:"bytes,4,opt,name=grpc"`
 }
 
 // ProbeHandlerApplyConfiguration constructs an declarative configuration of the ProbeHandler type for use with

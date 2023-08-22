@@ -21,12 +21,12 @@ package v1
 // CephFSVolumeSourceApplyConfiguration represents an declarative configuration of the CephFSVolumeSource type for use
 // with apply.
 type CephFSVolumeSourceApplyConfiguration struct {
-	Monitors   []string                                `json:"monitors,omitempty"`
-	Path       *string                                 `json:"path,omitempty"`
-	User       *string                                 `json:"user,omitempty"`
-	SecretFile *string                                 `json:"secretFile,omitempty"`
-	SecretRef  *LocalObjectReferenceApplyConfiguration `json:"secretRef,omitempty"`
-	ReadOnly   *bool                                   `json:"readOnly,omitempty"`
+	Monitors   []string                                `json:"monitors,omitempty" protobuf:"bytes,1,rep,name=monitors"`
+	Path       *string                                 `json:"path,omitempty" protobuf:"bytes,2,opt,name=path"`
+	User       *string                                 `json:"user,omitempty" protobuf:"bytes,3,opt,name=user"`
+	SecretFile *string                                 `json:"secretFile,omitempty" protobuf:"bytes,4,opt,name=secretFile"`
+	SecretRef  *LocalObjectReferenceApplyConfiguration `json:"secretRef,omitempty" protobuf:"bytes,5,opt,name=secretRef"`
+	ReadOnly   *bool                                   `json:"readOnly,omitempty" protobuf:"varint,6,opt,name=readOnly"`
 }
 
 // CephFSVolumeSourceApplyConfiguration constructs an declarative configuration of the CephFSVolumeSource type for use with

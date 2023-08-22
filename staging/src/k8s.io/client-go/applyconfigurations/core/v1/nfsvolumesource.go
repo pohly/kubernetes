@@ -21,9 +21,9 @@ package v1
 // NFSVolumeSourceApplyConfiguration represents an declarative configuration of the NFSVolumeSource type for use
 // with apply.
 type NFSVolumeSourceApplyConfiguration struct {
-	Server   *string `json:"server,omitempty"`
-	Path     *string `json:"path,omitempty"`
-	ReadOnly *bool   `json:"readOnly,omitempty"`
+	Server   *string `json:"server,omitempty" protobuf:"bytes,1,opt,name=server"`
+	Path     *string `json:"path,omitempty" protobuf:"bytes,2,opt,name=path"`
+	ReadOnly *bool   `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
 }
 
 // NFSVolumeSourceApplyConfiguration constructs an declarative configuration of the NFSVolumeSource type for use with

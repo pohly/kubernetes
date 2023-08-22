@@ -21,8 +21,8 @@ package v1alpha2
 // ResourceHandleApplyConfiguration represents an declarative configuration of the ResourceHandle type for use
 // with apply.
 type ResourceHandleApplyConfiguration struct {
-	DriverName *string `json:"driverName,omitempty"`
-	Data       *string `json:"data,omitempty"`
+	DriverName *string `json:"driverName,omitempty" protobuf:"bytes,1,opt,name=driverName"`
+	Data       *string `json:"data,omitempty" protobuf:"bytes,2,opt,name=data"`
 }
 
 // ResourceHandleApplyConfiguration constructs an declarative configuration of the ResourceHandle type for use with

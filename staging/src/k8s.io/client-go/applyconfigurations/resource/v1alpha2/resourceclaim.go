@@ -30,10 +30,10 @@ import (
 // ResourceClaimApplyConfiguration represents an declarative configuration of the ResourceClaim type for use
 // with apply.
 type ResourceClaimApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *ResourceClaimSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *ResourceClaimStatusApplyConfiguration `json:"status,omitempty"`
+	v1.TypeMetaApplyConfiguration    `json:",inline" protobuf:"bytes,1,opt,name=typeMetaApplyConfiguration"`
+	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty" protobuf:"bytes,2,opt,name=metadata"`
+	Spec                             *ResourceClaimSpecApplyConfiguration   `json:"spec,omitempty" protobuf:"bytes,3,opt,name=spec"`
+	Status                           *ResourceClaimStatusApplyConfiguration `json:"status,omitempty" protobuf:"bytes,4,opt,name=status"`
 }
 
 // ResourceClaim constructs an declarative configuration of the ResourceClaim type for use with

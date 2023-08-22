@@ -21,10 +21,10 @@ package v1
 // ConfigMapVolumeSourceApplyConfiguration represents an declarative configuration of the ConfigMapVolumeSource type for use
 // with apply.
 type ConfigMapVolumeSourceApplyConfiguration struct {
-	LocalObjectReferenceApplyConfiguration `json:",inline"`
-	Items                                  []KeyToPathApplyConfiguration `json:"items,omitempty"`
-	DefaultMode                            *int32                        `json:"defaultMode,omitempty"`
-	Optional                               *bool                         `json:"optional,omitempty"`
+	LocalObjectReferenceApplyConfiguration `json:",inline" protobuf:"bytes,1,opt,name=localObjectReferenceApplyConfiguration"`
+	Items                                  []KeyToPathApplyConfiguration `json:"items,omitempty" protobuf:"bytes,2,rep,name=items"`
+	DefaultMode                            *int32                        `json:"defaultMode,omitempty" protobuf:"varint,3,opt,name=defaultMode"`
+	Optional                               *bool                         `json:"optional,omitempty" protobuf:"varint,4,opt,name=optional"`
 }
 
 // ConfigMapVolumeSourceApplyConfiguration constructs an declarative configuration of the ConfigMapVolumeSource type for use with

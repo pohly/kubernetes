@@ -21,9 +21,9 @@ package v1
 // AffinityApplyConfiguration represents an declarative configuration of the Affinity type for use
 // with apply.
 type AffinityApplyConfiguration struct {
-	NodeAffinity    *NodeAffinityApplyConfiguration    `json:"nodeAffinity,omitempty"`
-	PodAffinity     *PodAffinityApplyConfiguration     `json:"podAffinity,omitempty"`
-	PodAntiAffinity *PodAntiAffinityApplyConfiguration `json:"podAntiAffinity,omitempty"`
+	NodeAffinity    *NodeAffinityApplyConfiguration    `json:"nodeAffinity,omitempty" protobuf:"bytes,1,opt,name=nodeAffinity"`
+	PodAffinity     *PodAffinityApplyConfiguration     `json:"podAffinity,omitempty" protobuf:"bytes,2,opt,name=podAffinity"`
+	PodAntiAffinity *PodAntiAffinityApplyConfiguration `json:"podAntiAffinity,omitempty" protobuf:"bytes,3,opt,name=podAntiAffinity"`
 }
 
 // AffinityApplyConfiguration constructs an declarative configuration of the Affinity type for use with

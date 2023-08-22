@@ -21,7 +21,7 @@ package v1
 // NodeSelectorApplyConfiguration represents an declarative configuration of the NodeSelector type for use
 // with apply.
 type NodeSelectorApplyConfiguration struct {
-	NodeSelectorTerms []NodeSelectorTermApplyConfiguration `json:"nodeSelectorTerms,omitempty"`
+	NodeSelectorTerms []NodeSelectorTermApplyConfiguration `json:"nodeSelectorTerms,omitempty" protobuf:"bytes,1,rep,name=nodeSelectorTerms"`
 }
 
 // NodeSelectorApplyConfiguration constructs an declarative configuration of the NodeSelector type for use with

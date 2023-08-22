@@ -31,6 +31,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	resourcev1alpha2apply "k8s.io/client-go/applyconfigurations/resource/v1alpha2"
 	"k8s.io/client-go/kubernetes"
@@ -184,7 +185,14 @@ func (p *podSchedulingState) publish(ctx context.Context, pod *v1.Pod, clientset
 		} else {
 			logger.V(5).Info("Updating PodSchedulingContext", "podSchedulingCtx", klog.KObj(pod))
 		}
-		_, err = clientset.ResourceV1alpha2().PodSchedulingContexts(pod.Namespace).Apply(ctx, schedulingCtxApply, metav1.ApplyOptions{FieldManager: "kube-scheduler", Force: true})
+		data, err := schedulingCtxApply.Marshal()
+		if err != nil {
+			return err
+		}
+		_, err = clientset.ResourceV1alpha2().PodSchedulingContexts(pod.Namespace).Patch(ctx, pod.Name, types.StrategicMergePatchType /* TODO: ApplyPatchTypeGRPC */, data, metav1.PatchOptions{})
+		// if err != nil {
+		// 	_, err = clientset.ResourceV1alpha2().PodSchedulingContexts(pod.Namespace).Apply(ctx, schedulingCtxApply, metav1.ApplyOptions{FieldManager: "kube-scheduler", Force: true})
+		// }
 	} else {
 		// Create it.
 		schedulingCtx := &resourcev1alpha2.PodSchedulingContext{

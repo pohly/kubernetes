@@ -25,9 +25,9 @@ import (
 // ResourceRequirementsApplyConfiguration represents an declarative configuration of the ResourceRequirements type for use
 // with apply.
 type ResourceRequirementsApplyConfiguration struct {
-	Limits   *v1.ResourceList                  `json:"limits,omitempty"`
-	Requests *v1.ResourceList                  `json:"requests,omitempty"`
-	Claims   []ResourceClaimApplyConfiguration `json:"claims,omitempty"`
+	Limits   *v1.ResourceList                  `json:"limits,omitempty" protobuf:"bytes,1,rep,name=limits,casttype=k8s.io/api/core/v1.ResourceList,castkey=k8s.io/api/core/v1.ResourceName"`
+	Requests *v1.ResourceList                  `json:"requests,omitempty" protobuf:"bytes,2,rep,name=requests,casttype=k8s.io/api/core/v1.ResourceList,castkey=k8s.io/api/core/v1.ResourceName"`
+	Claims   []ResourceClaimApplyConfiguration `json:"claims,omitempty" protobuf:"bytes,3,rep,name=claims"`
 }
 
 // ResourceRequirementsApplyConfiguration constructs an declarative configuration of the ResourceRequirements type for use with

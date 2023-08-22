@@ -25,10 +25,10 @@ import (
 // LoadBalancerIngressApplyConfiguration represents an declarative configuration of the LoadBalancerIngress type for use
 // with apply.
 type LoadBalancerIngressApplyConfiguration struct {
-	IP       *string                        `json:"ip,omitempty"`
-	Hostname *string                        `json:"hostname,omitempty"`
-	IPMode   *v1.LoadBalancerIPMode         `json:"ipMode,omitempty"`
-	Ports    []PortStatusApplyConfiguration `json:"ports,omitempty"`
+	IP       *string                        `json:"ip,omitempty" protobuf:"bytes,1,opt,name=ip"`
+	Hostname *string                        `json:"hostname,omitempty" protobuf:"bytes,2,opt,name=hostname"`
+	IPMode   *v1.LoadBalancerIPMode         `json:"ipMode,omitempty" protobuf:"bytes,3,opt,name=ipMode,casttype=k8s.io/api/core/v1.LoadBalancerIPMode"`
+	Ports    []PortStatusApplyConfiguration `json:"ports,omitempty" protobuf:"bytes,4,rep,name=ports"`
 }
 
 // LoadBalancerIngressApplyConfiguration constructs an declarative configuration of the LoadBalancerIngress type for use with

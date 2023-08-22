@@ -21,10 +21,10 @@ package v1
 // CinderVolumeSourceApplyConfiguration represents an declarative configuration of the CinderVolumeSource type for use
 // with apply.
 type CinderVolumeSourceApplyConfiguration struct {
-	VolumeID  *string                                 `json:"volumeID,omitempty"`
-	FSType    *string                                 `json:"fsType,omitempty"`
-	ReadOnly  *bool                                   `json:"readOnly,omitempty"`
-	SecretRef *LocalObjectReferenceApplyConfiguration `json:"secretRef,omitempty"`
+	VolumeID  *string                                 `json:"volumeID,omitempty" protobuf:"bytes,1,opt,name=volumeID"`
+	FSType    *string                                 `json:"fsType,omitempty" protobuf:"bytes,2,opt,name=fsType"`
+	ReadOnly  *bool                                   `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
+	SecretRef *LocalObjectReferenceApplyConfiguration `json:"secretRef,omitempty" protobuf:"bytes,4,opt,name=secretRef"`
 }
 
 // CinderVolumeSourceApplyConfiguration constructs an declarative configuration of the CinderVolumeSource type for use with

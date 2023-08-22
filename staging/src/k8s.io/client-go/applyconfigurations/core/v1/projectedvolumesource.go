@@ -21,8 +21,8 @@ package v1
 // ProjectedVolumeSourceApplyConfiguration represents an declarative configuration of the ProjectedVolumeSource type for use
 // with apply.
 type ProjectedVolumeSourceApplyConfiguration struct {
-	Sources     []VolumeProjectionApplyConfiguration `json:"sources,omitempty"`
-	DefaultMode *int32                               `json:"defaultMode,omitempty"`
+	Sources     []VolumeProjectionApplyConfiguration `json:"sources,omitempty" protobuf:"bytes,1,rep,name=sources"`
+	DefaultMode *int32                               `json:"defaultMode,omitempty" protobuf:"varint,2,opt,name=defaultMode"`
 }
 
 // ProjectedVolumeSourceApplyConfiguration constructs an declarative configuration of the ProjectedVolumeSource type for use with

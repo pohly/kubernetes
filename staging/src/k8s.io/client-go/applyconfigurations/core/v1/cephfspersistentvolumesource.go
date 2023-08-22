@@ -21,12 +21,12 @@ package v1
 // CephFSPersistentVolumeSourceApplyConfiguration represents an declarative configuration of the CephFSPersistentVolumeSource type for use
 // with apply.
 type CephFSPersistentVolumeSourceApplyConfiguration struct {
-	Monitors   []string                           `json:"monitors,omitempty"`
-	Path       *string                            `json:"path,omitempty"`
-	User       *string                            `json:"user,omitempty"`
-	SecretFile *string                            `json:"secretFile,omitempty"`
-	SecretRef  *SecretReferenceApplyConfiguration `json:"secretRef,omitempty"`
-	ReadOnly   *bool                              `json:"readOnly,omitempty"`
+	Monitors   []string                           `json:"monitors,omitempty" protobuf:"bytes,1,rep,name=monitors"`
+	Path       *string                            `json:"path,omitempty" protobuf:"bytes,2,opt,name=path"`
+	User       *string                            `json:"user,omitempty" protobuf:"bytes,3,opt,name=user"`
+	SecretFile *string                            `json:"secretFile,omitempty" protobuf:"bytes,4,opt,name=secretFile"`
+	SecretRef  *SecretReferenceApplyConfiguration `json:"secretRef,omitempty" protobuf:"bytes,5,opt,name=secretRef"`
+	ReadOnly   *bool                              `json:"readOnly,omitempty" protobuf:"varint,6,opt,name=readOnly"`
 }
 
 // CephFSPersistentVolumeSourceApplyConfiguration constructs an declarative configuration of the CephFSPersistentVolumeSource type for use with

@@ -21,11 +21,11 @@ package v1
 // StorageOSPersistentVolumeSourceApplyConfiguration represents an declarative configuration of the StorageOSPersistentVolumeSource type for use
 // with apply.
 type StorageOSPersistentVolumeSourceApplyConfiguration struct {
-	VolumeName      *string                            `json:"volumeName,omitempty"`
-	VolumeNamespace *string                            `json:"volumeNamespace,omitempty"`
-	FSType          *string                            `json:"fsType,omitempty"`
-	ReadOnly        *bool                              `json:"readOnly,omitempty"`
-	SecretRef       *ObjectReferenceApplyConfiguration `json:"secretRef,omitempty"`
+	VolumeName      *string                            `json:"volumeName,omitempty" protobuf:"bytes,1,opt,name=volumeName"`
+	VolumeNamespace *string                            `json:"volumeNamespace,omitempty" protobuf:"bytes,2,opt,name=volumeNamespace"`
+	FSType          *string                            `json:"fsType,omitempty" protobuf:"bytes,3,opt,name=fsType"`
+	ReadOnly        *bool                              `json:"readOnly,omitempty" protobuf:"varint,4,opt,name=readOnly"`
+	SecretRef       *ObjectReferenceApplyConfiguration `json:"secretRef,omitempty" protobuf:"bytes,5,opt,name=secretRef"`
 }
 
 // StorageOSPersistentVolumeSourceApplyConfiguration constructs an declarative configuration of the StorageOSPersistentVolumeSource type for use with

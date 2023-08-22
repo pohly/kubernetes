@@ -25,9 +25,9 @@ import (
 // ResourceFieldSelectorApplyConfiguration represents an declarative configuration of the ResourceFieldSelector type for use
 // with apply.
 type ResourceFieldSelectorApplyConfiguration struct {
-	ContainerName *string            `json:"containerName,omitempty"`
-	Resource      *string            `json:"resource,omitempty"`
-	Divisor       *resource.Quantity `json:"divisor,omitempty"`
+	ContainerName *string            `json:"containerName,omitempty" protobuf:"bytes,1,opt,name=containerName"`
+	Resource      *string            `json:"resource,omitempty" protobuf:"bytes,2,opt,name=resource"`
+	Divisor       *resource.Quantity `json:"divisor,omitempty" protobuf:"bytes,3,opt,name=divisor"`
 }
 
 // ResourceFieldSelectorApplyConfiguration constructs an declarative configuration of the ResourceFieldSelector type for use with

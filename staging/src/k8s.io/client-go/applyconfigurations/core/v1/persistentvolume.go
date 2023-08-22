@@ -30,10 +30,10 @@ import (
 // PersistentVolumeApplyConfiguration represents an declarative configuration of the PersistentVolume type for use
 // with apply.
 type PersistentVolumeApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *PersistentVolumeSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *PersistentVolumeStatusApplyConfiguration `json:"status,omitempty"`
+	v1.TypeMetaApplyConfiguration    `json:",inline" protobuf:"bytes,1,opt,name=typeMetaApplyConfiguration"`
+	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty" protobuf:"bytes,2,opt,name=metadata"`
+	Spec                             *PersistentVolumeSpecApplyConfiguration   `json:"spec,omitempty" protobuf:"bytes,3,opt,name=spec"`
+	Status                           *PersistentVolumeStatusApplyConfiguration `json:"status,omitempty" protobuf:"bytes,4,opt,name=status"`
 }
 
 // PersistentVolume constructs an declarative configuration of the PersistentVolume type for use with

@@ -21,8 +21,8 @@ package v1
 // SysctlApplyConfiguration represents an declarative configuration of the Sysctl type for use
 // with apply.
 type SysctlApplyConfiguration struct {
-	Name  *string `json:"name,omitempty"`
-	Value *string `json:"value,omitempty"`
+	Name  *string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
+	Value *string `json:"value,omitempty" protobuf:"bytes,2,opt,name=value"`
 }
 
 // SysctlApplyConfiguration constructs an declarative configuration of the Sysctl type for use with

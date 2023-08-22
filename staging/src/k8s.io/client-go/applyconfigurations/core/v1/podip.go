@@ -21,7 +21,7 @@ package v1
 // PodIPApplyConfiguration represents an declarative configuration of the PodIP type for use
 // with apply.
 type PodIPApplyConfiguration struct {
-	IP *string `json:"ip,omitempty"`
+	IP *string `json:"ip,omitempty" protobuf:"bytes,1,opt,name=ip"`
 }
 
 // PodIPApplyConfiguration constructs an declarative configuration of the PodIP type for use with

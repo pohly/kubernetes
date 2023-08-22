@@ -25,12 +25,12 @@ import (
 // VolumeMountApplyConfiguration represents an declarative configuration of the VolumeMount type for use
 // with apply.
 type VolumeMountApplyConfiguration struct {
-	Name             *string                  `json:"name,omitempty"`
-	ReadOnly         *bool                    `json:"readOnly,omitempty"`
-	MountPath        *string                  `json:"mountPath,omitempty"`
-	SubPath          *string                  `json:"subPath,omitempty"`
-	MountPropagation *v1.MountPropagationMode `json:"mountPropagation,omitempty"`
-	SubPathExpr      *string                  `json:"subPathExpr,omitempty"`
+	Name             *string                  `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
+	ReadOnly         *bool                    `json:"readOnly,omitempty" protobuf:"varint,2,opt,name=readOnly"`
+	MountPath        *string                  `json:"mountPath,omitempty" protobuf:"bytes,3,opt,name=mountPath"`
+	SubPath          *string                  `json:"subPath,omitempty" protobuf:"bytes,4,opt,name=subPath"`
+	MountPropagation *v1.MountPropagationMode `json:"mountPropagation,omitempty" protobuf:"bytes,5,opt,name=mountPropagation,casttype=k8s.io/api/core/v1.MountPropagationMode"`
+	SubPathExpr      *string                  `json:"subPathExpr,omitempty" protobuf:"bytes,6,opt,name=subPathExpr"`
 }
 
 // VolumeMountApplyConfiguration constructs an declarative configuration of the VolumeMount type for use with

@@ -21,8 +21,8 @@ package v1
 // NodeSelectorTermApplyConfiguration represents an declarative configuration of the NodeSelectorTerm type for use
 // with apply.
 type NodeSelectorTermApplyConfiguration struct {
-	MatchExpressions []NodeSelectorRequirementApplyConfiguration `json:"matchExpressions,omitempty"`
-	MatchFields      []NodeSelectorRequirementApplyConfiguration `json:"matchFields,omitempty"`
+	MatchExpressions []NodeSelectorRequirementApplyConfiguration `json:"matchExpressions,omitempty" protobuf:"bytes,1,rep,name=matchExpressions"`
+	MatchFields      []NodeSelectorRequirementApplyConfiguration `json:"matchFields,omitempty" protobuf:"bytes,2,rep,name=matchFields"`
 }
 
 // NodeSelectorTermApplyConfiguration constructs an declarative configuration of the NodeSelectorTerm type for use with

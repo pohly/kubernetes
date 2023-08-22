@@ -21,9 +21,9 @@ package v1
 // TypedLocalObjectReferenceApplyConfiguration represents an declarative configuration of the TypedLocalObjectReference type for use
 // with apply.
 type TypedLocalObjectReferenceApplyConfiguration struct {
-	APIGroup *string `json:"apiGroup,omitempty"`
-	Kind     *string `json:"kind,omitempty"`
-	Name     *string `json:"name,omitempty"`
+	APIGroup *string `json:"apiGroup,omitempty" protobuf:"bytes,1,opt,name=apiGroup"`
+	Kind     *string `json:"kind,omitempty" protobuf:"bytes,2,opt,name=kind"`
+	Name     *string `json:"name,omitempty" protobuf:"bytes,3,opt,name=name"`
 }
 
 // TypedLocalObjectReferenceApplyConfiguration constructs an declarative configuration of the TypedLocalObjectReference type for use with

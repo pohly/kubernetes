@@ -27,8 +27,8 @@ import (
 // PersistentVolumeClaimTemplateApplyConfiguration represents an declarative configuration of the PersistentVolumeClaimTemplate type for use
 // with apply.
 type PersistentVolumeClaimTemplateApplyConfiguration struct {
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *PersistentVolumeClaimSpecApplyConfiguration `json:"spec,omitempty"`
+	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	Spec                             *PersistentVolumeClaimSpecApplyConfiguration `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 }
 
 // PersistentVolumeClaimTemplateApplyConfiguration constructs an declarative configuration of the PersistentVolumeClaimTemplate type for use with

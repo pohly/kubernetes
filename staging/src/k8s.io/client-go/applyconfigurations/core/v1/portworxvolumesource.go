@@ -21,9 +21,9 @@ package v1
 // PortworxVolumeSourceApplyConfiguration represents an declarative configuration of the PortworxVolumeSource type for use
 // with apply.
 type PortworxVolumeSourceApplyConfiguration struct {
-	VolumeID *string `json:"volumeID,omitempty"`
-	FSType   *string `json:"fsType,omitempty"`
-	ReadOnly *bool   `json:"readOnly,omitempty"`
+	VolumeID *string `json:"volumeID,omitempty" protobuf:"bytes,1,opt,name=volumeID"`
+	FSType   *string `json:"fsType,omitempty" protobuf:"bytes,2,opt,name=fsType"`
+	ReadOnly *bool   `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
 }
 
 // PortworxVolumeSourceApplyConfiguration constructs an declarative configuration of the PortworxVolumeSource type for use with

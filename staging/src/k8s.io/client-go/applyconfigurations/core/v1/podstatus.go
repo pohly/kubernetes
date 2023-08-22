@@ -26,22 +26,22 @@ import (
 // PodStatusApplyConfiguration represents an declarative configuration of the PodStatus type for use
 // with apply.
 type PodStatusApplyConfiguration struct {
-	Phase                      *v1.PodPhase                               `json:"phase,omitempty"`
-	Conditions                 []PodConditionApplyConfiguration           `json:"conditions,omitempty"`
-	Message                    *string                                    `json:"message,omitempty"`
-	Reason                     *string                                    `json:"reason,omitempty"`
-	NominatedNodeName          *string                                    `json:"nominatedNodeName,omitempty"`
-	HostIP                     *string                                    `json:"hostIP,omitempty"`
-	HostIPs                    []HostIPApplyConfiguration                 `json:"hostIPs,omitempty"`
-	PodIP                      *string                                    `json:"podIP,omitempty"`
-	PodIPs                     []PodIPApplyConfiguration                  `json:"podIPs,omitempty"`
-	StartTime                  *metav1.Time                               `json:"startTime,omitempty"`
-	InitContainerStatuses      []ContainerStatusApplyConfiguration        `json:"initContainerStatuses,omitempty"`
-	ContainerStatuses          []ContainerStatusApplyConfiguration        `json:"containerStatuses,omitempty"`
-	QOSClass                   *v1.PodQOSClass                            `json:"qosClass,omitempty"`
-	EphemeralContainerStatuses []ContainerStatusApplyConfiguration        `json:"ephemeralContainerStatuses,omitempty"`
-	Resize                     *v1.PodResizeStatus                        `json:"resize,omitempty"`
-	ResourceClaimStatuses      []PodResourceClaimStatusApplyConfiguration `json:"resourceClaimStatuses,omitempty"`
+	Phase                      *v1.PodPhase                               `json:"phase,omitempty" protobuf:"bytes,1,opt,name=phase,casttype=k8s.io/api/core/v1.PodPhase"`
+	Conditions                 []PodConditionApplyConfiguration           `json:"conditions,omitempty" protobuf:"bytes,2,rep,name=conditions"`
+	Message                    *string                                    `json:"message,omitempty" protobuf:"bytes,3,opt,name=message"`
+	Reason                     *string                                    `json:"reason,omitempty" protobuf:"bytes,4,opt,name=reason"`
+	NominatedNodeName          *string                                    `json:"nominatedNodeName,omitempty" protobuf:"bytes,5,opt,name=nominatedNodeName"`
+	HostIP                     *string                                    `json:"hostIP,omitempty" protobuf:"bytes,6,opt,name=hostIP"`
+	HostIPs                    []HostIPApplyConfiguration                 `json:"hostIPs,omitempty" protobuf:"bytes,7,rep,name=hostIPs"`
+	PodIP                      *string                                    `json:"podIP,omitempty" protobuf:"bytes,8,opt,name=podIP"`
+	PodIPs                     []PodIPApplyConfiguration                  `json:"podIPs,omitempty" protobuf:"bytes,9,rep,name=podIPs"`
+	StartTime                  *metav1.Time                               `json:"startTime,omitempty" protobuf:"bytes,10,opt,name=startTime"`
+	InitContainerStatuses      []ContainerStatusApplyConfiguration        `json:"initContainerStatuses,omitempty" protobuf:"bytes,11,rep,name=initContainerStatuses"`
+	ContainerStatuses          []ContainerStatusApplyConfiguration        `json:"containerStatuses,omitempty" protobuf:"bytes,12,rep,name=containerStatuses"`
+	QOSClass                   *v1.PodQOSClass                            `json:"qosClass,omitempty" protobuf:"bytes,13,opt,name=qosClass,casttype=k8s.io/api/core/v1.PodQOSClass"`
+	EphemeralContainerStatuses []ContainerStatusApplyConfiguration        `json:"ephemeralContainerStatuses,omitempty" protobuf:"bytes,14,rep,name=ephemeralContainerStatuses"`
+	Resize                     *v1.PodResizeStatus                        `json:"resize,omitempty" protobuf:"bytes,15,opt,name=resize,casttype=k8s.io/api/core/v1.PodResizeStatus"`
+	ResourceClaimStatuses      []PodResourceClaimStatusApplyConfiguration `json:"resourceClaimStatuses,omitempty" protobuf:"bytes,16,rep,name=resourceClaimStatuses"`
 }
 
 // PodStatusApplyConfiguration constructs an declarative configuration of the PodStatus type for use with

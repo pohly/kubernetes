@@ -21,7 +21,7 @@ package v1alpha2
 // PodSchedulingContextStatusApplyConfiguration represents an declarative configuration of the PodSchedulingContextStatus type for use
 // with apply.
 type PodSchedulingContextStatusApplyConfiguration struct {
-	ResourceClaims []ResourceClaimSchedulingStatusApplyConfiguration `json:"resourceClaims,omitempty"`
+	ResourceClaims []ResourceClaimSchedulingStatusApplyConfiguration `json:"resourceClaims,omitempty" protobuf:"bytes,1,rep,name=resourceClaims"`
 }
 
 // PodSchedulingContextStatusApplyConfiguration constructs an declarative configuration of the PodSchedulingContextStatus type for use with

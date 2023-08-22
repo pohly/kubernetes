@@ -25,11 +25,11 @@ import (
 // ConfigMapNodeConfigSourceApplyConfiguration represents an declarative configuration of the ConfigMapNodeConfigSource type for use
 // with apply.
 type ConfigMapNodeConfigSourceApplyConfiguration struct {
-	Namespace        *string    `json:"namespace,omitempty"`
-	Name             *string    `json:"name,omitempty"`
-	UID              *types.UID `json:"uid,omitempty"`
-	ResourceVersion  *string    `json:"resourceVersion,omitempty"`
-	KubeletConfigKey *string    `json:"kubeletConfigKey,omitempty"`
+	Namespace        *string    `json:"namespace,omitempty" protobuf:"bytes,1,opt,name=namespace"`
+	Name             *string    `json:"name,omitempty" protobuf:"bytes,2,opt,name=name"`
+	UID              *types.UID `json:"uid,omitempty" protobuf:"bytes,3,opt,name=uid,casttype=k8s.io/apimachinery/pkg/types.UID"`
+	ResourceVersion  *string    `json:"resourceVersion,omitempty" protobuf:"bytes,4,opt,name=resourceVersion"`
+	KubeletConfigKey *string    `json:"kubeletConfigKey,omitempty" protobuf:"bytes,5,opt,name=kubeletConfigKey"`
 }
 
 // ConfigMapNodeConfigSourceApplyConfiguration constructs an declarative configuration of the ConfigMapNodeConfigSource type for use with

@@ -21,8 +21,8 @@ package v1
 // HostAliasApplyConfiguration represents an declarative configuration of the HostAlias type for use
 // with apply.
 type HostAliasApplyConfiguration struct {
-	IP        *string  `json:"ip,omitempty"`
-	Hostnames []string `json:"hostnames,omitempty"`
+	IP        *string  `json:"ip,omitempty" protobuf:"bytes,1,opt,name=ip"`
+	Hostnames []string `json:"hostnames,omitempty" protobuf:"bytes,2,rep,name=hostnames"`
 }
 
 // HostAliasApplyConfiguration constructs an declarative configuration of the HostAlias type for use with

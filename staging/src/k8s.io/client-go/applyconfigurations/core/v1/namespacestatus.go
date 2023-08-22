@@ -25,8 +25,8 @@ import (
 // NamespaceStatusApplyConfiguration represents an declarative configuration of the NamespaceStatus type for use
 // with apply.
 type NamespaceStatusApplyConfiguration struct {
-	Phase      *v1.NamespacePhase                     `json:"phase,omitempty"`
-	Conditions []NamespaceConditionApplyConfiguration `json:"conditions,omitempty"`
+	Phase      *v1.NamespacePhase                     `json:"phase,omitempty" protobuf:"bytes,1,opt,name=phase,casttype=k8s.io/api/core/v1.NamespacePhase"`
+	Conditions []NamespaceConditionApplyConfiguration `json:"conditions,omitempty" protobuf:"bytes,2,rep,name=conditions"`
 }
 
 // NamespaceStatusApplyConfiguration constructs an declarative configuration of the NamespaceStatus type for use with

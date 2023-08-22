@@ -21,7 +21,7 @@ package v1
 // ExecActionApplyConfiguration represents an declarative configuration of the ExecAction type for use
 // with apply.
 type ExecActionApplyConfiguration struct {
-	Command []string `json:"command,omitempty"`
+	Command []string `json:"command,omitempty" protobuf:"bytes,1,rep,name=command"`
 }
 
 // ExecActionApplyConfiguration constructs an declarative configuration of the ExecAction type for use with

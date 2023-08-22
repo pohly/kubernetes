@@ -25,9 +25,9 @@ import (
 // ResourceClaimSpecApplyConfiguration represents an declarative configuration of the ResourceClaimSpec type for use
 // with apply.
 type ResourceClaimSpecApplyConfiguration struct {
-	ResourceClassName *string                                             `json:"resourceClassName,omitempty"`
-	ParametersRef     *ResourceClaimParametersReferenceApplyConfiguration `json:"parametersRef,omitempty"`
-	AllocationMode    *resourcev1alpha2.AllocationMode                    `json:"allocationMode,omitempty"`
+	ResourceClassName *string                                             `json:"resourceClassName,omitempty" protobuf:"bytes,1,opt,name=resourceClassName"`
+	ParametersRef     *ResourceClaimParametersReferenceApplyConfiguration `json:"parametersRef,omitempty" protobuf:"bytes,2,opt,name=parametersRef"`
+	AllocationMode    *resourcev1alpha2.AllocationMode                    `json:"allocationMode,omitempty" protobuf:"bytes,3,opt,name=allocationMode,casttype=k8s.io/api/resource/v1alpha2.AllocationMode"`
 }
 
 // ResourceClaimSpecApplyConfiguration constructs an declarative configuration of the ResourceClaimSpec type for use with

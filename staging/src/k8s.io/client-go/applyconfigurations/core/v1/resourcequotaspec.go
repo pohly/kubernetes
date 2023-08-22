@@ -25,9 +25,9 @@ import (
 // ResourceQuotaSpecApplyConfiguration represents an declarative configuration of the ResourceQuotaSpec type for use
 // with apply.
 type ResourceQuotaSpecApplyConfiguration struct {
-	Hard          *v1.ResourceList                 `json:"hard,omitempty"`
-	Scopes        []v1.ResourceQuotaScope          `json:"scopes,omitempty"`
-	ScopeSelector *ScopeSelectorApplyConfiguration `json:"scopeSelector,omitempty"`
+	Hard          *v1.ResourceList                 `json:"hard,omitempty" protobuf:"bytes,1,rep,name=hard,casttype=k8s.io/api/core/v1.ResourceList,castkey=k8s.io/api/core/v1.ResourceName"`
+	Scopes        []v1.ResourceQuotaScope          `json:"scopes,omitempty" protobuf:"bytes,2,rep,name=scopes,casttype=k8s.io/api/core/v1.ResourceQuotaScope"`
+	ScopeSelector *ScopeSelectorApplyConfiguration `json:"scopeSelector,omitempty" protobuf:"bytes,3,opt,name=scopeSelector"`
 }
 
 // ResourceQuotaSpecApplyConfiguration constructs an declarative configuration of the ResourceQuotaSpec type for use with

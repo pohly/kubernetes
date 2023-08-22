@@ -30,11 +30,11 @@ import (
 // ServiceAccountApplyConfiguration represents an declarative configuration of the ServiceAccount type for use
 // with apply.
 type ServiceAccountApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Secrets                          []ObjectReferenceApplyConfiguration      `json:"secrets,omitempty"`
-	ImagePullSecrets                 []LocalObjectReferenceApplyConfiguration `json:"imagePullSecrets,omitempty"`
-	AutomountServiceAccountToken     *bool                                    `json:"automountServiceAccountToken,omitempty"`
+	v1.TypeMetaApplyConfiguration    `json:",inline" protobuf:"bytes,1,opt,name=typeMetaApplyConfiguration"`
+	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty" protobuf:"bytes,2,opt,name=metadata"`
+	Secrets                          []ObjectReferenceApplyConfiguration      `json:"secrets,omitempty" protobuf:"bytes,3,rep,name=secrets"`
+	ImagePullSecrets                 []LocalObjectReferenceApplyConfiguration `json:"imagePullSecrets,omitempty" protobuf:"bytes,4,rep,name=imagePullSecrets"`
+	AutomountServiceAccountToken     *bool                                    `json:"automountServiceAccountToken,omitempty" protobuf:"varint,5,opt,name=automountServiceAccountToken"`
 }
 
 // ServiceAccount constructs an declarative configuration of the ServiceAccount type for use with

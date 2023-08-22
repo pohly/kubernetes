@@ -21,8 +21,8 @@ package v1
 // ObjectFieldSelectorApplyConfiguration represents an declarative configuration of the ObjectFieldSelector type for use
 // with apply.
 type ObjectFieldSelectorApplyConfiguration struct {
-	APIVersion *string `json:"apiVersion,omitempty"`
-	FieldPath  *string `json:"fieldPath,omitempty"`
+	APIVersion *string `json:"apiVersion,omitempty" protobuf:"bytes,1,opt,name=apiVersion"`
+	FieldPath  *string `json:"fieldPath,omitempty" protobuf:"bytes,2,opt,name=fieldPath"`
 }
 
 // ObjectFieldSelectorApplyConfiguration constructs an declarative configuration of the ObjectFieldSelector type for use with

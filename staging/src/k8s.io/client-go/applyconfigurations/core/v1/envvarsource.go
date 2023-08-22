@@ -21,10 +21,10 @@ package v1
 // EnvVarSourceApplyConfiguration represents an declarative configuration of the EnvVarSource type for use
 // with apply.
 type EnvVarSourceApplyConfiguration struct {
-	FieldRef         *ObjectFieldSelectorApplyConfiguration   `json:"fieldRef,omitempty"`
-	ResourceFieldRef *ResourceFieldSelectorApplyConfiguration `json:"resourceFieldRef,omitempty"`
-	ConfigMapKeyRef  *ConfigMapKeySelectorApplyConfiguration  `json:"configMapKeyRef,omitempty"`
-	SecretKeyRef     *SecretKeySelectorApplyConfiguration     `json:"secretKeyRef,omitempty"`
+	FieldRef         *ObjectFieldSelectorApplyConfiguration   `json:"fieldRef,omitempty" protobuf:"bytes,1,opt,name=fieldRef"`
+	ResourceFieldRef *ResourceFieldSelectorApplyConfiguration `json:"resourceFieldRef,omitempty" protobuf:"bytes,2,opt,name=resourceFieldRef"`
+	ConfigMapKeyRef  *ConfigMapKeySelectorApplyConfiguration  `json:"configMapKeyRef,omitempty" protobuf:"bytes,3,opt,name=configMapKeyRef"`
+	SecretKeyRef     *SecretKeySelectorApplyConfiguration     `json:"secretKeyRef,omitempty" protobuf:"bytes,4,opt,name=secretKeyRef"`
 }
 
 // EnvVarSourceApplyConfiguration constructs an declarative configuration of the EnvVarSource type for use with

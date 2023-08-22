@@ -21,10 +21,10 @@ package v1
 // NodeConfigStatusApplyConfiguration represents an declarative configuration of the NodeConfigStatus type for use
 // with apply.
 type NodeConfigStatusApplyConfiguration struct {
-	Assigned      *NodeConfigSourceApplyConfiguration `json:"assigned,omitempty"`
-	Active        *NodeConfigSourceApplyConfiguration `json:"active,omitempty"`
-	LastKnownGood *NodeConfigSourceApplyConfiguration `json:"lastKnownGood,omitempty"`
-	Error         *string                             `json:"error,omitempty"`
+	Assigned      *NodeConfigSourceApplyConfiguration `json:"assigned,omitempty" protobuf:"bytes,1,opt,name=assigned"`
+	Active        *NodeConfigSourceApplyConfiguration `json:"active,omitempty" protobuf:"bytes,2,opt,name=active"`
+	LastKnownGood *NodeConfigSourceApplyConfiguration `json:"lastKnownGood,omitempty" protobuf:"bytes,3,opt,name=lastKnownGood"`
+	Error         *string                             `json:"error,omitempty" protobuf:"bytes,4,opt,name=error"`
 }
 
 // NodeConfigStatusApplyConfiguration constructs an declarative configuration of the NodeConfigStatus type for use with

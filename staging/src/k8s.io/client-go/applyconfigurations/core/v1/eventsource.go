@@ -21,8 +21,8 @@ package v1
 // EventSourceApplyConfiguration represents an declarative configuration of the EventSource type for use
 // with apply.
 type EventSourceApplyConfiguration struct {
-	Component *string `json:"component,omitempty"`
-	Host      *string `json:"host,omitempty"`
+	Component *string `json:"component,omitempty" protobuf:"bytes,1,opt,name=component"`
+	Host      *string `json:"host,omitempty" protobuf:"bytes,2,opt,name=host"`
 }
 
 // EventSourceApplyConfiguration constructs an declarative configuration of the EventSource type for use with

@@ -21,7 +21,7 @@ package v1
 // TopologySelectorTermApplyConfiguration represents an declarative configuration of the TopologySelectorTerm type for use
 // with apply.
 type TopologySelectorTermApplyConfiguration struct {
-	MatchLabelExpressions []TopologySelectorLabelRequirementApplyConfiguration `json:"matchLabelExpressions,omitempty"`
+	MatchLabelExpressions []TopologySelectorLabelRequirementApplyConfiguration `json:"matchLabelExpressions,omitempty" protobuf:"bytes,1,rep,name=matchLabelExpressions"`
 }
 
 // TopologySelectorTermApplyConfiguration constructs an declarative configuration of the TopologySelectorTerm type for use with

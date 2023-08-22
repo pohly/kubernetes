@@ -21,8 +21,8 @@ package v1
 // FlockerVolumeSourceApplyConfiguration represents an declarative configuration of the FlockerVolumeSource type for use
 // with apply.
 type FlockerVolumeSourceApplyConfiguration struct {
-	DatasetName *string `json:"datasetName,omitempty"`
-	DatasetUUID *string `json:"datasetUUID,omitempty"`
+	DatasetName *string `json:"datasetName,omitempty" protobuf:"bytes,1,opt,name=datasetName"`
+	DatasetUUID *string `json:"datasetUUID,omitempty" protobuf:"bytes,2,opt,name=datasetUUID"`
 }
 
 // FlockerVolumeSourceApplyConfiguration constructs an declarative configuration of the FlockerVolumeSource type for use with

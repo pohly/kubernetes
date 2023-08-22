@@ -27,8 +27,8 @@ import (
 // ResourceClaimTemplateSpecApplyConfiguration represents an declarative configuration of the ResourceClaimTemplateSpec type for use
 // with apply.
 type ResourceClaimTemplateSpecApplyConfiguration struct {
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *ResourceClaimSpecApplyConfiguration `json:"spec,omitempty"`
+	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	Spec                             *ResourceClaimSpecApplyConfiguration `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 }
 
 // ResourceClaimTemplateSpecApplyConfiguration constructs an declarative configuration of the ResourceClaimTemplateSpec type for use with

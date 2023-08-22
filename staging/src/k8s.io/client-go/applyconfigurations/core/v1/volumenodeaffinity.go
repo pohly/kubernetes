@@ -21,7 +21,7 @@ package v1
 // VolumeNodeAffinityApplyConfiguration represents an declarative configuration of the VolumeNodeAffinity type for use
 // with apply.
 type VolumeNodeAffinityApplyConfiguration struct {
-	Required *NodeSelectorApplyConfiguration `json:"required,omitempty"`
+	Required *NodeSelectorApplyConfiguration `json:"required,omitempty" protobuf:"bytes,1,opt,name=required"`
 }
 
 // VolumeNodeAffinityApplyConfiguration constructs an declarative configuration of the VolumeNodeAffinity type for use with

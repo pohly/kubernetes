@@ -30,10 +30,10 @@ import (
 // ResourceQuotaApplyConfiguration represents an declarative configuration of the ResourceQuota type for use
 // with apply.
 type ResourceQuotaApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *ResourceQuotaSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *ResourceQuotaStatusApplyConfiguration `json:"status,omitempty"`
+	v1.TypeMetaApplyConfiguration    `json:",inline" protobuf:"bytes,1,opt,name=typeMetaApplyConfiguration"`
+	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty" protobuf:"bytes,2,opt,name=metadata"`
+	Spec                             *ResourceQuotaSpecApplyConfiguration   `json:"spec,omitempty" protobuf:"bytes,3,opt,name=spec"`
+	Status                           *ResourceQuotaStatusApplyConfiguration `json:"status,omitempty" protobuf:"bytes,4,opt,name=status"`
 }
 
 // ResourceQuota constructs an declarative configuration of the ResourceQuota type for use with

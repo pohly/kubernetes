@@ -25,8 +25,8 @@ import (
 // HostPathVolumeSourceApplyConfiguration represents an declarative configuration of the HostPathVolumeSource type for use
 // with apply.
 type HostPathVolumeSourceApplyConfiguration struct {
-	Path *string          `json:"path,omitempty"`
-	Type *v1.HostPathType `json:"type,omitempty"`
+	Path *string          `json:"path,omitempty" protobuf:"bytes,1,opt,name=path"`
+	Type *v1.HostPathType `json:"type,omitempty" protobuf:"bytes,2,opt,name=type,casttype=k8s.io/api/core/v1.HostPathType"`
 }
 
 // HostPathVolumeSourceApplyConfiguration constructs an declarative configuration of the HostPathVolumeSource type for use with

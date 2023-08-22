@@ -21,8 +21,8 @@ package v1
 // SecretReferenceApplyConfiguration represents an declarative configuration of the SecretReference type for use
 // with apply.
 type SecretReferenceApplyConfiguration struct {
-	Name      *string `json:"name,omitempty"`
-	Namespace *string `json:"namespace,omitempty"`
+	Name      *string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
+	Namespace *string `json:"namespace,omitempty" protobuf:"bytes,2,opt,name=namespace"`
 }
 
 // SecretReferenceApplyConfiguration constructs an declarative configuration of the SecretReference type for use with

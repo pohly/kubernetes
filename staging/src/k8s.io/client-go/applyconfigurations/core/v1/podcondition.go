@@ -26,12 +26,12 @@ import (
 // PodConditionApplyConfiguration represents an declarative configuration of the PodCondition type for use
 // with apply.
 type PodConditionApplyConfiguration struct {
-	Type               *v1.PodConditionType `json:"type,omitempty"`
-	Status             *v1.ConditionStatus  `json:"status,omitempty"`
-	LastProbeTime      *metav1.Time         `json:"lastProbeTime,omitempty"`
-	LastTransitionTime *metav1.Time         `json:"lastTransitionTime,omitempty"`
-	Reason             *string              `json:"reason,omitempty"`
-	Message            *string              `json:"message,omitempty"`
+	Type               *v1.PodConditionType `json:"type,omitempty" protobuf:"bytes,1,opt,name=type,casttype=k8s.io/api/core/v1.PodConditionType"`
+	Status             *v1.ConditionStatus  `json:"status,omitempty" protobuf:"bytes,2,opt,name=status,casttype=k8s.io/api/core/v1.ConditionStatus"`
+	LastProbeTime      *metav1.Time         `json:"lastProbeTime,omitempty" protobuf:"bytes,3,opt,name=lastProbeTime"`
+	LastTransitionTime *metav1.Time         `json:"lastTransitionTime,omitempty" protobuf:"bytes,4,opt,name=lastTransitionTime"`
+	Reason             *string              `json:"reason,omitempty" protobuf:"bytes,5,opt,name=reason"`
+	Message            *string              `json:"message,omitempty" protobuf:"bytes,6,opt,name=message"`
 }
 
 // PodConditionApplyConfiguration constructs an declarative configuration of the PodCondition type for use with

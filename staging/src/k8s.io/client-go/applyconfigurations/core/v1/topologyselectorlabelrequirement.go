@@ -21,8 +21,8 @@ package v1
 // TopologySelectorLabelRequirementApplyConfiguration represents an declarative configuration of the TopologySelectorLabelRequirement type for use
 // with apply.
 type TopologySelectorLabelRequirementApplyConfiguration struct {
-	Key    *string  `json:"key,omitempty"`
-	Values []string `json:"values,omitempty"`
+	Key    *string  `json:"key,omitempty" protobuf:"bytes,1,opt,name=key"`
+	Values []string `json:"values,omitempty" protobuf:"bytes,2,rep,name=values"`
 }
 
 // TopologySelectorLabelRequirementApplyConfiguration constructs an declarative configuration of the TopologySelectorLabelRequirement type for use with

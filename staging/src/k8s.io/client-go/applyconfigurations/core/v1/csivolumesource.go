@@ -21,11 +21,11 @@ package v1
 // CSIVolumeSourceApplyConfiguration represents an declarative configuration of the CSIVolumeSource type for use
 // with apply.
 type CSIVolumeSourceApplyConfiguration struct {
-	Driver               *string                                 `json:"driver,omitempty"`
-	ReadOnly             *bool                                   `json:"readOnly,omitempty"`
-	FSType               *string                                 `json:"fsType,omitempty"`
-	VolumeAttributes     map[string]string                       `json:"volumeAttributes,omitempty"`
-	NodePublishSecretRef *LocalObjectReferenceApplyConfiguration `json:"nodePublishSecretRef,omitempty"`
+	Driver               *string                                 `json:"driver,omitempty" protobuf:"bytes,1,opt,name=driver"`
+	ReadOnly             *bool                                   `json:"readOnly,omitempty" protobuf:"varint,2,opt,name=readOnly"`
+	FSType               *string                                 `json:"fsType,omitempty" protobuf:"bytes,3,opt,name=fsType"`
+	VolumeAttributes     map[string]string                       `json:"volumeAttributes,omitempty" protobuf:"bytes,4,rep,name=volumeAttributes"`
+	NodePublishSecretRef *LocalObjectReferenceApplyConfiguration `json:"nodePublishSecretRef,omitempty" protobuf:"bytes,5,opt,name=nodePublishSecretRef"`
 }
 
 // CSIVolumeSourceApplyConfiguration constructs an declarative configuration of the CSIVolumeSource type for use with

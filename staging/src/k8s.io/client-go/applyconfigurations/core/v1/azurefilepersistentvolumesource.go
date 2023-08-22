@@ -21,10 +21,10 @@ package v1
 // AzureFilePersistentVolumeSourceApplyConfiguration represents an declarative configuration of the AzureFilePersistentVolumeSource type for use
 // with apply.
 type AzureFilePersistentVolumeSourceApplyConfiguration struct {
-	SecretName      *string `json:"secretName,omitempty"`
-	ShareName       *string `json:"shareName,omitempty"`
-	ReadOnly        *bool   `json:"readOnly,omitempty"`
-	SecretNamespace *string `json:"secretNamespace,omitempty"`
+	SecretName      *string `json:"secretName,omitempty" protobuf:"bytes,1,opt,name=secretName"`
+	ShareName       *string `json:"shareName,omitempty" protobuf:"bytes,2,opt,name=shareName"`
+	ReadOnly        *bool   `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
+	SecretNamespace *string `json:"secretNamespace,omitempty" protobuf:"bytes,4,opt,name=secretNamespace"`
 }
 
 // AzureFilePersistentVolumeSourceApplyConfiguration constructs an declarative configuration of the AzureFilePersistentVolumeSource type for use with

@@ -25,15 +25,15 @@ import (
 // PersistentVolumeSpecApplyConfiguration represents an declarative configuration of the PersistentVolumeSpec type for use
 // with apply.
 type PersistentVolumeSpecApplyConfiguration struct {
-	Capacity                                 *v1.ResourceList `json:"capacity,omitempty"`
-	PersistentVolumeSourceApplyConfiguration `json:",inline"`
-	AccessModes                              []v1.PersistentVolumeAccessMode       `json:"accessModes,omitempty"`
-	ClaimRef                                 *ObjectReferenceApplyConfiguration    `json:"claimRef,omitempty"`
-	PersistentVolumeReclaimPolicy            *v1.PersistentVolumeReclaimPolicy     `json:"persistentVolumeReclaimPolicy,omitempty"`
-	StorageClassName                         *string                               `json:"storageClassName,omitempty"`
-	MountOptions                             []string                              `json:"mountOptions,omitempty"`
-	VolumeMode                               *v1.PersistentVolumeMode              `json:"volumeMode,omitempty"`
-	NodeAffinity                             *VolumeNodeAffinityApplyConfiguration `json:"nodeAffinity,omitempty"`
+	Capacity                                 *v1.ResourceList `json:"capacity,omitempty" protobuf:"bytes,1,rep,name=capacity,casttype=k8s.io/api/core/v1.ResourceList,castkey=k8s.io/api/core/v1.ResourceName"`
+	PersistentVolumeSourceApplyConfiguration `json:",inline" protobuf:"bytes,2,opt,name=persistentVolumeSourceApplyConfiguration"`
+	AccessModes                              []v1.PersistentVolumeAccessMode       `json:"accessModes,omitempty" protobuf:"bytes,3,rep,name=accessModes,casttype=k8s.io/api/core/v1.PersistentVolumeAccessMode"`
+	ClaimRef                                 *ObjectReferenceApplyConfiguration    `json:"claimRef,omitempty" protobuf:"bytes,4,opt,name=claimRef"`
+	PersistentVolumeReclaimPolicy            *v1.PersistentVolumeReclaimPolicy     `json:"persistentVolumeReclaimPolicy,omitempty" protobuf:"bytes,5,opt,name=persistentVolumeReclaimPolicy,casttype=k8s.io/api/core/v1.PersistentVolumeReclaimPolicy"`
+	StorageClassName                         *string                               `json:"storageClassName,omitempty" protobuf:"bytes,6,opt,name=storageClassName"`
+	MountOptions                             []string                              `json:"mountOptions,omitempty" protobuf:"bytes,7,rep,name=mountOptions"`
+	VolumeMode                               *v1.PersistentVolumeMode              `json:"volumeMode,omitempty" protobuf:"bytes,8,opt,name=volumeMode,casttype=k8s.io/api/core/v1.PersistentVolumeMode"`
+	NodeAffinity                             *VolumeNodeAffinityApplyConfiguration `json:"nodeAffinity,omitempty" protobuf:"bytes,9,opt,name=nodeAffinity"`
 }
 
 // PersistentVolumeSpecApplyConfiguration constructs an declarative configuration of the PersistentVolumeSpec type for use with

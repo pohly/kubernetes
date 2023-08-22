@@ -21,9 +21,9 @@ package v1
 // ConfigMapProjectionApplyConfiguration represents an declarative configuration of the ConfigMapProjection type for use
 // with apply.
 type ConfigMapProjectionApplyConfiguration struct {
-	LocalObjectReferenceApplyConfiguration `json:",inline"`
-	Items                                  []KeyToPathApplyConfiguration `json:"items,omitempty"`
-	Optional                               *bool                         `json:"optional,omitempty"`
+	LocalObjectReferenceApplyConfiguration `json:",inline" protobuf:"bytes,1,opt,name=localObjectReferenceApplyConfiguration"`
+	Items                                  []KeyToPathApplyConfiguration `json:"items,omitempty" protobuf:"bytes,2,rep,name=items"`
+	Optional                               *bool                         `json:"optional,omitempty" protobuf:"varint,3,opt,name=optional"`
 }
 
 // ConfigMapProjectionApplyConfiguration constructs an declarative configuration of the ConfigMapProjection type for use with

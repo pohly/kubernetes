@@ -21,11 +21,11 @@ package v1
 // FlexVolumeSourceApplyConfiguration represents an declarative configuration of the FlexVolumeSource type for use
 // with apply.
 type FlexVolumeSourceApplyConfiguration struct {
-	Driver    *string                                 `json:"driver,omitempty"`
-	FSType    *string                                 `json:"fsType,omitempty"`
-	SecretRef *LocalObjectReferenceApplyConfiguration `json:"secretRef,omitempty"`
-	ReadOnly  *bool                                   `json:"readOnly,omitempty"`
-	Options   map[string]string                       `json:"options,omitempty"`
+	Driver    *string                                 `json:"driver,omitempty" protobuf:"bytes,1,opt,name=driver"`
+	FSType    *string                                 `json:"fsType,omitempty" protobuf:"bytes,2,opt,name=fsType"`
+	SecretRef *LocalObjectReferenceApplyConfiguration `json:"secretRef,omitempty" protobuf:"bytes,3,opt,name=secretRef"`
+	ReadOnly  *bool                                   `json:"readOnly,omitempty" protobuf:"varint,4,opt,name=readOnly"`
+	Options   map[string]string                       `json:"options,omitempty" protobuf:"bytes,5,rep,name=options"`
 }
 
 // FlexVolumeSourceApplyConfiguration constructs an declarative configuration of the FlexVolumeSource type for use with

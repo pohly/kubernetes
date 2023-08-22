@@ -25,8 +25,8 @@ import (
 // ResourceQuotaStatusApplyConfiguration represents an declarative configuration of the ResourceQuotaStatus type for use
 // with apply.
 type ResourceQuotaStatusApplyConfiguration struct {
-	Hard *v1.ResourceList `json:"hard,omitempty"`
-	Used *v1.ResourceList `json:"used,omitempty"`
+	Hard *v1.ResourceList `json:"hard,omitempty" protobuf:"bytes,1,rep,name=hard,casttype=k8s.io/api/core/v1.ResourceList,castkey=k8s.io/api/core/v1.ResourceName"`
+	Used *v1.ResourceList `json:"used,omitempty" protobuf:"bytes,2,rep,name=used,casttype=k8s.io/api/core/v1.ResourceList,castkey=k8s.io/api/core/v1.ResourceName"`
 }
 
 // ResourceQuotaStatusApplyConfiguration constructs an declarative configuration of the ResourceQuotaStatus type for use with

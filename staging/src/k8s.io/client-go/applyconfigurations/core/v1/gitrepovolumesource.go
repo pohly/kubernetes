@@ -21,9 +21,9 @@ package v1
 // GitRepoVolumeSourceApplyConfiguration represents an declarative configuration of the GitRepoVolumeSource type for use
 // with apply.
 type GitRepoVolumeSourceApplyConfiguration struct {
-	Repository *string `json:"repository,omitempty"`
-	Revision   *string `json:"revision,omitempty"`
-	Directory  *string `json:"directory,omitempty"`
+	Repository *string `json:"repository,omitempty" protobuf:"bytes,1,opt,name=repository"`
+	Revision   *string `json:"revision,omitempty" protobuf:"bytes,2,opt,name=revision"`
+	Directory  *string `json:"directory,omitempty" protobuf:"bytes,3,opt,name=directory"`
 }
 
 // GitRepoVolumeSourceApplyConfiguration constructs an declarative configuration of the GitRepoVolumeSource type for use with

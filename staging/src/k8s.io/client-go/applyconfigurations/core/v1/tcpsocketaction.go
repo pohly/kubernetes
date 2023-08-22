@@ -25,8 +25,8 @@ import (
 // TCPSocketActionApplyConfiguration represents an declarative configuration of the TCPSocketAction type for use
 // with apply.
 type TCPSocketActionApplyConfiguration struct {
-	Port *intstr.IntOrString `json:"port,omitempty"`
-	Host *string             `json:"host,omitempty"`
+	Port *intstr.IntOrString `json:"port,omitempty" protobuf:"bytes,1,opt,name=port"`
+	Host *string             `json:"host,omitempty" protobuf:"bytes,2,opt,name=host"`
 }
 
 // TCPSocketActionApplyConfiguration constructs an declarative configuration of the TCPSocketAction type for use with

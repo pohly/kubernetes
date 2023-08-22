@@ -21,8 +21,8 @@ package v1
 // DownwardAPIVolumeSourceApplyConfiguration represents an declarative configuration of the DownwardAPIVolumeSource type for use
 // with apply.
 type DownwardAPIVolumeSourceApplyConfiguration struct {
-	Items       []DownwardAPIVolumeFileApplyConfiguration `json:"items,omitempty"`
-	DefaultMode *int32                                    `json:"defaultMode,omitempty"`
+	Items       []DownwardAPIVolumeFileApplyConfiguration `json:"items,omitempty" protobuf:"bytes,1,rep,name=items"`
+	DefaultMode *int32                                    `json:"defaultMode,omitempty" protobuf:"varint,2,opt,name=defaultMode"`
 }
 
 // DownwardAPIVolumeSourceApplyConfiguration constructs an declarative configuration of the DownwardAPIVolumeSource type for use with

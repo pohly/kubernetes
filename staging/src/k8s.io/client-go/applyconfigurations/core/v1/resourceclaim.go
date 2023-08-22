@@ -21,7 +21,7 @@ package v1
 // ResourceClaimApplyConfiguration represents an declarative configuration of the ResourceClaim type for use
 // with apply.
 type ResourceClaimApplyConfiguration struct {
-	Name *string `json:"name,omitempty"`
+	Name *string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
 }
 
 // ResourceClaimApplyConfiguration constructs an declarative configuration of the ResourceClaim type for use with

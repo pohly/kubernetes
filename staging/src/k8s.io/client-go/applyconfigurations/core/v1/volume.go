@@ -21,8 +21,8 @@ package v1
 // VolumeApplyConfiguration represents an declarative configuration of the Volume type for use
 // with apply.
 type VolumeApplyConfiguration struct {
-	Name                           *string `json:"name,omitempty"`
-	VolumeSourceApplyConfiguration `json:",inline"`
+	Name                           *string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
+	VolumeSourceApplyConfiguration `json:",inline" protobuf:"bytes,2,opt,name=volumeSourceApplyConfiguration"`
 }
 
 // VolumeApplyConfiguration constructs an declarative configuration of the Volume type for use with

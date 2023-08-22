@@ -21,7 +21,7 @@ package v1
 // ScopeSelectorApplyConfiguration represents an declarative configuration of the ScopeSelector type for use
 // with apply.
 type ScopeSelectorApplyConfiguration struct {
-	MatchExpressions []ScopedResourceSelectorRequirementApplyConfiguration `json:"matchExpressions,omitempty"`
+	MatchExpressions []ScopedResourceSelectorRequirementApplyConfiguration `json:"matchExpressions,omitempty" protobuf:"bytes,1,rep,name=matchExpressions"`
 }
 
 // ScopeSelectorApplyConfiguration constructs an declarative configuration of the ScopeSelector type for use with

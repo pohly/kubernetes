@@ -21,9 +21,9 @@ package v1
 // EnvVarApplyConfiguration represents an declarative configuration of the EnvVar type for use
 // with apply.
 type EnvVarApplyConfiguration struct {
-	Name      *string                         `json:"name,omitempty"`
-	Value     *string                         `json:"value,omitempty"`
-	ValueFrom *EnvVarSourceApplyConfiguration `json:"valueFrom,omitempty"`
+	Name      *string                         `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
+	Value     *string                         `json:"value,omitempty" protobuf:"bytes,2,opt,name=value"`
+	ValueFrom *EnvVarSourceApplyConfiguration `json:"valueFrom,omitempty" protobuf:"bytes,3,opt,name=valueFrom"`
 }
 
 // EnvVarApplyConfiguration constructs an declarative configuration of the EnvVar type for use with

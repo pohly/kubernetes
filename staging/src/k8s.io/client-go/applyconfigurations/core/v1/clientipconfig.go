@@ -21,7 +21,7 @@ package v1
 // ClientIPConfigApplyConfiguration represents an declarative configuration of the ClientIPConfig type for use
 // with apply.
 type ClientIPConfigApplyConfiguration struct {
-	TimeoutSeconds *int32 `json:"timeoutSeconds,omitempty"`
+	TimeoutSeconds *int32 `json:"timeoutSeconds,omitempty" protobuf:"varint,1,opt,name=timeoutSeconds"`
 }
 
 // ClientIPConfigApplyConfiguration constructs an declarative configuration of the ClientIPConfig type for use with

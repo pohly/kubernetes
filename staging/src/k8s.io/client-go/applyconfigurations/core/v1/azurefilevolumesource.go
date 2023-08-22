@@ -21,9 +21,9 @@ package v1
 // AzureFileVolumeSourceApplyConfiguration represents an declarative configuration of the AzureFileVolumeSource type for use
 // with apply.
 type AzureFileVolumeSourceApplyConfiguration struct {
-	SecretName *string `json:"secretName,omitempty"`
-	ShareName  *string `json:"shareName,omitempty"`
-	ReadOnly   *bool   `json:"readOnly,omitempty"`
+	SecretName *string `json:"secretName,omitempty" protobuf:"bytes,1,opt,name=secretName"`
+	ShareName  *string `json:"shareName,omitempty" protobuf:"bytes,2,opt,name=shareName"`
+	ReadOnly   *bool   `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
 }
 
 // AzureFileVolumeSourceApplyConfiguration constructs an declarative configuration of the AzureFileVolumeSource type for use with

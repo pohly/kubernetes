@@ -21,8 +21,8 @@ package v1
 // PodResourceClaimApplyConfiguration represents an declarative configuration of the PodResourceClaim type for use
 // with apply.
 type PodResourceClaimApplyConfiguration struct {
-	Name   *string                        `json:"name,omitempty"`
-	Source *ClaimSourceApplyConfiguration `json:"source,omitempty"`
+	Name   *string                        `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
+	Source *ClaimSourceApplyConfiguration `json:"source,omitempty" protobuf:"bytes,2,opt,name=source"`
 }
 
 // PodResourceClaimApplyConfiguration constructs an declarative configuration of the PodResourceClaim type for use with

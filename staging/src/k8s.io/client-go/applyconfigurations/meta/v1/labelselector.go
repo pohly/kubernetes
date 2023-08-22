@@ -21,8 +21,8 @@ package v1
 // LabelSelectorApplyConfiguration represents an declarative configuration of the LabelSelector type for use
 // with apply.
 type LabelSelectorApplyConfiguration struct {
-	MatchLabels      map[string]string                            `json:"matchLabels,omitempty"`
-	MatchExpressions []LabelSelectorRequirementApplyConfiguration `json:"matchExpressions,omitempty"`
+	MatchLabels      map[string]string                            `json:"matchLabels,omitempty" protobuf:"bytes,1,rep,name=matchLabels"`
+	MatchExpressions []LabelSelectorRequirementApplyConfiguration `json:"matchExpressions,omitempty" protobuf:"bytes,2,rep,name=matchExpressions"`
 }
 
 // LabelSelectorApplyConfiguration constructs an declarative configuration of the LabelSelector type for use with

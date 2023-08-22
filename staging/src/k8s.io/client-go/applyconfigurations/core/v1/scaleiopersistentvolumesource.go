@@ -21,16 +21,16 @@ package v1
 // ScaleIOPersistentVolumeSourceApplyConfiguration represents an declarative configuration of the ScaleIOPersistentVolumeSource type for use
 // with apply.
 type ScaleIOPersistentVolumeSourceApplyConfiguration struct {
-	Gateway          *string                            `json:"gateway,omitempty"`
-	System           *string                            `json:"system,omitempty"`
-	SecretRef        *SecretReferenceApplyConfiguration `json:"secretRef,omitempty"`
-	SSLEnabled       *bool                              `json:"sslEnabled,omitempty"`
-	ProtectionDomain *string                            `json:"protectionDomain,omitempty"`
-	StoragePool      *string                            `json:"storagePool,omitempty"`
-	StorageMode      *string                            `json:"storageMode,omitempty"`
-	VolumeName       *string                            `json:"volumeName,omitempty"`
-	FSType           *string                            `json:"fsType,omitempty"`
-	ReadOnly         *bool                              `json:"readOnly,omitempty"`
+	Gateway          *string                            `json:"gateway,omitempty" protobuf:"bytes,1,opt,name=gateway"`
+	System           *string                            `json:"system,omitempty" protobuf:"bytes,2,opt,name=system"`
+	SecretRef        *SecretReferenceApplyConfiguration `json:"secretRef,omitempty" protobuf:"bytes,3,opt,name=secretRef"`
+	SSLEnabled       *bool                              `json:"sslEnabled,omitempty" protobuf:"varint,4,opt,name=sslEnabled"`
+	ProtectionDomain *string                            `json:"protectionDomain,omitempty" protobuf:"bytes,5,opt,name=protectionDomain"`
+	StoragePool      *string                            `json:"storagePool,omitempty" protobuf:"bytes,6,opt,name=storagePool"`
+	StorageMode      *string                            `json:"storageMode,omitempty" protobuf:"bytes,7,opt,name=storageMode"`
+	VolumeName       *string                            `json:"volumeName,omitempty" protobuf:"bytes,8,opt,name=volumeName"`
+	FSType           *string                            `json:"fsType,omitempty" protobuf:"bytes,9,opt,name=fsType"`
+	ReadOnly         *bool                              `json:"readOnly,omitempty" protobuf:"varint,10,opt,name=readOnly"`
 }
 
 // ScaleIOPersistentVolumeSourceApplyConfiguration constructs an declarative configuration of the ScaleIOPersistentVolumeSource type for use with

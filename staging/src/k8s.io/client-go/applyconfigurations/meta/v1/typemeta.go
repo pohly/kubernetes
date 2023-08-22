@@ -21,8 +21,8 @@ package v1
 // TypeMetaApplyConfiguration represents an declarative configuration of the TypeMeta type for use
 // with apply.
 type TypeMetaApplyConfiguration struct {
-	Kind       *string `json:"kind,omitempty"`
-	APIVersion *string `json:"apiVersion,omitempty"`
+	Kind       *string `json:"kind,omitempty" protobuf:"bytes,1,opt,name=kind"`
+	APIVersion *string `json:"apiVersion,omitempty" protobuf:"bytes,2,opt,name=apiVersion"`
 }
 
 // TypeMetaApplyConfiguration constructs an declarative configuration of the TypeMeta type for use with

@@ -21,13 +21,13 @@ package v1
 // NodeSpecApplyConfiguration represents an declarative configuration of the NodeSpec type for use
 // with apply.
 type NodeSpecApplyConfiguration struct {
-	PodCIDR            *string                             `json:"podCIDR,omitempty"`
-	PodCIDRs           []string                            `json:"podCIDRs,omitempty"`
-	ProviderID         *string                             `json:"providerID,omitempty"`
-	Unschedulable      *bool                               `json:"unschedulable,omitempty"`
-	Taints             []TaintApplyConfiguration           `json:"taints,omitempty"`
-	ConfigSource       *NodeConfigSourceApplyConfiguration `json:"configSource,omitempty"`
-	DoNotUseExternalID *string                             `json:"externalID,omitempty"`
+	PodCIDR            *string                             `json:"podCIDR,omitempty" protobuf:"bytes,1,opt,name=podCIDR"`
+	PodCIDRs           []string                            `json:"podCIDRs,omitempty" protobuf:"bytes,2,rep,name=podCIDRs"`
+	ProviderID         *string                             `json:"providerID,omitempty" protobuf:"bytes,3,opt,name=providerID"`
+	Unschedulable      *bool                               `json:"unschedulable,omitempty" protobuf:"varint,4,opt,name=unschedulable"`
+	Taints             []TaintApplyConfiguration           `json:"taints,omitempty" protobuf:"bytes,5,rep,name=taints"`
+	ConfigSource       *NodeConfigSourceApplyConfiguration `json:"configSource,omitempty" protobuf:"bytes,6,opt,name=configSource"`
+	DoNotUseExternalID *string                             `json:"externalID,omitempty" protobuf:"bytes,7,opt,name=externalID"`
 }
 
 // NodeSpecApplyConfiguration constructs an declarative configuration of the NodeSpec type for use with

@@ -25,45 +25,45 @@ import (
 // PodSpecApplyConfiguration represents an declarative configuration of the PodSpec type for use
 // with apply.
 type PodSpecApplyConfiguration struct {
-	Volumes                       []VolumeApplyConfiguration                   `json:"volumes,omitempty"`
-	InitContainers                []ContainerApplyConfiguration                `json:"initContainers,omitempty"`
-	Containers                    []ContainerApplyConfiguration                `json:"containers,omitempty"`
-	EphemeralContainers           []EphemeralContainerApplyConfiguration       `json:"ephemeralContainers,omitempty"`
-	RestartPolicy                 *corev1.RestartPolicy                        `json:"restartPolicy,omitempty"`
-	TerminationGracePeriodSeconds *int64                                       `json:"terminationGracePeriodSeconds,omitempty"`
-	ActiveDeadlineSeconds         *int64                                       `json:"activeDeadlineSeconds,omitempty"`
-	DNSPolicy                     *corev1.DNSPolicy                            `json:"dnsPolicy,omitempty"`
-	NodeSelector                  map[string]string                            `json:"nodeSelector,omitempty"`
-	ServiceAccountName            *string                                      `json:"serviceAccountName,omitempty"`
-	DeprecatedServiceAccount      *string                                      `json:"serviceAccount,omitempty"`
-	AutomountServiceAccountToken  *bool                                        `json:"automountServiceAccountToken,omitempty"`
-	NodeName                      *string                                      `json:"nodeName,omitempty"`
-	HostNetwork                   *bool                                        `json:"hostNetwork,omitempty"`
-	HostPID                       *bool                                        `json:"hostPID,omitempty"`
-	HostIPC                       *bool                                        `json:"hostIPC,omitempty"`
-	ShareProcessNamespace         *bool                                        `json:"shareProcessNamespace,omitempty"`
-	SecurityContext               *PodSecurityContextApplyConfiguration        `json:"securityContext,omitempty"`
-	ImagePullSecrets              []LocalObjectReferenceApplyConfiguration     `json:"imagePullSecrets,omitempty"`
-	Hostname                      *string                                      `json:"hostname,omitempty"`
-	Subdomain                     *string                                      `json:"subdomain,omitempty"`
-	Affinity                      *AffinityApplyConfiguration                  `json:"affinity,omitempty"`
-	SchedulerName                 *string                                      `json:"schedulerName,omitempty"`
-	Tolerations                   []TolerationApplyConfiguration               `json:"tolerations,omitempty"`
-	HostAliases                   []HostAliasApplyConfiguration                `json:"hostAliases,omitempty"`
-	PriorityClassName             *string                                      `json:"priorityClassName,omitempty"`
-	Priority                      *int32                                       `json:"priority,omitempty"`
-	DNSConfig                     *PodDNSConfigApplyConfiguration              `json:"dnsConfig,omitempty"`
-	ReadinessGates                []PodReadinessGateApplyConfiguration         `json:"readinessGates,omitempty"`
-	RuntimeClassName              *string                                      `json:"runtimeClassName,omitempty"`
-	EnableServiceLinks            *bool                                        `json:"enableServiceLinks,omitempty"`
-	PreemptionPolicy              *corev1.PreemptionPolicy                     `json:"preemptionPolicy,omitempty"`
-	Overhead                      *corev1.ResourceList                         `json:"overhead,omitempty"`
-	TopologySpreadConstraints     []TopologySpreadConstraintApplyConfiguration `json:"topologySpreadConstraints,omitempty"`
-	SetHostnameAsFQDN             *bool                                        `json:"setHostnameAsFQDN,omitempty"`
-	OS                            *PodOSApplyConfiguration                     `json:"os,omitempty"`
-	HostUsers                     *bool                                        `json:"hostUsers,omitempty"`
-	SchedulingGates               []PodSchedulingGateApplyConfiguration        `json:"schedulingGates,omitempty"`
-	ResourceClaims                []PodResourceClaimApplyConfiguration         `json:"resourceClaims,omitempty"`
+	Volumes                       []VolumeApplyConfiguration                   `json:"volumes,omitempty" protobuf:"bytes,1,rep,name=volumes"`
+	InitContainers                []ContainerApplyConfiguration                `json:"initContainers,omitempty" protobuf:"bytes,2,rep,name=initContainers"`
+	Containers                    []ContainerApplyConfiguration                `json:"containers,omitempty" protobuf:"bytes,3,rep,name=containers"`
+	EphemeralContainers           []EphemeralContainerApplyConfiguration       `json:"ephemeralContainers,omitempty" protobuf:"bytes,4,rep,name=ephemeralContainers"`
+	RestartPolicy                 *corev1.RestartPolicy                        `json:"restartPolicy,omitempty" protobuf:"bytes,5,opt,name=restartPolicy,casttype=k8s.io/api/core/v1.RestartPolicy"`
+	TerminationGracePeriodSeconds *int64                                       `json:"terminationGracePeriodSeconds,omitempty" protobuf:"varint,6,opt,name=terminationGracePeriodSeconds"`
+	ActiveDeadlineSeconds         *int64                                       `json:"activeDeadlineSeconds,omitempty" protobuf:"varint,7,opt,name=activeDeadlineSeconds"`
+	DNSPolicy                     *corev1.DNSPolicy                            `json:"dnsPolicy,omitempty" protobuf:"bytes,8,opt,name=dnsPolicy,casttype=k8s.io/api/core/v1.DNSPolicy"`
+	NodeSelector                  map[string]string                            `json:"nodeSelector,omitempty" protobuf:"bytes,9,rep,name=nodeSelector"`
+	ServiceAccountName            *string                                      `json:"serviceAccountName,omitempty" protobuf:"bytes,10,opt,name=serviceAccountName"`
+	DeprecatedServiceAccount      *string                                      `json:"serviceAccount,omitempty" protobuf:"bytes,11,opt,name=serviceAccount"`
+	AutomountServiceAccountToken  *bool                                        `json:"automountServiceAccountToken,omitempty" protobuf:"varint,12,opt,name=automountServiceAccountToken"`
+	NodeName                      *string                                      `json:"nodeName,omitempty" protobuf:"bytes,13,opt,name=nodeName"`
+	HostNetwork                   *bool                                        `json:"hostNetwork,omitempty" protobuf:"varint,14,opt,name=hostNetwork"`
+	HostPID                       *bool                                        `json:"hostPID,omitempty" protobuf:"varint,15,opt,name=hostPID"`
+	HostIPC                       *bool                                        `json:"hostIPC,omitempty" protobuf:"varint,16,opt,name=hostIPC"`
+	ShareProcessNamespace         *bool                                        `json:"shareProcessNamespace,omitempty" protobuf:"varint,17,opt,name=shareProcessNamespace"`
+	SecurityContext               *PodSecurityContextApplyConfiguration        `json:"securityContext,omitempty" protobuf:"bytes,18,opt,name=securityContext"`
+	ImagePullSecrets              []LocalObjectReferenceApplyConfiguration     `json:"imagePullSecrets,omitempty" protobuf:"bytes,19,rep,name=imagePullSecrets"`
+	Hostname                      *string                                      `json:"hostname,omitempty" protobuf:"bytes,20,opt,name=hostname"`
+	Subdomain                     *string                                      `json:"subdomain,omitempty" protobuf:"bytes,21,opt,name=subdomain"`
+	Affinity                      *AffinityApplyConfiguration                  `json:"affinity,omitempty" protobuf:"bytes,22,opt,name=affinity"`
+	SchedulerName                 *string                                      `json:"schedulerName,omitempty" protobuf:"bytes,23,opt,name=schedulerName"`
+	Tolerations                   []TolerationApplyConfiguration               `json:"tolerations,omitempty" protobuf:"bytes,24,rep,name=tolerations"`
+	HostAliases                   []HostAliasApplyConfiguration                `json:"hostAliases,omitempty" protobuf:"bytes,25,rep,name=hostAliases"`
+	PriorityClassName             *string                                      `json:"priorityClassName,omitempty" protobuf:"bytes,26,opt,name=priorityClassName"`
+	Priority                      *int32                                       `json:"priority,omitempty" protobuf:"varint,27,opt,name=priority"`
+	DNSConfig                     *PodDNSConfigApplyConfiguration              `json:"dnsConfig,omitempty" protobuf:"bytes,28,opt,name=dnsConfig"`
+	ReadinessGates                []PodReadinessGateApplyConfiguration         `json:"readinessGates,omitempty" protobuf:"bytes,29,rep,name=readinessGates"`
+	RuntimeClassName              *string                                      `json:"runtimeClassName,omitempty" protobuf:"bytes,30,opt,name=runtimeClassName"`
+	EnableServiceLinks            *bool                                        `json:"enableServiceLinks,omitempty" protobuf:"varint,31,opt,name=enableServiceLinks"`
+	PreemptionPolicy              *corev1.PreemptionPolicy                     `json:"preemptionPolicy,omitempty" protobuf:"bytes,32,opt,name=preemptionPolicy,casttype=k8s.io/api/core/v1.PreemptionPolicy"`
+	Overhead                      *corev1.ResourceList                         `json:"overhead,omitempty" protobuf:"bytes,33,rep,name=overhead,casttype=k8s.io/api/core/v1.ResourceList,castkey=k8s.io/api/core/v1.ResourceName"`
+	TopologySpreadConstraints     []TopologySpreadConstraintApplyConfiguration `json:"topologySpreadConstraints,omitempty" protobuf:"bytes,34,rep,name=topologySpreadConstraints"`
+	SetHostnameAsFQDN             *bool                                        `json:"setHostnameAsFQDN,omitempty" protobuf:"varint,35,opt,name=setHostnameAsFQDN"`
+	OS                            *PodOSApplyConfiguration                     `json:"os,omitempty" protobuf:"bytes,36,opt,name=os"`
+	HostUsers                     *bool                                        `json:"hostUsers,omitempty" protobuf:"varint,37,opt,name=hostUsers"`
+	SchedulingGates               []PodSchedulingGateApplyConfiguration        `json:"schedulingGates,omitempty" protobuf:"bytes,38,rep,name=schedulingGates"`
+	ResourceClaims                []PodResourceClaimApplyConfiguration         `json:"resourceClaims,omitempty" protobuf:"bytes,39,rep,name=resourceClaims"`
 }
 
 // PodSpecApplyConfiguration constructs an declarative configuration of the PodSpec type for use with

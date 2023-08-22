@@ -25,17 +25,17 @@ import (
 // SecurityContextApplyConfiguration represents an declarative configuration of the SecurityContext type for use
 // with apply.
 type SecurityContextApplyConfiguration struct {
-	Capabilities             *CapabilitiesApplyConfiguration                  `json:"capabilities,omitempty"`
-	Privileged               *bool                                            `json:"privileged,omitempty"`
-	SELinuxOptions           *SELinuxOptionsApplyConfiguration                `json:"seLinuxOptions,omitempty"`
-	WindowsOptions           *WindowsSecurityContextOptionsApplyConfiguration `json:"windowsOptions,omitempty"`
-	RunAsUser                *int64                                           `json:"runAsUser,omitempty"`
-	RunAsGroup               *int64                                           `json:"runAsGroup,omitempty"`
-	RunAsNonRoot             *bool                                            `json:"runAsNonRoot,omitempty"`
-	ReadOnlyRootFilesystem   *bool                                            `json:"readOnlyRootFilesystem,omitempty"`
-	AllowPrivilegeEscalation *bool                                            `json:"allowPrivilegeEscalation,omitempty"`
-	ProcMount                *corev1.ProcMountType                            `json:"procMount,omitempty"`
-	SeccompProfile           *SeccompProfileApplyConfiguration                `json:"seccompProfile,omitempty"`
+	Capabilities             *CapabilitiesApplyConfiguration                  `json:"capabilities,omitempty" protobuf:"bytes,1,opt,name=capabilities"`
+	Privileged               *bool                                            `json:"privileged,omitempty" protobuf:"varint,2,opt,name=privileged"`
+	SELinuxOptions           *SELinuxOptionsApplyConfiguration                `json:"seLinuxOptions,omitempty" protobuf:"bytes,3,opt,name=seLinuxOptions"`
+	WindowsOptions           *WindowsSecurityContextOptionsApplyConfiguration `json:"windowsOptions,omitempty" protobuf:"bytes,4,opt,name=windowsOptions"`
+	RunAsUser                *int64                                           `json:"runAsUser,omitempty" protobuf:"varint,5,opt,name=runAsUser"`
+	RunAsGroup               *int64                                           `json:"runAsGroup,omitempty" protobuf:"varint,6,opt,name=runAsGroup"`
+	RunAsNonRoot             *bool                                            `json:"runAsNonRoot,omitempty" protobuf:"varint,7,opt,name=runAsNonRoot"`
+	ReadOnlyRootFilesystem   *bool                                            `json:"readOnlyRootFilesystem,omitempty" protobuf:"varint,8,opt,name=readOnlyRootFilesystem"`
+	AllowPrivilegeEscalation *bool                                            `json:"allowPrivilegeEscalation,omitempty" protobuf:"varint,9,opt,name=allowPrivilegeEscalation"`
+	ProcMount                *corev1.ProcMountType                            `json:"procMount,omitempty" protobuf:"bytes,10,opt,name=procMount,casttype=k8s.io/api/core/v1.ProcMountType"`
+	SeccompProfile           *SeccompProfileApplyConfiguration                `json:"seccompProfile,omitempty" protobuf:"bytes,11,opt,name=seccompProfile"`
 }
 
 // SecurityContextApplyConfiguration constructs an declarative configuration of the SecurityContext type for use with

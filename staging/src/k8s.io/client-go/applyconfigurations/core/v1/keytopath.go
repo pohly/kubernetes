@@ -21,9 +21,9 @@ package v1
 // KeyToPathApplyConfiguration represents an declarative configuration of the KeyToPath type for use
 // with apply.
 type KeyToPathApplyConfiguration struct {
-	Key  *string `json:"key,omitempty"`
-	Path *string `json:"path,omitempty"`
-	Mode *int32  `json:"mode,omitempty"`
+	Key  *string `json:"key,omitempty" protobuf:"bytes,1,opt,name=key"`
+	Path *string `json:"path,omitempty" protobuf:"bytes,2,opt,name=path"`
+	Mode *int32  `json:"mode,omitempty" protobuf:"varint,3,opt,name=mode"`
 }
 
 // KeyToPathApplyConfiguration constructs an declarative configuration of the KeyToPath type for use with

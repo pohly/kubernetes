@@ -21,10 +21,10 @@ package v1
 // EndpointAddressApplyConfiguration represents an declarative configuration of the EndpointAddress type for use
 // with apply.
 type EndpointAddressApplyConfiguration struct {
-	IP        *string                            `json:"ip,omitempty"`
-	Hostname  *string                            `json:"hostname,omitempty"`
-	NodeName  *string                            `json:"nodeName,omitempty"`
-	TargetRef *ObjectReferenceApplyConfiguration `json:"targetRef,omitempty"`
+	IP        *string                            `json:"ip,omitempty" protobuf:"bytes,1,opt,name=ip"`
+	Hostname  *string                            `json:"hostname,omitempty" protobuf:"bytes,2,opt,name=hostname"`
+	NodeName  *string                            `json:"nodeName,omitempty" protobuf:"bytes,3,opt,name=nodeName"`
+	TargetRef *ObjectReferenceApplyConfiguration `json:"targetRef,omitempty" protobuf:"bytes,4,opt,name=targetRef"`
 }
 
 // EndpointAddressApplyConfiguration constructs an declarative configuration of the EndpointAddress type for use with

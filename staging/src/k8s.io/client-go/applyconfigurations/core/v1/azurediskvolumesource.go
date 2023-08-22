@@ -25,12 +25,12 @@ import (
 // AzureDiskVolumeSourceApplyConfiguration represents an declarative configuration of the AzureDiskVolumeSource type for use
 // with apply.
 type AzureDiskVolumeSourceApplyConfiguration struct {
-	DiskName    *string                      `json:"diskName,omitempty"`
-	DataDiskURI *string                      `json:"diskURI,omitempty"`
-	CachingMode *v1.AzureDataDiskCachingMode `json:"cachingMode,omitempty"`
-	FSType      *string                      `json:"fsType,omitempty"`
-	ReadOnly    *bool                        `json:"readOnly,omitempty"`
-	Kind        *v1.AzureDataDiskKind        `json:"kind,omitempty"`
+	DiskName    *string                      `json:"diskName,omitempty" protobuf:"bytes,1,opt,name=diskName"`
+	DataDiskURI *string                      `json:"diskURI,omitempty" protobuf:"bytes,2,opt,name=diskURI"`
+	CachingMode *v1.AzureDataDiskCachingMode `json:"cachingMode,omitempty" protobuf:"bytes,3,opt,name=cachingMode,casttype=k8s.io/api/core/v1.AzureDataDiskCachingMode"`
+	FSType      *string                      `json:"fsType,omitempty" protobuf:"bytes,4,opt,name=fsType"`
+	ReadOnly    *bool                        `json:"readOnly,omitempty" protobuf:"varint,5,opt,name=readOnly"`
+	Kind        *v1.AzureDataDiskKind        `json:"kind,omitempty" protobuf:"bytes,6,opt,name=kind,casttype=k8s.io/api/core/v1.AzureDataDiskKind"`
 }
 
 // AzureDiskVolumeSourceApplyConfiguration constructs an declarative configuration of the AzureDiskVolumeSource type for use with

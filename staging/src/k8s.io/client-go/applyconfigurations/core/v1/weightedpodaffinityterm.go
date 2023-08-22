@@ -21,8 +21,8 @@ package v1
 // WeightedPodAffinityTermApplyConfiguration represents an declarative configuration of the WeightedPodAffinityTerm type for use
 // with apply.
 type WeightedPodAffinityTermApplyConfiguration struct {
-	Weight          *int32                             `json:"weight,omitempty"`
-	PodAffinityTerm *PodAffinityTermApplyConfiguration `json:"podAffinityTerm,omitempty"`
+	Weight          *int32                             `json:"weight,omitempty" protobuf:"varint,1,opt,name=weight"`
+	PodAffinityTerm *PodAffinityTermApplyConfiguration `json:"podAffinityTerm,omitempty" protobuf:"bytes,2,opt,name=podAffinityTerm"`
 }
 
 // WeightedPodAffinityTermApplyConfiguration constructs an declarative configuration of the WeightedPodAffinityTerm type for use with

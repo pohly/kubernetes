@@ -21,7 +21,7 @@ package v1
 // DaemonEndpointApplyConfiguration represents an declarative configuration of the DaemonEndpoint type for use
 // with apply.
 type DaemonEndpointApplyConfiguration struct {
-	Port *int32 `json:"Port,omitempty"`
+	Port *int32 `json:"Port,omitempty" protobuf:"varint,1,opt,name=Port"`
 }
 
 // DaemonEndpointApplyConfiguration constructs an declarative configuration of the DaemonEndpoint type for use with

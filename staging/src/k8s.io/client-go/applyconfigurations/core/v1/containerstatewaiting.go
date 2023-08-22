@@ -21,8 +21,8 @@ package v1
 // ContainerStateWaitingApplyConfiguration represents an declarative configuration of the ContainerStateWaiting type for use
 // with apply.
 type ContainerStateWaitingApplyConfiguration struct {
-	Reason  *string `json:"reason,omitempty"`
-	Message *string `json:"message,omitempty"`
+	Reason  *string `json:"reason,omitempty" protobuf:"bytes,1,opt,name=reason"`
+	Message *string `json:"message,omitempty" protobuf:"bytes,2,opt,name=message"`
 }
 
 // ContainerStateWaitingApplyConfiguration constructs an declarative configuration of the ContainerStateWaiting type for use with

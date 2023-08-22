@@ -26,11 +26,11 @@ import (
 // HTTPGetActionApplyConfiguration represents an declarative configuration of the HTTPGetAction type for use
 // with apply.
 type HTTPGetActionApplyConfiguration struct {
-	Path        *string                        `json:"path,omitempty"`
-	Port        *intstr.IntOrString            `json:"port,omitempty"`
-	Host        *string                        `json:"host,omitempty"`
-	Scheme      *v1.URIScheme                  `json:"scheme,omitempty"`
-	HTTPHeaders []HTTPHeaderApplyConfiguration `json:"httpHeaders,omitempty"`
+	Path        *string                        `json:"path,omitempty" protobuf:"bytes,1,opt,name=path"`
+	Port        *intstr.IntOrString            `json:"port,omitempty" protobuf:"bytes,2,opt,name=port"`
+	Host        *string                        `json:"host,omitempty" protobuf:"bytes,3,opt,name=host"`
+	Scheme      *v1.URIScheme                  `json:"scheme,omitempty" protobuf:"bytes,4,opt,name=scheme,casttype=k8s.io/api/core/v1.URIScheme"`
+	HTTPHeaders []HTTPHeaderApplyConfiguration `json:"httpHeaders,omitempty" protobuf:"bytes,5,rep,name=httpHeaders"`
 }
 
 // HTTPGetActionApplyConfiguration constructs an declarative configuration of the HTTPGetAction type for use with

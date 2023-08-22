@@ -25,9 +25,9 @@ import (
 // ScopedResourceSelectorRequirementApplyConfiguration represents an declarative configuration of the ScopedResourceSelectorRequirement type for use
 // with apply.
 type ScopedResourceSelectorRequirementApplyConfiguration struct {
-	ScopeName *v1.ResourceQuotaScope    `json:"scopeName,omitempty"`
-	Operator  *v1.ScopeSelectorOperator `json:"operator,omitempty"`
-	Values    []string                  `json:"values,omitempty"`
+	ScopeName *v1.ResourceQuotaScope    `json:"scopeName,omitempty" protobuf:"bytes,1,opt,name=scopeName,casttype=k8s.io/api/core/v1.ResourceQuotaScope"`
+	Operator  *v1.ScopeSelectorOperator `json:"operator,omitempty" protobuf:"bytes,2,opt,name=operator,casttype=k8s.io/api/core/v1.ScopeSelectorOperator"`
+	Values    []string                  `json:"values,omitempty" protobuf:"bytes,3,rep,name=values"`
 }
 
 // ScopedResourceSelectorRequirementApplyConfiguration constructs an declarative configuration of the ScopedResourceSelectorRequirement type for use with

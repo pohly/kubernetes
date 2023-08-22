@@ -25,7 +25,7 @@ import (
 // ContainerStateRunningApplyConfiguration represents an declarative configuration of the ContainerStateRunning type for use
 // with apply.
 type ContainerStateRunningApplyConfiguration struct {
-	StartedAt *v1.Time `json:"startedAt,omitempty"`
+	StartedAt *v1.Time `json:"startedAt,omitempty" protobuf:"bytes,1,opt,name=startedAt"`
 }
 
 // ContainerStateRunningApplyConfiguration constructs an declarative configuration of the ContainerStateRunning type for use with

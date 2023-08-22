@@ -25,30 +25,30 @@ import (
 // EphemeralContainerCommonApplyConfiguration represents an declarative configuration of the EphemeralContainerCommon type for use
 // with apply.
 type EphemeralContainerCommonApplyConfiguration struct {
-	Name                     *string                                   `json:"name,omitempty"`
-	Image                    *string                                   `json:"image,omitempty"`
-	Command                  []string                                  `json:"command,omitempty"`
-	Args                     []string                                  `json:"args,omitempty"`
-	WorkingDir               *string                                   `json:"workingDir,omitempty"`
-	Ports                    []ContainerPortApplyConfiguration         `json:"ports,omitempty"`
-	EnvFrom                  []EnvFromSourceApplyConfiguration         `json:"envFrom,omitempty"`
-	Env                      []EnvVarApplyConfiguration                `json:"env,omitempty"`
-	Resources                *ResourceRequirementsApplyConfiguration   `json:"resources,omitempty"`
-	ResizePolicy             []ContainerResizePolicyApplyConfiguration `json:"resizePolicy,omitempty"`
-	RestartPolicy            *corev1.ContainerRestartPolicy            `json:"restartPolicy,omitempty"`
-	VolumeMounts             []VolumeMountApplyConfiguration           `json:"volumeMounts,omitempty"`
-	VolumeDevices            []VolumeDeviceApplyConfiguration          `json:"volumeDevices,omitempty"`
-	LivenessProbe            *ProbeApplyConfiguration                  `json:"livenessProbe,omitempty"`
-	ReadinessProbe           *ProbeApplyConfiguration                  `json:"readinessProbe,omitempty"`
-	StartupProbe             *ProbeApplyConfiguration                  `json:"startupProbe,omitempty"`
-	Lifecycle                *LifecycleApplyConfiguration              `json:"lifecycle,omitempty"`
-	TerminationMessagePath   *string                                   `json:"terminationMessagePath,omitempty"`
-	TerminationMessagePolicy *corev1.TerminationMessagePolicy          `json:"terminationMessagePolicy,omitempty"`
-	ImagePullPolicy          *corev1.PullPolicy                        `json:"imagePullPolicy,omitempty"`
-	SecurityContext          *SecurityContextApplyConfiguration        `json:"securityContext,omitempty"`
-	Stdin                    *bool                                     `json:"stdin,omitempty"`
-	StdinOnce                *bool                                     `json:"stdinOnce,omitempty"`
-	TTY                      *bool                                     `json:"tty,omitempty"`
+	Name                     *string                                   `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
+	Image                    *string                                   `json:"image,omitempty" protobuf:"bytes,2,opt,name=image"`
+	Command                  []string                                  `json:"command,omitempty" protobuf:"bytes,3,rep,name=command"`
+	Args                     []string                                  `json:"args,omitempty" protobuf:"bytes,4,rep,name=args"`
+	WorkingDir               *string                                   `json:"workingDir,omitempty" protobuf:"bytes,5,opt,name=workingDir"`
+	Ports                    []ContainerPortApplyConfiguration         `json:"ports,omitempty" protobuf:"bytes,6,rep,name=ports"`
+	EnvFrom                  []EnvFromSourceApplyConfiguration         `json:"envFrom,omitempty" protobuf:"bytes,7,rep,name=envFrom"`
+	Env                      []EnvVarApplyConfiguration                `json:"env,omitempty" protobuf:"bytes,8,rep,name=env"`
+	Resources                *ResourceRequirementsApplyConfiguration   `json:"resources,omitempty" protobuf:"bytes,9,opt,name=resources"`
+	ResizePolicy             []ContainerResizePolicyApplyConfiguration `json:"resizePolicy,omitempty" protobuf:"bytes,10,rep,name=resizePolicy"`
+	RestartPolicy            *corev1.ContainerRestartPolicy            `json:"restartPolicy,omitempty" protobuf:"bytes,11,opt,name=restartPolicy,casttype=k8s.io/api/core/v1.ContainerRestartPolicy"`
+	VolumeMounts             []VolumeMountApplyConfiguration           `json:"volumeMounts,omitempty" protobuf:"bytes,12,rep,name=volumeMounts"`
+	VolumeDevices            []VolumeDeviceApplyConfiguration          `json:"volumeDevices,omitempty" protobuf:"bytes,13,rep,name=volumeDevices"`
+	LivenessProbe            *ProbeApplyConfiguration                  `json:"livenessProbe,omitempty" protobuf:"bytes,14,opt,name=livenessProbe"`
+	ReadinessProbe           *ProbeApplyConfiguration                  `json:"readinessProbe,omitempty" protobuf:"bytes,15,opt,name=readinessProbe"`
+	StartupProbe             *ProbeApplyConfiguration                  `json:"startupProbe,omitempty" protobuf:"bytes,16,opt,name=startupProbe"`
+	Lifecycle                *LifecycleApplyConfiguration              `json:"lifecycle,omitempty" protobuf:"bytes,17,opt,name=lifecycle"`
+	TerminationMessagePath   *string                                   `json:"terminationMessagePath,omitempty" protobuf:"bytes,18,opt,name=terminationMessagePath"`
+	TerminationMessagePolicy *corev1.TerminationMessagePolicy          `json:"terminationMessagePolicy,omitempty" protobuf:"bytes,19,opt,name=terminationMessagePolicy,casttype=k8s.io/api/core/v1.TerminationMessagePolicy"`
+	ImagePullPolicy          *corev1.PullPolicy                        `json:"imagePullPolicy,omitempty" protobuf:"bytes,20,opt,name=imagePullPolicy,casttype=k8s.io/api/core/v1.PullPolicy"`
+	SecurityContext          *SecurityContextApplyConfiguration        `json:"securityContext,omitempty" protobuf:"bytes,21,opt,name=securityContext"`
+	Stdin                    *bool                                     `json:"stdin,omitempty" protobuf:"varint,22,opt,name=stdin"`
+	StdinOnce                *bool                                     `json:"stdinOnce,omitempty" protobuf:"varint,23,opt,name=stdinOnce"`
+	TTY                      *bool                                     `json:"tty,omitempty" protobuf:"varint,24,opt,name=tty"`
 }
 
 // EphemeralContainerCommonApplyConfiguration constructs an declarative configuration of the EphemeralContainerCommon type for use with

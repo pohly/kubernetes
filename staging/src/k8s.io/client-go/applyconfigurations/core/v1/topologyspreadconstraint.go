@@ -26,14 +26,14 @@ import (
 // TopologySpreadConstraintApplyConfiguration represents an declarative configuration of the TopologySpreadConstraint type for use
 // with apply.
 type TopologySpreadConstraintApplyConfiguration struct {
-	MaxSkew            *int32                                  `json:"maxSkew,omitempty"`
-	TopologyKey        *string                                 `json:"topologyKey,omitempty"`
-	WhenUnsatisfiable  *v1.UnsatisfiableConstraintAction       `json:"whenUnsatisfiable,omitempty"`
-	LabelSelector      *metav1.LabelSelectorApplyConfiguration `json:"labelSelector,omitempty"`
-	MinDomains         *int32                                  `json:"minDomains,omitempty"`
-	NodeAffinityPolicy *v1.NodeInclusionPolicy                 `json:"nodeAffinityPolicy,omitempty"`
-	NodeTaintsPolicy   *v1.NodeInclusionPolicy                 `json:"nodeTaintsPolicy,omitempty"`
-	MatchLabelKeys     []string                                `json:"matchLabelKeys,omitempty"`
+	MaxSkew            *int32                                  `json:"maxSkew,omitempty" protobuf:"varint,1,opt,name=maxSkew"`
+	TopologyKey        *string                                 `json:"topologyKey,omitempty" protobuf:"bytes,2,opt,name=topologyKey"`
+	WhenUnsatisfiable  *v1.UnsatisfiableConstraintAction       `json:"whenUnsatisfiable,omitempty" protobuf:"bytes,3,opt,name=whenUnsatisfiable,casttype=k8s.io/api/core/v1.UnsatisfiableConstraintAction"`
+	LabelSelector      *metav1.LabelSelectorApplyConfiguration `json:"labelSelector,omitempty" protobuf:"bytes,4,opt,name=labelSelector"`
+	MinDomains         *int32                                  `json:"minDomains,omitempty" protobuf:"varint,5,opt,name=minDomains"`
+	NodeAffinityPolicy *v1.NodeInclusionPolicy                 `json:"nodeAffinityPolicy,omitempty" protobuf:"bytes,6,opt,name=nodeAffinityPolicy,casttype=k8s.io/api/core/v1.NodeInclusionPolicy"`
+	NodeTaintsPolicy   *v1.NodeInclusionPolicy                 `json:"nodeTaintsPolicy,omitempty" protobuf:"bytes,7,opt,name=nodeTaintsPolicy,casttype=k8s.io/api/core/v1.NodeInclusionPolicy"`
+	MatchLabelKeys     []string                                `json:"matchLabelKeys,omitempty" protobuf:"bytes,8,rep,name=matchLabelKeys"`
 }
 
 // TopologySpreadConstraintApplyConfiguration constructs an declarative configuration of the TopologySpreadConstraint type for use with

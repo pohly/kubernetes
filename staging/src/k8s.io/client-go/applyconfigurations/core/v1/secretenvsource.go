@@ -21,8 +21,8 @@ package v1
 // SecretEnvSourceApplyConfiguration represents an declarative configuration of the SecretEnvSource type for use
 // with apply.
 type SecretEnvSourceApplyConfiguration struct {
-	LocalObjectReferenceApplyConfiguration `json:",inline"`
-	Optional                               *bool `json:"optional,omitempty"`
+	LocalObjectReferenceApplyConfiguration `json:",inline" protobuf:"bytes,1,opt,name=localObjectReferenceApplyConfiguration"`
+	Optional                               *bool `json:"optional,omitempty" protobuf:"varint,2,opt,name=optional"`
 }
 
 // SecretEnvSourceApplyConfiguration constructs an declarative configuration of the SecretEnvSource type for use with

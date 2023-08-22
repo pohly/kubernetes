@@ -30,9 +30,9 @@ import (
 // LimitRangeApplyConfiguration represents an declarative configuration of the LimitRange type for use
 // with apply.
 type LimitRangeApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *LimitRangeSpecApplyConfiguration `json:"spec,omitempty"`
+	v1.TypeMetaApplyConfiguration    `json:",inline" protobuf:"bytes,1,opt,name=typeMetaApplyConfiguration"`
+	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty" protobuf:"bytes,2,opt,name=metadata"`
+	Spec                             *LimitRangeSpecApplyConfiguration `json:"spec,omitempty" protobuf:"bytes,3,opt,name=spec"`
 }
 
 // LimitRange constructs an declarative configuration of the LimitRange type for use with

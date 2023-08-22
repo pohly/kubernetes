@@ -32,6 +32,7 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	resourcev1alpha2apply "k8s.io/client-go/applyconfigurations/resource/v1alpha2"
 	"k8s.io/client-go/informers"
@@ -806,9 +807,16 @@ func (ctrl *controller) syncPodSchedulingContexts(ctx context.Context, schedulin
 		logger.V(6).Info("Updating pod scheduling with modified unsuitable nodes", "podSchedulingCtx", schedulingCtx)
 		schedulingCtxApply := resourcev1alpha2apply.PodSchedulingContext(schedulingCtx.Name, schedulingCtx.Namespace).
 			WithStatus(resourcev1alpha2apply.PodSchedulingContextStatus().WithResourceClaims(claimsApply...))
-		if _, err := ctrl.kubeClient.ResourceV1alpha2().PodSchedulingContexts(schedulingCtx.Namespace).ApplyStatus(ctx, schedulingCtxApply, metav1.ApplyOptions{FieldManager: ctrl.name, Force: true}); err != nil {
+		data, err := schedulingCtxApply.Marshal()
+		if err != nil {
+			return err
+		}
+		if _, err := ctrl.kubeClient.ResourceV1alpha2().PodSchedulingContexts(schedulingCtx.Namespace).Patch(ctx, schedulingCtx.Name, types.StrategicMergePatchType /* TODO: types.ApplyPatchTypeGRPC */, data, metav1.PatchOptions{}, "status"); err != nil {
 			return fmt.Errorf("update unsuitable node status: %v", err)
 		}
+		// if _, err := ctrl.kubeClient.ResourceV1alpha2().PodSchedulingContexts(schedulingCtx.Namespace).ApplyStatus(ctx, schedulingCtxApply, metav1.ApplyOptions{FieldManager: ctrl.name, Force: true}); err != nil {
+		// 	return fmt.Errorf("update unsuitable node status: %v", err)
+		// }
 	}
 
 	// We must keep the object in our queue and keep updating the

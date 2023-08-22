@@ -21,10 +21,10 @@ package v1
 // VsphereVirtualDiskVolumeSourceApplyConfiguration represents an declarative configuration of the VsphereVirtualDiskVolumeSource type for use
 // with apply.
 type VsphereVirtualDiskVolumeSourceApplyConfiguration struct {
-	VolumePath        *string `json:"volumePath,omitempty"`
-	FSType            *string `json:"fsType,omitempty"`
-	StoragePolicyName *string `json:"storagePolicyName,omitempty"`
-	StoragePolicyID   *string `json:"storagePolicyID,omitempty"`
+	VolumePath        *string `json:"volumePath,omitempty" protobuf:"bytes,1,opt,name=volumePath"`
+	FSType            *string `json:"fsType,omitempty" protobuf:"bytes,2,opt,name=fsType"`
+	StoragePolicyName *string `json:"storagePolicyName,omitempty" protobuf:"bytes,3,opt,name=storagePolicyName"`
+	StoragePolicyID   *string `json:"storagePolicyID,omitempty" protobuf:"bytes,4,opt,name=storagePolicyID"`
 }
 
 // VsphereVirtualDiskVolumeSourceApplyConfiguration constructs an declarative configuration of the VsphereVirtualDiskVolumeSource type for use with

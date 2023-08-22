@@ -21,8 +21,8 @@ package v1
 // ContainerImageApplyConfiguration represents an declarative configuration of the ContainerImage type for use
 // with apply.
 type ContainerImageApplyConfiguration struct {
-	Names     []string `json:"names,omitempty"`
-	SizeBytes *int64   `json:"sizeBytes,omitempty"`
+	Names     []string `json:"names,omitempty" protobuf:"bytes,1,rep,name=names"`
+	SizeBytes *int64   `json:"sizeBytes,omitempty" protobuf:"varint,2,opt,name=sizeBytes"`
 }
 
 // ContainerImageApplyConfiguration constructs an declarative configuration of the ContainerImage type for use with

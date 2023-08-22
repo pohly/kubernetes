@@ -21,8 +21,8 @@ package v1
 // PhotonPersistentDiskVolumeSourceApplyConfiguration represents an declarative configuration of the PhotonPersistentDiskVolumeSource type for use
 // with apply.
 type PhotonPersistentDiskVolumeSourceApplyConfiguration struct {
-	PdID   *string `json:"pdID,omitempty"`
-	FSType *string `json:"fsType,omitempty"`
+	PdID   *string `json:"pdID,omitempty" protobuf:"bytes,1,opt,name=pdID"`
+	FSType *string `json:"fsType,omitempty" protobuf:"bytes,2,opt,name=fsType"`
 }
 
 // PhotonPersistentDiskVolumeSourceApplyConfiguration constructs an declarative configuration of the PhotonPersistentDiskVolumeSource type for use with

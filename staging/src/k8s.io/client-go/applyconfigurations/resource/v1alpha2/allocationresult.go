@@ -25,9 +25,9 @@ import (
 // AllocationResultApplyConfiguration represents an declarative configuration of the AllocationResult type for use
 // with apply.
 type AllocationResultApplyConfiguration struct {
-	ResourceHandles  []ResourceHandleApplyConfiguration `json:"resourceHandles,omitempty"`
-	AvailableOnNodes *v1.NodeSelectorApplyConfiguration `json:"availableOnNodes,omitempty"`
-	Shareable        *bool                              `json:"shareable,omitempty"`
+	ResourceHandles  []ResourceHandleApplyConfiguration `json:"resourceHandles,omitempty" protobuf:"bytes,1,rep,name=resourceHandles"`
+	AvailableOnNodes *v1.NodeSelectorApplyConfiguration `json:"availableOnNodes,omitempty" protobuf:"bytes,2,opt,name=availableOnNodes"`
+	Shareable        *bool                              `json:"shareable,omitempty" protobuf:"varint,3,opt,name=shareable"`
 }
 
 // AllocationResultApplyConfiguration constructs an declarative configuration of the AllocationResult type for use with

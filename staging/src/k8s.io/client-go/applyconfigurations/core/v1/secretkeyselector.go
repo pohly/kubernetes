@@ -21,9 +21,9 @@ package v1
 // SecretKeySelectorApplyConfiguration represents an declarative configuration of the SecretKeySelector type for use
 // with apply.
 type SecretKeySelectorApplyConfiguration struct {
-	LocalObjectReferenceApplyConfiguration `json:",inline"`
-	Key                                    *string `json:"key,omitempty"`
-	Optional                               *bool   `json:"optional,omitempty"`
+	LocalObjectReferenceApplyConfiguration `json:",inline" protobuf:"bytes,1,opt,name=localObjectReferenceApplyConfiguration"`
+	Key                                    *string `json:"key,omitempty" protobuf:"bytes,2,opt,name=key"`
+	Optional                               *bool   `json:"optional,omitempty" protobuf:"varint,3,opt,name=optional"`
 }
 
 // SecretKeySelectorApplyConfiguration constructs an declarative configuration of the SecretKeySelector type for use with

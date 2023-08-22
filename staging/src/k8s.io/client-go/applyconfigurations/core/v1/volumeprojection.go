@@ -21,10 +21,10 @@ package v1
 // VolumeProjectionApplyConfiguration represents an declarative configuration of the VolumeProjection type for use
 // with apply.
 type VolumeProjectionApplyConfiguration struct {
-	Secret              *SecretProjectionApplyConfiguration              `json:"secret,omitempty"`
-	DownwardAPI         *DownwardAPIProjectionApplyConfiguration         `json:"downwardAPI,omitempty"`
-	ConfigMap           *ConfigMapProjectionApplyConfiguration           `json:"configMap,omitempty"`
-	ServiceAccountToken *ServiceAccountTokenProjectionApplyConfiguration `json:"serviceAccountToken,omitempty"`
+	Secret              *SecretProjectionApplyConfiguration              `json:"secret,omitempty" protobuf:"bytes,1,opt,name=secret"`
+	DownwardAPI         *DownwardAPIProjectionApplyConfiguration         `json:"downwardAPI,omitempty" protobuf:"bytes,2,opt,name=downwardAPI"`
+	ConfigMap           *ConfigMapProjectionApplyConfiguration           `json:"configMap,omitempty" protobuf:"bytes,3,opt,name=configMap"`
+	ServiceAccountToken *ServiceAccountTokenProjectionApplyConfiguration `json:"serviceAccountToken,omitempty" protobuf:"bytes,4,opt,name=serviceAccountToken"`
 }
 
 // VolumeProjectionApplyConfiguration constructs an declarative configuration of the VolumeProjection type for use with

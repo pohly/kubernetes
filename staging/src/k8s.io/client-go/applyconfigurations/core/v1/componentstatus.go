@@ -30,9 +30,9 @@ import (
 // ComponentStatusApplyConfiguration represents an declarative configuration of the ComponentStatus type for use
 // with apply.
 type ComponentStatusApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Conditions                       []ComponentConditionApplyConfiguration `json:"conditions,omitempty"`
+	v1.TypeMetaApplyConfiguration    `json:",inline" protobuf:"bytes,1,opt,name=typeMetaApplyConfiguration"`
+	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty" protobuf:"bytes,2,opt,name=metadata"`
+	Conditions                       []ComponentConditionApplyConfiguration `json:"conditions,omitempty" protobuf:"bytes,3,rep,name=conditions"`
 }
 
 // ComponentStatus constructs an declarative configuration of the ComponentStatus type for use with

@@ -25,10 +25,10 @@ import (
 // ResourceClaimConsumerReferenceApplyConfiguration represents an declarative configuration of the ResourceClaimConsumerReference type for use
 // with apply.
 type ResourceClaimConsumerReferenceApplyConfiguration struct {
-	APIGroup *string    `json:"apiGroup,omitempty"`
-	Resource *string    `json:"resource,omitempty"`
-	Name     *string    `json:"name,omitempty"`
-	UID      *types.UID `json:"uid,omitempty"`
+	APIGroup *string    `json:"apiGroup,omitempty" protobuf:"bytes,1,opt,name=apiGroup"`
+	Resource *string    `json:"resource,omitempty" protobuf:"bytes,2,opt,name=resource"`
+	Name     *string    `json:"name,omitempty" protobuf:"bytes,3,opt,name=name"`
+	UID      *types.UID `json:"uid,omitempty" protobuf:"bytes,4,opt,name=uid,casttype=k8s.io/apimachinery/pkg/types.UID"`
 }
 
 // ResourceClaimConsumerReferenceApplyConfiguration constructs an declarative configuration of the ResourceClaimConsumerReference type for use with

@@ -30,9 +30,9 @@ import (
 // EndpointsApplyConfiguration represents an declarative configuration of the Endpoints type for use
 // with apply.
 type EndpointsApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Subsets                          []EndpointSubsetApplyConfiguration `json:"subsets,omitempty"`
+	v1.TypeMetaApplyConfiguration    `json:",inline" protobuf:"bytes,1,opt,name=typeMetaApplyConfiguration"`
+	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty" protobuf:"bytes,2,opt,name=metadata"`
+	Subsets                          []EndpointSubsetApplyConfiguration `json:"subsets,omitempty" protobuf:"bytes,3,rep,name=subsets"`
 }
 
 // Endpoints constructs an declarative configuration of the Endpoints type for use with

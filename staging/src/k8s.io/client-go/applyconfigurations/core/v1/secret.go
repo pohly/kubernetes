@@ -30,12 +30,12 @@ import (
 // SecretApplyConfiguration represents an declarative configuration of the Secret type for use
 // with apply.
 type SecretApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Immutable                        *bool              `json:"immutable,omitempty"`
-	Data                             map[string][]byte  `json:"data,omitempty"`
-	StringData                       map[string]string  `json:"stringData,omitempty"`
-	Type                             *corev1.SecretType `json:"type,omitempty"`
+	v1.TypeMetaApplyConfiguration    `json:",inline" protobuf:"bytes,1,opt,name=typeMetaApplyConfiguration"`
+	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty" protobuf:"bytes,2,opt,name=metadata"`
+	Immutable                        *bool              `json:"immutable,omitempty" protobuf:"varint,3,opt,name=immutable"`
+	Data                             map[string][]byte  `json:"data,omitempty" protobuf:"bytes,4,rep,name=data"`
+	StringData                       map[string]string  `json:"stringData,omitempty" protobuf:"bytes,5,rep,name=stringData"`
+	Type                             *corev1.SecretType `json:"type,omitempty" protobuf:"bytes,6,opt,name=type,casttype=k8s.io/api/core/v1.SecretType"`
 }
 
 // Secret constructs an declarative configuration of the Secret type for use with

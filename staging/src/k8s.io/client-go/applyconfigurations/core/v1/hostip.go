@@ -21,7 +21,7 @@ package v1
 // HostIPApplyConfiguration represents an declarative configuration of the HostIP type for use
 // with apply.
 type HostIPApplyConfiguration struct {
-	IP *string `json:"ip,omitempty"`
+	IP *string `json:"ip,omitempty" protobuf:"bytes,1,opt,name=ip"`
 }
 
 // HostIPApplyConfiguration constructs an declarative configuration of the HostIP type for use with

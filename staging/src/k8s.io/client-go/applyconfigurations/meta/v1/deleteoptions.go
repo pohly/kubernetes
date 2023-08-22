@@ -25,12 +25,12 @@ import (
 // DeleteOptionsApplyConfiguration represents an declarative configuration of the DeleteOptions type for use
 // with apply.
 type DeleteOptionsApplyConfiguration struct {
-	TypeMetaApplyConfiguration `json:",inline"`
-	GracePeriodSeconds         *int64                           `json:"gracePeriodSeconds,omitempty"`
-	Preconditions              *PreconditionsApplyConfiguration `json:"preconditions,omitempty"`
-	OrphanDependents           *bool                            `json:"orphanDependents,omitempty"`
-	PropagationPolicy          *metav1.DeletionPropagation      `json:"propagationPolicy,omitempty"`
-	DryRun                     []string                         `json:"dryRun,omitempty"`
+	TypeMetaApplyConfiguration `json:",inline" protobuf:"bytes,1,opt,name=typeMetaApplyConfiguration"`
+	GracePeriodSeconds         *int64                           `json:"gracePeriodSeconds,omitempty" protobuf:"varint,2,opt,name=gracePeriodSeconds"`
+	Preconditions              *PreconditionsApplyConfiguration `json:"preconditions,omitempty" protobuf:"bytes,3,opt,name=preconditions"`
+	OrphanDependents           *bool                            `json:"orphanDependents,omitempty" protobuf:"varint,4,opt,name=orphanDependents"`
+	PropagationPolicy          *metav1.DeletionPropagation      `json:"propagationPolicy,omitempty" protobuf:"bytes,5,opt,name=propagationPolicy,casttype=k8s.io/apimachinery/pkg/apis/meta/v1.DeletionPropagation"`
+	DryRun                     []string                         `json:"dryRun,omitempty" protobuf:"bytes,6,rep,name=dryRun"`
 }
 
 // DeleteOptionsApplyConfiguration constructs an declarative configuration of the DeleteOptions type for use with

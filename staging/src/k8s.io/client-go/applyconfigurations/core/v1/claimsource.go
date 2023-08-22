@@ -21,8 +21,8 @@ package v1
 // ClaimSourceApplyConfiguration represents an declarative configuration of the ClaimSource type for use
 // with apply.
 type ClaimSourceApplyConfiguration struct {
-	ResourceClaimName         *string `json:"resourceClaimName,omitempty"`
-	ResourceClaimTemplateName *string `json:"resourceClaimTemplateName,omitempty"`
+	ResourceClaimName         *string `json:"resourceClaimName,omitempty" protobuf:"bytes,1,opt,name=resourceClaimName"`
+	ResourceClaimTemplateName *string `json:"resourceClaimTemplateName,omitempty" protobuf:"bytes,2,opt,name=resourceClaimTemplateName"`
 }
 
 // ClaimSourceApplyConfiguration constructs an declarative configuration of the ClaimSource type for use with

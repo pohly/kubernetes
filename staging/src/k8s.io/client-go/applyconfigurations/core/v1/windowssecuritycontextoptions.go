@@ -21,10 +21,10 @@ package v1
 // WindowsSecurityContextOptionsApplyConfiguration represents an declarative configuration of the WindowsSecurityContextOptions type for use
 // with apply.
 type WindowsSecurityContextOptionsApplyConfiguration struct {
-	GMSACredentialSpecName *string `json:"gmsaCredentialSpecName,omitempty"`
-	GMSACredentialSpec     *string `json:"gmsaCredentialSpec,omitempty"`
-	RunAsUserName          *string `json:"runAsUserName,omitempty"`
-	HostProcess            *bool   `json:"hostProcess,omitempty"`
+	GMSACredentialSpecName *string `json:"gmsaCredentialSpecName,omitempty" protobuf:"bytes,1,opt,name=gmsaCredentialSpecName"`
+	GMSACredentialSpec     *string `json:"gmsaCredentialSpec,omitempty" protobuf:"bytes,2,opt,name=gmsaCredentialSpec"`
+	RunAsUserName          *string `json:"runAsUserName,omitempty" protobuf:"bytes,3,opt,name=runAsUserName"`
+	HostProcess            *bool   `json:"hostProcess,omitempty" protobuf:"varint,4,opt,name=hostProcess"`
 }
 
 // WindowsSecurityContextOptionsApplyConfiguration constructs an declarative configuration of the WindowsSecurityContextOptions type for use with

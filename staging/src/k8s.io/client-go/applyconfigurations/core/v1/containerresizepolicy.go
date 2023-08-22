@@ -25,8 +25,8 @@ import (
 // ContainerResizePolicyApplyConfiguration represents an declarative configuration of the ContainerResizePolicy type for use
 // with apply.
 type ContainerResizePolicyApplyConfiguration struct {
-	ResourceName  *v1.ResourceName                `json:"resourceName,omitempty"`
-	RestartPolicy *v1.ResourceResizeRestartPolicy `json:"restartPolicy,omitempty"`
+	ResourceName  *v1.ResourceName                `json:"resourceName,omitempty" protobuf:"bytes,1,opt,name=resourceName,casttype=k8s.io/api/core/v1.ResourceName"`
+	RestartPolicy *v1.ResourceResizeRestartPolicy `json:"restartPolicy,omitempty" protobuf:"bytes,2,opt,name=restartPolicy,casttype=k8s.io/api/core/v1.ResourceResizeRestartPolicy"`
 }
 
 // ContainerResizePolicyApplyConfiguration constructs an declarative configuration of the ContainerResizePolicy type for use with

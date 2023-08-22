@@ -21,16 +21,16 @@ package v1
 // NodeSystemInfoApplyConfiguration represents an declarative configuration of the NodeSystemInfo type for use
 // with apply.
 type NodeSystemInfoApplyConfiguration struct {
-	MachineID               *string `json:"machineID,omitempty"`
-	SystemUUID              *string `json:"systemUUID,omitempty"`
-	BootID                  *string `json:"bootID,omitempty"`
-	KernelVersion           *string `json:"kernelVersion,omitempty"`
-	OSImage                 *string `json:"osImage,omitempty"`
-	ContainerRuntimeVersion *string `json:"containerRuntimeVersion,omitempty"`
-	KubeletVersion          *string `json:"kubeletVersion,omitempty"`
-	KubeProxyVersion        *string `json:"kubeProxyVersion,omitempty"`
-	OperatingSystem         *string `json:"operatingSystem,omitempty"`
-	Architecture            *string `json:"architecture,omitempty"`
+	MachineID               *string `json:"machineID,omitempty" protobuf:"bytes,1,opt,name=machineID"`
+	SystemUUID              *string `json:"systemUUID,omitempty" protobuf:"bytes,2,opt,name=systemUUID"`
+	BootID                  *string `json:"bootID,omitempty" protobuf:"bytes,3,opt,name=bootID"`
+	KernelVersion           *string `json:"kernelVersion,omitempty" protobuf:"bytes,4,opt,name=kernelVersion"`
+	OSImage                 *string `json:"osImage,omitempty" protobuf:"bytes,5,opt,name=osImage"`
+	ContainerRuntimeVersion *string `json:"containerRuntimeVersion,omitempty" protobuf:"bytes,6,opt,name=containerRuntimeVersion"`
+	KubeletVersion          *string `json:"kubeletVersion,omitempty" protobuf:"bytes,7,opt,name=kubeletVersion"`
+	KubeProxyVersion        *string `json:"kubeProxyVersion,omitempty" protobuf:"bytes,8,opt,name=kubeProxyVersion"`
+	OperatingSystem         *string `json:"operatingSystem,omitempty" protobuf:"bytes,9,opt,name=operatingSystem"`
+	Architecture            *string `json:"architecture,omitempty" protobuf:"bytes,10,opt,name=architecture"`
 }
 
 // NodeSystemInfoApplyConfiguration constructs an declarative configuration of the NodeSystemInfo type for use with

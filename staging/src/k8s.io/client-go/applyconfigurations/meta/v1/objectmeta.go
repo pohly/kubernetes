@@ -26,19 +26,19 @@ import (
 // ObjectMetaApplyConfiguration represents an declarative configuration of the ObjectMeta type for use
 // with apply.
 type ObjectMetaApplyConfiguration struct {
-	Name                       *string                            `json:"name,omitempty"`
-	GenerateName               *string                            `json:"generateName,omitempty"`
-	Namespace                  *string                            `json:"namespace,omitempty"`
-	UID                        *types.UID                         `json:"uid,omitempty"`
-	ResourceVersion            *string                            `json:"resourceVersion,omitempty"`
-	Generation                 *int64                             `json:"generation,omitempty"`
-	CreationTimestamp          *v1.Time                           `json:"creationTimestamp,omitempty"`
-	DeletionTimestamp          *v1.Time                           `json:"deletionTimestamp,omitempty"`
-	DeletionGracePeriodSeconds *int64                             `json:"deletionGracePeriodSeconds,omitempty"`
-	Labels                     map[string]string                  `json:"labels,omitempty"`
-	Annotations                map[string]string                  `json:"annotations,omitempty"`
-	OwnerReferences            []OwnerReferenceApplyConfiguration `json:"ownerReferences,omitempty"`
-	Finalizers                 []string                           `json:"finalizers,omitempty"`
+	Name                       *string                            `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
+	GenerateName               *string                            `json:"generateName,omitempty" protobuf:"bytes,2,opt,name=generateName"`
+	Namespace                  *string                            `json:"namespace,omitempty" protobuf:"bytes,3,opt,name=namespace"`
+	UID                        *types.UID                         `json:"uid,omitempty" protobuf:"bytes,4,opt,name=uid,casttype=k8s.io/apimachinery/pkg/types.UID"`
+	ResourceVersion            *string                            `json:"resourceVersion,omitempty" protobuf:"bytes,5,opt,name=resourceVersion"`
+	Generation                 *int64                             `json:"generation,omitempty" protobuf:"varint,6,opt,name=generation"`
+	CreationTimestamp          *v1.Time                           `json:"creationTimestamp,omitempty" protobuf:"bytes,7,opt,name=creationTimestamp"`
+	DeletionTimestamp          *v1.Time                           `json:"deletionTimestamp,omitempty" protobuf:"bytes,8,opt,name=deletionTimestamp"`
+	DeletionGracePeriodSeconds *int64                             `json:"deletionGracePeriodSeconds,omitempty" protobuf:"varint,9,opt,name=deletionGracePeriodSeconds"`
+	Labels                     map[string]string                  `json:"labels,omitempty" protobuf:"bytes,10,rep,name=labels"`
+	Annotations                map[string]string                  `json:"annotations,omitempty" protobuf:"bytes,11,rep,name=annotations"`
+	OwnerReferences            []OwnerReferenceApplyConfiguration `json:"ownerReferences,omitempty" protobuf:"bytes,12,rep,name=ownerReferences"`
+	Finalizers                 []string                           `json:"finalizers,omitempty" protobuf:"bytes,13,rep,name=finalizers"`
 }
 
 // ObjectMetaApplyConfiguration constructs an declarative configuration of the ObjectMeta type for use with

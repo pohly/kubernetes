@@ -21,7 +21,7 @@ package v1
 // NodeConfigSourceApplyConfiguration represents an declarative configuration of the NodeConfigSource type for use
 // with apply.
 type NodeConfigSourceApplyConfiguration struct {
-	ConfigMap *ConfigMapNodeConfigSourceApplyConfiguration `json:"configMap,omitempty"`
+	ConfigMap *ConfigMapNodeConfigSourceApplyConfiguration `json:"configMap,omitempty" protobuf:"bytes,1,opt,name=configMap"`
 }
 
 // NodeConfigSourceApplyConfiguration constructs an declarative configuration of the NodeConfigSource type for use with

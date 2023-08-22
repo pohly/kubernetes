@@ -21,8 +21,8 @@ package v1
 // NodeAffinityApplyConfiguration represents an declarative configuration of the NodeAffinity type for use
 // with apply.
 type NodeAffinityApplyConfiguration struct {
-	RequiredDuringSchedulingIgnoredDuringExecution  *NodeSelectorApplyConfiguration             `json:"requiredDuringSchedulingIgnoredDuringExecution,omitempty"`
-	PreferredDuringSchedulingIgnoredDuringExecution []PreferredSchedulingTermApplyConfiguration `json:"preferredDuringSchedulingIgnoredDuringExecution,omitempty"`
+	RequiredDuringSchedulingIgnoredDuringExecution  *NodeSelectorApplyConfiguration             `json:"requiredDuringSchedulingIgnoredDuringExecution,omitempty" protobuf:"bytes,1,opt,name=requiredDuringSchedulingIgnoredDuringExecution"`
+	PreferredDuringSchedulingIgnoredDuringExecution []PreferredSchedulingTermApplyConfiguration `json:"preferredDuringSchedulingIgnoredDuringExecution,omitempty" protobuf:"bytes,2,rep,name=preferredDuringSchedulingIgnoredDuringExecution"`
 }
 
 // NodeAffinityApplyConfiguration constructs an declarative configuration of the NodeAffinity type for use with

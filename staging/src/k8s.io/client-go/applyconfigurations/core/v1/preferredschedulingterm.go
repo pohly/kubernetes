@@ -21,8 +21,8 @@ package v1
 // PreferredSchedulingTermApplyConfiguration represents an declarative configuration of the PreferredSchedulingTerm type for use
 // with apply.
 type PreferredSchedulingTermApplyConfiguration struct {
-	Weight     *int32                              `json:"weight,omitempty"`
-	Preference *NodeSelectorTermApplyConfiguration `json:"preference,omitempty"`
+	Weight     *int32                              `json:"weight,omitempty" protobuf:"varint,1,opt,name=weight"`
+	Preference *NodeSelectorTermApplyConfiguration `json:"preference,omitempty" protobuf:"bytes,2,opt,name=preference"`
 }
 
 // PreferredSchedulingTermApplyConfiguration constructs an declarative configuration of the PreferredSchedulingTerm type for use with

@@ -25,16 +25,16 @@ import (
 // PodSecurityContextApplyConfiguration represents an declarative configuration of the PodSecurityContext type for use
 // with apply.
 type PodSecurityContextApplyConfiguration struct {
-	SELinuxOptions      *SELinuxOptionsApplyConfiguration                `json:"seLinuxOptions,omitempty"`
-	WindowsOptions      *WindowsSecurityContextOptionsApplyConfiguration `json:"windowsOptions,omitempty"`
-	RunAsUser           *int64                                           `json:"runAsUser,omitempty"`
-	RunAsGroup          *int64                                           `json:"runAsGroup,omitempty"`
-	RunAsNonRoot        *bool                                            `json:"runAsNonRoot,omitempty"`
-	SupplementalGroups  []int64                                          `json:"supplementalGroups,omitempty"`
-	FSGroup             *int64                                           `json:"fsGroup,omitempty"`
-	Sysctls             []SysctlApplyConfiguration                       `json:"sysctls,omitempty"`
-	FSGroupChangePolicy *corev1.PodFSGroupChangePolicy                   `json:"fsGroupChangePolicy,omitempty"`
-	SeccompProfile      *SeccompProfileApplyConfiguration                `json:"seccompProfile,omitempty"`
+	SELinuxOptions      *SELinuxOptionsApplyConfiguration                `json:"seLinuxOptions,omitempty" protobuf:"bytes,1,opt,name=seLinuxOptions"`
+	WindowsOptions      *WindowsSecurityContextOptionsApplyConfiguration `json:"windowsOptions,omitempty" protobuf:"bytes,2,opt,name=windowsOptions"`
+	RunAsUser           *int64                                           `json:"runAsUser,omitempty" protobuf:"varint,3,opt,name=runAsUser"`
+	RunAsGroup          *int64                                           `json:"runAsGroup,omitempty" protobuf:"varint,4,opt,name=runAsGroup"`
+	RunAsNonRoot        *bool                                            `json:"runAsNonRoot,omitempty" protobuf:"varint,5,opt,name=runAsNonRoot"`
+	SupplementalGroups  []int64                                          `json:"supplementalGroups,omitempty" protobuf:"varint,6,rep,name=supplementalGroups"`
+	FSGroup             *int64                                           `json:"fsGroup,omitempty" protobuf:"varint,7,opt,name=fsGroup"`
+	Sysctls             []SysctlApplyConfiguration                       `json:"sysctls,omitempty" protobuf:"bytes,8,rep,name=sysctls"`
+	FSGroupChangePolicy *corev1.PodFSGroupChangePolicy                   `json:"fsGroupChangePolicy,omitempty" protobuf:"bytes,9,opt,name=fsGroupChangePolicy,casttype=k8s.io/api/core/v1.PodFSGroupChangePolicy"`
+	SeccompProfile      *SeccompProfileApplyConfiguration                `json:"seccompProfile,omitempty" protobuf:"bytes,10,opt,name=seccompProfile"`
 }
 
 // PodSecurityContextApplyConfiguration constructs an declarative configuration of the PodSecurityContext type for use with

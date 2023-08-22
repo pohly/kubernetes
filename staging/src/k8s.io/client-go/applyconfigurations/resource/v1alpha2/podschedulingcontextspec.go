@@ -21,8 +21,8 @@ package v1alpha2
 // PodSchedulingContextSpecApplyConfiguration represents an declarative configuration of the PodSchedulingContextSpec type for use
 // with apply.
 type PodSchedulingContextSpecApplyConfiguration struct {
-	SelectedNode   *string  `json:"selectedNode,omitempty"`
-	PotentialNodes []string `json:"potentialNodes,omitempty"`
+	SelectedNode   *string  `json:"selectedNode,omitempty" protobuf:"bytes,1,opt,name=selectedNode"`
+	PotentialNodes []string `json:"potentialNodes,omitempty" protobuf:"bytes,2,rep,name=potentialNodes"`
 }
 
 // PodSchedulingContextSpecApplyConfiguration constructs an declarative configuration of the PodSchedulingContextSpec type for use with

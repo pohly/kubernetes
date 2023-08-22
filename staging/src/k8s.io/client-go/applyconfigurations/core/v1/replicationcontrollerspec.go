@@ -21,10 +21,10 @@ package v1
 // ReplicationControllerSpecApplyConfiguration represents an declarative configuration of the ReplicationControllerSpec type for use
 // with apply.
 type ReplicationControllerSpecApplyConfiguration struct {
-	Replicas        *int32                             `json:"replicas,omitempty"`
-	MinReadySeconds *int32                             `json:"minReadySeconds,omitempty"`
-	Selector        map[string]string                  `json:"selector,omitempty"`
-	Template        *PodTemplateSpecApplyConfiguration `json:"template,omitempty"`
+	Replicas        *int32                             `json:"replicas,omitempty" protobuf:"varint,1,opt,name=replicas"`
+	MinReadySeconds *int32                             `json:"minReadySeconds,omitempty" protobuf:"varint,2,opt,name=minReadySeconds"`
+	Selector        map[string]string                  `json:"selector,omitempty" protobuf:"bytes,3,rep,name=selector"`
+	Template        *PodTemplateSpecApplyConfiguration `json:"template,omitempty" protobuf:"bytes,4,opt,name=template"`
 }
 
 // ReplicationControllerSpecApplyConfiguration constructs an declarative configuration of the ReplicationControllerSpec type for use with

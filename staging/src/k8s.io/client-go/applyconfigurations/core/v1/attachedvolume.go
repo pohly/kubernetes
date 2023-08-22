@@ -25,8 +25,8 @@ import (
 // AttachedVolumeApplyConfiguration represents an declarative configuration of the AttachedVolume type for use
 // with apply.
 type AttachedVolumeApplyConfiguration struct {
-	Name       *v1.UniqueVolumeName `json:"name,omitempty"`
-	DevicePath *string              `json:"devicePath,omitempty"`
+	Name       *v1.UniqueVolumeName `json:"name,omitempty" protobuf:"bytes,1,opt,name=name,casttype=k8s.io/api/core/v1.UniqueVolumeName"`
+	DevicePath *string              `json:"devicePath,omitempty" protobuf:"bytes,2,opt,name=devicePath"`
 }
 
 // AttachedVolumeApplyConfiguration constructs an declarative configuration of the AttachedVolume type for use with

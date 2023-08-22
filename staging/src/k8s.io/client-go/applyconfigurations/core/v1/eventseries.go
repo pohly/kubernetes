@@ -25,8 +25,8 @@ import (
 // EventSeriesApplyConfiguration represents an declarative configuration of the EventSeries type for use
 // with apply.
 type EventSeriesApplyConfiguration struct {
-	Count            *int32        `json:"count,omitempty"`
-	LastObservedTime *v1.MicroTime `json:"lastObservedTime,omitempty"`
+	Count            *int32        `json:"count,omitempty" protobuf:"varint,1,opt,name=count"`
+	LastObservedTime *v1.MicroTime `json:"lastObservedTime,omitempty" protobuf:"bytes,2,opt,name=lastObservedTime"`
 }
 
 // EventSeriesApplyConfiguration constructs an declarative configuration of the EventSeries type for use with

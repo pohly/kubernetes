@@ -21,10 +21,10 @@ package v1alpha2
 // ResourceClaimStatusApplyConfiguration represents an declarative configuration of the ResourceClaimStatus type for use
 // with apply.
 type ResourceClaimStatusApplyConfiguration struct {
-	DriverName            *string                                            `json:"driverName,omitempty"`
-	Allocation            *AllocationResultApplyConfiguration                `json:"allocation,omitempty"`
-	ReservedFor           []ResourceClaimConsumerReferenceApplyConfiguration `json:"reservedFor,omitempty"`
-	DeallocationRequested *bool                                              `json:"deallocationRequested,omitempty"`
+	DriverName            *string                                            `json:"driverName,omitempty" protobuf:"bytes,1,opt,name=driverName"`
+	Allocation            *AllocationResultApplyConfiguration                `json:"allocation,omitempty" protobuf:"bytes,2,opt,name=allocation"`
+	ReservedFor           []ResourceClaimConsumerReferenceApplyConfiguration `json:"reservedFor,omitempty" protobuf:"bytes,3,rep,name=reservedFor"`
+	DeallocationRequested *bool                                              `json:"deallocationRequested,omitempty" protobuf:"varint,4,opt,name=deallocationRequested"`
 }
 
 // ResourceClaimStatusApplyConfiguration constructs an declarative configuration of the ResourceClaimStatus type for use with

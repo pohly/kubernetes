@@ -21,9 +21,9 @@ package v1
 // GlusterfsVolumeSourceApplyConfiguration represents an declarative configuration of the GlusterfsVolumeSource type for use
 // with apply.
 type GlusterfsVolumeSourceApplyConfiguration struct {
-	EndpointsName *string `json:"endpoints,omitempty"`
-	Path          *string `json:"path,omitempty"`
-	ReadOnly      *bool   `json:"readOnly,omitempty"`
+	EndpointsName *string `json:"endpoints,omitempty" protobuf:"bytes,1,opt,name=endpoints"`
+	Path          *string `json:"path,omitempty" protobuf:"bytes,2,opt,name=path"`
+	ReadOnly      *bool   `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
 }
 
 // GlusterfsVolumeSourceApplyConfiguration constructs an declarative configuration of the GlusterfsVolumeSource type for use with

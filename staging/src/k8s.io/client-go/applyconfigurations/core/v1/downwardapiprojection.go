@@ -21,7 +21,7 @@ package v1
 // DownwardAPIProjectionApplyConfiguration represents an declarative configuration of the DownwardAPIProjection type for use
 // with apply.
 type DownwardAPIProjectionApplyConfiguration struct {
-	Items []DownwardAPIVolumeFileApplyConfiguration `json:"items,omitempty"`
+	Items []DownwardAPIVolumeFileApplyConfiguration `json:"items,omitempty" protobuf:"bytes,1,rep,name=items"`
 }
 
 // DownwardAPIProjectionApplyConfiguration constructs an declarative configuration of the DownwardAPIProjection type for use with

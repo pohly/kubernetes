@@ -25,8 +25,8 @@ import (
 // PreconditionsApplyConfiguration represents an declarative configuration of the Preconditions type for use
 // with apply.
 type PreconditionsApplyConfiguration struct {
-	UID             *types.UID `json:"uid,omitempty"`
-	ResourceVersion *string    `json:"resourceVersion,omitempty"`
+	UID             *types.UID `json:"uid,omitempty" protobuf:"bytes,1,opt,name=uid,casttype=k8s.io/apimachinery/pkg/types.UID"`
+	ResourceVersion *string    `json:"resourceVersion,omitempty" protobuf:"bytes,2,opt,name=resourceVersion"`
 }
 
 // PreconditionsApplyConfiguration constructs an declarative configuration of the Preconditions type for use with

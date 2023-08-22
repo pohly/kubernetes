@@ -21,8 +21,8 @@ package v1
 // VolumeDeviceApplyConfiguration represents an declarative configuration of the VolumeDevice type for use
 // with apply.
 type VolumeDeviceApplyConfiguration struct {
-	Name       *string `json:"name,omitempty"`
-	DevicePath *string `json:"devicePath,omitempty"`
+	Name       *string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
+	DevicePath *string `json:"devicePath,omitempty" protobuf:"bytes,2,opt,name=devicePath"`
 }
 
 // VolumeDeviceApplyConfiguration constructs an declarative configuration of the VolumeDevice type for use with

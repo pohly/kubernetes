@@ -21,12 +21,12 @@ package v1
 // QuobyteVolumeSourceApplyConfiguration represents an declarative configuration of the QuobyteVolumeSource type for use
 // with apply.
 type QuobyteVolumeSourceApplyConfiguration struct {
-	Registry *string `json:"registry,omitempty"`
-	Volume   *string `json:"volume,omitempty"`
-	ReadOnly *bool   `json:"readOnly,omitempty"`
-	User     *string `json:"user,omitempty"`
-	Group    *string `json:"group,omitempty"`
-	Tenant   *string `json:"tenant,omitempty"`
+	Registry *string `json:"registry,omitempty" protobuf:"bytes,1,opt,name=registry"`
+	Volume   *string `json:"volume,omitempty" protobuf:"bytes,2,opt,name=volume"`
+	ReadOnly *bool   `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
+	User     *string `json:"user,omitempty" protobuf:"bytes,4,opt,name=user"`
+	Group    *string `json:"group,omitempty" protobuf:"bytes,5,opt,name=group"`
+	Tenant   *string `json:"tenant,omitempty" protobuf:"bytes,6,opt,name=tenant"`
 }
 
 // QuobyteVolumeSourceApplyConfiguration constructs an declarative configuration of the QuobyteVolumeSource type for use with

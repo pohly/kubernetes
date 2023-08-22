@@ -21,35 +21,35 @@ package v1
 // VolumeSourceApplyConfiguration represents an declarative configuration of the VolumeSource type for use
 // with apply.
 type VolumeSourceApplyConfiguration struct {
-	HostPath              *HostPathVolumeSourceApplyConfiguration              `json:"hostPath,omitempty"`
-	EmptyDir              *EmptyDirVolumeSourceApplyConfiguration              `json:"emptyDir,omitempty"`
-	GCEPersistentDisk     *GCEPersistentDiskVolumeSourceApplyConfiguration     `json:"gcePersistentDisk,omitempty"`
-	AWSElasticBlockStore  *AWSElasticBlockStoreVolumeSourceApplyConfiguration  `json:"awsElasticBlockStore,omitempty"`
-	GitRepo               *GitRepoVolumeSourceApplyConfiguration               `json:"gitRepo,omitempty"`
-	Secret                *SecretVolumeSourceApplyConfiguration                `json:"secret,omitempty"`
-	NFS                   *NFSVolumeSourceApplyConfiguration                   `json:"nfs,omitempty"`
-	ISCSI                 *ISCSIVolumeSourceApplyConfiguration                 `json:"iscsi,omitempty"`
-	Glusterfs             *GlusterfsVolumeSourceApplyConfiguration             `json:"glusterfs,omitempty"`
-	PersistentVolumeClaim *PersistentVolumeClaimVolumeSourceApplyConfiguration `json:"persistentVolumeClaim,omitempty"`
-	RBD                   *RBDVolumeSourceApplyConfiguration                   `json:"rbd,omitempty"`
-	FlexVolume            *FlexVolumeSourceApplyConfiguration                  `json:"flexVolume,omitempty"`
-	Cinder                *CinderVolumeSourceApplyConfiguration                `json:"cinder,omitempty"`
-	CephFS                *CephFSVolumeSourceApplyConfiguration                `json:"cephfs,omitempty"`
-	Flocker               *FlockerVolumeSourceApplyConfiguration               `json:"flocker,omitempty"`
-	DownwardAPI           *DownwardAPIVolumeSourceApplyConfiguration           `json:"downwardAPI,omitempty"`
-	FC                    *FCVolumeSourceApplyConfiguration                    `json:"fc,omitempty"`
-	AzureFile             *AzureFileVolumeSourceApplyConfiguration             `json:"azureFile,omitempty"`
-	ConfigMap             *ConfigMapVolumeSourceApplyConfiguration             `json:"configMap,omitempty"`
-	VsphereVolume         *VsphereVirtualDiskVolumeSourceApplyConfiguration    `json:"vsphereVolume,omitempty"`
-	Quobyte               *QuobyteVolumeSourceApplyConfiguration               `json:"quobyte,omitempty"`
-	AzureDisk             *AzureDiskVolumeSourceApplyConfiguration             `json:"azureDisk,omitempty"`
-	PhotonPersistentDisk  *PhotonPersistentDiskVolumeSourceApplyConfiguration  `json:"photonPersistentDisk,omitempty"`
-	Projected             *ProjectedVolumeSourceApplyConfiguration             `json:"projected,omitempty"`
-	PortworxVolume        *PortworxVolumeSourceApplyConfiguration              `json:"portworxVolume,omitempty"`
-	ScaleIO               *ScaleIOVolumeSourceApplyConfiguration               `json:"scaleIO,omitempty"`
-	StorageOS             *StorageOSVolumeSourceApplyConfiguration             `json:"storageos,omitempty"`
-	CSI                   *CSIVolumeSourceApplyConfiguration                   `json:"csi,omitempty"`
-	Ephemeral             *EphemeralVolumeSourceApplyConfiguration             `json:"ephemeral,omitempty"`
+	HostPath              *HostPathVolumeSourceApplyConfiguration              `json:"hostPath,omitempty" protobuf:"bytes,1,opt,name=hostPath"`
+	EmptyDir              *EmptyDirVolumeSourceApplyConfiguration              `json:"emptyDir,omitempty" protobuf:"bytes,2,opt,name=emptyDir"`
+	GCEPersistentDisk     *GCEPersistentDiskVolumeSourceApplyConfiguration     `json:"gcePersistentDisk,omitempty" protobuf:"bytes,3,opt,name=gcePersistentDisk"`
+	AWSElasticBlockStore  *AWSElasticBlockStoreVolumeSourceApplyConfiguration  `json:"awsElasticBlockStore,omitempty" protobuf:"bytes,4,opt,name=awsElasticBlockStore"`
+	GitRepo               *GitRepoVolumeSourceApplyConfiguration               `json:"gitRepo,omitempty" protobuf:"bytes,5,opt,name=gitRepo"`
+	Secret                *SecretVolumeSourceApplyConfiguration                `json:"secret,omitempty" protobuf:"bytes,6,opt,name=secret"`
+	NFS                   *NFSVolumeSourceApplyConfiguration                   `json:"nfs,omitempty" protobuf:"bytes,7,opt,name=nfs"`
+	ISCSI                 *ISCSIVolumeSourceApplyConfiguration                 `json:"iscsi,omitempty" protobuf:"bytes,8,opt,name=iscsi"`
+	Glusterfs             *GlusterfsVolumeSourceApplyConfiguration             `json:"glusterfs,omitempty" protobuf:"bytes,9,opt,name=glusterfs"`
+	PersistentVolumeClaim *PersistentVolumeClaimVolumeSourceApplyConfiguration `json:"persistentVolumeClaim,omitempty" protobuf:"bytes,10,opt,name=persistentVolumeClaim"`
+	RBD                   *RBDVolumeSourceApplyConfiguration                   `json:"rbd,omitempty" protobuf:"bytes,11,opt,name=rbd"`
+	FlexVolume            *FlexVolumeSourceApplyConfiguration                  `json:"flexVolume,omitempty" protobuf:"bytes,12,opt,name=flexVolume"`
+	Cinder                *CinderVolumeSourceApplyConfiguration                `json:"cinder,omitempty" protobuf:"bytes,13,opt,name=cinder"`
+	CephFS                *CephFSVolumeSourceApplyConfiguration                `json:"cephfs,omitempty" protobuf:"bytes,14,opt,name=cephfs"`
+	Flocker               *FlockerVolumeSourceApplyConfiguration               `json:"flocker,omitempty" protobuf:"bytes,15,opt,name=flocker"`
+	DownwardAPI           *DownwardAPIVolumeSourceApplyConfiguration           `json:"downwardAPI,omitempty" protobuf:"bytes,16,opt,name=downwardAPI"`
+	FC                    *FCVolumeSourceApplyConfiguration                    `json:"fc,omitempty" protobuf:"bytes,17,opt,name=fc"`
+	AzureFile             *AzureFileVolumeSourceApplyConfiguration             `json:"azureFile,omitempty" protobuf:"bytes,18,opt,name=azureFile"`
+	ConfigMap             *ConfigMapVolumeSourceApplyConfiguration             `json:"configMap,omitempty" protobuf:"bytes,19,opt,name=configMap"`
+	VsphereVolume         *VsphereVirtualDiskVolumeSourceApplyConfiguration    `json:"vsphereVolume,omitempty" protobuf:"bytes,20,opt,name=vsphereVolume"`
+	Quobyte               *QuobyteVolumeSourceApplyConfiguration               `json:"quobyte,omitempty" protobuf:"bytes,21,opt,name=quobyte"`
+	AzureDisk             *AzureDiskVolumeSourceApplyConfiguration             `json:"azureDisk,omitempty" protobuf:"bytes,22,opt,name=azureDisk"`
+	PhotonPersistentDisk  *PhotonPersistentDiskVolumeSourceApplyConfiguration  `json:"photonPersistentDisk,omitempty" protobuf:"bytes,23,opt,name=photonPersistentDisk"`
+	Projected             *ProjectedVolumeSourceApplyConfiguration             `json:"projected,omitempty" protobuf:"bytes,24,opt,name=projected"`
+	PortworxVolume        *PortworxVolumeSourceApplyConfiguration              `json:"portworxVolume,omitempty" protobuf:"bytes,25,opt,name=portworxVolume"`
+	ScaleIO               *ScaleIOVolumeSourceApplyConfiguration               `json:"scaleIO,omitempty" protobuf:"bytes,26,opt,name=scaleIO"`
+	StorageOS             *StorageOSVolumeSourceApplyConfiguration             `json:"storageos,omitempty" protobuf:"bytes,27,opt,name=storageos"`
+	CSI                   *CSIVolumeSourceApplyConfiguration                   `json:"csi,omitempty" protobuf:"bytes,28,opt,name=csi"`
+	Ephemeral             *EphemeralVolumeSourceApplyConfiguration             `json:"ephemeral,omitempty" protobuf:"bytes,29,opt,name=ephemeral"`
 }
 
 // VolumeSourceApplyConfiguration constructs an declarative configuration of the VolumeSource type for use with

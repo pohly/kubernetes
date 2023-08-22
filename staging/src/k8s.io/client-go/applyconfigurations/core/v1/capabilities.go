@@ -25,8 +25,8 @@ import (
 // CapabilitiesApplyConfiguration represents an declarative configuration of the Capabilities type for use
 // with apply.
 type CapabilitiesApplyConfiguration struct {
-	Add  []v1.Capability `json:"add,omitempty"`
-	Drop []v1.Capability `json:"drop,omitempty"`
+	Add  []v1.Capability `json:"add,omitempty" protobuf:"bytes,1,rep,name=add,casttype=k8s.io/api/core/v1.Capability"`
+	Drop []v1.Capability `json:"drop,omitempty" protobuf:"bytes,2,rep,name=drop,casttype=k8s.io/api/core/v1.Capability"`
 }
 
 // CapabilitiesApplyConfiguration constructs an declarative configuration of the Capabilities type for use with

@@ -25,12 +25,12 @@ import (
 // OwnerReferenceApplyConfiguration represents an declarative configuration of the OwnerReference type for use
 // with apply.
 type OwnerReferenceApplyConfiguration struct {
-	APIVersion         *string    `json:"apiVersion,omitempty"`
-	Kind               *string    `json:"kind,omitempty"`
-	Name               *string    `json:"name,omitempty"`
-	UID                *types.UID `json:"uid,omitempty"`
-	Controller         *bool      `json:"controller,omitempty"`
-	BlockOwnerDeletion *bool      `json:"blockOwnerDeletion,omitempty"`
+	APIVersion         *string    `json:"apiVersion,omitempty" protobuf:"bytes,1,opt,name=apiVersion"`
+	Kind               *string    `json:"kind,omitempty" protobuf:"bytes,2,opt,name=kind"`
+	Name               *string    `json:"name,omitempty" protobuf:"bytes,3,opt,name=name"`
+	UID                *types.UID `json:"uid,omitempty" protobuf:"bytes,4,opt,name=uid,casttype=k8s.io/apimachinery/pkg/types.UID"`
+	Controller         *bool      `json:"controller,omitempty" protobuf:"varint,5,opt,name=controller"`
+	BlockOwnerDeletion *bool      `json:"blockOwnerDeletion,omitempty" protobuf:"varint,6,opt,name=blockOwnerDeletion"`
 }
 
 // OwnerReferenceApplyConfiguration constructs an declarative configuration of the OwnerReference type for use with

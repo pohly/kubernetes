@@ -21,7 +21,7 @@ package v1
 // LocalObjectReferenceApplyConfiguration represents an declarative configuration of the LocalObjectReference type for use
 // with apply.
 type LocalObjectReferenceApplyConfiguration struct {
-	Name *string `json:"name,omitempty"`
+	Name *string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
 }
 
 // LocalObjectReferenceApplyConfiguration constructs an declarative configuration of the LocalObjectReference type for use with

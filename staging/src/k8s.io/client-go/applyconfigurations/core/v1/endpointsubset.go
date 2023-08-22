@@ -21,9 +21,9 @@ package v1
 // EndpointSubsetApplyConfiguration represents an declarative configuration of the EndpointSubset type for use
 // with apply.
 type EndpointSubsetApplyConfiguration struct {
-	Addresses         []EndpointAddressApplyConfiguration `json:"addresses,omitempty"`
-	NotReadyAddresses []EndpointAddressApplyConfiguration `json:"notReadyAddresses,omitempty"`
-	Ports             []EndpointPortApplyConfiguration    `json:"ports,omitempty"`
+	Addresses         []EndpointAddressApplyConfiguration `json:"addresses,omitempty" protobuf:"bytes,1,rep,name=addresses"`
+	NotReadyAddresses []EndpointAddressApplyConfiguration `json:"notReadyAddresses,omitempty" protobuf:"bytes,2,rep,name=notReadyAddresses"`
+	Ports             []EndpointPortApplyConfiguration    `json:"ports,omitempty" protobuf:"bytes,3,rep,name=ports"`
 }
 
 // EndpointSubsetApplyConfiguration constructs an declarative configuration of the EndpointSubset type for use with

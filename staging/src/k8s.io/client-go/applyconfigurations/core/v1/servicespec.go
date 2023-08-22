@@ -25,25 +25,25 @@ import (
 // ServiceSpecApplyConfiguration represents an declarative configuration of the ServiceSpec type for use
 // with apply.
 type ServiceSpecApplyConfiguration struct {
-	Ports                         []ServicePortApplyConfiguration          `json:"ports,omitempty"`
-	Selector                      map[string]string                        `json:"selector,omitempty"`
-	ClusterIP                     *string                                  `json:"clusterIP,omitempty"`
-	ClusterIPs                    []string                                 `json:"clusterIPs,omitempty"`
-	Type                          *corev1.ServiceType                      `json:"type,omitempty"`
-	ExternalIPs                   []string                                 `json:"externalIPs,omitempty"`
-	SessionAffinity               *corev1.ServiceAffinity                  `json:"sessionAffinity,omitempty"`
-	LoadBalancerIP                *string                                  `json:"loadBalancerIP,omitempty"`
-	LoadBalancerSourceRanges      []string                                 `json:"loadBalancerSourceRanges,omitempty"`
-	ExternalName                  *string                                  `json:"externalName,omitempty"`
-	ExternalTrafficPolicy         *corev1.ServiceExternalTrafficPolicy     `json:"externalTrafficPolicy,omitempty"`
-	HealthCheckNodePort           *int32                                   `json:"healthCheckNodePort,omitempty"`
-	PublishNotReadyAddresses      *bool                                    `json:"publishNotReadyAddresses,omitempty"`
-	SessionAffinityConfig         *SessionAffinityConfigApplyConfiguration `json:"sessionAffinityConfig,omitempty"`
-	IPFamilies                    []corev1.IPFamily                        `json:"ipFamilies,omitempty"`
-	IPFamilyPolicy                *corev1.IPFamilyPolicy                   `json:"ipFamilyPolicy,omitempty"`
-	AllocateLoadBalancerNodePorts *bool                                    `json:"allocateLoadBalancerNodePorts,omitempty"`
-	LoadBalancerClass             *string                                  `json:"loadBalancerClass,omitempty"`
-	InternalTrafficPolicy         *corev1.ServiceInternalTrafficPolicy     `json:"internalTrafficPolicy,omitempty"`
+	Ports                         []ServicePortApplyConfiguration          `json:"ports,omitempty" protobuf:"bytes,1,rep,name=ports"`
+	Selector                      map[string]string                        `json:"selector,omitempty" protobuf:"bytes,2,rep,name=selector"`
+	ClusterIP                     *string                                  `json:"clusterIP,omitempty" protobuf:"bytes,3,opt,name=clusterIP"`
+	ClusterIPs                    []string                                 `json:"clusterIPs,omitempty" protobuf:"bytes,4,rep,name=clusterIPs"`
+	Type                          *corev1.ServiceType                      `json:"type,omitempty" protobuf:"bytes,5,opt,name=type,casttype=k8s.io/api/core/v1.ServiceType"`
+	ExternalIPs                   []string                                 `json:"externalIPs,omitempty" protobuf:"bytes,6,rep,name=externalIPs"`
+	SessionAffinity               *corev1.ServiceAffinity                  `json:"sessionAffinity,omitempty" protobuf:"bytes,7,opt,name=sessionAffinity,casttype=k8s.io/api/core/v1.ServiceAffinity"`
+	LoadBalancerIP                *string                                  `json:"loadBalancerIP,omitempty" protobuf:"bytes,8,opt,name=loadBalancerIP"`
+	LoadBalancerSourceRanges      []string                                 `json:"loadBalancerSourceRanges,omitempty" protobuf:"bytes,9,rep,name=loadBalancerSourceRanges"`
+	ExternalName                  *string                                  `json:"externalName,omitempty" protobuf:"bytes,10,opt,name=externalName"`
+	ExternalTrafficPolicy         *corev1.ServiceExternalTrafficPolicy     `json:"externalTrafficPolicy,omitempty" protobuf:"bytes,11,opt,name=externalTrafficPolicy,casttype=k8s.io/api/core/v1.ServiceExternalTrafficPolicy"`
+	HealthCheckNodePort           *int32                                   `json:"healthCheckNodePort,omitempty" protobuf:"varint,12,opt,name=healthCheckNodePort"`
+	PublishNotReadyAddresses      *bool                                    `json:"publishNotReadyAddresses,omitempty" protobuf:"varint,13,opt,name=publishNotReadyAddresses"`
+	SessionAffinityConfig         *SessionAffinityConfigApplyConfiguration `json:"sessionAffinityConfig,omitempty" protobuf:"bytes,14,opt,name=sessionAffinityConfig"`
+	IPFamilies                    []corev1.IPFamily                        `json:"ipFamilies,omitempty" protobuf:"bytes,15,rep,name=ipFamilies,casttype=k8s.io/api/core/v1.IPFamily"`
+	IPFamilyPolicy                *corev1.IPFamilyPolicy                   `json:"ipFamilyPolicy,omitempty" protobuf:"bytes,16,opt,name=ipFamilyPolicy,casttype=k8s.io/api/core/v1.IPFamilyPolicy"`
+	AllocateLoadBalancerNodePorts *bool                                    `json:"allocateLoadBalancerNodePorts,omitempty" protobuf:"varint,17,opt,name=allocateLoadBalancerNodePorts"`
+	LoadBalancerClass             *string                                  `json:"loadBalancerClass,omitempty" protobuf:"bytes,18,opt,name=loadBalancerClass"`
+	InternalTrafficPolicy         *corev1.ServiceInternalTrafficPolicy     `json:"internalTrafficPolicy,omitempty" protobuf:"bytes,19,opt,name=internalTrafficPolicy,casttype=k8s.io/api/core/v1.ServiceInternalTrafficPolicy"`
 }
 
 // ServiceSpecApplyConfiguration constructs an declarative configuration of the ServiceSpec type for use with

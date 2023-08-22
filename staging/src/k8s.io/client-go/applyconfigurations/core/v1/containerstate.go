@@ -21,9 +21,9 @@ package v1
 // ContainerStateApplyConfiguration represents an declarative configuration of the ContainerState type for use
 // with apply.
 type ContainerStateApplyConfiguration struct {
-	Waiting    *ContainerStateWaitingApplyConfiguration    `json:"waiting,omitempty"`
-	Running    *ContainerStateRunningApplyConfiguration    `json:"running,omitempty"`
-	Terminated *ContainerStateTerminatedApplyConfiguration `json:"terminated,omitempty"`
+	Waiting    *ContainerStateWaitingApplyConfiguration    `json:"waiting,omitempty" protobuf:"bytes,1,opt,name=waiting"`
+	Running    *ContainerStateRunningApplyConfiguration    `json:"running,omitempty" protobuf:"bytes,2,opt,name=running"`
+	Terminated *ContainerStateTerminatedApplyConfiguration `json:"terminated,omitempty" protobuf:"bytes,3,opt,name=terminated"`
 }
 
 // ContainerStateApplyConfiguration constructs an declarative configuration of the ContainerState type for use with

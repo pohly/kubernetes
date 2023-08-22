@@ -25,17 +25,17 @@ import (
 // NodeStatusApplyConfiguration represents an declarative configuration of the NodeStatus type for use
 // with apply.
 type NodeStatusApplyConfiguration struct {
-	Capacity        *v1.ResourceList                       `json:"capacity,omitempty"`
-	Allocatable     *v1.ResourceList                       `json:"allocatable,omitempty"`
-	Phase           *v1.NodePhase                          `json:"phase,omitempty"`
-	Conditions      []NodeConditionApplyConfiguration      `json:"conditions,omitempty"`
-	Addresses       []NodeAddressApplyConfiguration        `json:"addresses,omitempty"`
-	DaemonEndpoints *NodeDaemonEndpointsApplyConfiguration `json:"daemonEndpoints,omitempty"`
-	NodeInfo        *NodeSystemInfoApplyConfiguration      `json:"nodeInfo,omitempty"`
-	Images          []ContainerImageApplyConfiguration     `json:"images,omitempty"`
-	VolumesInUse    []v1.UniqueVolumeName                  `json:"volumesInUse,omitempty"`
-	VolumesAttached []AttachedVolumeApplyConfiguration     `json:"volumesAttached,omitempty"`
-	Config          *NodeConfigStatusApplyConfiguration    `json:"config,omitempty"`
+	Capacity        *v1.ResourceList                       `json:"capacity,omitempty" protobuf:"bytes,1,rep,name=capacity,casttype=k8s.io/api/core/v1.ResourceList,castkey=k8s.io/api/core/v1.ResourceName"`
+	Allocatable     *v1.ResourceList                       `json:"allocatable,omitempty" protobuf:"bytes,2,rep,name=allocatable,casttype=k8s.io/api/core/v1.ResourceList,castkey=k8s.io/api/core/v1.ResourceName"`
+	Phase           *v1.NodePhase                          `json:"phase,omitempty" protobuf:"bytes,3,opt,name=phase,casttype=k8s.io/api/core/v1.NodePhase"`
+	Conditions      []NodeConditionApplyConfiguration      `json:"conditions,omitempty" protobuf:"bytes,4,rep,name=conditions"`
+	Addresses       []NodeAddressApplyConfiguration        `json:"addresses,omitempty" protobuf:"bytes,5,rep,name=addresses"`
+	DaemonEndpoints *NodeDaemonEndpointsApplyConfiguration `json:"daemonEndpoints,omitempty" protobuf:"bytes,6,opt,name=daemonEndpoints"`
+	NodeInfo        *NodeSystemInfoApplyConfiguration      `json:"nodeInfo,omitempty" protobuf:"bytes,7,opt,name=nodeInfo"`
+	Images          []ContainerImageApplyConfiguration     `json:"images,omitempty" protobuf:"bytes,8,rep,name=images"`
+	VolumesInUse    []v1.UniqueVolumeName                  `json:"volumesInUse,omitempty" protobuf:"bytes,9,rep,name=volumesInUse,casttype=k8s.io/api/core/v1.UniqueVolumeName"`
+	VolumesAttached []AttachedVolumeApplyConfiguration     `json:"volumesAttached,omitempty" protobuf:"bytes,10,rep,name=volumesAttached"`
+	Config          *NodeConfigStatusApplyConfiguration    `json:"config,omitempty" protobuf:"bytes,11,opt,name=config"`
 }
 
 // NodeStatusApplyConfiguration constructs an declarative configuration of the NodeStatus type for use with

@@ -21,7 +21,7 @@ package v1
 // LimitRangeSpecApplyConfiguration represents an declarative configuration of the LimitRangeSpec type for use
 // with apply.
 type LimitRangeSpecApplyConfiguration struct {
-	Limits []LimitRangeItemApplyConfiguration `json:"limits,omitempty"`
+	Limits []LimitRangeItemApplyConfiguration `json:"limits,omitempty" protobuf:"bytes,1,rep,name=limits"`
 }
 
 // LimitRangeSpecApplyConfiguration constructs an declarative configuration of the LimitRangeSpec type for use with

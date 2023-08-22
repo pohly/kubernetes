@@ -21,10 +21,10 @@ package v1
 // SELinuxOptionsApplyConfiguration represents an declarative configuration of the SELinuxOptions type for use
 // with apply.
 type SELinuxOptionsApplyConfiguration struct {
-	User  *string `json:"user,omitempty"`
-	Role  *string `json:"role,omitempty"`
-	Type  *string `json:"type,omitempty"`
-	Level *string `json:"level,omitempty"`
+	User  *string `json:"user,omitempty" protobuf:"bytes,1,opt,name=user"`
+	Role  *string `json:"role,omitempty" protobuf:"bytes,2,opt,name=role"`
+	Type  *string `json:"type,omitempty" protobuf:"bytes,3,opt,name=type"`
+	Level *string `json:"level,omitempty" protobuf:"bytes,4,opt,name=level"`
 }
 
 // SELinuxOptionsApplyConfiguration constructs an declarative configuration of the SELinuxOptions type for use with

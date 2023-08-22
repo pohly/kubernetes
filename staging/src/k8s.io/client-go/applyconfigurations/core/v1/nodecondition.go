@@ -26,12 +26,12 @@ import (
 // NodeConditionApplyConfiguration represents an declarative configuration of the NodeCondition type for use
 // with apply.
 type NodeConditionApplyConfiguration struct {
-	Type               *v1.NodeConditionType `json:"type,omitempty"`
-	Status             *v1.ConditionStatus   `json:"status,omitempty"`
-	LastHeartbeatTime  *metav1.Time          `json:"lastHeartbeatTime,omitempty"`
-	LastTransitionTime *metav1.Time          `json:"lastTransitionTime,omitempty"`
-	Reason             *string               `json:"reason,omitempty"`
-	Message            *string               `json:"message,omitempty"`
+	Type               *v1.NodeConditionType `json:"type,omitempty" protobuf:"bytes,1,opt,name=type,casttype=k8s.io/api/core/v1.NodeConditionType"`
+	Status             *v1.ConditionStatus   `json:"status,omitempty" protobuf:"bytes,2,opt,name=status,casttype=k8s.io/api/core/v1.ConditionStatus"`
+	LastHeartbeatTime  *metav1.Time          `json:"lastHeartbeatTime,omitempty" protobuf:"bytes,3,opt,name=lastHeartbeatTime"`
+	LastTransitionTime *metav1.Time          `json:"lastTransitionTime,omitempty" protobuf:"bytes,4,opt,name=lastTransitionTime"`
+	Reason             *string               `json:"reason,omitempty" protobuf:"bytes,5,opt,name=reason"`
+	Message            *string               `json:"message,omitempty" protobuf:"bytes,6,opt,name=message"`
 }
 
 // NodeConditionApplyConfiguration constructs an declarative configuration of the NodeCondition type for use with

@@ -25,13 +25,13 @@ import (
 // ContainerStateTerminatedApplyConfiguration represents an declarative configuration of the ContainerStateTerminated type for use
 // with apply.
 type ContainerStateTerminatedApplyConfiguration struct {
-	ExitCode    *int32   `json:"exitCode,omitempty"`
-	Signal      *int32   `json:"signal,omitempty"`
-	Reason      *string  `json:"reason,omitempty"`
-	Message     *string  `json:"message,omitempty"`
-	StartedAt   *v1.Time `json:"startedAt,omitempty"`
-	FinishedAt  *v1.Time `json:"finishedAt,omitempty"`
-	ContainerID *string  `json:"containerID,omitempty"`
+	ExitCode    *int32   `json:"exitCode,omitempty" protobuf:"varint,1,opt,name=exitCode"`
+	Signal      *int32   `json:"signal,omitempty" protobuf:"varint,2,opt,name=signal"`
+	Reason      *string  `json:"reason,omitempty" protobuf:"bytes,3,opt,name=reason"`
+	Message     *string  `json:"message,omitempty" protobuf:"bytes,4,opt,name=message"`
+	StartedAt   *v1.Time `json:"startedAt,omitempty" protobuf:"bytes,5,opt,name=startedAt"`
+	FinishedAt  *v1.Time `json:"finishedAt,omitempty" protobuf:"bytes,6,opt,name=finishedAt"`
+	ContainerID *string  `json:"containerID,omitempty" protobuf:"bytes,7,opt,name=containerID"`
 }
 
 // ContainerStateTerminatedApplyConfiguration constructs an declarative configuration of the ContainerStateTerminated type for use with

@@ -25,9 +25,9 @@ import (
 // LabelSelectorRequirementApplyConfiguration represents an declarative configuration of the LabelSelectorRequirement type for use
 // with apply.
 type LabelSelectorRequirementApplyConfiguration struct {
-	Key      *string                   `json:"key,omitempty"`
-	Operator *v1.LabelSelectorOperator `json:"operator,omitempty"`
-	Values   []string                  `json:"values,omitempty"`
+	Key      *string                   `json:"key,omitempty" protobuf:"bytes,1,opt,name=key"`
+	Operator *v1.LabelSelectorOperator `json:"operator,omitempty" protobuf:"bytes,2,opt,name=operator,casttype=k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelectorOperator"`
+	Values   []string                  `json:"values,omitempty" protobuf:"bytes,3,rep,name=values"`
 }
 
 // LabelSelectorRequirementApplyConfiguration constructs an declarative configuration of the LabelSelectorRequirement type for use with

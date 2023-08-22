@@ -25,12 +25,12 @@ import (
 // PersistentVolumeClaimStatusApplyConfiguration represents an declarative configuration of the PersistentVolumeClaimStatus type for use
 // with apply.
 type PersistentVolumeClaimStatusApplyConfiguration struct {
-	Phase                     *v1.PersistentVolumeClaimPhase                     `json:"phase,omitempty"`
-	AccessModes               []v1.PersistentVolumeAccessMode                    `json:"accessModes,omitempty"`
-	Capacity                  *v1.ResourceList                                   `json:"capacity,omitempty"`
-	Conditions                []PersistentVolumeClaimConditionApplyConfiguration `json:"conditions,omitempty"`
-	AllocatedResources        *v1.ResourceList                                   `json:"allocatedResources,omitempty"`
-	AllocatedResourceStatuses map[v1.ResourceName]v1.ClaimResourceStatus         `json:"allocatedResourceStatuses,omitempty"`
+	Phase                     *v1.PersistentVolumeClaimPhase                     `json:"phase,omitempty" protobuf:"bytes,1,opt,name=phase,casttype=k8s.io/api/core/v1.PersistentVolumeClaimPhase"`
+	AccessModes               []v1.PersistentVolumeAccessMode                    `json:"accessModes,omitempty" protobuf:"bytes,2,rep,name=accessModes,casttype=k8s.io/api/core/v1.PersistentVolumeAccessMode"`
+	Capacity                  *v1.ResourceList                                   `json:"capacity,omitempty" protobuf:"bytes,3,rep,name=capacity,casttype=k8s.io/api/core/v1.ResourceList,castkey=k8s.io/api/core/v1.ResourceName"`
+	Conditions                []PersistentVolumeClaimConditionApplyConfiguration `json:"conditions,omitempty" protobuf:"bytes,4,rep,name=conditions"`
+	AllocatedResources        *v1.ResourceList                                   `json:"allocatedResources,omitempty" protobuf:"bytes,5,rep,name=allocatedResources,casttype=k8s.io/api/core/v1.ResourceList,castkey=k8s.io/api/core/v1.ResourceName"`
+	AllocatedResourceStatuses map[v1.ResourceName]v1.ClaimResourceStatus         `json:"allocatedResourceStatuses,omitempty" protobuf:"bytes,6,rep,name=allocatedResourceStatuses,castkey=k8s.io/api/core/v1.ResourceName,castvalue=k8s.io/api/core/v1.ClaimResourceStatus"`
 }
 
 // PersistentVolumeClaimStatusApplyConfiguration constructs an declarative configuration of the PersistentVolumeClaimStatus type for use with

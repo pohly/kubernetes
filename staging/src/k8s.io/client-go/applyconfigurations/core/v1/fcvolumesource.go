@@ -21,11 +21,11 @@ package v1
 // FCVolumeSourceApplyConfiguration represents an declarative configuration of the FCVolumeSource type for use
 // with apply.
 type FCVolumeSourceApplyConfiguration struct {
-	TargetWWNs []string `json:"targetWWNs,omitempty"`
-	Lun        *int32   `json:"lun,omitempty"`
-	FSType     *string  `json:"fsType,omitempty"`
-	ReadOnly   *bool    `json:"readOnly,omitempty"`
-	WWIDs      []string `json:"wwids,omitempty"`
+	TargetWWNs []string `json:"targetWWNs,omitempty" protobuf:"bytes,1,rep,name=targetWWNs"`
+	Lun        *int32   `json:"lun,omitempty" protobuf:"varint,2,opt,name=lun"`
+	FSType     *string  `json:"fsType,omitempty" protobuf:"bytes,3,opt,name=fsType"`
+	ReadOnly   *bool    `json:"readOnly,omitempty" protobuf:"varint,4,opt,name=readOnly"`
+	WWIDs      []string `json:"wwids,omitempty" protobuf:"bytes,5,rep,name=wwids"`
 }
 
 // FCVolumeSourceApplyConfiguration constructs an declarative configuration of the FCVolumeSource type for use with

@@ -21,9 +21,9 @@ package v1
 // EnvFromSourceApplyConfiguration represents an declarative configuration of the EnvFromSource type for use
 // with apply.
 type EnvFromSourceApplyConfiguration struct {
-	Prefix       *string                               `json:"prefix,omitempty"`
-	ConfigMapRef *ConfigMapEnvSourceApplyConfiguration `json:"configMapRef,omitempty"`
-	SecretRef    *SecretEnvSourceApplyConfiguration    `json:"secretRef,omitempty"`
+	Prefix       *string                               `json:"prefix,omitempty" protobuf:"bytes,1,opt,name=prefix"`
+	ConfigMapRef *ConfigMapEnvSourceApplyConfiguration `json:"configMapRef,omitempty" protobuf:"bytes,2,opt,name=configMapRef"`
+	SecretRef    *SecretEnvSourceApplyConfiguration    `json:"secretRef,omitempty" protobuf:"bytes,3,opt,name=secretRef"`
 }
 
 // EnvFromSourceApplyConfiguration constructs an declarative configuration of the EnvFromSource type for use with

@@ -30,22 +30,22 @@ import (
 // EventApplyConfiguration represents an declarative configuration of the Event type for use
 // with apply.
 type EventApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	InvolvedObject                   *ObjectReferenceApplyConfiguration `json:"involvedObject,omitempty"`
-	Reason                           *string                            `json:"reason,omitempty"`
-	Message                          *string                            `json:"message,omitempty"`
-	Source                           *EventSourceApplyConfiguration     `json:"source,omitempty"`
-	FirstTimestamp                   *metav1.Time                       `json:"firstTimestamp,omitempty"`
-	LastTimestamp                    *metav1.Time                       `json:"lastTimestamp,omitempty"`
-	Count                            *int32                             `json:"count,omitempty"`
-	Type                             *string                            `json:"type,omitempty"`
-	EventTime                        *metav1.MicroTime                  `json:"eventTime,omitempty"`
-	Series                           *EventSeriesApplyConfiguration     `json:"series,omitempty"`
-	Action                           *string                            `json:"action,omitempty"`
-	Related                          *ObjectReferenceApplyConfiguration `json:"related,omitempty"`
-	ReportingController              *string                            `json:"reportingComponent,omitempty"`
-	ReportingInstance                *string                            `json:"reportingInstance,omitempty"`
+	v1.TypeMetaApplyConfiguration    `json:",inline" protobuf:"bytes,1,opt,name=typeMetaApplyConfiguration"`
+	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty" protobuf:"bytes,2,opt,name=metadata"`
+	InvolvedObject                   *ObjectReferenceApplyConfiguration `json:"involvedObject,omitempty" protobuf:"bytes,3,opt,name=involvedObject"`
+	Reason                           *string                            `json:"reason,omitempty" protobuf:"bytes,4,opt,name=reason"`
+	Message                          *string                            `json:"message,omitempty" protobuf:"bytes,5,opt,name=message"`
+	Source                           *EventSourceApplyConfiguration     `json:"source,omitempty" protobuf:"bytes,6,opt,name=source"`
+	FirstTimestamp                   *metav1.Time                       `json:"firstTimestamp,omitempty" protobuf:"bytes,7,opt,name=firstTimestamp"`
+	LastTimestamp                    *metav1.Time                       `json:"lastTimestamp,omitempty" protobuf:"bytes,8,opt,name=lastTimestamp"`
+	Count                            *int32                             `json:"count,omitempty" protobuf:"varint,9,opt,name=count"`
+	Type                             *string                            `json:"type,omitempty" protobuf:"bytes,10,opt,name=type"`
+	EventTime                        *metav1.MicroTime                  `json:"eventTime,omitempty" protobuf:"bytes,11,opt,name=eventTime"`
+	Series                           *EventSeriesApplyConfiguration     `json:"series,omitempty" protobuf:"bytes,12,opt,name=series"`
+	Action                           *string                            `json:"action,omitempty" protobuf:"bytes,13,opt,name=action"`
+	Related                          *ObjectReferenceApplyConfiguration `json:"related,omitempty" protobuf:"bytes,14,opt,name=related"`
+	ReportingController              *string                            `json:"reportingComponent,omitempty" protobuf:"bytes,15,opt,name=reportingComponent"`
+	ReportingInstance                *string                            `json:"reportingInstance,omitempty" protobuf:"bytes,16,opt,name=reportingInstance"`
 }
 
 // Event constructs an declarative configuration of the Event type for use with

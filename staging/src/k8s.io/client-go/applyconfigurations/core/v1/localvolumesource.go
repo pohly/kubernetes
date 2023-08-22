@@ -21,8 +21,8 @@ package v1
 // LocalVolumeSourceApplyConfiguration represents an declarative configuration of the LocalVolumeSource type for use
 // with apply.
 type LocalVolumeSourceApplyConfiguration struct {
-	Path   *string `json:"path,omitempty"`
-	FSType *string `json:"fsType,omitempty"`
+	Path   *string `json:"path,omitempty" protobuf:"bytes,1,opt,name=path"`
+	FSType *string `json:"fsType,omitempty" protobuf:"bytes,2,opt,name=fsType"`
 }
 
 // LocalVolumeSourceApplyConfiguration constructs an declarative configuration of the LocalVolumeSource type for use with

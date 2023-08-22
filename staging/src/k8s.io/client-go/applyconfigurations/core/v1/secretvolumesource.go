@@ -21,10 +21,10 @@ package v1
 // SecretVolumeSourceApplyConfiguration represents an declarative configuration of the SecretVolumeSource type for use
 // with apply.
 type SecretVolumeSourceApplyConfiguration struct {
-	SecretName  *string                       `json:"secretName,omitempty"`
-	Items       []KeyToPathApplyConfiguration `json:"items,omitempty"`
-	DefaultMode *int32                        `json:"defaultMode,omitempty"`
-	Optional    *bool                         `json:"optional,omitempty"`
+	SecretName  *string                       `json:"secretName,omitempty" protobuf:"bytes,1,opt,name=secretName"`
+	Items       []KeyToPathApplyConfiguration `json:"items,omitempty" protobuf:"bytes,2,rep,name=items"`
+	DefaultMode *int32                        `json:"defaultMode,omitempty" protobuf:"varint,3,opt,name=defaultMode"`
+	Optional    *bool                         `json:"optional,omitempty" protobuf:"varint,4,opt,name=optional"`
 }
 
 // SecretVolumeSourceApplyConfiguration constructs an declarative configuration of the SecretVolumeSource type for use with

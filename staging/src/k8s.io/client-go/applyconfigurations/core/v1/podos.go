@@ -25,7 +25,7 @@ import (
 // PodOSApplyConfiguration represents an declarative configuration of the PodOS type for use
 // with apply.
 type PodOSApplyConfiguration struct {
-	Name *v1.OSName `json:"name,omitempty"`
+	Name *v1.OSName `json:"name,omitempty" protobuf:"bytes,1,opt,name=name,casttype=k8s.io/api/core/v1.OSName"`
 }
 
 // PodOSApplyConfiguration constructs an declarative configuration of the PodOS type for use with

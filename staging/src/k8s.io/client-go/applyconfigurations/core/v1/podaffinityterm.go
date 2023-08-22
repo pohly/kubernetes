@@ -25,10 +25,10 @@ import (
 // PodAffinityTermApplyConfiguration represents an declarative configuration of the PodAffinityTerm type for use
 // with apply.
 type PodAffinityTermApplyConfiguration struct {
-	LabelSelector     *v1.LabelSelectorApplyConfiguration `json:"labelSelector,omitempty"`
-	Namespaces        []string                            `json:"namespaces,omitempty"`
-	TopologyKey       *string                             `json:"topologyKey,omitempty"`
-	NamespaceSelector *v1.LabelSelectorApplyConfiguration `json:"namespaceSelector,omitempty"`
+	LabelSelector     *v1.LabelSelectorApplyConfiguration `json:"labelSelector,omitempty" protobuf:"bytes,1,opt,name=labelSelector"`
+	Namespaces        []string                            `json:"namespaces,omitempty" protobuf:"bytes,2,rep,name=namespaces"`
+	TopologyKey       *string                             `json:"topologyKey,omitempty" protobuf:"bytes,3,opt,name=topologyKey"`
+	NamespaceSelector *v1.LabelSelectorApplyConfiguration `json:"namespaceSelector,omitempty" protobuf:"bytes,4,opt,name=namespaceSelector"`
 }
 
 // PodAffinityTermApplyConfiguration constructs an declarative configuration of the PodAffinityTerm type for use with

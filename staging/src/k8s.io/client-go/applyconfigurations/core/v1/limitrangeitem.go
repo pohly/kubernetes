@@ -25,12 +25,12 @@ import (
 // LimitRangeItemApplyConfiguration represents an declarative configuration of the LimitRangeItem type for use
 // with apply.
 type LimitRangeItemApplyConfiguration struct {
-	Type                 *v1.LimitType    `json:"type,omitempty"`
-	Max                  *v1.ResourceList `json:"max,omitempty"`
-	Min                  *v1.ResourceList `json:"min,omitempty"`
-	Default              *v1.ResourceList `json:"default,omitempty"`
-	DefaultRequest       *v1.ResourceList `json:"defaultRequest,omitempty"`
-	MaxLimitRequestRatio *v1.ResourceList `json:"maxLimitRequestRatio,omitempty"`
+	Type                 *v1.LimitType    `json:"type,omitempty" protobuf:"bytes,1,opt,name=type,casttype=k8s.io/api/core/v1.LimitType"`
+	Max                  *v1.ResourceList `json:"max,omitempty" protobuf:"bytes,2,rep,name=max,casttype=k8s.io/api/core/v1.ResourceList,castkey=k8s.io/api/core/v1.ResourceName"`
+	Min                  *v1.ResourceList `json:"min,omitempty" protobuf:"bytes,3,rep,name=min,casttype=k8s.io/api/core/v1.ResourceList,castkey=k8s.io/api/core/v1.ResourceName"`
+	Default              *v1.ResourceList `json:"default,omitempty" protobuf:"bytes,4,rep,name=default,casttype=k8s.io/api/core/v1.ResourceList,castkey=k8s.io/api/core/v1.ResourceName"`
+	DefaultRequest       *v1.ResourceList `json:"defaultRequest,omitempty" protobuf:"bytes,5,rep,name=defaultRequest,casttype=k8s.io/api/core/v1.ResourceList,castkey=k8s.io/api/core/v1.ResourceName"`
+	MaxLimitRequestRatio *v1.ResourceList `json:"maxLimitRequestRatio,omitempty" protobuf:"bytes,6,rep,name=maxLimitRequestRatio,casttype=k8s.io/api/core/v1.ResourceList,castkey=k8s.io/api/core/v1.ResourceName"`
 }
 
 // LimitRangeItemApplyConfiguration constructs an declarative configuration of the LimitRangeItem type for use with

@@ -25,7 +25,7 @@ import (
 // PodReadinessGateApplyConfiguration represents an declarative configuration of the PodReadinessGate type for use
 // with apply.
 type PodReadinessGateApplyConfiguration struct {
-	ConditionType *v1.PodConditionType `json:"conditionType,omitempty"`
+	ConditionType *v1.PodConditionType `json:"conditionType,omitempty" protobuf:"bytes,1,opt,name=conditionType,casttype=k8s.io/api/core/v1.PodConditionType"`
 }
 
 // PodReadinessGateApplyConfiguration constructs an declarative configuration of the PodReadinessGate type for use with

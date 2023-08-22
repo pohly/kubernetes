@@ -21,14 +21,14 @@ package v1
 // RBDVolumeSourceApplyConfiguration represents an declarative configuration of the RBDVolumeSource type for use
 // with apply.
 type RBDVolumeSourceApplyConfiguration struct {
-	CephMonitors []string                                `json:"monitors,omitempty"`
-	RBDImage     *string                                 `json:"image,omitempty"`
-	FSType       *string                                 `json:"fsType,omitempty"`
-	RBDPool      *string                                 `json:"pool,omitempty"`
-	RadosUser    *string                                 `json:"user,omitempty"`
-	Keyring      *string                                 `json:"keyring,omitempty"`
-	SecretRef    *LocalObjectReferenceApplyConfiguration `json:"secretRef,omitempty"`
-	ReadOnly     *bool                                   `json:"readOnly,omitempty"`
+	CephMonitors []string                                `json:"monitors,omitempty" protobuf:"bytes,1,rep,name=monitors"`
+	RBDImage     *string                                 `json:"image,omitempty" protobuf:"bytes,2,opt,name=image"`
+	FSType       *string                                 `json:"fsType,omitempty" protobuf:"bytes,3,opt,name=fsType"`
+	RBDPool      *string                                 `json:"pool,omitempty" protobuf:"bytes,4,opt,name=pool"`
+	RadosUser    *string                                 `json:"user,omitempty" protobuf:"bytes,5,opt,name=user"`
+	Keyring      *string                                 `json:"keyring,omitempty" protobuf:"bytes,6,opt,name=keyring"`
+	SecretRef    *LocalObjectReferenceApplyConfiguration `json:"secretRef,omitempty" protobuf:"bytes,7,opt,name=secretRef"`
+	ReadOnly     *bool                                   `json:"readOnly,omitempty" protobuf:"varint,8,opt,name=readOnly"`
 }
 
 // RBDVolumeSourceApplyConfiguration constructs an declarative configuration of the RBDVolumeSource type for use with

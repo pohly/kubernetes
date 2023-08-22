@@ -25,11 +25,11 @@ import (
 // TolerationApplyConfiguration represents an declarative configuration of the Toleration type for use
 // with apply.
 type TolerationApplyConfiguration struct {
-	Key               *string                `json:"key,omitempty"`
-	Operator          *v1.TolerationOperator `json:"operator,omitempty"`
-	Value             *string                `json:"value,omitempty"`
-	Effect            *v1.TaintEffect        `json:"effect,omitempty"`
-	TolerationSeconds *int64                 `json:"tolerationSeconds,omitempty"`
+	Key               *string                `json:"key,omitempty" protobuf:"bytes,1,opt,name=key"`
+	Operator          *v1.TolerationOperator `json:"operator,omitempty" protobuf:"bytes,2,opt,name=operator,casttype=k8s.io/api/core/v1.TolerationOperator"`
+	Value             *string                `json:"value,omitempty" protobuf:"bytes,3,opt,name=value"`
+	Effect            *v1.TaintEffect        `json:"effect,omitempty" protobuf:"bytes,4,opt,name=effect,casttype=k8s.io/api/core/v1.TaintEffect"`
+	TolerationSeconds *int64                 `json:"tolerationSeconds,omitempty" protobuf:"varint,5,opt,name=tolerationSeconds"`
 }
 
 // TolerationApplyConfiguration constructs an declarative configuration of the Toleration type for use with

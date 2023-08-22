@@ -21,10 +21,10 @@ package v1
 // GlusterfsPersistentVolumeSourceApplyConfiguration represents an declarative configuration of the GlusterfsPersistentVolumeSource type for use
 // with apply.
 type GlusterfsPersistentVolumeSourceApplyConfiguration struct {
-	EndpointsName      *string `json:"endpoints,omitempty"`
-	Path               *string `json:"path,omitempty"`
-	ReadOnly           *bool   `json:"readOnly,omitempty"`
-	EndpointsNamespace *string `json:"endpointsNamespace,omitempty"`
+	EndpointsName      *string `json:"endpoints,omitempty" protobuf:"bytes,1,opt,name=endpoints"`
+	Path               *string `json:"path,omitempty" protobuf:"bytes,2,opt,name=path"`
+	ReadOnly           *bool   `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
+	EndpointsNamespace *string `json:"endpointsNamespace,omitempty" protobuf:"bytes,4,opt,name=endpointsNamespace"`
 }
 
 // GlusterfsPersistentVolumeSourceApplyConfiguration constructs an declarative configuration of the GlusterfsPersistentVolumeSource type for use with

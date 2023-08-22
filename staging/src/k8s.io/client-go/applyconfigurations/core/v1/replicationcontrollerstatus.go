@@ -21,12 +21,12 @@ package v1
 // ReplicationControllerStatusApplyConfiguration represents an declarative configuration of the ReplicationControllerStatus type for use
 // with apply.
 type ReplicationControllerStatusApplyConfiguration struct {
-	Replicas             *int32                                             `json:"replicas,omitempty"`
-	FullyLabeledReplicas *int32                                             `json:"fullyLabeledReplicas,omitempty"`
-	ReadyReplicas        *int32                                             `json:"readyReplicas,omitempty"`
-	AvailableReplicas    *int32                                             `json:"availableReplicas,omitempty"`
-	ObservedGeneration   *int64                                             `json:"observedGeneration,omitempty"`
-	Conditions           []ReplicationControllerConditionApplyConfiguration `json:"conditions,omitempty"`
+	Replicas             *int32                                             `json:"replicas,omitempty" protobuf:"varint,1,opt,name=replicas"`
+	FullyLabeledReplicas *int32                                             `json:"fullyLabeledReplicas,omitempty" protobuf:"varint,2,opt,name=fullyLabeledReplicas"`
+	ReadyReplicas        *int32                                             `json:"readyReplicas,omitempty" protobuf:"varint,3,opt,name=readyReplicas"`
+	AvailableReplicas    *int32                                             `json:"availableReplicas,omitempty" protobuf:"varint,4,opt,name=availableReplicas"`
+	ObservedGeneration   *int64                                             `json:"observedGeneration,omitempty" protobuf:"varint,5,opt,name=observedGeneration"`
+	Conditions           []ReplicationControllerConditionApplyConfiguration `json:"conditions,omitempty" protobuf:"bytes,6,rep,name=conditions"`
 }
 
 // ReplicationControllerStatusApplyConfiguration constructs an declarative configuration of the ReplicationControllerStatus type for use with

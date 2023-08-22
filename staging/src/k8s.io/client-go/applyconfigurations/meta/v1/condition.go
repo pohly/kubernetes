@@ -25,12 +25,12 @@ import (
 // ConditionApplyConfiguration represents an declarative configuration of the Condition type for use
 // with apply.
 type ConditionApplyConfiguration struct {
-	Type               *string             `json:"type,omitempty"`
-	Status             *v1.ConditionStatus `json:"status,omitempty"`
-	ObservedGeneration *int64              `json:"observedGeneration,omitempty"`
-	LastTransitionTime *v1.Time            `json:"lastTransitionTime,omitempty"`
-	Reason             *string             `json:"reason,omitempty"`
-	Message            *string             `json:"message,omitempty"`
+	Type               *string             `json:"type,omitempty" protobuf:"bytes,1,opt,name=type"`
+	Status             *v1.ConditionStatus `json:"status,omitempty" protobuf:"bytes,2,opt,name=status,casttype=k8s.io/apimachinery/pkg/apis/meta/v1.ConditionStatus"`
+	ObservedGeneration *int64              `json:"observedGeneration,omitempty" protobuf:"varint,3,opt,name=observedGeneration"`
+	LastTransitionTime *v1.Time            `json:"lastTransitionTime,omitempty" protobuf:"bytes,4,opt,name=lastTransitionTime"`
+	Reason             *string             `json:"reason,omitempty" protobuf:"bytes,5,opt,name=reason"`
+	Message            *string             `json:"message,omitempty" protobuf:"bytes,6,opt,name=message"`
 }
 
 // ConditionApplyConfiguration constructs an declarative configuration of the Condition type for use with

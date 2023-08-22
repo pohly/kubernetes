@@ -25,8 +25,8 @@ import (
 // NodeAddressApplyConfiguration represents an declarative configuration of the NodeAddress type for use
 // with apply.
 type NodeAddressApplyConfiguration struct {
-	Type    *v1.NodeAddressType `json:"type,omitempty"`
-	Address *string             `json:"address,omitempty"`
+	Type    *v1.NodeAddressType `json:"type,omitempty" protobuf:"bytes,1,opt,name=type,casttype=k8s.io/api/core/v1.NodeAddressType"`
+	Address *string             `json:"address,omitempty" protobuf:"bytes,2,opt,name=address"`
 }
 
 // NodeAddressApplyConfiguration constructs an declarative configuration of the NodeAddress type for use with

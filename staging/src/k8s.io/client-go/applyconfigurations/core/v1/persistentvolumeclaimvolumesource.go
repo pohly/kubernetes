@@ -21,8 +21,8 @@ package v1
 // PersistentVolumeClaimVolumeSourceApplyConfiguration represents an declarative configuration of the PersistentVolumeClaimVolumeSource type for use
 // with apply.
 type PersistentVolumeClaimVolumeSourceApplyConfiguration struct {
-	ClaimName *string `json:"claimName,omitempty"`
-	ReadOnly  *bool   `json:"readOnly,omitempty"`
+	ClaimName *string `json:"claimName,omitempty" protobuf:"bytes,1,opt,name=claimName"`
+	ReadOnly  *bool   `json:"readOnly,omitempty" protobuf:"varint,2,opt,name=readOnly"`
 }
 
 // PersistentVolumeClaimVolumeSourceApplyConfiguration constructs an declarative configuration of the PersistentVolumeClaimVolumeSource type for use with

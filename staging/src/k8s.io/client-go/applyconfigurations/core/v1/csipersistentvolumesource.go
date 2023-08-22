@@ -21,16 +21,16 @@ package v1
 // CSIPersistentVolumeSourceApplyConfiguration represents an declarative configuration of the CSIPersistentVolumeSource type for use
 // with apply.
 type CSIPersistentVolumeSourceApplyConfiguration struct {
-	Driver                     *string                            `json:"driver,omitempty"`
-	VolumeHandle               *string                            `json:"volumeHandle,omitempty"`
-	ReadOnly                   *bool                              `json:"readOnly,omitempty"`
-	FSType                     *string                            `json:"fsType,omitempty"`
-	VolumeAttributes           map[string]string                  `json:"volumeAttributes,omitempty"`
-	ControllerPublishSecretRef *SecretReferenceApplyConfiguration `json:"controllerPublishSecretRef,omitempty"`
-	NodeStageSecretRef         *SecretReferenceApplyConfiguration `json:"nodeStageSecretRef,omitempty"`
-	NodePublishSecretRef       *SecretReferenceApplyConfiguration `json:"nodePublishSecretRef,omitempty"`
-	ControllerExpandSecretRef  *SecretReferenceApplyConfiguration `json:"controllerExpandSecretRef,omitempty"`
-	NodeExpandSecretRef        *SecretReferenceApplyConfiguration `json:"nodeExpandSecretRef,omitempty"`
+	Driver                     *string                            `json:"driver,omitempty" protobuf:"bytes,1,opt,name=driver"`
+	VolumeHandle               *string                            `json:"volumeHandle,omitempty" protobuf:"bytes,2,opt,name=volumeHandle"`
+	ReadOnly                   *bool                              `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
+	FSType                     *string                            `json:"fsType,omitempty" protobuf:"bytes,4,opt,name=fsType"`
+	VolumeAttributes           map[string]string                  `json:"volumeAttributes,omitempty" protobuf:"bytes,5,rep,name=volumeAttributes"`
+	ControllerPublishSecretRef *SecretReferenceApplyConfiguration `json:"controllerPublishSecretRef,omitempty" protobuf:"bytes,6,opt,name=controllerPublishSecretRef"`
+	NodeStageSecretRef         *SecretReferenceApplyConfiguration `json:"nodeStageSecretRef,omitempty" protobuf:"bytes,7,opt,name=nodeStageSecretRef"`
+	NodePublishSecretRef       *SecretReferenceApplyConfiguration `json:"nodePublishSecretRef,omitempty" protobuf:"bytes,8,opt,name=nodePublishSecretRef"`
+	ControllerExpandSecretRef  *SecretReferenceApplyConfiguration `json:"controllerExpandSecretRef,omitempty" protobuf:"bytes,9,opt,name=controllerExpandSecretRef"`
+	NodeExpandSecretRef        *SecretReferenceApplyConfiguration `json:"nodeExpandSecretRef,omitempty" protobuf:"bytes,10,opt,name=nodeExpandSecretRef"`
 }
 
 // CSIPersistentVolumeSourceApplyConfiguration constructs an declarative configuration of the CSIPersistentVolumeSource type for use with

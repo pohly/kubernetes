@@ -26,12 +26,12 @@ import (
 // ServicePortApplyConfiguration represents an declarative configuration of the ServicePort type for use
 // with apply.
 type ServicePortApplyConfiguration struct {
-	Name        *string             `json:"name,omitempty"`
-	Protocol    *v1.Protocol        `json:"protocol,omitempty"`
-	AppProtocol *string             `json:"appProtocol,omitempty"`
-	Port        *int32              `json:"port,omitempty"`
-	TargetPort  *intstr.IntOrString `json:"targetPort,omitempty"`
-	NodePort    *int32              `json:"nodePort,omitempty"`
+	Name        *string             `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
+	Protocol    *v1.Protocol        `json:"protocol,omitempty" protobuf:"bytes,2,opt,name=protocol,casttype=k8s.io/api/core/v1.Protocol"`
+	AppProtocol *string             `json:"appProtocol,omitempty" protobuf:"bytes,3,opt,name=appProtocol"`
+	Port        *int32              `json:"port,omitempty" protobuf:"varint,4,opt,name=port"`
+	TargetPort  *intstr.IntOrString `json:"targetPort,omitempty" protobuf:"bytes,5,opt,name=targetPort"`
+	NodePort    *int32              `json:"nodePort,omitempty" protobuf:"varint,6,opt,name=nodePort"`
 }
 
 // ServicePortApplyConfiguration constructs an declarative configuration of the ServicePort type for use with

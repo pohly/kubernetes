@@ -21,8 +21,8 @@ package v1
 // LifecycleApplyConfiguration represents an declarative configuration of the Lifecycle type for use
 // with apply.
 type LifecycleApplyConfiguration struct {
-	PostStart *LifecycleHandlerApplyConfiguration `json:"postStart,omitempty"`
-	PreStop   *LifecycleHandlerApplyConfiguration `json:"preStop,omitempty"`
+	PostStart *LifecycleHandlerApplyConfiguration `json:"postStart,omitempty" protobuf:"bytes,1,opt,name=postStart"`
+	PreStop   *LifecycleHandlerApplyConfiguration `json:"preStop,omitempty" protobuf:"bytes,2,opt,name=preStop"`
 }
 
 // LifecycleApplyConfiguration constructs an declarative configuration of the Lifecycle type for use with

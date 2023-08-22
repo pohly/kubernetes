@@ -21,9 +21,9 @@ package v1
 // PodDNSConfigApplyConfiguration represents an declarative configuration of the PodDNSConfig type for use
 // with apply.
 type PodDNSConfigApplyConfiguration struct {
-	Nameservers []string                               `json:"nameservers,omitempty"`
-	Searches    []string                               `json:"searches,omitempty"`
-	Options     []PodDNSConfigOptionApplyConfiguration `json:"options,omitempty"`
+	Nameservers []string                               `json:"nameservers,omitempty" protobuf:"bytes,1,rep,name=nameservers"`
+	Searches    []string                               `json:"searches,omitempty" protobuf:"bytes,2,rep,name=searches"`
+	Options     []PodDNSConfigOptionApplyConfiguration `json:"options,omitempty" protobuf:"bytes,3,rep,name=options"`
 }
 
 // PodDNSConfigApplyConfiguration constructs an declarative configuration of the PodDNSConfig type for use with

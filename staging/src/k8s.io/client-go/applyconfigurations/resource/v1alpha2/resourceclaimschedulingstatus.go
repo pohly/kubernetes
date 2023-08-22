@@ -21,8 +21,8 @@ package v1alpha2
 // ResourceClaimSchedulingStatusApplyConfiguration represents an declarative configuration of the ResourceClaimSchedulingStatus type for use
 // with apply.
 type ResourceClaimSchedulingStatusApplyConfiguration struct {
-	Name            *string  `json:"name,omitempty"`
-	UnsuitableNodes []string `json:"unsuitableNodes,omitempty"`
+	Name            *string  `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
+	UnsuitableNodes []string `json:"unsuitableNodes,omitempty" protobuf:"bytes,2,rep,name=unsuitableNodes"`
 }
 
 // ResourceClaimSchedulingStatusApplyConfiguration constructs an declarative configuration of the ResourceClaimSchedulingStatus type for use with

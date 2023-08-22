@@ -25,8 +25,8 @@ import (
 // SeccompProfileApplyConfiguration represents an declarative configuration of the SeccompProfile type for use
 // with apply.
 type SeccompProfileApplyConfiguration struct {
-	Type             *v1.SeccompProfileType `json:"type,omitempty"`
-	LocalhostProfile *string                `json:"localhostProfile,omitempty"`
+	Type             *v1.SeccompProfileType `json:"type,omitempty" protobuf:"bytes,1,opt,name=type,casttype=k8s.io/api/core/v1.SeccompProfileType"`
+	LocalhostProfile *string                `json:"localhostProfile,omitempty" protobuf:"bytes,2,opt,name=localhostProfile"`
 }
 
 // SeccompProfileApplyConfiguration constructs an declarative configuration of the SeccompProfile type for use with

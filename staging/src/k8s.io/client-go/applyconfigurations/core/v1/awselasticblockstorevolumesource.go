@@ -21,10 +21,10 @@ package v1
 // AWSElasticBlockStoreVolumeSourceApplyConfiguration represents an declarative configuration of the AWSElasticBlockStoreVolumeSource type for use
 // with apply.
 type AWSElasticBlockStoreVolumeSourceApplyConfiguration struct {
-	VolumeID  *string `json:"volumeID,omitempty"`
-	FSType    *string `json:"fsType,omitempty"`
-	Partition *int32  `json:"partition,omitempty"`
-	ReadOnly  *bool   `json:"readOnly,omitempty"`
+	VolumeID  *string `json:"volumeID,omitempty" protobuf:"bytes,1,opt,name=volumeID"`
+	FSType    *string `json:"fsType,omitempty" protobuf:"bytes,2,opt,name=fsType"`
+	Partition *int32  `json:"partition,omitempty" protobuf:"varint,3,opt,name=partition"`
+	ReadOnly  *bool   `json:"readOnly,omitempty" protobuf:"varint,4,opt,name=readOnly"`
 }
 
 // AWSElasticBlockStoreVolumeSourceApplyConfiguration constructs an declarative configuration of the AWSElasticBlockStoreVolumeSource type for use with

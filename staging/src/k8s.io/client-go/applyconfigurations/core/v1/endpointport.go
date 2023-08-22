@@ -25,10 +25,10 @@ import (
 // EndpointPortApplyConfiguration represents an declarative configuration of the EndpointPort type for use
 // with apply.
 type EndpointPortApplyConfiguration struct {
-	Name        *string      `json:"name,omitempty"`
-	Port        *int32       `json:"port,omitempty"`
-	Protocol    *v1.Protocol `json:"protocol,omitempty"`
-	AppProtocol *string      `json:"appProtocol,omitempty"`
+	Name        *string      `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
+	Port        *int32       `json:"port,omitempty" protobuf:"varint,2,opt,name=port"`
+	Protocol    *v1.Protocol `json:"protocol,omitempty" protobuf:"bytes,3,opt,name=protocol,casttype=k8s.io/api/core/v1.Protocol"`
+	AppProtocol *string      `json:"appProtocol,omitempty" protobuf:"bytes,4,opt,name=appProtocol"`
 }
 
 // EndpointPortApplyConfiguration constructs an declarative configuration of the EndpointPort type for use with

@@ -25,13 +25,13 @@ import (
 // ManagedFieldsEntryApplyConfiguration represents an declarative configuration of the ManagedFieldsEntry type for use
 // with apply.
 type ManagedFieldsEntryApplyConfiguration struct {
-	Manager     *string                        `json:"manager,omitempty"`
-	Operation   *v1.ManagedFieldsOperationType `json:"operation,omitempty"`
-	APIVersion  *string                        `json:"apiVersion,omitempty"`
-	Time        *v1.Time                       `json:"time,omitempty"`
-	FieldsType  *string                        `json:"fieldsType,omitempty"`
-	FieldsV1    *v1.FieldsV1                   `json:"fieldsV1,omitempty"`
-	Subresource *string                        `json:"subresource,omitempty"`
+	Manager     *string                        `json:"manager,omitempty" protobuf:"bytes,1,opt,name=manager"`
+	Operation   *v1.ManagedFieldsOperationType `json:"operation,omitempty" protobuf:"bytes,2,opt,name=operation,casttype=k8s.io/apimachinery/pkg/apis/meta/v1.ManagedFieldsOperationType"`
+	APIVersion  *string                        `json:"apiVersion,omitempty" protobuf:"bytes,3,opt,name=apiVersion"`
+	Time        *v1.Time                       `json:"time,omitempty" protobuf:"bytes,4,opt,name=time"`
+	FieldsType  *string                        `json:"fieldsType,omitempty" protobuf:"bytes,5,opt,name=fieldsType"`
+	FieldsV1    *v1.FieldsV1                   `json:"fieldsV1,omitempty" protobuf:"bytes,6,opt,name=fieldsV1"`
+	Subresource *string                        `json:"subresource,omitempty" protobuf:"bytes,7,opt,name=subresource"`
 }
 
 // ManagedFieldsEntryApplyConfiguration constructs an declarative configuration of the ManagedFieldsEntry type for use with

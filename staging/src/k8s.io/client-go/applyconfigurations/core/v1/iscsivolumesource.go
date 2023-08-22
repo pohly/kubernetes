@@ -21,17 +21,17 @@ package v1
 // ISCSIVolumeSourceApplyConfiguration represents an declarative configuration of the ISCSIVolumeSource type for use
 // with apply.
 type ISCSIVolumeSourceApplyConfiguration struct {
-	TargetPortal      *string                                 `json:"targetPortal,omitempty"`
-	IQN               *string                                 `json:"iqn,omitempty"`
-	Lun               *int32                                  `json:"lun,omitempty"`
-	ISCSIInterface    *string                                 `json:"iscsiInterface,omitempty"`
-	FSType            *string                                 `json:"fsType,omitempty"`
-	ReadOnly          *bool                                   `json:"readOnly,omitempty"`
-	Portals           []string                                `json:"portals,omitempty"`
-	DiscoveryCHAPAuth *bool                                   `json:"chapAuthDiscovery,omitempty"`
-	SessionCHAPAuth   *bool                                   `json:"chapAuthSession,omitempty"`
-	SecretRef         *LocalObjectReferenceApplyConfiguration `json:"secretRef,omitempty"`
-	InitiatorName     *string                                 `json:"initiatorName,omitempty"`
+	TargetPortal      *string                                 `json:"targetPortal,omitempty" protobuf:"bytes,1,opt,name=targetPortal"`
+	IQN               *string                                 `json:"iqn,omitempty" protobuf:"bytes,2,opt,name=iqn"`
+	Lun               *int32                                  `json:"lun,omitempty" protobuf:"varint,3,opt,name=lun"`
+	ISCSIInterface    *string                                 `json:"iscsiInterface,omitempty" protobuf:"bytes,4,opt,name=iscsiInterface"`
+	FSType            *string                                 `json:"fsType,omitempty" protobuf:"bytes,5,opt,name=fsType"`
+	ReadOnly          *bool                                   `json:"readOnly,omitempty" protobuf:"varint,6,opt,name=readOnly"`
+	Portals           []string                                `json:"portals,omitempty" protobuf:"bytes,7,rep,name=portals"`
+	DiscoveryCHAPAuth *bool                                   `json:"chapAuthDiscovery,omitempty" protobuf:"varint,8,opt,name=chapAuthDiscovery"`
+	SessionCHAPAuth   *bool                                   `json:"chapAuthSession,omitempty" protobuf:"varint,9,opt,name=chapAuthSession"`
+	SecretRef         *LocalObjectReferenceApplyConfiguration `json:"secretRef,omitempty" protobuf:"bytes,10,opt,name=secretRef"`
+	InitiatorName     *string                                 `json:"initiatorName,omitempty" protobuf:"bytes,11,opt,name=initiatorName"`
 }
 
 // ISCSIVolumeSourceApplyConfiguration constructs an declarative configuration of the ISCSIVolumeSource type for use with

@@ -21,14 +21,14 @@ package v1
 // RBDPersistentVolumeSourceApplyConfiguration represents an declarative configuration of the RBDPersistentVolumeSource type for use
 // with apply.
 type RBDPersistentVolumeSourceApplyConfiguration struct {
-	CephMonitors []string                           `json:"monitors,omitempty"`
-	RBDImage     *string                            `json:"image,omitempty"`
-	FSType       *string                            `json:"fsType,omitempty"`
-	RBDPool      *string                            `json:"pool,omitempty"`
-	RadosUser    *string                            `json:"user,omitempty"`
-	Keyring      *string                            `json:"keyring,omitempty"`
-	SecretRef    *SecretReferenceApplyConfiguration `json:"secretRef,omitempty"`
-	ReadOnly     *bool                              `json:"readOnly,omitempty"`
+	CephMonitors []string                           `json:"monitors,omitempty" protobuf:"bytes,1,rep,name=monitors"`
+	RBDImage     *string                            `json:"image,omitempty" protobuf:"bytes,2,opt,name=image"`
+	FSType       *string                            `json:"fsType,omitempty" protobuf:"bytes,3,opt,name=fsType"`
+	RBDPool      *string                            `json:"pool,omitempty" protobuf:"bytes,4,opt,name=pool"`
+	RadosUser    *string                            `json:"user,omitempty" protobuf:"bytes,5,opt,name=user"`
+	Keyring      *string                            `json:"keyring,omitempty" protobuf:"bytes,6,opt,name=keyring"`
+	SecretRef    *SecretReferenceApplyConfiguration `json:"secretRef,omitempty" protobuf:"bytes,7,opt,name=secretRef"`
+	ReadOnly     *bool                              `json:"readOnly,omitempty" protobuf:"varint,8,opt,name=readOnly"`
 }
 
 // RBDPersistentVolumeSourceApplyConfiguration constructs an declarative configuration of the RBDPersistentVolumeSource type for use with

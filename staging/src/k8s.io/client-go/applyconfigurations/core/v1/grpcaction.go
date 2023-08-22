@@ -21,8 +21,8 @@ package v1
 // GRPCActionApplyConfiguration represents an declarative configuration of the GRPCAction type for use
 // with apply.
 type GRPCActionApplyConfiguration struct {
-	Port    *int32  `json:"port,omitempty"`
-	Service *string `json:"service,omitempty"`
+	Port    *int32  `json:"port,omitempty" protobuf:"varint,1,opt,name=port"`
+	Service *string `json:"service,omitempty" protobuf:"bytes,2,opt,name=service"`
 }
 
 // GRPCActionApplyConfiguration constructs an declarative configuration of the GRPCAction type for use with

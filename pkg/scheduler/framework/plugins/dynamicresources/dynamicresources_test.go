@@ -35,7 +35,7 @@ import (
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/yaml"
+	resourcev1alpha2apply "k8s.io/client-go/applyconfigurations/resource/v1alpha2"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	cgotesting "k8s.io/client-go/testing"
@@ -895,7 +895,7 @@ func createReactor(tracker cgotesting.ObjectTracker) func(action cgotesting.Acti
 			resourceVersionCounter++
 
 		case cgotesting.PatchActionImpl:
-			if action.GetPatchType() != types.ApplyPatchType {
+			if action.GetPatchType() != types.StrategicMergePatchType /* TODO: ApplyPatchTypeGRPC */ {
 				// Handled by staging/src/k8s.io/client-go/testing/fixture.go.
 				return false, nil, nil
 			}
@@ -913,22 +913,13 @@ func createReactor(tracker cgotesting.ObjectTracker) func(action cgotesting.Acti
 
 			// Decode directly into a type which has exactly those
 			// fields which the code below knows to handle.
-			patchObj := struct {
-				metav1.TypeMeta   `json:",inline"`
-				metav1.ObjectMeta `json:"metadata"`
-				Spec              struct {
-					SelectedNode   string   `json:"selectedNode"`
-					PotentialNodes []string `json:"potentialNodes"`
-				} `json:"spec"`
-			}{}
-			if err := yaml.UnmarshalStrict(action.GetPatch(), &patchObj); err != nil {
-				// If this fails, the code under test must have
-				// been changed such that it updates additional
-				// fields and this reactor also needs to be
-				// updated.
+			var patchObj resourcev1alpha2apply.PodSchedulingContextApplyConfiguration
+			if err := patchObj.Unmarshal(action.GetPatch()); err != nil {
 				return true, nil, err
 			}
-			podScheduling.Spec.SelectedNode = patchObj.Spec.SelectedNode
+			if patchObj.Spec.SelectedNode != nil {
+				podScheduling.Spec.SelectedNode = *patchObj.Spec.SelectedNode
+			}
 			podScheduling.Spec.PotentialNodes = patchObj.Spec.PotentialNodes
 			podScheduling.SetResourceVersion(fmt.Sprintf("REV-%d", resourceVersionCounter))
 			resourceVersionCounter++

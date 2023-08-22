@@ -21,9 +21,9 @@ package v1
 // LifecycleHandlerApplyConfiguration represents an declarative configuration of the LifecycleHandler type for use
 // with apply.
 type LifecycleHandlerApplyConfiguration struct {
-	Exec      *ExecActionApplyConfiguration      `json:"exec,omitempty"`
-	HTTPGet   *HTTPGetActionApplyConfiguration   `json:"httpGet,omitempty"`
-	TCPSocket *TCPSocketActionApplyConfiguration `json:"tcpSocket,omitempty"`
+	Exec      *ExecActionApplyConfiguration      `json:"exec,omitempty" protobuf:"bytes,1,opt,name=exec"`
+	HTTPGet   *HTTPGetActionApplyConfiguration   `json:"httpGet,omitempty" protobuf:"bytes,2,opt,name=httpGet"`
+	TCPSocket *TCPSocketActionApplyConfiguration `json:"tcpSocket,omitempty" protobuf:"bytes,3,opt,name=tcpSocket"`
 }
 
 // LifecycleHandlerApplyConfiguration constructs an declarative configuration of the LifecycleHandler type for use with

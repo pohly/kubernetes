@@ -31,11 +31,11 @@ import (
 // ResourceClassApplyConfiguration represents an declarative configuration of the ResourceClass type for use
 // with apply.
 type ResourceClassApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	DriverName                       *string                                             `json:"driverName,omitempty"`
-	ParametersRef                    *ResourceClassParametersReferenceApplyConfiguration `json:"parametersRef,omitempty"`
-	SuitableNodes                    *corev1.NodeSelectorApplyConfiguration              `json:"suitableNodes,omitempty"`
+	v1.TypeMetaApplyConfiguration    `json:",inline" protobuf:"bytes,1,opt,name=typeMetaApplyConfiguration"`
+	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty" protobuf:"bytes,2,opt,name=metadata"`
+	DriverName                       *string                                             `json:"driverName,omitempty" protobuf:"bytes,3,opt,name=driverName"`
+	ParametersRef                    *ResourceClassParametersReferenceApplyConfiguration `json:"parametersRef,omitempty" protobuf:"bytes,4,opt,name=parametersRef"`
+	SuitableNodes                    *corev1.NodeSelectorApplyConfiguration              `json:"suitableNodes,omitempty" protobuf:"bytes,5,opt,name=suitableNodes"`
 }
 
 // ResourceClass constructs an declarative configuration of the ResourceClass type for use with

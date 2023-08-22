@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/yaml"
+	resourcev1alpha2apply "k8s.io/client-go/applyconfigurations/resource/v1alpha2"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
@@ -665,7 +665,7 @@ func createReactor(tracker cgotesting.ObjectTracker) func(action cgotesting.Acti
 	return func(action cgotesting.Action) (handled bool, ret apiruntime.Object, err error) {
 		switch action := action.(type) {
 		case cgotesting.PatchActionImpl:
-			if action.GetPatchType() != types.ApplyPatchType {
+			if action.GetPatchType() != types.StrategicMergePatchType /* TODO: types.ApplyPatchTypeGRPC */ {
 				// Handled by staging/src/k8s.io/client-go/testing/fixture.go.
 				return false, nil, nil
 			}
@@ -681,31 +681,18 @@ func createReactor(tracker cgotesting.ObjectTracker) func(action cgotesting.Acti
 				return false, nil, nil
 			}
 
-			// Decode directly into a type which has exactly those
-			// fields which the code below knows to handle. If any
-			// other field is present, we fall back to normal apply
-			// handling.
-			patchObj := struct {
-				metav1.TypeMeta   `json:",inline"`
-				metav1.ObjectMeta `json:"metadata"`
-				Status            struct {
-					ResourceClaims []struct {
-						Name            string   `json:"name"`
-						UnsuitableNodes []string `json:"unsuitableNodes"`
-					} `json:"resourceClaims"`
-				} `json:"status"`
-			}{}
-			if err := yaml.UnmarshalStrict(action.GetPatch(), &patchObj); err != nil {
+			var patchObj resourcev1alpha2apply.PodSchedulingContextApplyConfiguration
+			if err := patchObj.Unmarshal(action.GetPatch()); err != nil {
 				return true, nil, err
 			}
 			for _, claimStatus := range patchObj.Status.ResourceClaims {
-				if existingClaimStatus := findClaimStatus(podScheduling.Status.ResourceClaims, claimStatus.Name); existingClaimStatus != nil {
+				if existingClaimStatus := findClaimStatus(podScheduling.Status.ResourceClaims, *claimStatus.Name); existingClaimStatus != nil {
 					existingClaimStatus.UnsuitableNodes = claimStatus.UnsuitableNodes
 					continue
 				}
 				podScheduling.Status.ResourceClaims = append(podScheduling.Status.ResourceClaims,
 					resourcev1alpha2.ResourceClaimSchedulingStatus{
-						Name:            claimStatus.Name,
+						Name:            *claimStatus.Name,
 						UnsuitableNodes: claimStatus.UnsuitableNodes,
 					})
 			}

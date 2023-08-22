@@ -30,11 +30,11 @@ import (
 // ConfigMapApplyConfiguration represents an declarative configuration of the ConfigMap type for use
 // with apply.
 type ConfigMapApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Immutable                        *bool             `json:"immutable,omitempty"`
-	Data                             map[string]string `json:"data,omitempty"`
-	BinaryData                       map[string][]byte `json:"binaryData,omitempty"`
+	v1.TypeMetaApplyConfiguration    `json:",inline" protobuf:"bytes,1,opt,name=typeMetaApplyConfiguration"`
+	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty" protobuf:"bytes,2,opt,name=metadata"`
+	Immutable                        *bool             `json:"immutable,omitempty" protobuf:"varint,3,opt,name=immutable"`
+	Data                             map[string]string `json:"data,omitempty" protobuf:"bytes,4,rep,name=data"`
+	BinaryData                       map[string][]byte `json:"binaryData,omitempty" protobuf:"bytes,5,rep,name=binaryData"`
 }
 
 // ConfigMap constructs an declarative configuration of the ConfigMap type for use with

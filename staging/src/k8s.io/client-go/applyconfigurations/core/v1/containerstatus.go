@@ -25,17 +25,17 @@ import (
 // ContainerStatusApplyConfiguration represents an declarative configuration of the ContainerStatus type for use
 // with apply.
 type ContainerStatusApplyConfiguration struct {
-	Name                 *string                                 `json:"name,omitempty"`
-	State                *ContainerStateApplyConfiguration       `json:"state,omitempty"`
-	LastTerminationState *ContainerStateApplyConfiguration       `json:"lastState,omitempty"`
-	Ready                *bool                                   `json:"ready,omitempty"`
-	RestartCount         *int32                                  `json:"restartCount,omitempty"`
-	Image                *string                                 `json:"image,omitempty"`
-	ImageID              *string                                 `json:"imageID,omitempty"`
-	ContainerID          *string                                 `json:"containerID,omitempty"`
-	Started              *bool                                   `json:"started,omitempty"`
-	AllocatedResources   *corev1.ResourceList                    `json:"allocatedResources,omitempty"`
-	Resources            *ResourceRequirementsApplyConfiguration `json:"resources,omitempty"`
+	Name                 *string                                 `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
+	State                *ContainerStateApplyConfiguration       `json:"state,omitempty" protobuf:"bytes,2,opt,name=state"`
+	LastTerminationState *ContainerStateApplyConfiguration       `json:"lastState,omitempty" protobuf:"bytes,3,opt,name=lastState"`
+	Ready                *bool                                   `json:"ready,omitempty" protobuf:"varint,4,opt,name=ready"`
+	RestartCount         *int32                                  `json:"restartCount,omitempty" protobuf:"varint,5,opt,name=restartCount"`
+	Image                *string                                 `json:"image,omitempty" protobuf:"bytes,6,opt,name=image"`
+	ImageID              *string                                 `json:"imageID,omitempty" protobuf:"bytes,7,opt,name=imageID"`
+	ContainerID          *string                                 `json:"containerID,omitempty" protobuf:"bytes,8,opt,name=containerID"`
+	Started              *bool                                   `json:"started,omitempty" protobuf:"varint,9,opt,name=started"`
+	AllocatedResources   *corev1.ResourceList                    `json:"allocatedResources,omitempty" protobuf:"bytes,10,rep,name=allocatedResources,casttype=k8s.io/api/core/v1.ResourceList,castkey=k8s.io/api/core/v1.ResourceName"`
+	Resources            *ResourceRequirementsApplyConfiguration `json:"resources,omitempty" protobuf:"bytes,11,opt,name=resources"`
 }
 
 // ContainerStatusApplyConfiguration constructs an declarative configuration of the ContainerStatus type for use with

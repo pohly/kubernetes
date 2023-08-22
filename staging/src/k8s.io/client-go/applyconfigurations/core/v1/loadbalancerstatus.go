@@ -21,7 +21,7 @@ package v1
 // LoadBalancerStatusApplyConfiguration represents an declarative configuration of the LoadBalancerStatus type for use
 // with apply.
 type LoadBalancerStatusApplyConfiguration struct {
-	Ingress []LoadBalancerIngressApplyConfiguration `json:"ingress,omitempty"`
+	Ingress []LoadBalancerIngressApplyConfiguration `json:"ingress,omitempty" protobuf:"bytes,1,rep,name=ingress"`
 }
 
 // LoadBalancerStatusApplyConfiguration constructs an declarative configuration of the LoadBalancerStatus type for use with

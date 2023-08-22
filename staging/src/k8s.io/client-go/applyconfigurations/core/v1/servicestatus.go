@@ -25,8 +25,8 @@ import (
 // ServiceStatusApplyConfiguration represents an declarative configuration of the ServiceStatus type for use
 // with apply.
 type ServiceStatusApplyConfiguration struct {
-	LoadBalancer *LoadBalancerStatusApplyConfiguration `json:"loadBalancer,omitempty"`
-	Conditions   []metav1.ConditionApplyConfiguration  `json:"conditions,omitempty"`
+	LoadBalancer *LoadBalancerStatusApplyConfiguration `json:"loadBalancer,omitempty" protobuf:"bytes,1,opt,name=loadBalancer"`
+	Conditions   []metav1.ConditionApplyConfiguration  `json:"conditions,omitempty" protobuf:"bytes,2,rep,name=conditions"`
 }
 
 // ServiceStatusApplyConfiguration constructs an declarative configuration of the ServiceStatus type for use with

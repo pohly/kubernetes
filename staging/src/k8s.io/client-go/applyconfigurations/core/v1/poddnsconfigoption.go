@@ -21,8 +21,8 @@ package v1
 // PodDNSConfigOptionApplyConfiguration represents an declarative configuration of the PodDNSConfigOption type for use
 // with apply.
 type PodDNSConfigOptionApplyConfiguration struct {
-	Name  *string `json:"name,omitempty"`
-	Value *string `json:"value,omitempty"`
+	Name  *string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
+	Value *string `json:"value,omitempty" protobuf:"bytes,2,opt,name=value"`
 }
 
 // PodDNSConfigOptionApplyConfiguration constructs an declarative configuration of the PodDNSConfigOption type for use with

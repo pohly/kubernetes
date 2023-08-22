@@ -25,7 +25,7 @@ import (
 // NamespaceSpecApplyConfiguration represents an declarative configuration of the NamespaceSpec type for use
 // with apply.
 type NamespaceSpecApplyConfiguration struct {
-	Finalizers []v1.FinalizerName `json:"finalizers,omitempty"`
+	Finalizers []v1.FinalizerName `json:"finalizers,omitempty" protobuf:"bytes,1,rep,name=finalizers,casttype=k8s.io/api/core/v1.FinalizerName"`
 }
 
 // NamespaceSpecApplyConfiguration constructs an declarative configuration of the NamespaceSpec type for use with
