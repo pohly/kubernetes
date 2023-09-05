@@ -761,6 +761,10 @@ func (pl *dynamicResources) PostFilter(ctx context.Context, cs *framework.CycleS
 	// pick one claim randomly because there is no better heuristic.
 	for index := range state.unavailableClaims {
 		claim := state.claims[index]
+		if claim.Status.DeallocationRequested {
+			// Don't ask again, just wait.
+			break
+		}
 		if len(claim.Status.ReservedFor) == 0 ||
 			len(claim.Status.ReservedFor) == 1 && claim.Status.ReservedFor[0].UID == pod.UID {
 			// Before we tell a driver to deallocate a claim, we
