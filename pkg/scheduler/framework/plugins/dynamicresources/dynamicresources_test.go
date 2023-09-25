@@ -35,6 +35,7 @@ import (
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	dynfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	cgotesting "k8s.io/client-go/testing"
@@ -812,10 +813,14 @@ func setup(t *testing.T, nodes []*v1.Node, claims []*resourcev1alpha2.ResourceCl
 	reactor := createReactor(tc.client.Tracker())
 	tc.client.PrependReactor("*", "*", reactor)
 
+	scheme := apiruntime.NewScheme()
+	dynClient := dynfake.NewSimpleDynamicClient(scheme)
+
 	tc.informerFactory = informers.NewSharedInformerFactory(tc.client, 0)
 
 	opts := []runtime.Option{
 		runtime.WithClientSet(tc.client),
+		runtime.WithDynClientSet(dynClient),
 		runtime.WithInformerFactory(tc.informerFactory),
 	}
 	fh, err := runtime.NewFramework(ctx, nil, nil, opts...)
@@ -1013,7 +1018,7 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 					require.NoError(t, store.Update(claim))
 				}
 			}
-			actualHint, err := testCtx.p.isSchedulableAfterClaimChange(logger, tc.pod, tc.oldObj, tc.newObj)
+			actualHint, err := testCtx.p.listers.isSchedulableAfterClaimChange(logger, tc.pod, tc.oldObj, tc.newObj)
 			if tc.expectedErr {
 				require.Error(t, err)
 				return
@@ -1142,7 +1147,7 @@ func Test_isSchedulableAfterPodSchedulingContextChange(t *testing.T) {
 			t.Parallel()
 			logger, _ := ktesting.NewTestContext(t)
 			testCtx := setup(t, nil, tc.claims, nil, tc.schedulings)
-			actualHint, err := testCtx.p.isSchedulableAfterPodSchedulingContextChange(logger, tc.pod, tc.oldObj, tc.newObj)
+			actualHint, err := testCtx.p.listers.isSchedulableAfterPodSchedulingContextChange(logger, tc.pod, tc.oldObj, tc.newObj)
 			if tc.expectedErr {
 				require.Error(t, err)
 				return
