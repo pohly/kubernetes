@@ -23,6 +23,7 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/go-logr/logr"
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
@@ -36,8 +37,10 @@ import (
 	resourcev1alpha2apply "k8s.io/client-go/applyconfigurations/resource/v1alpha2"
 	"k8s.io/client-go/kubernetes"
 	resourcev1alpha2listers "k8s.io/client-go/listers/resource/v1alpha2"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
+	"k8s.io/dynamic-resource-allocation/simulation"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
@@ -53,10 +56,24 @@ const (
 	stateKey framework.StateKey = Name
 )
 
-// The state is initialized in PreFilter phase. Because we save the pointer in
-// framework.CycleState, in the later phases we don't need to call Write method
-// to update the value
+// The state is initialized in PreFilter phase (for scheduling) or
+// in StartSimulation (for cluster autoscaling).
+//
+// Because we save the pointer in framework.CycleState, in the later phases we
+// don't need to call Write method to update the value
 type stateData struct {
+	// simulation is true of StartSimulation was invoked.
+	simulation bool
+
+	// listers always gets set when initializing a stateData instance.
+	listers
+
+	// plugins is only non-empty when doing a simulation.
+	plugins map[simulation.PluginName]simulation.StartedPlugin
+
+	// indexers only gets set during a simulation.
+	indexers
+
 	// preScored is true if PreScore was invoked.
 	preScored bool
 
@@ -87,6 +104,39 @@ type stateData struct {
 	informationsForClaim []informationForClaim
 }
 
+type indexers struct {
+	claimNameLookup            *resourceclaim.Lookup
+	claimIndexer, classIndexer cache.Indexer
+}
+
+func (i indexers) clone() indexers {
+	return indexers{
+		claimNameLookup: i.claimNameLookup,
+		claimIndexer:    cloneIndexer(i.claimIndexer),
+		classIndexer:    cloneIndexer(i.classIndexer),
+	}
+}
+
+func (i indexers) listers() listers {
+	return listers{
+		claimNameLookup: i.claimNameLookup,
+		claimLister:     resourcev1alpha2listers.NewResourceClaimLister(i.claimIndexer),
+		classLister:     resourcev1alpha2listers.NewResourceClassLister(i.classIndexer),
+	}
+}
+
+func cloneIndexer(oldIndexer cache.Indexer) cache.Indexer {
+	newIndexer := cache.NewIndexer(cache.DeletionHandlingMetaNamespaceKeyFunc, oldIndexer.GetIndexers())
+	newIndexer.Replace(oldIndexer.List(), "")
+	return newIndexer
+}
+
+type listers struct {
+	claimNameLookup *resourceclaim.Lookup
+	claimLister     resourcev1alpha2listers.ResourceClaimLister
+	classLister     resourcev1alpha2listers.ResourceClassLister
+}
+
 type informationForClaim struct {
 	// The availableOnNode node filter of the claim converted from the
 	// v1 API to nodeaffinity.NodeSelector by PreFilter for repeated
@@ -96,10 +146,25 @@ type informationForClaim struct {
 	// schedulingCtx by PreFilter for repeated
 	// evaluation in Filter. Nil for claim which don't have it.
 	status *resourcev1alpha2.ResourceClaimSchedulingStatus
+	// The plugin which simulates allocation.
+	// Never nil when doing a simulation.
+	plugin simulation.StartedPlugin
 }
 
 func (d *stateData) Clone() framework.StateData {
-	return d
+	if !d.simulation {
+		return d
+	}
+	clone := *d
+	// TODO: can we make this cheaper by only cloning on demand
+	// when the store gets modified?
+	clone.indexers = d.indexers.clone()
+	clone.listers = d.indexers.listers()
+	for name, plugin := range d.plugins {
+		plugin = plugin.Clone()
+		clone.plugins[name] = plugin
+	}
+	return &clone
 }
 
 func (d *stateData) updateClaimStatus(ctx context.Context, clientset kubernetes.Interface, index int, claim *resourcev1alpha2.ResourceClaim) error {
@@ -271,28 +336,60 @@ type dynamicResources struct {
 	enabled                    bool
 	fh                         framework.Handle
 	clientset                  kubernetes.Interface
-	claimLister                resourcev1alpha2listers.ResourceClaimLister
-	classLister                resourcev1alpha2listers.ResourceClassLister
+	plugins                    plugins
+	listers                    listers
+	indexers                   indexers
 	podSchedulingContextLister resourcev1alpha2listers.PodSchedulingContextLister
 }
 
+// plugins is a map with implementations for logging just the names.
+type plugins map[simulation.PluginName]simulation.ActivePlugin
+
+var _ logr.Marshaler = plugins{}
+
+func (p plugins) MarshalLog() interface{} {
+	names := make([]string, 0, len(p))
+	for name := range p {
+		names = append(names, string(name))
+	}
+	sort.Strings(names)
+	return names
+}
+
 // New initializes a new plugin and returns it.
-func New(_ context.Context, plArgs runtime.Object, fh framework.Handle, fts feature.Features) (framework.Plugin, error) {
+func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts feature.Features) (framework.Plugin, error) {
 	if !fts.EnableDynamicResourceAllocation {
 		// Disabled, won't do anything.
 		return &dynamicResources{}, nil
 	}
 
+	// We don't know yet whether this instance will be used for simulating
+	// allocation as part of the Cluster AutoScaler or for which kind of
+	// claims, so we have to activate all available plugins. In the scheduler
+	// there will be no such plugins and this is a no-op.
+	plugins, err := simulation.Registry.Activate(ctx, fh.ClientSet(), fh.SharedInformerFactory())
+	if err != nil {
+		return nil, fmt.Errorf("activating simulation plugins: %v", err)
+	}
+	indexers := indexers{
+		claimNameLookup: resourceclaim.NewNameLookup(fh.ClientSet()),
+		claimIndexer:    fh.SharedInformerFactory().Resource().V1alpha2().ResourceClaims().Informer().GetIndexer(),
+		classIndexer:    fh.SharedInformerFactory().Resource().V1alpha2().ResourceClasses().Informer().GetIndexer(),
+	}
+	listers := indexers.listers()
+
 	return &dynamicResources{
 		enabled:                    true,
 		fh:                         fh,
 		clientset:                  fh.ClientSet(),
-		claimLister:                fh.SharedInformerFactory().Resource().V1alpha2().ResourceClaims().Lister(),
-		classLister:                fh.SharedInformerFactory().Resource().V1alpha2().ResourceClasses().Lister(),
+		plugins:                    plugins,
+		indexers:                   indexers,
+		listers:                    listers,
 		podSchedulingContextLister: fh.SharedInformerFactory().Resource().V1alpha2().PodSchedulingContexts().Lister(),
 	}, nil
 }
 
+var _ framework.ClusterAutoScalerPlugin = &dynamicResources{}
 var _ framework.PreEnqueuePlugin = &dynamicResources{}
 var _ framework.PreFilterPlugin = &dynamicResources{}
 var _ framework.FilterPlugin = &dynamicResources{}
@@ -313,12 +410,13 @@ func (pl *dynamicResources) EventsToRegister() []framework.ClusterEventWithHint 
 	if !pl.enabled {
 		return nil
 	}
+
 	events := []framework.ClusterEventWithHint{
 		// Allocation is tracked in ResourceClaims, so any changes may make the pods schedulable.
-		{Event: framework.ClusterEvent{Resource: framework.ResourceClaim, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterClaimChange},
+		{Event: framework.ClusterEvent{Resource: framework.ResourceClaim, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.listers.isSchedulableAfterClaimChange},
 		// When a driver has provided additional information, a pod waiting for that information
 		// may be schedulable.
-		{Event: framework.ClusterEvent{Resource: framework.PodSchedulingContext, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterPodSchedulingContextChange},
+		{Event: framework.ClusterEvent{Resource: framework.PodSchedulingContext, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.listers.isSchedulableAfterPodSchedulingContextChange},
 		// A resource might depend on node labels for topology filtering.
 		// A new or updated node may make pods schedulable.
 		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeLabel}},
@@ -332,7 +430,7 @@ func (pl *dynamicResources) EventsToRegister() []framework.ClusterEventWithHint 
 // scheduled. When this fails, one of the registered events can trigger another
 // attempt.
 func (pl *dynamicResources) PreEnqueue(ctx context.Context, pod *v1.Pod) (status *framework.Status) {
-	if err := pl.foreachPodResourceClaim(pod, nil); err != nil {
+	if err := pl.listers.foreachPodResourceClaim(pod, nil); err != nil {
 		return statusUnschedulable(klog.FromContext(ctx), err.Error())
 	}
 	return nil
@@ -342,7 +440,7 @@ func (pl *dynamicResources) PreEnqueue(ctx context.Context, pod *v1.Pod) (status
 // an informer. It checks whether that change made a previously unschedulable
 // pod schedulable. It errs on the side of letting a pod scheduling attempt
 // happen.
-func (pl *dynamicResources) isSchedulableAfterClaimChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+func (l *listers) isSchedulableAfterClaimChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
 	if newObj == nil {
 		// Deletes don't make a pod schedulable.
 		return framework.QueueSkip, nil
@@ -355,7 +453,7 @@ func (pl *dynamicResources) isSchedulableAfterClaimChange(logger klog.Logger, po
 	}
 
 	usesClaim := false
-	if err := pl.foreachPodResourceClaim(pod, func(_ string, claim *resourcev1alpha2.ResourceClaim) {
+	if err := l.foreachPodResourceClaim(pod, func(_ string, claim *resourcev1alpha2.ResourceClaim) {
 		if claim.UID == modifiedClaim.UID {
 			usesClaim = true
 		}
@@ -401,7 +499,7 @@ func (pl *dynamicResources) isSchedulableAfterClaimChange(logger klog.Logger, po
 // change made a previously unschedulable pod schedulable (updated) or a new
 // attempt is needed to re-create the object (deleted). It errs on the side of
 // letting a pod scheduling attempt happen.
-func (pl *dynamicResources) isSchedulableAfterPodSchedulingContextChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+func (l *listers) isSchedulableAfterPodSchedulingContextChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
 	// Deleted? That can happen because we ourselves delete the PodSchedulingContext while
 	// working on the pod. This can be ignored.
 	if oldObj != nil && newObj == nil {
@@ -427,7 +525,7 @@ func (pl *dynamicResources) isSchedulableAfterPodSchedulingContextChange(logger 
 	// immediately if this occurred for the first time, otherwise
 	// we allow backoff.
 	pendingDelayedClaims := 0
-	if err := pl.foreachPodResourceClaim(pod, func(podResourceName string, claim *resourcev1alpha2.ResourceClaim) {
+	if err := l.foreachPodResourceClaim(pod, func(podResourceName string, claim *resourcev1alpha2.ResourceClaim) {
 		if claim.Spec.AllocationMode == resourcev1alpha2.AllocationModeWaitForFirstConsumer &&
 			claim.Status.Allocation == nil &&
 			!podSchedulingHasClaimInfo(podScheduling, podResourceName) {
@@ -530,9 +628,9 @@ func sliceContains(hay []string, needle string) bool {
 }
 
 // podResourceClaims returns the ResourceClaims for all pod.Spec.PodResourceClaims.
-func (pl *dynamicResources) podResourceClaims(pod *v1.Pod) ([]*resourcev1alpha2.ResourceClaim, error) {
+func (l *listers) podResourceClaims(pod *v1.Pod) ([]*resourcev1alpha2.ResourceClaim, error) {
 	claims := make([]*resourcev1alpha2.ResourceClaim, 0, len(pod.Spec.ResourceClaims))
-	if err := pl.foreachPodResourceClaim(pod, func(_ string, claim *resourcev1alpha2.ResourceClaim) {
+	if err := l.foreachPodResourceClaim(pod, func(_ string, claim *resourcev1alpha2.ResourceClaim) {
 		// We store the pointer as returned by the lister. The
 		// assumption is that if a claim gets modified while our code
 		// runs, the cache will store a new pointer, not mutate the
@@ -546,9 +644,9 @@ func (pl *dynamicResources) podResourceClaims(pod *v1.Pod) ([]*resourcev1alpha2.
 
 // foreachPodResourceClaim checks that each ResourceClaim for the pod exists.
 // It calls an optional handler for those claims that it finds.
-func (pl *dynamicResources) foreachPodResourceClaim(pod *v1.Pod, cb func(podResourceName string, claim *resourcev1alpha2.ResourceClaim)) error {
+func (l *listers) foreachPodResourceClaim(pod *v1.Pod, cb func(podResourceName string, claim *resourcev1alpha2.ResourceClaim)) error {
 	for _, resource := range pod.Spec.ResourceClaims {
-		claimName, mustCheckOwner, err := resourceclaim.Name(pod, &resource)
+		claimName, mustCheckOwner, err := l.claimNameLookup.Name(pod, &resource)
 		if err != nil {
 			return err
 		}
@@ -558,7 +656,7 @@ func (pl *dynamicResources) foreachPodResourceClaim(pod *v1.Pod, cb func(podReso
 		if claimName == nil {
 			continue
 		}
-		claim, err := pl.claimLister.ResourceClaims(pod.Namespace).Get(*claimName)
+		claim, err := l.claimLister.ResourceClaims(pod.Namespace).Get(*claimName)
 		if err != nil {
 			return err
 		}
@@ -579,12 +677,151 @@ func (pl *dynamicResources) foreachPodResourceClaim(pod *v1.Pod, cb func(podReso
 	return nil
 }
 
+// StartSimulation is invoked only by the cluster autoscaler when it begins
+// a simulation. When the plugin is used like that, it replaces the listers
+// fed by informers with listers that use a snapshot of the current objects.
+// Those stores then may get mutated to simulate the effect of allocating
+// and reserving claims.
+func (pl *dynamicResources) StartSimulation(ctx context.Context, cs *framework.CycleState) *framework.Status {
+	logger := klog.FromContext(ctx)
+	state := &stateData{simulation: true}
+	state.indexers = pl.indexers.clone()
+	state.listers = state.indexers.listers()
+	state.plugins = make(map[simulation.PluginName]simulation.StartedPlugin, len(pl.plugins))
+	for name, plugin := range pl.plugins {
+		plugin, err := plugin.Start(ctx)
+		if err != nil {
+			return statusError(logger, fmt.Errorf("starting simulation in plugin %s: %v", name, err))
+		}
+		state.plugins[name] = plugin
+	}
+	cs.Write(stateKey, state)
+	logger.V(3).Info("Started simulation", "plugins", pl.plugins)
+
+	return nil
+}
+
+// SimulateBindPod gets called after the cluster autoscaler has been determined
+// a pod can potentially run on a node. This was based on the assumption that
+// all claims can be allocated and reserved, so now the cluster must be updated
+// accordingly.
+//
+// This gets called in a loop for all pending pods. After each pod, the claim
+// state must get updated in the snapshot store to have an effect on the next
+// pod.
+func (pl *dynamicResources) SimulateBindPod(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+	logger := klog.FromContext(ctx)
+	node := nodeInfo.Node()
+	logger.V(3).Info("Simulating binding", "pod", klog.KObj(pod), "node", klog.KObj(node))
+	status := pl.pre(ctx, cs, pod)
+	if !status.IsSuccess() {
+		return status
+	}
+	state, err := getStateData(cs)
+	if err != nil {
+		return statusError(logger, err)
+	}
+
+	for index, claim := range state.claims {
+		modified := false
+		if claim.Status.Allocation == nil {
+			allocation, err := state.informationsForClaim[index].plugin.Allocate(ctx, claim, node)
+			if err != nil {
+				return statusUnschedulable(logger, fmt.Sprintf("unallocated immediate resourceclaim: %v", err), "pod", klog.KObj(pod), "resourceclaim", klog.KObj(claim))
+			}
+			claim = claim.DeepCopy()
+			modified = true
+			claim.Status.Allocation = allocation
+
+		}
+		if !resourceclaim.IsReservedForPod(pod, claim) {
+			if !resourceclaim.CanBeReserved(claim) {
+				// Resource is in use. The pod has to wait.
+				return statusUnschedulable(logger, "resourceclaim in use", "pod", klog.KObj(pod), "resourceclaim", klog.KObj(claim))
+			}
+			if !modified {
+				claim = claim.DeepCopy()
+				modified = true
+			}
+			claim.Status.ReservedFor = append(claim.Status.ReservedFor, resourcev1alpha2.ResourceClaimConsumerReference{
+				Resource: "pods",
+				Name:     pod.Name,
+				UID:      pod.UID,
+			})
+		}
+
+		// Store the result of the simulation?
+		if modified {
+			if err := state.indexers.claimIndexer.Add(claim); err != nil {
+				return statusError(logger, fmt.Errorf("store modified resourceclaim: %v", err), "pod", klog.KObj(pod), "resourceclaim", klog.KObj(claim))
+			}
+		}
+	}
+	return nil
+}
+
+// SimulateEvictPod is the inverse operation for SimulateBindPod: a pod is
+// running on a node and the simulation wants to pretend that it is
+// getting removed, together with deallocating all claims that it is
+// currently using.
+func (pl *dynamicResources) SimulateEvictPod(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
+	logger := klog.FromContext(ctx)
+	logger.V(3).Info("Simulating eviction", "pod", klog.KObj(pod), "node", klog.KRef("", nodeName))
+	state, err := getStateData(cs)
+	if err != nil {
+		return statusError(logger, err)
+	}
+	claims, err := state.podResourceClaims(pod)
+	if err != nil {
+		return statusError(logger, err)
+	}
+	logger.V(5).Info("pod resource claims", "pod", klog.KObj(pod), "resourceclaims", klog.KObjSlice(claims))
+	for _, claim := range claims {
+		plugin := state.plugins[simulation.PluginName(claim.Status.DriverName)]
+		if plugin == nil {
+			plugin = unlimitedPlugin{}
+		}
+		claim = claim.DeepCopy()
+
+		// Remove reservation.
+		for i, ref := range claim.Status.ReservedFor {
+			if ref.Resource == "pods" &&
+				ref.Name == pod.Name &&
+				ref.UID == pod.UID {
+				claim.Status.ReservedFor = append(claim.Status.ReservedFor[0:i], claim.Status.ReservedFor[i+1:]...)
+				break
+			}
+		}
+		if err := state.indexers.claimIndexer.Add(claim); err != nil {
+			return statusError(logger, fmt.Errorf("store modified resourceclaim: %v", err), "pod", klog.KObj(pod), "resourceclaim", klog.KObj(claim))
+		}
+
+		// Also deallocate?
+		if len(claim.Status.ReservedFor) == 0 {
+			if err := plugin.Deallocate(ctx, claim); err != nil {
+				return statusError(logger, fmt.Errorf("simulate deallocation: %v", err))
+			}
+			claim.Status.Allocation = nil
+			if err := state.indexers.claimIndexer.Add(claim); err != nil {
+				return statusError(logger, fmt.Errorf("store modified resourceclaim: %v", err), "pod", klog.KObj(pod), "resourceclaim", klog.KObj(claim))
+			}
+		}
+	}
+	return nil
+}
+
 // PreFilter invoked at the prefilter extension point to check if pod has all
 // immediate claims bound. UnschedulableAndUnresolvable is returned if
 // the pod cannot be scheduled at the moment on any node.
-func (pl *dynamicResources) PreFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+func (pl *dynamicResources) PreFilter(ctx context.Context, cs *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+	return nil, pl.pre(ctx, cs, pod)
+}
+
+// pre is called by both PreFilter and SimulateBindPod. It initializes
+// stateData with information about pending claims.
+func (pl *dynamicResources) pre(ctx context.Context, cs *framework.CycleState, pod *v1.Pod) *framework.Status {
 	if !pl.enabled {
-		return nil, framework.NewStatus(framework.Skip)
+		return framework.NewStatus(framework.Skip)
 	}
 	logger := klog.FromContext(ctx)
 
@@ -592,82 +829,109 @@ func (pl *dynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 	// anything for it. We just initialize an empty state to record that
 	// observation for the other functions. This gets updated below
 	// if we get that far.
-	s := &stateData{}
-	state.Write(stateKey, s)
-
-	claims, err := pl.podResourceClaims(pod)
+	//
+	// StartSimulation might have been called before, in which case
+	// our stateData already exists.
+	sf, err := cs.Read(stateKey)
 	if err != nil {
-		return nil, statusUnschedulable(logger, err.Error())
+		sf = &stateData{
+			listers: pl.listers,
+		}
+		cs.Write(stateKey, sf)
+	}
+	state := sf.(*stateData)
+
+	claims, err := state.podResourceClaims(pod)
+	if err != nil {
+		return statusUnschedulable(logger, err.Error())
 	}
 	logger.V(5).Info("pod resource claims", "pod", klog.KObj(pod), "resourceclaims", klog.KObjSlice(claims))
+
 	// If the pod does not reference any claim,
 	// DynamicResources Filter has nothing to do with the Pod.
 	if len(claims) == 0 {
-		return nil, framework.NewStatus(framework.Skip)
+		return framework.NewStatus(framework.Skip)
 	}
 
-	// Fetch s.podSchedulingState.schedulingCtx, it's going to be needed when checking claims.
-	if err := s.podSchedulingState.init(ctx, pod, pl.podSchedulingContextLister); err != nil {
-		return nil, statusError(logger, err)
+	// Fetch PodSchedulingContext, it's going to be needed when checking claims.
+	// During simulation we don't have PodSchedulingContext objects.
+	if !state.simulation {
+		if err := state.podSchedulingState.init(ctx, pod, pl.podSchedulingContextLister); err != nil {
+			return statusError(logger, err)
+		}
 	}
 
-	s.informationsForClaim = make([]informationForClaim, len(claims))
+	state.informationsForClaim = make([]informationForClaim, len(claims))
 	for index, claim := range claims {
 		if claim.Spec.AllocationMode == resourcev1alpha2.AllocationModeImmediate &&
 			claim.Status.Allocation == nil {
-			// This will get resolved by the resource driver.
-			return nil, statusUnschedulable(logger, "unallocated immediate resourceclaim", "pod", klog.KObj(pod), "resourceclaim", klog.KObj(claim))
+			// When simulating, we have to go through the code path below
+			// where we check whether the node is suitable. It might be
+			// a simulated node and returning an error here would prevent
+			// the necessary scale up.
+			if !state.simulation {
+				// This will get resolved by the resource driver.
+				return statusUnschedulable(logger, "unallocated immediate resourceclaim", "pod", klog.KObj(pod), "resourceclaim", klog.KObj(claim))
+			}
 		}
 		if claim.Status.DeallocationRequested {
 			// This will get resolved by the resource driver.
-			return nil, statusUnschedulable(logger, "resourceclaim must be reallocated", "pod", klog.KObj(pod), "resourceclaim", klog.KObj(claim))
+			return statusUnschedulable(logger, "resourceclaim must be reallocated", "pod", klog.KObj(pod), "resourceclaim", klog.KObj(claim))
 		}
 		if claim.Status.Allocation != nil &&
 			!resourceclaim.CanBeReserved(claim) &&
 			!resourceclaim.IsReservedForPod(pod, claim) {
 			// Resource is in use. The pod has to wait.
-			return nil, statusUnschedulable(logger, "resourceclaim in use", "pod", klog.KObj(pod), "resourceclaim", klog.KObj(claim))
+			return statusUnschedulable(logger, "resourceclaim in use", "pod", klog.KObj(pod), "resourceclaim", klog.KObj(claim))
 		}
 		if claim.Status.Allocation != nil &&
 			claim.Status.Allocation.AvailableOnNodes != nil {
 			nodeSelector, err := nodeaffinity.NewNodeSelector(claim.Status.Allocation.AvailableOnNodes)
 			if err != nil {
-				return nil, statusError(logger, err)
+				return statusError(logger, err)
 			}
-			s.informationsForClaim[index].availableOnNode = nodeSelector
+			state.informationsForClaim[index].availableOnNode = nodeSelector
 		}
 		if claim.Status.Allocation == nil &&
-			claim.Spec.AllocationMode == resourcev1alpha2.AllocationModeWaitForFirstConsumer {
+			(state.simulation || claim.Spec.AllocationMode == resourcev1alpha2.AllocationModeWaitForFirstConsumer) {
 			// The ResourceClass might have a node filter. This is
 			// useful for trimming the initial set of potential
 			// nodes before we ask the driver(s) for information
 			// about the specific pod.
-			class, err := pl.classLister.Get(claim.Spec.ResourceClassName)
+			class, err := state.classLister.Get(claim.Spec.ResourceClassName)
 			if err != nil {
 				// If the class cannot be retrieved, allocation cannot proceed.
 				if apierrors.IsNotFound(err) {
 					// Here we mark the pod as "unschedulable", so it'll sleep in
 					// the unscheduleable queue until a ResourceClass event occurs.
-					return nil, statusUnschedulable(logger, fmt.Sprintf("resource class %s does not exist", claim.Spec.ResourceClassName))
+					return statusUnschedulable(logger, fmt.Sprintf("resource class %s does not exist", claim.Spec.ResourceClassName))
 				}
 				// Other error, retry with backoff.
-				return nil, statusError(logger, fmt.Errorf("look up resource class: %v", err))
+				return statusError(logger, fmt.Errorf("look up resource class: %v", err))
 			}
 			if class.SuitableNodes != nil {
 				selector, err := nodeaffinity.NewNodeSelector(class.SuitableNodes)
 				if err != nil {
-					return nil, statusError(logger, err)
+					return statusError(logger, err)
 				}
-				s.informationsForClaim[index].availableOnNode = selector
+				state.informationsForClaim[index].availableOnNode = selector
 			}
-			// Now we need information from drivers.
-			s.informationsForClaim[index].status = statusForClaim(s.podSchedulingState.schedulingCtx, pod.Spec.ResourceClaims[index].Name)
+			// Now we need information from drivers. If we cannot communicate with them via PodSchedulingContxt,
+			// we need a plugin which knows the business logic behind claim allocation.
+			if state.simulation {
+				plugin := state.plugins[simulation.PluginName(class.DriverName)]
+				if plugin == nil {
+					plugin = unlimitedPlugin{}
+				}
+				state.informationsForClaim[index].plugin = plugin
+			} else {
+				state.informationsForClaim[index].status = statusForClaim(state.podSchedulingState.schedulingCtx, pod.Spec.ResourceClaims[index].Name)
+			}
 		}
 	}
 
-	s.claims = claims
-	state.Write(stateKey, s)
-	return nil, nil
+	state.claims = claims
+	return nil
 }
 
 // PreFilterExtensions returns prefilter extensions, pod add and remove.
@@ -731,10 +995,21 @@ func (pl *dynamicResources) Filter(ctx context.Context, cs *framework.CycleState
 					return statusUnschedulable(logger, "excluded by resource class node filter", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclassName", claim.Spec.ResourceClassName)
 				}
 			}
-			if status := state.informationsForClaim[index].status; status != nil {
-				for _, unsuitableNode := range status.UnsuitableNodes {
-					if node.Name == unsuitableNode {
-						return statusUnschedulable(logger, "resourceclaim cannot be allocated for the node (unsuitable)", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim), "unsuitablenodes", status.UnsuitableNodes)
+			if state.simulation {
+				// The plugin must tell us whether the node is suitable.
+				suitable, err := state.informationsForClaim[index].plugin.NodeIsSuitable(ctx, pod, claim, node)
+				if err != nil {
+					return statusError(logger, fmt.Errorf("checking node %s and claim %s: %v", node.Name, klog.KObj(claim), err))
+				}
+				if !suitable {
+					return statusUnschedulable(logger, "resourceclaim cannot be allocated for the node (unsuitable)", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim))
+				}
+			} else {
+				if status := state.informationsForClaim[index].status; status != nil {
+					for _, unsuitableNode := range status.UnsuitableNodes {
+						if node.Name == unsuitableNode {
+							return statusUnschedulable(logger, "resourceclaim cannot be allocated for the node (unsuitable)", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim), "unsuitablenodes", status.UnsuitableNodes)
+						}
 					}
 				}
 			}

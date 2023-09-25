@@ -968,7 +968,7 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 					require.NoError(t, store.Update(claim))
 				}
 			}
-			actualHint, err := testCtx.p.isSchedulableAfterClaimChange(logger, tc.pod, tc.oldObj, tc.newObj)
+			actualHint, err := testCtx.p.listers.isSchedulableAfterClaimChange(logger, tc.pod, tc.oldObj, tc.newObj)
 			if tc.expectedErr {
 				require.Error(t, err)
 				return
@@ -1097,7 +1097,7 @@ func Test_isSchedulableAfterPodSchedulingContextChange(t *testing.T) {
 			t.Parallel()
 			logger, _ := ktesting.NewTestContext(t)
 			testCtx := setup(t, nil, tc.claims, nil, tc.schedulings)
-			actualHint, err := testCtx.p.isSchedulableAfterPodSchedulingContextChange(logger, tc.pod, tc.oldObj, tc.newObj)
+			actualHint, err := testCtx.p.listers.isSchedulableAfterPodSchedulingContextChange(logger, tc.pod, tc.oldObj, tc.newObj)
 			if tc.expectedErr {
 				require.Error(t, err)
 				return

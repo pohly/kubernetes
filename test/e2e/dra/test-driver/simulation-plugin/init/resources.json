@@ -1,0 +1,8 @@
+{
+    "DriverName": "test-driver.cdi.k8s.io",
+    "NodeLocal": true,
+    "NodeLabels": {
+        "test-driver.cdi.k8s.io": "yes"
+    },
+    "MaxAllocations": 2
+}
