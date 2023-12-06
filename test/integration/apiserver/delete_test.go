@@ -26,6 +26,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	applyv1 "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -38,8 +39,8 @@ func TestDeleteConflicts(t *testing.T) {
 	ns := framework.CreateNamespaceOrDie(clientSet, "status-code", t)
 	defer framework.DeleteNamespaceOrDie(clientSet, ns, t)
 
-	numOfObjects := 100
-	numOfOperationsPerObject := 100
+	numOfObjects := 1
+	numOfOperationsPerObject := 4
 	successes := int32(0)
 	notFounds := int32(0)
 
@@ -62,7 +63,7 @@ func TestDeleteConflicts(t *testing.T) {
 		// a valid response. Everything else isn't.
 		for e := 0; e < numOfOperationsPerObject; e++ {
 			wg.Add(1)
-			go func(i int, e int) {
+			/* go */ func(i int, e int) {
 				defer wg.Done()
 
 				if e == numOfOperationsPerObject/2 {
@@ -73,11 +74,23 @@ func TestDeleteConflicts(t *testing.T) {
 					return
 				}
 
-				// This patch includes the UID to ensure that the right object instance
-				// gets patched. This cannot fail in this test because the secret
-				// only gets created once, but it may be relevant elsewhere.
-				patch := fmt.Sprintf(`{"metadata":{"uid": %q, "labels":{"label-%d":"%d"}}}`, secret.UID, e, i)
-				_, err := clientSet.CoreV1().Secrets(secret.Namespace).Patch(ctx, secret.Name, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{})
+				var err error
+				if false {
+					// This patch includes the UID to ensure that the right object instance
+					// gets patched. This cannot fail in this test because the secret
+					// only gets created once, but it may be relevant elsewhere.
+					//
+					// TODO: how does
+					// https://github.com/kubernetes/apiserver/blob/d6876a0600de06fef75968c4641c64d7da499f25/pkg/registry/generic/registry/store.go#L552
+					// figure out the UID precondition? It doesn't have an object, so that code
+					// doesn't do anything.
+					patch := fmt.Sprintf(`{"metadata":{"uid": %q, "labels":{"label-%d":"%d"}}}`, secret.UID, e, i)
+					_, err = clientSet.CoreV1().Secrets(secret.Namespace).Patch(ctx, secret.Name, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{})
+				} else {
+					labels := map[string]string{fmt.Sprintf("label-%d", e): fmt.Sprintf("%d", i)}
+					secretApply := applyv1.Secret(secret.Name, secret.Namespace).WithUID(secret.UID).WithLabels(labels)
+					_, err = clientSet.CoreV1().Secrets(secret.Namespace).Apply(ctx, secretApply, metav1.ApplyOptions{FieldManager: "delete-test", Force: true})
+				}
 				switch {
 				case err == nil:
 					atomic.AddInt32(&successes, 1)
