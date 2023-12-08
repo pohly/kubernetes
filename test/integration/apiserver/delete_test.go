@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	applyv1 "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/kubernetes/test/integration/framework"
+	_ "k8s.io/kubernetes/test/utils/ktesting"
 )
 
 // Tests that the apiserver returns "not found" consistently when multiple
@@ -119,5 +120,149 @@ func TestDeleteConflicts(t *testing.T) {
 		t.Error("FAILURE: Expected at lease one 'not found', got none.")
 	} else {
 		t.Logf("Got a mixture of %d successful patches and %d 'not found'.", successes, notFounds)
+	}
+}
+
+// Tests that the apiserver returns "precondition failed" when an object
+// gets updated and then a client tries to patch the original
+// instance.
+func TestUIDConflictStrategic(t *testing.T) {
+	ctx, clientSet, _, tearDownFn := setup(t)
+	defer tearDownFn()
+
+	ns := framework.CreateNamespaceOrDie(clientSet, "status-code", t)
+	defer framework.DeleteNamespaceOrDie(clientSet, ns, t)
+
+	// Create the objects we're going to conflict on.
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test",
+		},
+	}
+	secret1, err := clientSet.CoreV1().Secrets(ns.Name).Create(ctx, secret, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("FAILURE: error creating secret: %v", err)
+	}
+	if err := clientSet.CoreV1().Secrets(ns.Name).Delete(ctx, secret.Name, metav1.DeleteOptions{}); err != nil {
+		t.Errorf("FAILURE: error deleting secret: %v", err)
+	}
+	if _, err := clientSet.CoreV1().Secrets(ns.Name).Create(ctx, secret, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("FAILURE: error creating secret again: %v", err)
+	}
+
+	patch := fmt.Sprintf(`{"metadata":{"uid": %q, "labels":{"foo":"bar"}}}`, secret1.UID)
+	_, err = clientSet.CoreV1().Secrets(ns.Name).Patch(ctx, secret.Name, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{})
+	switch {
+	case err == nil:
+		t.Error("FAILURE: expected error for patching secret, got none")
+	default:
+		t.Errorf("FAILURE: error patching secret: %v", err)
+	}
+}
+
+// Tests that the apiserver returns "precondition failed" when an object
+// gets deleted, recreated and then a client tries to patch the original
+// instance.
+func TestResourceVersionConflictStrategic(t *testing.T) {
+	ctx, clientSet, _, tearDownFn := setup(t)
+	defer tearDownFn()
+
+	ns := framework.CreateNamespaceOrDie(clientSet, "status-code", t)
+	defer framework.DeleteNamespaceOrDie(clientSet, ns, t)
+
+	// Create the objects we're going to conflict on.
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test",
+		},
+	}
+	secret1, err := clientSet.CoreV1().Secrets(ns.Name).Create(ctx, secret, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("FAILURE: error creating secret: %v", err)
+	}
+	secret1.Labels = map[string]string{"hello": "world"}
+	if _, err := clientSet.CoreV1().Secrets(ns.Name).Update(ctx, secret1, metav1.UpdateOptions{}); err != nil {
+		t.Fatalf("FAILURE: error creating secret again: %v", err)
+	}
+
+	patch := fmt.Sprintf(`{"metadata":{"uid": %q, "resourceVersion": %q, "labels":{"foo":"bar"}}}`, secret1.UID, secret1.ResourceVersion)
+	_, err = clientSet.CoreV1().Secrets(ns.Name).Patch(ctx, secret.Name, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{})
+	switch {
+	case err == nil:
+		t.Error("FAILURE: expected error for patching secret, got none")
+	default:
+		t.Errorf("FAILURE: error patching secret: %v", err)
+	}
+}
+
+// Tests that the apiserver returns "precondition failed" when an object
+// gets updated and then a client tries to patch the original
+// instance.
+func TestUIDConflictJSON(t *testing.T) {
+	ctx, clientSet, _, tearDownFn := setup(t)
+	defer tearDownFn()
+
+	ns := framework.CreateNamespaceOrDie(clientSet, "status-code", t)
+	defer framework.DeleteNamespaceOrDie(clientSet, ns, t)
+
+	// Create the objects we're going to conflict on.
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test",
+		},
+	}
+	secret1, err := clientSet.CoreV1().Secrets(ns.Name).Create(ctx, secret, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("FAILURE: error creating secret: %v", err)
+	}
+	if err := clientSet.CoreV1().Secrets(ns.Name).Delete(ctx, secret.Name, metav1.DeleteOptions{}); err != nil {
+		t.Errorf("FAILURE: error deleting secret: %v", err)
+	}
+	if _, err := clientSet.CoreV1().Secrets(ns.Name).Create(ctx, secret, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("FAILURE: error creating secret again: %v", err)
+	}
+
+	patch := fmt.Sprintf(`{"metadata":{"uid": %q, "labels":{"foo":"bar"}}}`, secret1.UID)
+	_, err = clientSet.CoreV1().Secrets(ns.Name).Patch(ctx, secret.Name, types.JSONPatchType, []byte(patch), metav1.PatchOptions{})
+	switch {
+	case err == nil:
+		t.Error("FAILURE: expected error for patching secret, got none")
+	default:
+		t.Errorf("FAILURE: error patching secret: %v", err)
+	}
+}
+
+// Tests that the apiserver returns "precondition failed" when an object
+// gets deleted, recreated and then a client tries to patch the original
+// instance.
+func TestResourceVersionConflictJSON(t *testing.T) {
+	ctx, clientSet, _, tearDownFn := setup(t)
+	defer tearDownFn()
+
+	ns := framework.CreateNamespaceOrDie(clientSet, "status-code", t)
+	defer framework.DeleteNamespaceOrDie(clientSet, ns, t)
+
+	// Create the objects we're going to conflict on.
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "conflict-test",
+		},
+	}
+	secret1, err := clientSet.CoreV1().Secrets(ns.Name).Create(ctx, secret, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("FAILURE: error creating secret: %v", err)
+	}
+	secret1.Labels = map[string]string{"hello": "world"}
+	if _, err := clientSet.CoreV1().Secrets(ns.Name).Update(ctx, secret1, metav1.UpdateOptions{}); err != nil {
+		t.Fatalf("FAILURE: error creating secret again: %v", err)
+	}
+
+	patch := fmt.Sprintf(`[{"op": "xxx", "path": "/metadata/resourceVersion", "value": %q}, {"op": "add", "path": "/metadata/labels", "value": {"foo":"bar"}}]`, secret1.ResourceVersion)
+	_, err = clientSet.CoreV1().Secrets(ns.Name).Patch(ctx, secret.Name, types.JSONPatchType, []byte(patch), metav1.PatchOptions{})
+	switch {
+	case err == nil:
+		t.Error("FAILURE: expected error for patching secret, got none")
+	default:
+		t.Errorf("FAILURE: error patching secret: %v", err)
 	}
 }
