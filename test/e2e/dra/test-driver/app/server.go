@@ -37,6 +37,7 @@ import (
 	"k8s.io/component-base/metrics"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -55,6 +56,7 @@ import (
 func NewCommand() *cobra.Command {
 	o := logsapi.NewLoggingConfiguration()
 	var clientset kubernetes.Interface
+	var dynClient dynamic.Interface
 	var config *rest.Config
 	ctx := context.Background()
 	logger := klog.Background()
@@ -131,6 +133,10 @@ func NewCommand() *cobra.Command {
 		clientset, err = kubernetes.NewForConfig(config)
 		if err != nil {
 			return fmt.Errorf("create client: %w", err)
+		}
+		dynClient, err = dynamic.NewForConfig(config)
+		if err != nil {
+			return fmt.Errorf("create dynamic client: %w", err)
 		}
 
 		if *httpEndpoint != "" {
@@ -219,7 +225,7 @@ func NewCommand() *cobra.Command {
 		}
 
 		run := func() {
-			controller := NewController(clientset, resources)
+			controller := NewController(clientset, dynClient, resources)
 			controller.Run(ctx, *workers)
 		}
 

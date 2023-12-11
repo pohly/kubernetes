@@ -31,10 +31,14 @@ import (
 	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/dynamic-resource-allocation/controller"
 	"k8s.io/klog/v2"
+	driverv1alpha1 "k8s.io/kubernetes/test/e2e/dra/test-driver/api/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/dra/test-driver/app"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -177,23 +181,40 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		})
 	})
 
-	ginkgo.Context("driver", func() {
+	driverTest := func(customParameters bool) {
 		nodes := NewNodes(f, 1, 1)
 		driver := NewDriver(f, nodes, networkResources) // All tests get their own driver instance.
+		driver.customParameters = customParameters
 		b := newBuilder(f, driver)
 		// We need the parameters name *before* creating it.
 		b.parametersCounter = 1
 		b.classParametersName = b.parametersName()
 
 		ginkgo.It("supports claim and class parameters", func(ctx context.Context) {
-			classParameters := b.parameters("x", "y")
-			claimParameters := b.parameters()
+			var objects []klog.KMetadata
+			if customParameters {
+				objects = append(objects,
+					b.classParameters("x", "y"),
+					b.claimParameters(),
+				)
+			} else {
+				objects = append(objects,
+					b.parameters("x", "y"),
+					b.parameters(),
+				)
+			}
 			pod, template := b.podInline(resourcev1alpha2.AllocationModeWaitForFirstConsumer)
+			objects = append(objects, pod, template)
 
-			b.create(ctx, classParameters, claimParameters, pod, template)
+			b.create(ctx, objects...)
 
 			b.testPod(ctx, f.ClientSet, pod, "user_a", "b", "admin_x", "y")
 		})
+	}
+
+	ginkgo.Context("driver", func() {
+		ginkgo.Context("with ConfigMap parameters", func() { driverTest(false) })
+		ginkgo.Context("with dra.e2e.example.com parameters", func() { driverTest(true) })
 	})
 
 	ginkgo.Context("cluster", func() {
@@ -957,7 +978,8 @@ func (b *builder) class() *resourcev1alpha2.ResourceClass {
 	}
 	if b.classParametersName != "" {
 		class.ParametersRef = &resourcev1alpha2.ResourceClassParametersReference{
-			Kind:      "ConfigMap",
+			APIGroup:  b.driver.parameterAPIGroup,
+			Kind:      b.driver.classParameterAPIKind,
 			Name:      b.classParametersName,
 			Namespace: b.f.Namespace.Name,
 		}
@@ -998,6 +1020,7 @@ func (b *builder) externalClaim(allocationMode resourcev1alpha2.AllocationMode) 
 		Spec: resourcev1alpha2.ResourceClaimSpec{
 			ResourceClassName: b.className(),
 			ParametersRef: &resourcev1alpha2.ResourceClaimParametersReference{
+
 				Kind: "ConfigMap",
 				Name: b.parametersName(),
 			},
@@ -1021,6 +1044,44 @@ func (b *builder) parametersEnv() map[string]string {
 
 // parameters returns a config map with the default env variables.
 func (b *builder) parameters(kv ...string) *v1.ConfigMap {
+	data := b.parameterData(kv...)
+	return &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: b.f.Namespace.Name,
+			Name:      b.parametersName(),
+		},
+		Data: data,
+	}
+}
+
+func (b *builder) classParameters(kv ...string) *driverv1alpha1.ClassParameter {
+	data := b.parameterData(kv...)
+	return &driverv1alpha1.ClassParameter{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: b.f.Namespace.Name,
+			Name:      b.parametersName(),
+		},
+		Spec: driverv1alpha1.ClassParameterSpec{
+			Env: data,
+		},
+	}
+}
+
+func (b *builder) claimParameters(kv ...string) *driverv1alpha1.ClaimParameter {
+	data := b.parameterData(kv...)
+	return &driverv1alpha1.ClaimParameter{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: b.f.Namespace.Name,
+			Name:      b.parametersName(),
+		},
+		Spec: driverv1alpha1.ClaimParameterSpec{
+			Env:   data,
+			Count: 1,
+		},
+	}
+}
+
+func (b *builder) parameterData(kv ...string) map[string]string {
 	b.parametersCounter++
 	data := map[string]string{}
 	for i := 0; i < len(kv); i += 2 {
@@ -1029,13 +1090,7 @@ func (b *builder) parameters(kv ...string) *v1.ConfigMap {
 	if len(data) == 0 {
 		data = b.parametersEnv()
 	}
-	return &v1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: b.f.Namespace.Name,
-			Name:      b.parametersName(),
-		},
-		Data: data,
-	}
+	return data
 }
 
 // makePod returns a simple pod with no resource claims.
@@ -1088,8 +1143,9 @@ func (b *builder) podInline(allocationMode resourcev1alpha2.AllocationMode) (*v1
 			Spec: resourcev1alpha2.ResourceClaimSpec{
 				ResourceClassName: b.className(),
 				ParametersRef: &resourcev1alpha2.ResourceClaimParametersReference{
-					Kind: "ConfigMap",
-					Name: b.parametersName(),
+					APIGroup: b.driver.parameterAPIGroup,
+					Kind:     b.driver.claimParameterAPIKind,
+					Name:     b.parametersName(),
 				},
 				AllocationMode: allocationMode,
 			},
@@ -1152,6 +1208,10 @@ func (b *builder) create(ctx context.Context, objs ...klog.KMetadata) []klog.KMe
 			createdObj, err = b.f.ClientSet.ResourceV1alpha2().ResourceClaims(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
 		case *resourcev1alpha2.ResourceClaimTemplate:
 			createdObj, err = b.f.ClientSet.ResourceV1alpha2().ResourceClaimTemplates(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
+		case *driverv1alpha1.ClassParameter:
+			createdObj, err = createParameters[driverv1alpha1.ClassParameter](ctx, b, obj, "ClassParameter")
+		case *driverv1alpha1.ClaimParameter:
+			createdObj, err = createParameters[driverv1alpha1.ClaimParameter](ctx, b, obj, "ClaimParameter")
 		default:
 			framework.Fail(fmt.Sprintf("internal error, unsupported type %T", obj), 1)
 		}
@@ -1159,6 +1219,25 @@ func (b *builder) create(ctx context.Context, objs ...klog.KMetadata) []klog.KMe
 		createdObjs = append(createdObjs, createdObj)
 	}
 	return createdObjs
+}
+
+func createParameters[T any](ctx context.Context, b *builder, obj runtime.Object, kind string) (*T, error) {
+	gvr := schema.GroupVersionResource{Group: b.driver.parameterAPIGroup, Version: b.driver.parameterAPIVersion, Resource: strings.ToLower(kind) + "s"}
+	obj = obj.DeepCopyObject()
+	obj.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{Group: gvr.Group, Version: gvr.Version, Kind: kind})
+	out, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
+	if err != nil {
+		return nil, fmt.Errorf("conversion to unstructured parameter object %T: %w", obj, err)
+	}
+	in, err := b.f.DynamicClient.Resource(gvr).Namespace(b.f.Namespace.Name).Create(ctx, &unstructured.Unstructured{Object: out}, metav1.CreateOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("create parameter object %T: %v", obj, err)
+	}
+	var created T
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructuredWithValidation(in.Object, &created, true); err != nil {
+		return nil, fmt.Errorf("conversion from unstructured parameter object %T: %w", obj, err)
+	}
+	return &created, nil
 }
 
 // testPod runs pod and checks if container logs contain expected environment variables

@@ -30,26 +30,31 @@ import (
 	v1 "k8s.io/api/core/v1"
 	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	listersv1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/dynamic-resource-allocation/controller"
 	"k8s.io/klog/v2"
+	driverv1alpha1 "k8s.io/kubernetes/test/e2e/dra/test-driver/api/v1alpha1"
 )
 
 type Resources struct {
-	DriverName         string
-	DontSetReservedFor bool
-	NodeLocal          bool
+	DriverName              string
+	DriverParameterAPIGroup string
+	DontSetReservedFor      bool
+	NodeLocal               bool
 	// Nodes is a fixed list of node names on which resources are
 	// available. Mutually exclusive with NodeLabels.
 	Nodes []string
 	// NodeLabels are labels which determine on which nodes resources are
 	// available. Mutually exclusive with Nodes.
 	NodeLabels     labels.Set
-	MaxAllocations int
+	MaxAllocations int64
 	Shareable      bool
 
 	// AllocateWrapper, if set, gets called for each Allocate call.
@@ -134,26 +139,31 @@ type AllocateWrapperType func(ctx context.Context, claimAllocations []*controlle
 
 type ExampleController struct {
 	clientset  kubernetes.Interface
+	dynClient  dynamic.Interface
 	nodeLister listersv1.NodeLister
 	resources  Resources
 
 	mutex sync.Mutex
 	// allocated maps claim.UID to the node (if network-attached) or empty (if not).
 	allocated map[types.UID]string
-	// claimsPerNode counts how many claims are currently allocated for a node (non-empty key)
+	// allocatedPerNode counts how many items are currently allocated for a node (non-empty key)
 	// or allocated for the entire cluster (empty key). Must be kept in sync with allocated.
-	claimsPerNode map[string]int
+	allocatedPerNode map[string]int64
 
 	numAllocations, numDeallocations int64
 }
 
-func NewController(clientset kubernetes.Interface, resources Resources) *ExampleController {
+func NewController(clientset kubernetes.Interface, dynClient dynamic.Interface, resources Resources) *ExampleController {
+	if resources.DriverParameterAPIGroup == "" {
+		resources.DriverParameterAPIGroup = driverv1alpha1.DriverParameterAPIGroup
+	}
 	c := &ExampleController{
 		clientset: clientset,
+		dynClient: dynClient,
 		resources: resources,
 
-		allocated:     make(map[types.UID]string),
-		claimsPerNode: make(map[string]int),
+		allocated:        make(map[types.UID]string),
+		allocatedPerNode: make(map[string]int64),
 	}
 	return c
 }
@@ -197,33 +207,56 @@ func (c *ExampleController) GetNumDeallocations() int64 {
 }
 
 func (c *ExampleController) GetClassParameters(ctx context.Context, class *resourcev1alpha2.ResourceClass) (interface{}, error) {
-	if class.ParametersRef != nil {
-		if class.ParametersRef.APIGroup != "" ||
-			class.ParametersRef.Kind != "ConfigMap" {
-			return nil, fmt.Errorf("class parameters are only supported in APIVersion v1, Kind ConfigMap, got: %v", class.ParametersRef)
-		}
-		return c.readParametersFromConfigMap(ctx, class.ParametersRef.Namespace, class.ParametersRef.Name)
+	if ref := class.ParametersRef; ref != nil {
+		return c.readParameters(ctx, "ClassParameter", ref.APIGroup, ref.Kind, ref.Namespace, ref.Name)
 	}
 	return nil, nil
 }
 
 func (c *ExampleController) GetClaimParameters(ctx context.Context, claim *resourcev1alpha2.ResourceClaim, class *resourcev1alpha2.ResourceClass, classParameters interface{}) (interface{}, error) {
-	if claim.Spec.ParametersRef != nil {
-		if claim.Spec.ParametersRef.APIGroup != "" ||
-			claim.Spec.ParametersRef.Kind != "ConfigMap" {
-			return nil, fmt.Errorf("claim parameters are only supported in APIVersion v1, Kind ConfigMap, got: %v", claim.Spec.ParametersRef)
-		}
-		return c.readParametersFromConfigMap(ctx, claim.Namespace, claim.Spec.ParametersRef.Name)
+	if ref := claim.Spec.ParametersRef; ref != nil {
+		return c.readParameters(ctx, "ClaimParameter", ref.APIGroup, ref.Kind, claim.Namespace, ref.Name)
 	}
 	return nil, nil
 }
 
-func (c *ExampleController) readParametersFromConfigMap(ctx context.Context, namespace, name string) (map[string]string, error) {
+func (c *ExampleController) readParameters(ctx context.Context, expectedKind, group, kind, namespace, name string) (interface{}, error) {
+	switch {
+	case group == "" && kind == "ConfigMap":
+		return c.readParametersFromConfigMap(ctx, namespace, name)
+	case group == c.resources.DriverParameterAPIGroup && kind == expectedKind:
+		return c.readParametersFromCustomParameters(ctx, namespace, name, strings.ToLower(expectedKind)+"s")
+	default:
+		return nil, fmt.Errorf("parameters are only supported in APIVersion v1, Kind ConfigMap or %s, Kind %s, got: %s %s", c.resources.DriverParameterAPIGroup, expectedKind, group, kind)
+	}
+}
+
+func (c *ExampleController) readParametersFromConfigMap(ctx context.Context, namespace, name string) (*driverv1alpha1.ClaimParameterSpec, error) {
 	configMap, err := c.clientset.CoreV1().ConfigMaps(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("get config map: %w", err)
 	}
-	return configMap.Data, nil
+	return &driverv1alpha1.ClaimParameterSpec{Env: configMap.Data}, nil
+}
+
+func (c *ExampleController) readParametersFromCustomParameters(ctx context.Context, namespace, name string, resource string) (*driverv1alpha1.ClaimParameterSpec, error) {
+	gvr := schema.GroupVersionResource{Group: c.resources.DriverParameterAPIGroup, Version: "v1alpha1", Resource: resource}
+	obj, err := c.dynClient.Resource(gvr).Namespace(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("retrieve parameter object: %w", err)
+	}
+	env, _, err := unstructured.NestedStringMap(obj.Object, "spec", "env")
+	if err != nil {
+		return nil, fmt.Errorf("extract env from custom parameters: %w", err)
+	}
+	count, _, err := unstructured.NestedInt64(obj.Object, "spec", "count")
+	if err != nil {
+		return nil, fmt.Errorf("extract count from custom parameters: %w", err)
+	}
+	return &driverv1alpha1.ClaimParameterSpec{
+		Count: count,
+		Env:   env,
+	}, nil
 }
 
 func (c *ExampleController) Allocate(ctx context.Context, claimAllocations []*controller.ClaimAllocation, selectedNode string) {
@@ -258,6 +291,11 @@ func (c *ExampleController) allocateOne(ctx context.Context, claim *resourcev1al
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
+	count := int64(1)
+	if claimParameters != nil {
+		count = claimParameters.(*driverv1alpha1.ClaimParameterSpec).Count
+	}
+
 	// Already allocated? Then we don't need to count it again.
 	node, alreadyAllocated := c.allocated[claim.UID]
 	if alreadyAllocated {
@@ -276,7 +314,7 @@ func (c *ExampleController) allocateOne(ctx context.Context, claim *resourcev1al
 				var viableNodes []string
 				for _, n := range nodes {
 					if c.resources.MaxAllocations == 0 ||
-						c.claimsPerNode[n] < c.resources.MaxAllocations {
+						c.allocatedPerNode[n]+count <= c.resources.MaxAllocations {
 						viableNodes = append(viableNodes, n)
 					}
 				}
@@ -289,12 +327,12 @@ func (c *ExampleController) allocateOne(ctx context.Context, claim *resourcev1al
 				logger.V(3).Info("picked a node ourselves", "selectedNode", selectedNode)
 			} else if !contains(nodes, node) ||
 				c.resources.MaxAllocations > 0 &&
-					c.claimsPerNode[node] >= c.resources.MaxAllocations {
+					c.allocatedPerNode[node]+count > c.resources.MaxAllocations {
 				return nil, fmt.Errorf("resources exhausted on node %q", node)
 			}
 		} else {
 			if c.resources.MaxAllocations > 0 &&
-				len(c.allocated) >= c.resources.MaxAllocations {
+				c.allocatedPerNode[""]+count > c.resources.MaxAllocations {
 				return nil, errors.New("resources exhausted in the cluster")
 			}
 		}
@@ -314,7 +352,7 @@ func (c *ExampleController) allocateOne(ctx context.Context, claim *resourcev1al
 	if !alreadyAllocated {
 		c.numAllocations++
 		c.allocated[claim.UID] = node
-		c.claimsPerNode[node]++
+		c.allocatedPerNode[node] += count
 	}
 	return allocation, nil
 }
@@ -333,7 +371,7 @@ func (c *ExampleController) Deallocate(ctx context.Context, claim *resourcev1alp
 	logger.V(3).Info("done")
 	c.numDeallocations++
 	delete(c.allocated, claim.UID)
-	c.claimsPerNode[node]--
+	c.allocatedPerNode[node]--
 	return nil
 }
 
@@ -363,7 +401,7 @@ func (c *ExampleController) UnsuitableNodes(ctx context.Context, pod *v1.Pod, cl
 				// for all of them. Also, nodes that the driver
 				// doesn't run on cannot be used.
 				if !contains(nodes, node) ||
-					c.claimsPerNode[node]+len(claims) > c.resources.MaxAllocations {
+					c.allocatedPerNode[node]+totalCount(claims) > c.resources.MaxAllocations {
 					claim.UnsuitableNodes = append(claim.UnsuitableNodes, node)
 				}
 			}
@@ -371,12 +409,12 @@ func (c *ExampleController) UnsuitableNodes(ctx context.Context, pod *v1.Pod, cl
 		return nil
 	}
 
-	allocations := c.claimsPerNode[""]
+	allocations := c.allocatedPerNode[""]
 	for _, claim := range claims {
 		claim.UnsuitableNodes = nil
 		for _, node := range potentialNodes {
 			if !contains(nodes, node) ||
-				allocations+len(claims) > c.resources.MaxAllocations {
+				allocations+totalCount(claims) > c.resources.MaxAllocations {
 				claim.UnsuitableNodes = append(claim.UnsuitableNodes, node)
 			}
 		}
@@ -385,13 +423,25 @@ func (c *ExampleController) UnsuitableNodes(ctx context.Context, pod *v1.Pod, cl
 	return nil
 }
 
+func totalCount(claims []*controller.ClaimAllocation) int64 {
+	total := int64(0)
+	for _, claim := range claims {
+		count := int64(1)
+		if claim.ClaimParameters != nil {
+			count = claim.ClaimParameters.(*driverv1alpha1.ClaimParameterSpec).Count
+		}
+		total += count
+	}
+	return total
+}
+
 func toEnvVars(what string, from interface{}, to map[string]string) {
 	if from == nil {
 		return
 	}
 
-	env := from.(map[string]string)
-	for key, value := range env {
+	param := from.(*driverv1alpha1.ClaimParameterSpec)
+	for key, value := range param.Env {
 		to[what+"_"+strings.ToLower(key)] = value
 	}
 }

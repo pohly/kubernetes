@@ -1,12 +1,13 @@
 # One inline resource claim, one pod, two containers.
 # One container uses resource, one does not.
-apiVersion: v1
-kind: ConfigMap
+apiVersion: dra.e2e.example.com/v1alpha1
+kind: ClaimParameter
 metadata:
   name: test-inline-claim-parameters
   namespace: default
-data:
-  a: b
+spec:
+  env:
+    a: b
 ---
 apiVersion: resource.k8s.io/v1alpha2
 kind: ResourceClaimTemplate
@@ -20,7 +21,8 @@ spec:
   spec:
     resourceClassName: example
     parametersRef:
-      kind: ConfigMap
+      apiGroup: dra.e2e.example.com
+      kind: ClaimParameter
       name: test-inline-claim-parameters
 ---
 apiVersion: v1

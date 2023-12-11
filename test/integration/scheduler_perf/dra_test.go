@@ -194,7 +194,7 @@ func (op *createResourceDriverOp) run(ctx context.Context, tb testing.TB, client
 	resources := draapp.Resources{
 		DriverName:     op.DriverName,
 		NodeLocal:      true,
-		MaxAllocations: op.MaxClaimsPerNode,
+		MaxAllocations: int64(op.MaxClaimsPerNode),
 	}
 
 	nodes, err := client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})

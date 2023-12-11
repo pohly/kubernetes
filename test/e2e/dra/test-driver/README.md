@@ -71,19 +71,23 @@ go run ./test/e2e/dra/test-driver --feature-gates ContextualLogging=true -v=5 ku
 
 And finally:
 ```console
+$ kubectl create -f test/e2e/dra/test-driver/deploy/crd
+customresourcedefinition.apiextensions.k8s.io/claimparameters.dra.e2e.example.com created
+customresourcedefinition.apiextensions.k8s.io/classparameters.dra.e2e.example.com created
 $ kubectl create -f test/e2e/dra/test-driver/deploy/example/resourceclass.yaml
 resourceclass/example created
 $ kubectl create -f test/e2e/dra/test-driver/deploy/example/pod-inline.yaml
-configmap/pause-claim-parameters created
-pod/pause created
+claimparameter.dra.e2e.example.com/test-inline-claim-parameters created
+resourceclaimtemplate.resource.k8s.io/test-inline-claim-template created
+pod/test-inline-claim created
 
 $ kubectl get resourceclaims
-NAME             CLASSNAME   ALLOCATIONMODE         STATE                AGE
-pause-resource   example     WaitForFirstConsumer   allocated,reserved   19s
+NAME                               RESOURCECLASSNAME   ALLOCATIONMODE         STATE     AGE
+test-inline-claim-resource-p2x5s   example             WaitForFirstConsumer   pending   22s
 
 $ kubectl get pods
-NAME    READY   STATUS    RESTARTS   AGE
-pause   1/1     Running   0          23s
+NAME                READY   STATUS      RESTARTS   AGE
+test-inline-claim   0/2     Completed   0          8m9s
 ```
 
 There are also examples for other scenarios (multiple pods, multiple claims).

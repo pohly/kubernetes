@@ -1,0 +1,70 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.13.0
+  name: claimparameters.dra.e2e.example.com
+spec:
+  group: dra.e2e.example.com
+  names:
+    kind: ClaimParameter
+    listKind: ClaimParameterList
+    plural: claimparameters
+    singular: claimparameter
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: ClaimParameter is the type used for ResourceClaims.
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: 'Spec is used for these reasons: - Familarity - most types
+              have it, even when they have no status. - It groups non-standard fields
+              together in a YAML dump. - It contains metav1.TypeMeta for use as numeric
+              parameters, which would clash with the metav1.TypeMeta in the root (could
+              be fixed by using a different TypeMeta for numeric parameters).'
+            properties:
+              apiVersion:
+                default: counter.dra.config.k8s.io/v1alpha1
+                description: APIVersion must be one which is supported by the driver.
+                enum:
+                - counter.dra.config.k8s.io/v1alpha1
+                type: string
+              count:
+                default: 1
+                description: Count is the required number of items per claim.
+                format: int32
+                minimum: 1
+                type: integer
+              env:
+                additionalProperties:
+                  type: string
+                description: Env are environment variables that get injected into
+                  the container sandbox by the driver.
+                type: object
+              kind:
+                default: Capacity
+                description: Kind must be "Capacity".
+                enum:
+                - Capacity
+                type: string
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true

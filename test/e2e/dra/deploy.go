@@ -24,6 +24,7 @@ import (
 	"net"
 	"path"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -33,6 +34,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
@@ -125,6 +127,12 @@ type Driver struct {
 	Name       string
 	Nodes      map[string]*app.ExamplePlugin
 
+	customParameters      bool
+	parameterAPIGroup     string
+	parameterAPIVersion   string
+	claimParameterAPIKind string
+	classParameterAPIKind string
+
 	NodeV1alpha2, NodeV1alpha3 bool
 
 	mutex      sync.Mutex
@@ -137,6 +145,7 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 	d.Nodes = map[string]*app.ExamplePlugin{}
 	d.Name = d.f.UniqueName + d.NameSuffix + ".k8s.io"
 	resources.DriverName = d.Name
+	resources.DriverParameterAPIGroup = d.f.UniqueName + d.NameSuffix + ".dra.example.com"
 
 	ctx, cancel := context.WithCancel(context.Background())
 	if d.NameSuffix != "" {
@@ -148,7 +157,7 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 	d.cleanup = append(d.cleanup, cancel)
 
 	// The controller is easy: we simply connect to the API server.
-	d.Controller = app.NewController(d.f.ClientSet, resources)
+	d.Controller = app.NewController(d.f.ClientSet, d.f.DynamicClient, resources)
 	d.wg.Add(1)
 	go func() {
 		defer d.wg.Done()
@@ -160,6 +169,22 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 		// container names, etc.).
 		"test/e2e/testing-manifests/dra/dra-test-driver-proxy.yaml",
 	}
+	if d.customParameters {
+		d.parameterAPIGroup = d.f.UniqueName + d.NameSuffix + ".dra.example.com"
+		d.parameterAPIVersion = "v1alpha1"
+		d.claimParameterAPIKind = "ClaimParameter"
+		d.classParameterAPIKind = "ClassParameter"
+		manifests = append(manifests,
+			"test/e2e/dra/test-driver/deploy/crd/dra.e2e.example.com_claimparameters.yaml",
+			"test/e2e/dra/test-driver/deploy/crd/dra.e2e.example.com_classparameters.yaml",
+		)
+	} else {
+		d.parameterAPIGroup = ""
+		d.parameterAPIVersion = "v1"
+		d.claimParameterAPIKind = "ConfigMap"
+		d.classParameterAPIKind = "ConfigMap"
+	}
+
 	instanceKey := "app.kubernetes.io/instance"
 	rsName := ""
 	draAddr := path.Join(framework.TestContext.KubeletRootDir, "plugins", d.Name+".sock")
@@ -192,6 +217,10 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 			item.Spec.Template.Spec.Volumes[2].HostPath.Path = path.Join(framework.TestContext.KubeletRootDir, "plugins_registry")
 			item.Spec.Template.Spec.Containers[0].Args = append(item.Spec.Template.Spec.Containers[0].Args, "--endpoint=/plugins_registry/"+d.Name+"-reg.sock")
 			item.Spec.Template.Spec.Containers[1].Args = append(item.Spec.Template.Spec.Containers[1].Args, "--endpoint=/dra/"+d.Name+".sock")
+		case *apiextensionsv1.CustomResourceDefinition:
+			item.Name = strings.ReplaceAll(item.Name, "dra.e2e.example.com", d.parameterAPIGroup)
+			item.Spec.Group = d.parameterAPIGroup
+
 		}
 		return nil
 	}, manifests...)
