@@ -24,6 +24,7 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
+	noderesourcecapacitystore "k8s.io/kubernetes/pkg/registry/resource/noderesourcecapacity/storage"
 	podschedulingcontextsstore "k8s.io/kubernetes/pkg/registry/resource/podschedulingcontext/storage"
 	resourceclaimstore "k8s.io/kubernetes/pkg/registry/resource/resourceclaim/storage"
 	resourceclaimtemplatestore "k8s.io/kubernetes/pkg/registry/resource/resourceclaimtemplate/storage"
@@ -81,6 +82,15 @@ func (p RESTStorageProvider) v1alpha2Storage(apiResourceConfigSource serverstora
 		}
 		storage[resource] = podSchedulingStorage
 		storage[resource+"/status"] = podSchedulingStatusStorage
+	}
+
+	// TODO: feature gate?
+	if resource := "noderesourcecapacities"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha2.SchemeGroupVersion.WithResource(resource)) {
+		nodeResourceCapacityStorage, err := noderesourcecapacitystore.NewREST(restOptionsGetter)
+		if err != nil {
+			return nil, err
+		}
+		storage[resource] = nodeResourceCapacityStorage
 	}
 
 	return storage, nil

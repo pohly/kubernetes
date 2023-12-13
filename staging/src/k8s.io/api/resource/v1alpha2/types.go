@@ -19,6 +19,7 @@ package v1alpha2
 import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -347,6 +348,33 @@ type ResourceClass struct {
 	// Setting this field is optional. If null, all nodes are candidates.
 	// +optional
 	SuitableNodes *v1.NodeSelector `json:"suitableNodes,omitempty" protobuf:"bytes,4,opt,name=suitableNodes"`
+
+	// If (and only if) allocation of claims using this class is handled
+	// via numeric parameters, then NumericParameters must list all claim
+	// parameter types that are allowed for claims.
+	//
+	// +listType=atomic
+	// +optional
+	NumericParameters []NumericParameterType `json:"numericParameters,omitempty" protobuf:"bytes,5,opt,name=numericParameters"`
+}
+
+type NumericParameterType struct {
+	// APIGroup is the group for the resource being referenced. It is
+	// empty for the core API. This matches the group in the APIVersion
+	// that is used when creating the resources.
+	// +optional
+	APIGroup string `json:"apiGroup,omitempty" protobuf:"bytes,1,opt,name=apiGroup"`
+	// Kind is the type of resource being referenced. This is the same
+	// value as in the parameter object's metadata.
+	Kind string `json:"kind" protobuf:"bytes,2,name=kind"`
+
+	// FieldPath is a dot separarated JSON path that defines where in the
+	// parameter object the numeric parameters are embedded.
+	FieldPath string `json:"fieldPath" protobuf:"bytes,3,name=fieldPath"`
+
+	// Shareable is copied into the AllocationResult when a claim
+	// gets allocated.
+	Shareable bool `json:"shareable" protobuf:"bytes,4,name=shareable"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -461,4 +489,60 @@ type ResourceClaimTemplateList struct {
 
 	// Items is the list of resource claim templates.
 	Items []ResourceClaimTemplate `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
+
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.30
+
+// NodeResourceCapacity gets published by kubelet. Its name
+// matches the name of the node and the node is the owner.
+//
+// Capacity may get added, but should not get removed because
+// it would make scheduling decisions based on the old capacity
+// invalid.
+type NodeResourceCapacity struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard object metadata
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Resources contains information about the capacity
+	// reported by each DRA driver.
+	//
+	// +listType=map
+	// +listMapKey=driverName
+	// +patchStrategy=merge
+	// +patchMergeKey=driverName
+	// +optional
+	Resources []DriverResources `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources" patchStrategy:"merge" patchMergeKey:"driverName"`
+}
+
+type DriverResources struct {
+	// DriverName identifies the DRA which provided the capacity information.
+	DriverName string `json:"driverName,omitempty" protobuf:"bytes,1,opt,name=driverName"`
+
+	// ResourceInstances describes all discrete resource instances that are
+	// managed by the driver. Each entry must be an object of one of the
+	// supported numeric resource capacity types with kind, version and uid
+	// set. The uid only needs to be unique inside the node.
+	//
+	// +listType=atomic
+	// +optional
+	ResourceInstances []runtime.RawExtension `json:"resourceInstances,omitempty" protobuf:"bytes,2,opt,name=resourceInstances"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.26
+
+// NodeResourceCapacityList is a collection of claim templates.
+type NodeResourceCapacityList struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Items is the list of node resource capacity objects.
+	Items []NodeResourceCapacity `json:"items" protobuf:"bytes,2,rep,name=items"`
 }

@@ -654,6 +654,14 @@ func AddHandlers(h printers.PrintHandler) {
 	_ = h.TableHandler(podSchedulingCtxColumnDefinitions, printPodSchedulingContext)
 	_ = h.TableHandler(podSchedulingCtxColumnDefinitions, printPodSchedulingContextList)
 
+	nodeResourceCapacityColumnDefinitions := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		// TODO (?): list all drivers
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	_ = h.TableHandler(nodeResourceCapacityColumnDefinitions, printNodeResourceCapacity)
+	_ = h.TableHandler(nodeResourceCapacityColumnDefinitions, printNodeResourceCapacityList)
+
 	serviceCIDRColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "CIDRs", Type: "string", Description: networkingv1alpha1.ServiceCIDRSpec{}.SwaggerDoc()["cidrs"]},
@@ -3008,6 +3016,27 @@ func printPodSchedulingContextList(list *resource.PodSchedulingContextList, opti
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printPodSchedulingContext(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+func printNodeResourceCapacity(obj *resource.NodeResourceCapacity, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	row := metav1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+	row.Cells = append(row.Cells, obj.Name, translateTimestampSince(obj.CreationTimestamp))
+
+	return []metav1.TableRow{row}, nil
+}
+
+func printNodeResourceCapacityList(list *resource.NodeResourceCapacityList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	rows := make([]metav1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printNodeResourceCapacity(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}

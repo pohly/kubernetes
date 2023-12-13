@@ -18,6 +18,7 @@ package resource
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/apis/core"
 )
@@ -323,6 +324,30 @@ type ResourceClass struct {
 	// Setting this field is optional. If null, all nodes are candidates.
 	// +optional
 	SuitableNodes *core.NodeSelector
+
+	// If (and only if) allocation of claims using this class is handled
+	// via numeric parameters, then NumericParameters must list all claim
+	// parameter types that are allowed for claims.
+	NumericParameters []NumericParameterType
+}
+
+type NumericParameterType struct {
+	// APIGroup is the group for the resource being referenced. It is
+	// empty for the core API. This matches the group in the APIVersion
+	// that is used when creating the resources.
+	// +optional
+	APIGroup string
+	// Kind is the type of resource being referenced. This is the same
+	// value as in the parameter object's metadata.
+	Kind string
+
+	// FieldPath is a dot separarated JSON path that defines where in the
+	// parameter object the numeric parameters are embedded.
+	FieldPath string
+
+	// Shareable is copied into the AllocationResult when a claim
+	// gets allocated.
+	Shareable bool
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -433,4 +458,51 @@ type ResourceClaimTemplateList struct {
 
 	// Items is the list of resource claim templates.
 	Items []ResourceClaimTemplate
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// NodeResourceCapacity gets published by kubelet. Its name
+// matches the name of the node and the node is the owner.
+//
+// Capacity may get added, but should not get removed because
+// it would make scheduling decisions based on the old capacity
+// invalid.
+type NodeResourceCapacity struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard object metadata
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Resources contains information about the capacity
+	// reported by each DRA driver.
+	//
+	// +optional
+	Resources []DriverResources
+}
+
+type DriverResources struct {
+	// DriverName identifies the DRA which provided the capacity information.
+	DriverName string `json:"driverName,omitempty" protobuf:"bytes,1,opt,name=driverName"`
+
+	// ResourceInstances describes all discrete resource instances that are
+	// managed by the driver. Each entry must be an object of one of the
+	// supported numeric resource capacity types with kind, version and uid
+	// set. The uid only needs to be unique inside the node.
+	//
+	// +optional
+	ResourceInstances []runtime.RawExtension
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// NodeResourceCapacityList is a collection of claim templates.
+type NodeResourceCapacityList struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata
+	// +optional
+	metav1.ListMeta
+
+	// Items is the list of node resource capacity objects.
+	Items []NodeResourceCapacity
 }
