@@ -1493,6 +1493,12 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		// Group=resource.k8s.io, Version=v1alpha2
 	case v1alpha2.SchemeGroupVersion.WithKind("AllocationResult"):
 		return &resourcev1alpha2.AllocationResultApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("DriverResources"):
+		return &resourcev1alpha2.DriverResourcesApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("NodeResourceCapacity"):
+		return &resourcev1alpha2.NodeResourceCapacityApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("NumericParameterType"):
+		return &resourcev1alpha2.NumericParameterTypeApplyConfiguration{}
 	case v1alpha2.SchemeGroupVersion.WithKind("PodSchedulingContext"):
 		return &resourcev1alpha2.PodSchedulingContextApplyConfiguration{}
 	case v1alpha2.SchemeGroupVersion.WithKind("PodSchedulingContextSpec"):

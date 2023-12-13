@@ -28,6 +28,7 @@ import (
 
 type ResourceV1alpha2Interface interface {
 	RESTClient() rest.Interface
+	NodeResourceCapacitiesGetter
 	PodSchedulingContextsGetter
 	ResourceClaimsGetter
 	ResourceClaimTemplatesGetter
@@ -37,6 +38,10 @@ type ResourceV1alpha2Interface interface {
 // ResourceV1alpha2Client is used to interact with features provided by the resource.k8s.io group.
 type ResourceV1alpha2Client struct {
 	restClient rest.Interface
+}
+
+func (c *ResourceV1alpha2Client) NodeResourceCapacities() NodeResourceCapacityInterface {
+	return newNodeResourceCapacities(c)
 }
 
 func (c *ResourceV1alpha2Client) PodSchedulingContexts(namespace string) PodSchedulingContextInterface {

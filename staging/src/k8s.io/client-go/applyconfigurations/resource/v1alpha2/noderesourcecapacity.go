@@ -23,63 +23,59 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
-	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	internal "k8s.io/client-go/applyconfigurations/internal"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ResourceClassApplyConfiguration represents an declarative configuration of the ResourceClass type for use
+// NodeResourceCapacityApplyConfiguration represents an declarative configuration of the NodeResourceCapacity type for use
 // with apply.
-type ResourceClassApplyConfiguration struct {
+type NodeResourceCapacityApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	DriverName                       *string                                             `json:"driverName,omitempty"`
-	ParametersRef                    *ResourceClassParametersReferenceApplyConfiguration `json:"parametersRef,omitempty"`
-	SuitableNodes                    *corev1.NodeSelectorApplyConfiguration              `json:"suitableNodes,omitempty"`
-	NumericParameters                []NumericParameterTypeApplyConfiguration            `json:"numericParameters,omitempty"`
+	Resources                        []DriverResourcesApplyConfiguration `json:"resources,omitempty"`
 }
 
-// ResourceClass constructs an declarative configuration of the ResourceClass type for use with
+// NodeResourceCapacity constructs an declarative configuration of the NodeResourceCapacity type for use with
 // apply.
-func ResourceClass(name string) *ResourceClassApplyConfiguration {
-	b := &ResourceClassApplyConfiguration{}
+func NodeResourceCapacity(name string) *NodeResourceCapacityApplyConfiguration {
+	b := &NodeResourceCapacityApplyConfiguration{}
 	b.WithName(name)
-	b.WithKind("ResourceClass")
+	b.WithKind("NodeResourceCapacity")
 	b.WithAPIVersion("resource.k8s.io/v1alpha2")
 	return b
 }
 
-// ExtractResourceClass extracts the applied configuration owned by fieldManager from
-// resourceClass. If no managedFields are found in resourceClass for fieldManager, a
-// ResourceClassApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// ExtractNodeResourceCapacity extracts the applied configuration owned by fieldManager from
+// nodeResourceCapacity. If no managedFields are found in nodeResourceCapacity for fieldManager, a
+// NodeResourceCapacityApplyConfiguration is returned with only the Name, Namespace (if applicable),
 // APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
-// resourceClass must be a unmodified ResourceClass API object that was retrieved from the Kubernetes API.
-// ExtractResourceClass provides a way to perform a extract/modify-in-place/apply workflow.
+// nodeResourceCapacity must be a unmodified NodeResourceCapacity API object that was retrieved from the Kubernetes API.
+// ExtractNodeResourceCapacity provides a way to perform a extract/modify-in-place/apply workflow.
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractResourceClass(resourceClass *resourcev1alpha2.ResourceClass, fieldManager string) (*ResourceClassApplyConfiguration, error) {
-	return extractResourceClass(resourceClass, fieldManager, "")
+func ExtractNodeResourceCapacity(nodeResourceCapacity *resourcev1alpha2.NodeResourceCapacity, fieldManager string) (*NodeResourceCapacityApplyConfiguration, error) {
+	return extractNodeResourceCapacity(nodeResourceCapacity, fieldManager, "")
 }
 
-// ExtractResourceClassStatus is the same as ExtractResourceClass except
+// ExtractNodeResourceCapacityStatus is the same as ExtractNodeResourceCapacity except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractResourceClassStatus(resourceClass *resourcev1alpha2.ResourceClass, fieldManager string) (*ResourceClassApplyConfiguration, error) {
-	return extractResourceClass(resourceClass, fieldManager, "status")
+func ExtractNodeResourceCapacityStatus(nodeResourceCapacity *resourcev1alpha2.NodeResourceCapacity, fieldManager string) (*NodeResourceCapacityApplyConfiguration, error) {
+	return extractNodeResourceCapacity(nodeResourceCapacity, fieldManager, "status")
 }
 
-func extractResourceClass(resourceClass *resourcev1alpha2.ResourceClass, fieldManager string, subresource string) (*ResourceClassApplyConfiguration, error) {
-	b := &ResourceClassApplyConfiguration{}
-	err := managedfields.ExtractInto(resourceClass, internal.Parser().Type("io.k8s.api.resource.v1alpha2.ResourceClass"), fieldManager, b, subresource)
+func extractNodeResourceCapacity(nodeResourceCapacity *resourcev1alpha2.NodeResourceCapacity, fieldManager string, subresource string) (*NodeResourceCapacityApplyConfiguration, error) {
+	b := &NodeResourceCapacityApplyConfiguration{}
+	err := managedfields.ExtractInto(nodeResourceCapacity, internal.Parser().Type("io.k8s.api.resource.v1alpha2.NodeResourceCapacity"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}
-	b.WithName(resourceClass.Name)
+	b.WithName(nodeResourceCapacity.Name)
 
-	b.WithKind("ResourceClass")
+	b.WithKind("NodeResourceCapacity")
 	b.WithAPIVersion("resource.k8s.io/v1alpha2")
 	return b, nil
 }
@@ -87,7 +83,7 @@ func extractResourceClass(resourceClass *resourcev1alpha2.ResourceClass, fieldMa
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Kind field is set to the value of the last call.
-func (b *ResourceClassApplyConfiguration) WithKind(value string) *ResourceClassApplyConfiguration {
+func (b *NodeResourceCapacityApplyConfiguration) WithKind(value string) *NodeResourceCapacityApplyConfiguration {
 	b.Kind = &value
 	return b
 }
@@ -95,7 +91,7 @@ func (b *ResourceClassApplyConfiguration) WithKind(value string) *ResourceClassA
 // WithAPIVersion sets the APIVersion field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the APIVersion field is set to the value of the last call.
-func (b *ResourceClassApplyConfiguration) WithAPIVersion(value string) *ResourceClassApplyConfiguration {
+func (b *NodeResourceCapacityApplyConfiguration) WithAPIVersion(value string) *NodeResourceCapacityApplyConfiguration {
 	b.APIVersion = &value
 	return b
 }
@@ -103,7 +99,7 @@ func (b *ResourceClassApplyConfiguration) WithAPIVersion(value string) *Resource
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Name field is set to the value of the last call.
-func (b *ResourceClassApplyConfiguration) WithName(value string) *ResourceClassApplyConfiguration {
+func (b *NodeResourceCapacityApplyConfiguration) WithName(value string) *NodeResourceCapacityApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.Name = &value
 	return b
@@ -112,7 +108,7 @@ func (b *ResourceClassApplyConfiguration) WithName(value string) *ResourceClassA
 // WithGenerateName sets the GenerateName field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the GenerateName field is set to the value of the last call.
-func (b *ResourceClassApplyConfiguration) WithGenerateName(value string) *ResourceClassApplyConfiguration {
+func (b *NodeResourceCapacityApplyConfiguration) WithGenerateName(value string) *NodeResourceCapacityApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.GenerateName = &value
 	return b
@@ -121,7 +117,7 @@ func (b *ResourceClassApplyConfiguration) WithGenerateName(value string) *Resour
 // WithNamespace sets the Namespace field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Namespace field is set to the value of the last call.
-func (b *ResourceClassApplyConfiguration) WithNamespace(value string) *ResourceClassApplyConfiguration {
+func (b *NodeResourceCapacityApplyConfiguration) WithNamespace(value string) *NodeResourceCapacityApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.Namespace = &value
 	return b
@@ -130,7 +126,7 @@ func (b *ResourceClassApplyConfiguration) WithNamespace(value string) *ResourceC
 // WithUID sets the UID field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the UID field is set to the value of the last call.
-func (b *ResourceClassApplyConfiguration) WithUID(value types.UID) *ResourceClassApplyConfiguration {
+func (b *NodeResourceCapacityApplyConfiguration) WithUID(value types.UID) *NodeResourceCapacityApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.UID = &value
 	return b
@@ -139,7 +135,7 @@ func (b *ResourceClassApplyConfiguration) WithUID(value types.UID) *ResourceClas
 // WithResourceVersion sets the ResourceVersion field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the ResourceVersion field is set to the value of the last call.
-func (b *ResourceClassApplyConfiguration) WithResourceVersion(value string) *ResourceClassApplyConfiguration {
+func (b *NodeResourceCapacityApplyConfiguration) WithResourceVersion(value string) *NodeResourceCapacityApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.ResourceVersion = &value
 	return b
@@ -148,7 +144,7 @@ func (b *ResourceClassApplyConfiguration) WithResourceVersion(value string) *Res
 // WithGeneration sets the Generation field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Generation field is set to the value of the last call.
-func (b *ResourceClassApplyConfiguration) WithGeneration(value int64) *ResourceClassApplyConfiguration {
+func (b *NodeResourceCapacityApplyConfiguration) WithGeneration(value int64) *NodeResourceCapacityApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.Generation = &value
 	return b
@@ -157,7 +153,7 @@ func (b *ResourceClassApplyConfiguration) WithGeneration(value int64) *ResourceC
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *ResourceClassApplyConfiguration) WithCreationTimestamp(value metav1.Time) *ResourceClassApplyConfiguration {
+func (b *NodeResourceCapacityApplyConfiguration) WithCreationTimestamp(value metav1.Time) *NodeResourceCapacityApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.CreationTimestamp = &value
 	return b
@@ -166,7 +162,7 @@ func (b *ResourceClassApplyConfiguration) WithCreationTimestamp(value metav1.Tim
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *ResourceClassApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *ResourceClassApplyConfiguration {
+func (b *NodeResourceCapacityApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *NodeResourceCapacityApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.DeletionTimestamp = &value
 	return b
@@ -175,7 +171,7 @@ func (b *ResourceClassApplyConfiguration) WithDeletionTimestamp(value metav1.Tim
 // WithDeletionGracePeriodSeconds sets the DeletionGracePeriodSeconds field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionGracePeriodSeconds field is set to the value of the last call.
-func (b *ResourceClassApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) *ResourceClassApplyConfiguration {
+func (b *NodeResourceCapacityApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) *NodeResourceCapacityApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	b.DeletionGracePeriodSeconds = &value
 	return b
@@ -185,7 +181,7 @@ func (b *ResourceClassApplyConfiguration) WithDeletionGracePeriodSeconds(value i
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, the entries provided by each call will be put on the Labels field,
 // overwriting an existing map entries in Labels field with the same key.
-func (b *ResourceClassApplyConfiguration) WithLabels(entries map[string]string) *ResourceClassApplyConfiguration {
+func (b *NodeResourceCapacityApplyConfiguration) WithLabels(entries map[string]string) *NodeResourceCapacityApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	if b.Labels == nil && len(entries) > 0 {
 		b.Labels = make(map[string]string, len(entries))
@@ -200,7 +196,7 @@ func (b *ResourceClassApplyConfiguration) WithLabels(entries map[string]string) 
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, the entries provided by each call will be put on the Annotations field,
 // overwriting an existing map entries in Annotations field with the same key.
-func (b *ResourceClassApplyConfiguration) WithAnnotations(entries map[string]string) *ResourceClassApplyConfiguration {
+func (b *NodeResourceCapacityApplyConfiguration) WithAnnotations(entries map[string]string) *NodeResourceCapacityApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	if b.Annotations == nil && len(entries) > 0 {
 		b.Annotations = make(map[string]string, len(entries))
@@ -214,7 +210,7 @@ func (b *ResourceClassApplyConfiguration) WithAnnotations(entries map[string]str
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *ResourceClassApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *ResourceClassApplyConfiguration {
+func (b *NodeResourceCapacityApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *NodeResourceCapacityApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
@@ -228,7 +224,7 @@ func (b *ResourceClassApplyConfiguration) WithOwnerReferences(values ...*v1.Owne
 // WithFinalizers adds the given value to the Finalizers field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Finalizers field.
-func (b *ResourceClassApplyConfiguration) WithFinalizers(values ...string) *ResourceClassApplyConfiguration {
+func (b *NodeResourceCapacityApplyConfiguration) WithFinalizers(values ...string) *NodeResourceCapacityApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		b.Finalizers = append(b.Finalizers, values[i])
@@ -236,45 +232,21 @@ func (b *ResourceClassApplyConfiguration) WithFinalizers(values ...string) *Reso
 	return b
 }
 
-func (b *ResourceClassApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
+func (b *NodeResourceCapacityApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
 		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
 	}
 }
 
-// WithDriverName sets the DriverName field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the DriverName field is set to the value of the last call.
-func (b *ResourceClassApplyConfiguration) WithDriverName(value string) *ResourceClassApplyConfiguration {
-	b.DriverName = &value
-	return b
-}
-
-// WithParametersRef sets the ParametersRef field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the ParametersRef field is set to the value of the last call.
-func (b *ResourceClassApplyConfiguration) WithParametersRef(value *ResourceClassParametersReferenceApplyConfiguration) *ResourceClassApplyConfiguration {
-	b.ParametersRef = value
-	return b
-}
-
-// WithSuitableNodes sets the SuitableNodes field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the SuitableNodes field is set to the value of the last call.
-func (b *ResourceClassApplyConfiguration) WithSuitableNodes(value *corev1.NodeSelectorApplyConfiguration) *ResourceClassApplyConfiguration {
-	b.SuitableNodes = value
-	return b
-}
-
-// WithNumericParameters adds the given value to the NumericParameters field in the declarative configuration
+// WithResources adds the given value to the Resources field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the NumericParameters field.
-func (b *ResourceClassApplyConfiguration) WithNumericParameters(values ...*NumericParameterTypeApplyConfiguration) *ResourceClassApplyConfiguration {
+// If called multiple times, values provided by each call will be appended to the Resources field.
+func (b *NodeResourceCapacityApplyConfiguration) WithResources(values ...*DriverResourcesApplyConfiguration) *NodeResourceCapacityApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
-			panic("nil value passed to WithNumericParameters")
+			panic("nil value passed to WithResources")
 		}
-		b.NumericParameters = append(b.NumericParameters, *values[i])
+		b.Resources = append(b.Resources, *values[i])
 	}
 	return b
 }

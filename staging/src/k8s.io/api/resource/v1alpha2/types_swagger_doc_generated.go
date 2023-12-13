@@ -38,6 +38,46 @@ func (AllocationResult) SwaggerDoc() map[string]string {
 	return map_AllocationResult
 }
 
+var map_DriverResources = map[string]string{
+	"driverName":        "DriverName identifies the DRA which provided the capacity information.",
+	"resourceInstances": "ResourceInstances describes all discrete resource instances that are managed by the driver. Each entry must be an object of one of the supported numeric resource capacity types with kind, version and uid set. The uid only needs to be unique inside the node.",
+}
+
+func (DriverResources) SwaggerDoc() map[string]string {
+	return map_DriverResources
+}
+
+var map_NodeResourceCapacity = map[string]string{
+	"":          "NodeResourceCapacity gets published by kubelet. Its name matches the name of the node and the node is the owner.\n\nCapacity may get added, but should not get removed because it would make scheduling decisions based on the old capacity invalid.",
+	"metadata":  "Standard object metadata",
+	"resources": "Resources contains information about the capacity reported by each DRA driver.",
+}
+
+func (NodeResourceCapacity) SwaggerDoc() map[string]string {
+	return map_NodeResourceCapacity
+}
+
+var map_NodeResourceCapacityList = map[string]string{
+	"":         "NodeResourceCapacityList is a collection of claim templates.",
+	"metadata": "Standard list metadata",
+	"items":    "Items is the list of node resource capacity objects.",
+}
+
+func (NodeResourceCapacityList) SwaggerDoc() map[string]string {
+	return map_NodeResourceCapacityList
+}
+
+var map_NumericParameterType = map[string]string{
+	"apiGroup":  "APIGroup is the group for the resource being referenced. It is empty for the core API. This matches the group in the APIVersion that is used when creating the resources.",
+	"kind":      "Kind is the type of resource being referenced. This is the same value as in the parameter object's metadata.",
+	"fieldPath": "FieldPath is a dot separarated JSON path that defines where in the parameter object the numeric parameters are embedded.",
+	"shareable": "Shareable is copied into the AllocationResult when a claim gets allocated.",
+}
+
+func (NumericParameterType) SwaggerDoc() map[string]string {
+	return map_NumericParameterType
+}
+
 var map_PodSchedulingContext = map[string]string{
 	"":         "PodSchedulingContext objects hold information that is needed to schedule a Pod with ResourceClaims that use \"WaitForFirstConsumer\" allocation mode.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
 	"metadata": "Standard object metadata",
@@ -186,11 +226,12 @@ func (ResourceClaimTemplateSpec) SwaggerDoc() map[string]string {
 }
 
 var map_ResourceClass = map[string]string{
-	"":              "ResourceClass is used by administrators to influence how resources are allocated.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
-	"metadata":      "Standard object metadata",
-	"driverName":    "DriverName defines the name of the dynamic resource driver that is used for allocation of a ResourceClaim that uses this class.\n\nResource drivers have a unique name in forward domain order (acme.example.com).",
-	"parametersRef": "ParametersRef references an arbitrary separate object that may hold parameters that will be used by the driver when allocating a resource that uses this class. A dynamic resource driver can distinguish between parameters stored here and and those stored in ResourceClaimSpec.",
-	"suitableNodes": "Only nodes matching the selector will be considered by the scheduler when trying to find a Node that fits a Pod when that Pod uses a ResourceClaim that has not been allocated yet.\n\nSetting this field is optional. If null, all nodes are candidates.",
+	"":                  "ResourceClass is used by administrators to influence how resources are allocated.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
+	"metadata":          "Standard object metadata",
+	"driverName":        "DriverName defines the name of the dynamic resource driver that is used for allocation of a ResourceClaim that uses this class.\n\nResource drivers have a unique name in forward domain order (acme.example.com).",
+	"parametersRef":     "ParametersRef references an arbitrary separate object that may hold parameters that will be used by the driver when allocating a resource that uses this class. A dynamic resource driver can distinguish between parameters stored here and and those stored in ResourceClaimSpec.",
+	"suitableNodes":     "Only nodes matching the selector will be considered by the scheduler when trying to find a Node that fits a Pod when that Pod uses a ResourceClaim that has not been allocated yet.\n\nSetting this field is optional. If null, all nodes are candidates.",
+	"numericParameters": "If (and only if) allocation of claims using this class is handled via numeric parameters, then NumericParameters must list all claim parameter types that are allowed for claims.",
 }
 
 func (ResourceClass) SwaggerDoc() map[string]string {

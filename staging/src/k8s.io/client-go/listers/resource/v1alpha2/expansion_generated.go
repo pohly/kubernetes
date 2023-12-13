@@ -18,6 +18,10 @@ limitations under the License.
 
 package v1alpha2
 
+// NodeResourceCapacityListerExpansion allows custom methods to be added to
+// NodeResourceCapacityLister.
+type NodeResourceCapacityListerExpansion interface{}
+
 // PodSchedulingContextListerExpansion allows custom methods to be added to
 // PodSchedulingContextLister.
 type PodSchedulingContextListerExpansion interface{}

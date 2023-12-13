@@ -24,6 +24,8 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
+	// NodeResourceCapacities returns a NodeResourceCapacityInformer.
+	NodeResourceCapacities() NodeResourceCapacityInformer
 	// PodSchedulingContexts returns a PodSchedulingContextInformer.
 	PodSchedulingContexts() PodSchedulingContextInformer
 	// ResourceClaims returns a ResourceClaimInformer.
@@ -43,6 +45,11 @@ type version struct {
 // New returns a new Interface.
 func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
+}
+
+// NodeResourceCapacities returns a NodeResourceCapacityInformer.
+func (v *version) NodeResourceCapacities() NodeResourceCapacityInformer {
+	return &nodeResourceCapacityInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // PodSchedulingContexts returns a PodSchedulingContextInformer.

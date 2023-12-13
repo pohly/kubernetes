@@ -11658,6 +11658,57 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: shareable
       type:
         scalar: boolean
+- name: io.k8s.api.resource.v1alpha2.DriverResources
+  map:
+    fields:
+    - name: driverName
+      type:
+        scalar: string
+    - name: resourceInstances
+      type:
+        list:
+          elementType:
+            namedType: __untyped_atomic_
+          elementRelationship: atomic
+- name: io.k8s.api.resource.v1alpha2.NodeResourceCapacity
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: resources
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha2.DriverResources
+          elementRelationship: associative
+          keys:
+          - driverName
+- name: io.k8s.api.resource.v1alpha2.NumericParameterType
+  map:
+    fields:
+    - name: apiGroup
+      type:
+        scalar: string
+    - name: fieldPath
+      type:
+        scalar: string
+      default: ""
+    - name: kind
+      type:
+        scalar: string
+      default: ""
+    - name: shareable
+      type:
+        scalar: boolean
+      default: false
 - name: io.k8s.api.resource.v1alpha2.PodSchedulingContext
   map:
     fields:
@@ -11845,6 +11896,12 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
       default: {}
+    - name: numericParameters
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha2.NumericParameterType
+          elementRelationship: atomic
     - name: parametersRef
       type:
         namedType: io.k8s.api.resource.v1alpha2.ResourceClassParametersReference
