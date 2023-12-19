@@ -45,6 +45,7 @@ import (
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/dynamic-resource-allocation/builtincontroller"
 	dracache "k8s.io/dynamic-resource-allocation/cache"
+	"k8s.io/dynamic-resource-allocation/numeric/counter"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -354,7 +355,8 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 	// Start with globally registered controllers. This is empty in Kubernetes kube-scheduler,
 	// but might get extended in a custom scheduler. Then add all enabled numeric models.
 	controllerRegistry := builtincontroller.DefaultRegistry.Clone()
-	// TODO: add specific numeric types
+	// TODO: feature gate
+	controllerRegistry.Add(counter.CounterController{})
 	controllers, err := controllerRegistry.Activate(ctx, fh.ClientSet(), fh.SharedInformerFactory(), genericListerFactory)
 	if err != nil {
 		return nil, fmt.Errorf("activating claim controllers: %v", err)
