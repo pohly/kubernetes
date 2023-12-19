@@ -69,7 +69,7 @@ func (cro *createOp[T, P]) requiredNamespaces() []string {
 	return []string{cro.Namespace}
 }
 
-func (cro *createOp[T, P]) run(ctx context.Context, tb testing.TB, client clientset.Interface) {
+func (cro *createOp[T, P]) run(ctx context.Context, tb testing.TB, client clientSet) {
 	var obj *T
 	var p P
 	if err := getSpecFromFile(&cro.TemplatePath, &obj); err != nil {

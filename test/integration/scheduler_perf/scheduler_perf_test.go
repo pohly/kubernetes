@@ -292,7 +292,7 @@ type runnableOp interface {
 	// before running the operation.
 	requiredNamespaces() []string
 	// run executes the steps provided by the operation.
-	run(context.Context, testing.TB, clientset.Interface)
+	run(context.Context, testing.TB, clientSet)
 }
 
 func isValidParameterizable(val string) bool {
@@ -701,8 +701,8 @@ func BenchmarkPerfScheduling(b *testing.B) {
 					for feature, flag := range tc.FeatureGates {
 						defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, feature, flag)()
 					}
-					informerFactory, client, dyncClient := setupClusterForWorkload(ctx, b, tc.SchedulerConfigPath, tc.FeatureGates)
-					results := runWorkload(ctx, b, tc, w, informerFactory, client, dyncClient, false)
+					informerFactory, client := setupClusterForWorkload(ctx, b, tc.SchedulerConfigPath, tc.FeatureGates)
+					results := runWorkload(ctx, b, tc, w, informerFactory, client, false)
 					dataItems.DataItems = append(dataItems.DataItems, results...)
 
 					if len(results) > 0 {
@@ -795,7 +795,7 @@ func TestScheduling(t *testing.T) {
 			for feature, flag := range config.featureGates {
 				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, flag)()
 			}
-			informerFactory, client, dynClient := setupClusterForWorkload(ctx, t, config.schedulerConfigPath, config.featureGates)
+			informerFactory, client := setupClusterForWorkload(ctx, t, config.schedulerConfigPath, config.featureGates)
 
 			for _, tc := range testCases {
 				if !config.equals(tc) {
@@ -810,7 +810,7 @@ func TestScheduling(t *testing.T) {
 								t.Skipf("disabled by label filter %q", *testSchedulingLabelFilter)
 							}
 							_, ctx := ktesting.NewTestContext(t)
-							runWorkload(ctx, t, tc, w, informerFactory, client, dynClient, true)
+							runWorkload(ctx, t, tc, w, informerFactory, client, true)
 						})
 					}
 				})
@@ -868,7 +868,7 @@ func unrollWorkloadTemplate(tb testing.TB, wt []op, w *workload) []op {
 	return unrolled
 }
 
-func setupClusterForWorkload(ctx context.Context, tb testing.TB, configPath string, featureGates map[featuregate.Feature]bool) (informers.SharedInformerFactory, clientset.Interface, dynamic.Interface) {
+func setupClusterForWorkload(ctx context.Context, tb testing.TB, configPath string, featureGates map[featuregate.Feature]bool) (informers.SharedInformerFactory, clientSet) {
 	var cfg *config.KubeSchedulerConfiguration
 	var err error
 	if configPath != "" {
@@ -883,7 +883,7 @@ func setupClusterForWorkload(ctx context.Context, tb testing.TB, configPath stri
 	return mustSetupCluster(ctx, tb, cfg, featureGates)
 }
 
-func runWorkload(ctx context.Context, tb testing.TB, tc *testCase, w *workload, informerFactory informers.SharedInformerFactory, client clientset.Interface, dynClient dynamic.Interface, cleanup bool) []DataItem {
+func runWorkload(ctx context.Context, tb testing.TB, tc *testCase, w *workload, informerFactory informers.SharedInformerFactory, client clientSet, cleanup bool) []DataItem {
 	b, benchmarking := tb.(*testing.B)
 	if benchmarking {
 		start := time.Now()
@@ -1078,9 +1078,9 @@ func runWorkload(ctx context.Context, tb testing.TB, tc *testCase, w *workload, 
 				// Distinguish cluster-scoped with namespaced API objects.
 				var dynRes dynamic.ResourceInterface
 				if mapping.Scope.Name() == meta.RESTScopeNameNamespace {
-					dynRes = dynClient.Resource(gvr).Namespace(namespace)
+					dynRes = client.Resource(gvr).Namespace(namespace)
 				} else {
-					dynRes = dynClient.Resource(gvr)
+					dynRes = client.Resource(gvr)
 				}
 
 				churnFns = append(churnFns, func(name string) string {
