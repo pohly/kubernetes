@@ -211,7 +211,7 @@ func (op *createResourceDriverOp) run(ctx context.Context, tb testing.TB, client
 		}
 	}
 
-	controller := draapp.NewController(client, resources)
+	controller := draapp.NewController(client, client, resources)
 	ctx, cancel := context.WithCancel(ctx)
 	var wg sync.WaitGroup
 	wg.Add(1)

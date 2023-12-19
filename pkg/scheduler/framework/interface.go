@@ -31,6 +31,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -666,7 +667,10 @@ type Handle interface {
 	// ClientSet returns a kubernetes clientSet.
 	ClientSet() clientset.Interface
 
-	// KubeConfig returns the raw kube config.
+	// DynClientSet returns a generic client. May be nil, depending on how the framework was created.
+	DynClientSet() dynamic.Interface
+
+	// KubeConfig returns the raw kube config. May be nil, depending on how the framework was created.
 	KubeConfig() *restclient.Config
 
 	// EventRecorder returns an event recorder.

@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -66,6 +67,7 @@ type frameworkImpl struct {
 	permitPlugins        []framework.PermitPlugin
 
 	clientSet       clientset.Interface
+	dynClientSet    dynamic.Interface
 	kubeConfig      *restclient.Config
 	eventRecorder   events.EventRecorder
 	informerFactory informers.SharedInformerFactory
@@ -117,6 +119,7 @@ func (f *frameworkImpl) Extenders() []framework.Extender {
 type frameworkOptions struct {
 	componentConfigVersion string
 	clientSet              clientset.Interface
+	dynClientSet           dynamic.Interface
 	kubeConfig             *restclient.Config
 	eventRecorder          events.EventRecorder
 	informerFactory        informers.SharedInformerFactory
@@ -146,6 +149,13 @@ func WithComponentConfigVersion(componentConfigVersion string) Option {
 func WithClientSet(clientSet clientset.Interface) Option {
 	return func(o *frameworkOptions) {
 		o.clientSet = clientSet
+	}
+}
+
+// WithDynClientSet sets the generic client for the scheduling frameworkImpl.
+func WithDynClientSet(dynClientSet dynamic.Interface) Option {
+	return func(o *frameworkOptions) {
+		o.dynClientSet = dynClientSet
 	}
 }
 
@@ -250,6 +260,7 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		scorePluginWeight:    make(map[string]int),
 		waitingPods:          newWaitingPodsMap(),
 		clientSet:            options.clientSet,
+		dynClientSet:         options.dynClientSet,
 		kubeConfig:           options.kubeConfig,
 		eventRecorder:        options.eventRecorder,
 		informerFactory:      options.informerFactory,
@@ -258,6 +269,15 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		PodNominator:         options.podNominator,
 		parallelizer:         options.parallelizer,
 		logger:               logger,
+	}
+
+	if f.dynClientSet == nil && f.kubeConfig != nil {
+		// Construct a new generic client.
+		dynClient, err := dynamic.NewForConfig(f.kubeConfig)
+		if err != nil {
+			return nil, fmt.Errorf("no dynamic client was configured and constructing a new one for the kube config failed: %v", err)
+		}
+		f.dynClientSet = dynClient
 	}
 
 	if profile == nil {
@@ -1538,6 +1558,11 @@ func (f *frameworkImpl) ListPlugins() *config.Plugins {
 // ClientSet returns a kubernetes clientset.
 func (f *frameworkImpl) ClientSet() clientset.Interface {
 	return f.clientSet
+}
+
+// DynClientSet returns the generic client, if one is available.
+func (f *frameworkImpl) DynClientSet() dynamic.Interface {
+	return f.dynClientSet
 }
 
 // KubeConfig returns a kubernetes config.
