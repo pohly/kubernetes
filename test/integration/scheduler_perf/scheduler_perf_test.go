@@ -64,17 +64,16 @@ import (
 type operationCode string
 
 const (
-	createNodesOpcode                 operationCode = "createNodes"
-	createNamespacesOpcode            operationCode = "createNamespaces"
-	createPodsOpcode                  operationCode = "createPods"
-	createPodSetsOpcode               operationCode = "createPodSets"
-	createResourceClaimsOpcode        operationCode = "createResourceClaims"
-	createResourceClaimTemplateOpcode operationCode = "createResourceClaimTemplate"
-	createResourceClassOpcode         operationCode = "createResourceClass"
-	createResourceDriverOpcode        operationCode = "createResourceDriver"
-	churnOpcode                       operationCode = "churn"
-	barrierOpcode                     operationCode = "barrier"
-	sleepOpcode                       operationCode = "sleep"
+	createNodesOpcode          operationCode = "createNodes"
+	createNamespacesOpcode     operationCode = "createNamespaces"
+	createPodsOpcode           operationCode = "createPods"
+	createPodSetsOpcode        operationCode = "createPodSets"
+	createResourceClaimsOpcode operationCode = "createResourceClaims"
+	createResourceDriverOpcode operationCode = "createResourceDriver"
+	createAnyOpcode            operationCode = "createAny"
+	churnOpcode                operationCode = "churn"
+	barrierOpcode              operationCode = "barrier"
+	sleepOpcode                operationCode = "sleep"
 )
 
 const (
@@ -242,8 +241,7 @@ func (op *op) UnmarshalJSON(b []byte) error {
 		&createPodsOp{},
 		&createPodSetsOp{},
 		&createResourceClaimsOp{},
-		&createOp[resourcev1alpha2.ResourceClaimTemplate, createResourceClaimTemplateOpType]{},
-		&createOp[resourcev1alpha2.ResourceClass, createResourceClassOpType]{},
+		&createAny{},
 		&createResourceDriverOp{},
 		&churnOp{},
 		&barrierOp{},

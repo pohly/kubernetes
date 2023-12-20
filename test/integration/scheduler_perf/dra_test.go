@@ -115,28 +115,6 @@ func (op *createResourceClaimsOp) run(ctx context.Context, tb testing.TB, client
 	}
 }
 
-// createResourceClassOpType customizes createOp for creating a ResourceClass.
-type createResourceClassOpType struct{}
-
-func (c createResourceClassOpType) Opcode() operationCode { return createResourceClassOpcode }
-func (c createResourceClassOpType) Name() string          { return "ResourceClass" }
-func (c createResourceClassOpType) Namespaced() bool      { return false }
-func (c createResourceClassOpType) CreateCall(client clientset.Interface, namespace string) func(context.Context, *resourcev1alpha2.ResourceClass, metav1.CreateOptions) (*resourcev1alpha2.ResourceClass, error) {
-	return client.ResourceV1alpha2().ResourceClasses().Create
-}
-
-// createResourceClassOpType customizes createOp for creating a ResourceClaim.
-type createResourceClaimTemplateOpType struct{}
-
-func (c createResourceClaimTemplateOpType) Opcode() operationCode {
-	return createResourceClaimTemplateOpcode
-}
-func (c createResourceClaimTemplateOpType) Name() string     { return "ResourceClaimTemplate" }
-func (c createResourceClaimTemplateOpType) Namespaced() bool { return true }
-func (c createResourceClaimTemplateOpType) CreateCall(client clientset.Interface, namespace string) func(context.Context, *resourcev1alpha2.ResourceClaimTemplate, metav1.CreateOptions) (*resourcev1alpha2.ResourceClaimTemplate, error) {
-	return client.ResourceV1alpha2().ResourceClaimTemplates(namespace).Create
-}
-
 // createResourceDriverOp defines an op where resource claims are created.
 type createResourceDriverOp struct {
 	// Must be createResourceDriverOpcode.
