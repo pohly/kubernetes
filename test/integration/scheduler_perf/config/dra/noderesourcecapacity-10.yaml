@@ -1,0 +1,11 @@
+kind: NodeResourceCapacity
+apiVersion: resource.k8s.io/v1alpha2
+resources:
+- driverName: test-driver.cdi.k8s.io
+  resourceInstances:
+  - metadata:
+      name: widget
+      uid: abc
+    kind: Capacity
+    apiVersion: counter.dra.config.k8s.io/v1alpha1
+    count: 10

@@ -20,12 +20,14 @@ import (
 	"context"
 
 	v1 "k8s.io/api/core/v1"
+	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	testutils "k8s.io/kubernetes/test/utils"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -38,23 +40,17 @@ type IntegrationTestNodePreparer struct {
 	countToStrategy []testutils.CountToStrategy
 	nodeNamePrefix  string
 	nodeSpec        *v1.Node
+	nodeCapacity    *resourcev1alpha2.NodeResourceCapacity
 }
 
 // NewIntegrationTestNodePreparer creates an IntegrationTestNodePreparer configured with defaults.
-func NewIntegrationTestNodePreparer(client clientset.Interface, countToStrategy []testutils.CountToStrategy, nodeNamePrefix string) testutils.TestNodePreparer {
+func NewIntegrationTestNodePreparer(client clientset.Interface, countToStrategy []testutils.CountToStrategy, nodeNamePrefix string, nodeSpec *v1.Node, nodeCapacity *resourcev1alpha2.NodeResourceCapacity) testutils.TestNodePreparer {
 	return &IntegrationTestNodePreparer{
 		client:          client,
 		countToStrategy: countToStrategy,
 		nodeNamePrefix:  nodeNamePrefix,
-	}
-}
-
-// NewIntegrationTestNodePreparerWithNodeSpec creates an IntegrationTestNodePreparer configured with nodespec.
-func NewIntegrationTestNodePreparerWithNodeSpec(client clientset.Interface, countToStrategy []testutils.CountToStrategy, nodeSpec *v1.Node) testutils.TestNodePreparer {
-	return &IntegrationTestNodePreparer{
-		client:          client,
-		countToStrategy: countToStrategy,
 		nodeSpec:        nodeSpec,
+		nodeCapacity:    nodeCapacity,
 	}
 }
 
@@ -89,11 +85,12 @@ func (p *IntegrationTestNodePreparer) PrepareNodes(ctx context.Context, nextNode
 
 	for i := 0; i < numNodes; i++ {
 		var err error
+		var node *v1.Node
 		for retry := 0; retry < retries; retry++ {
 			// Create nodes with the usual kubernetes.io/hostname label.
 			// For that we need to know the name in advance, if we want to
 			// do it in one request.
-			node := baseNode.DeepCopy()
+			node = baseNode.DeepCopy()
 			name := node.Name
 			if name == "" {
 				name = node.GenerateName + rand.String(5)
@@ -103,13 +100,36 @@ func (p *IntegrationTestNodePreparer) PrepareNodes(ctx context.Context, nextNode
 				node.Labels = make(map[string]string)
 			}
 			node.Labels["kubernetes.io/hostname"] = name
-			_, err = p.client.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{})
+			node, err = p.client.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{})
 			if err == nil {
 				break
 			}
 		}
 		if err != nil {
 			klog.Fatalf("Error creating node: %v", err)
+		}
+		if p.nodeCapacity != nil {
+			for retry := 0; retry < retries; retry++ {
+				nodeCapacity := p.nodeCapacity.DeepCopy()
+				nodeCapacity.Name = node.Name
+				nodeCapacity.OwnerReferences = append(nodeCapacity.OwnerReferences,
+					metav1.OwnerReference{
+						UID:                node.UID,
+						Name:               node.Name,
+						Controller:         ptr.To(true),
+						APIVersion:         "v1",
+						Kind:               "Node",
+						BlockOwnerDeletion: ptr.To(true),
+					},
+				)
+				_, err = p.client.ResourceV1alpha2().NodeResourceCapacities().Create(ctx, nodeCapacity, metav1.CreateOptions{})
+				if err == nil {
+					break
+				}
+			}
+			if err != nil {
+				klog.Fatalf("Error creating node capacity: %v", err)
+			}
 		}
 	}
 

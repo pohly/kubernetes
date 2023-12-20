@@ -17,18 +17,23 @@ limitations under the License.
 package benchmark
 
 import (
+	"bytes"
 	"context"
+	"embed"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"sync"
 	"testing"
 
 	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	draapp "k8s.io/kubernetes/test/e2e/dra/test-driver/app"
+	dradeploy "k8s.io/kubernetes/test/e2e/dra/test-driver/deploy"
+	"sigs.k8s.io/yaml"
 )
 
 // createResourceClaimsOp defines an op where resource claims are created.
@@ -127,6 +132,10 @@ type createResourceDriverOp struct {
 	MaxClaimsPerNodeParam string
 	// Nodes matching this glob pattern have resources managed by the driver.
 	Nodes string
+	// Numeric is true if deploying the driver needs to be skipped in favor
+	// of installing the numeric parameter CRD from
+	// test/e2e/dra/test-driver/deploy/crd.
+	Numeric bool
 }
 
 var _ realOp = &createResourceDriverOp{}
@@ -167,6 +176,12 @@ func (op *createResourceDriverOp) requiredNamespaces() []string { return nil }
 func (op *createResourceDriverOp) run(ctx context.Context, tb testing.TB, client clientSet) {
 	tb.Logf("creating resource driver %q for nodes matching %q", op.DriverName, op.Nodes)
 
+	if op.Numeric {
+		deployCRD(ctx, tb, dradeploy.FS, "crd/dra.e2e.example.com_classparameters.yaml", client)
+		deployCRD(ctx, tb, dradeploy.FS, "crd/dra.e2e.example.com_claimparameters.yaml", client)
+		return
+	}
+
 	// Start the controller side of the DRA test driver such that it simulates
 	// per-node resources.
 	resources := draapp.Resources{
@@ -204,5 +219,30 @@ func (op *createResourceDriverOp) run(ctx context.Context, tb testing.TB, client
 		cancel()
 		wg.Wait()
 		tb.Logf("stopped resource driver %q", op.DriverName)
+	})
+}
+
+func deployCRD(ctx context.Context, tb testing.TB, fs embed.FS, path string, client clientSet) {
+	content, err := fs.ReadFile(path)
+	if err != nil {
+		tb.Fatalf("read embedded file: %v", err)
+	}
+	// controller-gen injects "---" into the output file, strip it.
+	content = bytes.TrimPrefix(content, []byte("---\n"))
+	var crd apiextensionsv1.CustomResourceDefinition
+	if err := yaml.Unmarshal(content, &crd); err != nil {
+		tb.Fatalf("unmarshal CRD: %v", err)
+	}
+	if _, err := client.ApiextensionsV1().CustomResourceDefinitions().Create(ctx, &crd, metav1.CreateOptions{}); err != nil {
+		tb.Fatalf("create CRD: %v", err)
+	}
+	tb.Cleanup(func() {
+		// Try to delete, but don't worry if the context is canceled because
+		// everything is shutting down.
+		if err := client.ApiextensionsV1().CustomResourceDefinitions().Delete(ctx, crd.GetName(), metav1.DeleteOptions{}); err != nil {
+			if !errors.Is(err, context.Canceled) {
+				tb.Errorf("delete CRD: %v", err)
+			}
+		}
 	})
 }

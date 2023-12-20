@@ -1,0 +1,6 @@
+apiVersion: dra.e2e.example.com/v1alpha1
+kind: ClaimParameter
+metadata:
+  name: test-claim-parameters
+spec:
+  counter: 1

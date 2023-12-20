@@ -39,6 +39,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
@@ -171,7 +172,7 @@ type workload struct {
 }
 
 type params struct {
-	params map[string]int
+	params map[string]intstr.IntOrString
 	// isUsed field records whether params is used or not.
 	isUsed map[string]bool
 }
@@ -195,7 +196,7 @@ type params struct {
 //		isUsed: map[string]bool{}, // empty map
 //	}
 func (p *params) UnmarshalJSON(b []byte) error {
-	aux := map[string]int{}
+	aux := map[string]intstr.IntOrString{}
 
 	if err := json.Unmarshal(b, &aux); err != nil {
 		return err
@@ -206,14 +207,30 @@ func (p *params) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// get returns param.
+// get returns an integer param.
 func (p params) get(key string) (int, error) {
 	p.isUsed[key] = true
 	param, ok := p.params[key]
-	if ok {
-		return param, nil
+	if !ok {
+		return 0, fmt.Errorf("parameter %s is undefined", key)
 	}
-	return 0, fmt.Errorf("parameter %s is undefined", key)
+	if param.Type != intstr.Int {
+		return 0, fmt.Errorf("parameter %s is a string", key)
+	}
+	return int(param.IntVal), nil
+}
+
+// get returns a string param.
+func (p params) getStr(key string) (string, error) {
+	p.isUsed[key] = true
+	param, ok := p.params[key]
+	if !ok {
+		return "", fmt.Errorf("parameter %s is undefined", key)
+	}
+	if param.Type != intstr.String {
+		return "", fmt.Errorf("parameter %s is an integer", key)
+	}
+	return param.StrVal, nil
 }
 
 // unusedParams returns the names of unusedParams
@@ -316,6 +333,9 @@ type createNodesOp struct {
 	// Path to spec file describing the nodes to create.
 	// Optional
 	NodeTemplatePath *string
+	// Path to spec file describing the NodeResourceCapacity to create.
+	// Optional
+	NodeResourceCapacityPath string
 	// At most one of the following strategies can be defined. Defaults
 	// to TrivialNodePrepareStrategy if unspecified.
 	// Optional
@@ -342,6 +362,13 @@ func (cno createNodesOp) patchParams(w *workload) (realOp, error) {
 	if cno.CountParam != "" {
 		var err error
 		cno.Count, err = w.Params.get(cno.CountParam[1:])
+		if err != nil {
+			return nil, err
+		}
+	}
+	if strings.HasPrefix(cno.NodeResourceCapacityPath, "$") {
+		var err error
+		cno.NodeResourceCapacityPath, err = w.Params.getStr(cno.NodeResourceCapacityPath[1:])
 		if err != nil {
 			return nil, err
 		}
@@ -1277,21 +1304,24 @@ func getNodePreparer(prefix string, cno *createNodesOp, clientset clientset.Inte
 		nodeStrategy = cno.UniqueNodeLabelStrategy
 	}
 
+	var nodeSpec *v1.Node
+	var nodeCapacity *resourcev1alpha2.NodeResourceCapacity
 	if cno.NodeTemplatePath != nil {
-		node, err := getNodeSpecFromFile(cno.NodeTemplatePath)
-		if err != nil {
+		if err := getSpecFromFile(cno.NodeTemplatePath, &nodeSpec); err != nil {
 			return nil, err
 		}
-		return framework.NewIntegrationTestNodePreparerWithNodeSpec(
-			clientset,
-			[]testutils.CountToStrategy{{Count: cno.Count, Strategy: nodeStrategy}},
-			node,
-		), nil
+	}
+	if cno.NodeResourceCapacityPath != "" {
+		if err := getSpecFromFile(&cno.NodeResourceCapacityPath, &nodeCapacity); err != nil {
+			return nil, err
+		}
 	}
 	return framework.NewIntegrationTestNodePreparer(
 		clientset,
 		[]testutils.CountToStrategy{{Count: cno.Count, Strategy: nodeStrategy}},
 		prefix,
+		nodeSpec,
+		nodeCapacity,
 	), nil
 }
 
@@ -1460,14 +1490,6 @@ func getPodStrategy(cpo *createPodsOp) (testutils.TestPodCreateStrategy, error) 
 		return nil, err
 	}
 	return testutils.NewCreatePodWithPersistentVolumeStrategy(pvcTemplate, getCustomVolumeFactory(pvTemplate), basePod), nil
-}
-
-func getNodeSpecFromFile(path *string) (*v1.Node, error) {
-	nodeSpec := &v1.Node{}
-	if err := getSpecFromFile(path, nodeSpec); err != nil {
-		return nil, fmt.Errorf("parsing Node: %w", err)
-	}
-	return nodeSpec, nil
 }
 
 func getPodSpecFromFile(path *string) (*v1.Pod, error) {

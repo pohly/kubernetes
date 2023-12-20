@@ -853,3 +853,76 @@
       initPods: 1000
       measurePods: 1000
       maxClaimsPerNode: 20
+
+# SchedulingWithResourceClaimTemplateNumeric uses a ResourceClaimTemplate
+# and dynamically created ResourceClaim instances for each pod.
+# The difference compared to SchedulingWithResourceClaimTemplate
+# is that a numeric "counter" parameter is used for resources.
+- name: SchedulingWithResourceClaimTemplateNumeric
+  featureGates:
+    DynamicResourceAllocation: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $nodesWithoutDRA
+  - opcode: createNodes
+    nodeTemplatePath: config/dra/node-with-dra-test-driver.yaml
+    countParam: $nodesWithDRA
+    nodeResourceCapacityPath: $nodeResourceTemplatePath
+  - opcode: createResourceDriver
+    driverName: test-driver.cdi.k8s.io
+    nodes: scheduler-perf-dra-*
+    numeric: true
+  - opcode: createAny
+    templatePath: config/dra/resourceclass-numeric.yaml
+  - opcode: createAny
+    templatePath: config/dra/resourceclaimtemplate.yaml
+    namespace: init
+  - opcode: createAny
+    templatePath: config/dra/resourceclaimparameter.yaml
+    namespace: init
+  - opcode: createPods
+    namespace: init
+    countParam: $initPods
+    podTemplatePath: config/dra/pod-with-claim-template.yaml
+  - opcode: createAny
+    templatePath: config/dra/resourceclaimparameter.yaml
+    namespace: test
+  - opcode: createAny
+    templatePath: config/dra/resourceclaimtemplate-numeric.yaml
+    namespace: test
+  - opcode: createPods
+    namespace: test
+    countParam: $measurePods
+    podTemplatePath: config/dra/pod-with-claim-template.yaml
+    collectMetrics: true
+  workloads:
+  - name: fast
+    labels: [integration-test, fast]
+    params:
+      # This testcase runs through all code paths without
+      # taking too long overall.
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      initPods: 0
+      measurePods: 10
+      nodeResourceTemplatePath: config/dra/noderesourcecapacity-10.yaml
+  - name: 2000pods_100nodes
+    labels: [performance, fast]
+    params:
+      # In this testcase, the number of nodes is smaller
+      # than the limit for the PodScheduling slices.
+      nodesWithDRA: 100
+      nodesWithoutDRA: 0
+      initPods: 1000
+      measurePods: 1000
+      nodeResourceTemplatePath: config/dra/noderesourcecapacity-20.yaml
+  - name: 2000pods_200nodes
+    params:
+      # In this testcase, the driver and scheduler must
+      # truncate the PotentialNodes and UnsuitableNodes
+      # slices.
+      nodesWithDRA: 200
+      nodesWithoutDRA: 0
+      initPods: 1000
+      measurePods: 1000
+      maxClaimsPerNode: 10
