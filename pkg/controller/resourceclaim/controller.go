@@ -880,7 +880,13 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 					// We are certain that the owning pod is not going to need
 					// the claim and therefore remove the claim.
 					logger.V(5).Info("deleting unused generated claim", "claim", klog.KObj(claim), "pod", klog.KObj(pod))
-					err := ec.kubeClient.ResourceV1alpha2().ResourceClaims(claim.Namespace).Delete(ctx, claim.Name, metav1.DeleteOptions{})
+					options := metav1.DeleteOptions{
+						Preconditions: &metav1.Preconditions{
+							UID:             &claim.UID,
+							ResourceVersion: &claim.ResourceVersion,
+						},
+					}
+					err := ec.kubeClient.ResourceV1alpha2().ResourceClaims(claim.Namespace).Delete(ctx, claim.Name, options)
 					if err != nil {
 						return fmt.Errorf("delete claim: %v", err)
 					}
