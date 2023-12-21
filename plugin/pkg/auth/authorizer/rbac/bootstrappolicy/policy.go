@@ -576,6 +576,10 @@ func ClusterRoles() []rbacv1.ClusterRole {
 			rbacv1helpers.NewRule(ReadUpdate...).Groups(resourceGroup).Resources("resourceclaims/status").RuleOrDie(),
 			rbacv1helpers.NewRule(ReadWrite...).Groups(resourceGroup).Resources("podschedulingcontexts").RuleOrDie(),
 			rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("podschedulingcontexts/status").RuleOrDie(),
+			rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("noderesourcecapacities").RuleOrDie(),
+			// Wildcard rule which allows reading arbitrary types. This is needed to get
+			// access to vendor-defined claim parameters.
+			rbacv1helpers.NewRule(Read...).Groups("*").Resources("*").RuleOrDie(),
 		)
 	}
 	roles = append(roles, rbacv1.ClusterRole{
