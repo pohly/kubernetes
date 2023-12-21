@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -41,6 +42,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/dynamic-resource-allocation/builtincontroller"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -835,8 +837,8 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 	logger.V(5).Info("claim reserved for counts", "currentCount", len(claim.Status.ReservedFor), "claim", klog.KRef(namespace, name), "updatedCount", len(valid))
 	if len(valid) < len(claim.Status.ReservedFor) {
 		// TODO (#113700): patch
-		claim := claim.DeepCopy()
-		claim.Status.ReservedFor = valid
+		updatedClaim := claim.DeepCopy()
+		updatedClaim.Status.ReservedFor = valid
 
 		// When a ResourceClaim uses delayed allocation, then it makes sense to
 		// deallocate the claim as soon as the last consumer stops using
@@ -855,14 +857,27 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 		// pod is done. However, it doesn't hurt to also trigger deallocation
 		// for such claims and not checking for them keeps this code simpler.
 		if len(valid) == 0 &&
-			claim.Spec.AllocationMode == resourcev1alpha2.AllocationModeWaitForFirstConsumer {
-			claim.Status.DeallocationRequested = true
+			updatedClaim.Spec.AllocationMode == resourcev1alpha2.AllocationModeWaitForFirstConsumer {
+			if index := slices.Index(updatedClaim.Finalizers, builtincontroller.Finalizer); index != -1 {
+				// The claim was allocated through a builtin controller.
+				// We clear the allocation and remove the finalizer
+				// in a single step because there is no control
+				// plane controller. The scheduler will see the
+				// updated claim and adjust its resource usage
+				// accordingly.
+				updatedClaim.Finalizers = slices.Delete(updatedClaim.Finalizers, index, index+1)
+				updatedClaim.Status.Allocation = nil
+			} else {
+				// Ask control plane controller.
+				updatedClaim.Status.DeallocationRequested = true
+			}
 		}
 
-		_, err := ec.kubeClient.ResourceV1alpha2().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
+		updatedClaim, err := ec.kubeClient.ResourceV1alpha2().ResourceClaims(updatedClaim.Namespace).UpdateStatus(ctx, updatedClaim, metav1.UpdateOptions{})
 		if err != nil {
-			return err
+			return fmt.Errorf("update status of unused resource claim: %v", err)
 		}
+		claim = updatedClaim
 	}
 
 	if len(valid) == 0 {
@@ -878,7 +893,25 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 				// Pod already replaced or not going to run?
 				if pod.UID != podUID || isPodDone(pod) {
 					// We are certain that the owning pod is not going to need
-					// the claim and therefore remove the claim.
+					// the claim and therefore remove the claim. This is serving
+					// as signal to the control plane controller that it can
+					// deallocate. If there is no such controller because the
+					// claim was allocated by a builtin controller, then we
+					// also need to remove the finalizer.
+					//
+					// This is similar to the code above, but we may need to do
+					// it here instead in case that someone else removed the
+					// ReservedFor entry.
+					if index := slices.Index(claim.Finalizers, builtincontroller.Finalizer); index != -1 {
+						updatedClaim := claim.DeepCopy()
+						updatedClaim.Finalizers = slices.Delete(updatedClaim.Finalizers, index, index+1)
+						updatedClaim, err := ec.kubeClient.ResourceV1alpha2().ResourceClaims(updatedClaim.Namespace).UpdateStatus(ctx, updatedClaim, metav1.UpdateOptions{})
+						if err != nil {
+							return fmt.Errorf("remove %q finalizer from obsolete per-pod resource claim: %v", builtincontroller.Finalizer, err)
+						}
+						claim = updatedClaim
+					}
+
 					logger.V(5).Info("deleting unused generated claim", "claim", klog.KObj(claim), "pod", klog.KObj(pod))
 					options := metav1.DeleteOptions{
 						Preconditions: &metav1.Preconditions{
@@ -902,6 +935,19 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 			}
 		} else {
 			logger.V(5).Info("claim not generated for a pod", "claim", klog.KObj(claim))
+		}
+	}
+
+	// Finally, deal with deleted claims that still have the finalizer of a builtin controller.
+	// We only need to do this if all other cases didn't get triggered.
+	if claim.DeletionTimestamp != nil {
+		if index := slices.Index(claim.Finalizers, builtincontroller.Finalizer); index != -1 {
+			updatedClaim := claim.DeepCopy()
+			updatedClaim.Finalizers = slices.Delete(updatedClaim.Finalizers, index, index+1)
+			_, err := ec.kubeClient.ResourceV1alpha2().ResourceClaims(updatedClaim.Namespace).UpdateStatus(ctx, updatedClaim, metav1.UpdateOptions{})
+			if err != nil {
+				return fmt.Errorf("remove %q finalizer of deleted resource claim: %v", builtincontroller.Finalizer, err)
+			}
 		}
 	}
 
