@@ -22,14 +22,20 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"google.golang.org/grpc"
 
+	"k8s.io/apimachinery/pkg/runtime"
+	serializerjson "k8s.io/apimachinery/pkg/runtime/serializer/json"
+	"k8s.io/dynamic-resource-allocation/apis/counter"
+	counterv1alpha1 "k8s.io/dynamic-resource-allocation/apis/counter/v1alpha1"
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
 	"k8s.io/klog/v2"
 	drapbv1alpha2 "k8s.io/kubelet/pkg/apis/dra/v1alpha2"
 	drapbv1alpha3 "k8s.io/kubelet/pkg/apis/dra/v1alpha3"
+	testdriverv1alpha1 "k8s.io/kubernetes/test/e2e/dra/test-driver/api/v1alpha1"
 )
 
 type ExamplePlugin struct {
@@ -44,6 +50,9 @@ type ExamplePlugin struct {
 	mutex     sync.Mutex
 	prepared  map[ClaimID]bool
 	gRPCCalls []GRPCCall
+
+	scheme  *runtime.Scheme
+	decoder *serializerjson.Serializer
 
 	block bool
 }
@@ -77,8 +86,17 @@ func (ex *ExamplePlugin) getJSONFilePath(claimUID string) string {
 	return filepath.Join(ex.cdiDir, fmt.Sprintf("%s-%s.json", ex.driverName, claimUID))
 }
 
-// FileOperations defines optional callbacks for handling CDI files.
+// FileOperations defines optional callbacks for handling CDI files and configuration options
+// for creating them.
 type FileOperations struct {
+	// NumericParameters determines what the kubelet plugin expects
+	// in the claim allocation result handle data: either our own parameters instance
+	// (numeric parameters off) or a counterv1alpha1.AllocationResult (on).
+	NumericParameters bool
+
+	// ParameterAPIGroup is the API group chosen for the test when using numeric parameters.
+	ParameterAPIGroup string
+
 	// Create must overwrite the file.
 	Create func(name string, content []byte) error
 
@@ -109,7 +127,12 @@ func StartPlugin(logger klog.Logger, cdiDir, driverName string, nodeName string,
 		driverName: driverName,
 		nodeName:   nodeName,
 		prepared:   make(map[ClaimID]bool),
+		scheme:     runtime.NewScheme(),
 	}
+
+	counter.Install(ex.scheme)
+	testdriverv1alpha1.Install(ex.scheme, fileOps.ParameterAPIGroup)
+	ex.decoder = serializerjson.NewSerializerWithOptions(serializerjson.DefaultMetaFactory, ex.scheme, ex.scheme, serializerjson.SerializerOptions{})
 
 	opts = append(opts,
 		kubeletplugin.Logger(logger),
@@ -160,8 +183,37 @@ func (ex *ExamplePlugin) NodePrepareResource(ctx context.Context, req *drapbv1al
 
 	// Determine environment variables.
 	var p parameters
-	if err := json.Unmarshal([]byte(req.ResourceHandle), &p); err != nil {
-		return nil, fmt.Errorf("unmarshal resource handle: %w", err)
+	if ex.fileOps.NumericParameters {
+		allocation := new(counterv1alpha1.AllocationResult)
+		if err := ex.decodeAs("allocation result", []byte(req.ResourceHandle), allocation); err != nil {
+			return nil, err
+		}
+		// TODO: together with publishing node capacity, add validation that
+		// the allocation is okay (right UID, capacity not exceeded).
+
+		// The scheduler didn't know about env variables. We need to
+		// extract those from the original class and claim parameters
+		// ourselves.
+		if raw := allocation.ClassParameters.Raw; len(raw) > 0 {
+			parameters := new(testdriverv1alpha1.ClassParameter)
+			if err := ex.decodeAs("class parameters from allocation result", raw, parameters); err != nil {
+				return nil, err
+			}
+			p.add("admin", parameters.Spec.Env)
+		}
+		if raw := allocation.ClaimParameters.Raw; len(raw) > 0 {
+			parameters := new(testdriverv1alpha1.ClaimParameter)
+			if err := ex.decodeAs("claim parameters from allocation result", raw, parameters); err != nil {
+				return nil, err
+			}
+			p.add("user", parameters.Spec.Env)
+		}
+	} else {
+		decoder := json.NewDecoder(strings.NewReader(req.ResourceHandle))
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&p); err != nil {
+			return nil, fmt.Errorf("unmarshal resource handle: %w", err)
+		}
 	}
 
 	// Sanity check scheduling.
@@ -324,4 +376,15 @@ func (ex *ExamplePlugin) GetGRPCCalls() []GRPCCall {
 	calls := make([]GRPCCall, 0, len(ex.gRPCCalls))
 	calls = append(calls, ex.gRPCCalls...)
 	return calls
+}
+
+func (ex *ExamplePlugin) decodeAs(what string, from []byte, to runtime.Object) error {
+	actual, gvk, err := ex.decoder.Decode(from, nil, to)
+	if err != nil {
+		return fmt.Errorf("decoding %s failed: %v", what, err)
+	}
+	if actual != to {
+		return fmt.Errorf("decoding %s returned unexpected object: need %T, got %T (= %q)", what, to, actual, gvk)
+	}
+	return nil
 }

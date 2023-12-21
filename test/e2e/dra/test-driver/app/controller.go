@@ -184,6 +184,19 @@ type parameters struct {
 	NodeName string
 }
 
+func (p *parameters) add(what string, env map[string]string) {
+	n := len(env)
+	if n == 0 {
+		return
+	}
+	if p.EnvVars == nil {
+		p.EnvVars = make(map[string]string, n)
+	}
+	for key, value := range env {
+		p.EnvVars[what+"_"+strings.ToLower(key)] = value
+	}
+}
+
 var _ controller.Driver = &ExampleController{}
 
 // GetNumAllocations returns the number of times that a claim was allocated.
@@ -339,11 +352,10 @@ func (c *ExampleController) allocateOne(ctx context.Context, claim *resourcev1al
 	}
 
 	p := parameters{
-		EnvVars:  make(map[string]string),
 		NodeName: node,
 	}
-	toEnvVars("user", claimParameters, p.EnvVars)
-	toEnvVars("admin", classParameters, p.EnvVars)
+	toEnvVars("user", claimParameters, &p)
+	toEnvVars("admin", classParameters, &p)
 	data, err := json.Marshal(p)
 	if err != nil {
 		return nil, fmt.Errorf("encode parameters: %w", err)
@@ -435,15 +447,13 @@ func totalCount(claims []*controller.ClaimAllocation) int64 {
 	return total
 }
 
-func toEnvVars(what string, from interface{}, to map[string]string) {
+func toEnvVars(what string, from interface{}, p *parameters) {
 	if from == nil {
 		return
 	}
 
 	param := from.(*driverv1alpha1.ClaimParameterSpec)
-	for key, value := range param.Env {
-		to[what+"_"+strings.ToLower(key)] = value
-	}
+	p.add(what, param.Env)
 }
 
 func contains[T comparable](list []T, value T) bool {

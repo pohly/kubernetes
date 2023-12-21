@@ -195,10 +195,11 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		})
 	})
 
-	driverTest := func(customParameters bool) {
+	driverTest := func(customParameters, numericParameters bool) {
 		nodes := NewNodes(f, 1, 1)
 		driver := NewDriver(f, nodes, perNode(1, nodes)) // All tests get their own driver instance.
 		driver.customParameters = customParameters
+		driver.numericParameters = numericParameters
 		b := newBuilder(f, driver)
 		// We need the parameters name *before* creating it.
 		b.parametersCounter = 1
@@ -227,8 +228,9 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 	}
 
 	ginkgo.Context("driver", func() {
-		ginkgo.Context("with ConfigMap parameters", func() { driverTest(false) })
-		ginkgo.Context("with dra.e2e.example.com parameters", func() { driverTest(true) })
+		ginkgo.Context("with ConfigMap parameters", func() { driverTest(false, false) })
+		ginkgo.Context("with dra.e2e.example.com parameters", func() { driverTest(true, false) })
+		ginkgo.Context("with numeric parameters", func() { driverTest(true, true) })
 	})
 
 	ginkgo.Context("cluster", func() {
@@ -966,6 +968,16 @@ func (b *builder) class() *resourcev1alpha2.ResourceClass {
 			Kind:      b.driver.classParameterAPIKind,
 			Name:      b.classParametersName,
 			Namespace: b.f.Namespace.Name,
+		}
+	}
+	if b.driver.numericParameters {
+		class.NumericParameters = []resourcev1alpha2.NumericParameterType{
+			{
+				APIGroup:  b.driver.parameterAPIGroup,
+				Kind:      b.driver.claimParameterAPIKind,
+				FieldPath: b.driver.claimParameterFieldPath,
+				Shareable: b.driver.claimShareable,
+			},
 		}
 	}
 	return class

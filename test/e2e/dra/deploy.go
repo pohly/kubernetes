@@ -19,6 +19,7 @@ package dra
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -34,12 +35,17 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/selection"
+	counterv1alpha1 "k8s.io/dynamic-resource-allocation/apis/counter/v1alpha1"
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
 	"k8s.io/klog/v2"
+	testdriverv1alpha1 "k8s.io/kubernetes/test/e2e/dra/test-driver/api/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/dra/test-driver/app"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -127,11 +133,14 @@ type Driver struct {
 	Name       string
 	Nodes      map[string]*app.ExamplePlugin
 
-	customParameters      bool
-	parameterAPIGroup     string
-	parameterAPIVersion   string
-	claimParameterAPIKind string
-	classParameterAPIKind string
+	customParameters        bool
+	numericParameters       bool
+	parameterAPIGroup       string
+	parameterAPIVersion     string
+	classParameterAPIKind   string
+	claimParameterAPIKind   string
+	claimParameterFieldPath string
+	claimShareable          bool
 
 	NodeV1alpha2, NodeV1alpha3 bool
 
@@ -157,27 +166,73 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 	d.cleanup = append(d.cleanup, cancel)
 
 	// The controller is easy: we simply connect to the API server.
-	d.Controller = app.NewController(d.f.ClientSet, d.f.DynamicClient, resources)
-	d.wg.Add(1)
-	go func() {
-		defer d.wg.Done()
-		d.Controller.Run(d.ctx, 5 /* workers */)
-	}()
+	// We don't need it when using numeric parameters.
+	if !d.numericParameters {
+		d.Controller = app.NewController(d.f.ClientSet, d.f.DynamicClient, resources)
+		d.wg.Add(1)
+		go func() {
+			defer d.wg.Done()
+			d.Controller.Run(d.ctx, 5 /* workers */)
+		}()
+	}
 
 	manifests := []string{
 		// The code below matches the content of this manifest (ports,
 		// container names, etc.).
 		"test/e2e/testing-manifests/dra/dra-test-driver-proxy.yaml",
 	}
-	if d.customParameters {
+	if d.customParameters || d.numericParameters {
 		d.parameterAPIGroup = d.f.UniqueName + d.NameSuffix + ".dra.example.com"
 		d.parameterAPIVersion = "v1alpha1"
 		d.claimParameterAPIKind = "ClaimParameter"
+		d.claimParameterFieldPath = "spec"
 		d.classParameterAPIKind = "ClassParameter"
+		d.claimShareable = resources.Shareable
 		manifests = append(manifests,
 			"test/e2e/dra/test-driver/deploy/crd/dra.e2e.example.com_claimparameters.yaml",
 			"test/e2e/dra/test-driver/deploy/crd/dra.e2e.example.com_classparameters.yaml",
 		)
+
+		if d.numericParameters {
+			if !resources.NodeLocal {
+				ginkgo.Fail("internal error: can only simulate node-local resources with numeric parameters")
+			}
+			// TODO: implement NodeResourceCapacity publishing in kubelet and remove this.
+			capacity := &counterv1alpha1.Capacity{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: counterv1alpha1.SchemeGroupVersion.String(),
+					Kind:       "Capacity",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					UID:  "abc",
+					Name: "thingies",
+				},
+				Count: resources.MaxAllocations,
+			}
+			instance, err := json.Marshal(capacity)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred(), "encode node capacity")
+			for _, nodeName := range nodes.NodeNames {
+				nodeResourceCapacity := &resourcev1alpha2.NodeResourceCapacity{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: nodeName,
+						// Normally the node would be the owner. Gets skipped here for simplicity's sake.
+					},
+					Resources: []resourcev1alpha2.DriverResources{
+						{
+							DriverName:        d.Name,
+							ResourceInstances: []runtime.RawExtension{{Raw: instance}},
+						},
+					},
+				}
+				// We don't even try to clean up after a test and instead do it here.
+				// Tests cannot run in parallel.
+				if err := d.f.ClientSet.ResourceV1alpha2().NodeResourceCapacities().Delete(ctx, nodeResourceCapacity.Name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+					gomega.Expect(err).To(gomega.Succeed(), "delete NodeResourceCapacity")
+				}
+				_, err := d.f.ClientSet.ResourceV1alpha2().NodeResourceCapacities().Create(ctx, nodeResourceCapacity, metav1.CreateOptions{})
+				gomega.Expect(err).To(gomega.Succeed(), "create NodeResourceCapacity")
+			}
+		}
 	} else {
 		d.parameterAPIGroup = ""
 		d.parameterAPIVersion = "v1"
@@ -218,7 +273,7 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 			item.Spec.Template.Spec.Containers[0].Args = append(item.Spec.Template.Spec.Containers[0].Args, "--endpoint=/plugins_registry/"+d.Name+"-reg.sock")
 			item.Spec.Template.Spec.Containers[1].Args = append(item.Spec.Template.Spec.Containers[1].Args, "--endpoint=/dra/"+d.Name+".sock")
 		case *apiextensionsv1.CustomResourceDefinition:
-			item.Name = strings.ReplaceAll(item.Name, "dra.e2e.example.com", d.parameterAPIGroup)
+			item.Name = strings.ReplaceAll(item.Name, testdriverv1alpha1.GroupName, d.parameterAPIGroup)
 			item.Spec.Group = d.parameterAPIGroup
 
 		}
@@ -249,6 +304,8 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 		logger := klog.LoggerWithValues(klog.LoggerWithName(klog.Background(), "kubelet plugin"), "node", pod.Spec.NodeName, "pod", klog.KObj(&pod))
 		plugin, err := app.StartPlugin(logger, "/cdi", d.Name, nodename,
 			app.FileOperations{
+				NumericParameters: d.numericParameters,
+				ParameterAPIGroup: d.parameterAPIGroup,
 				Create: func(name string, content []byte) error {
 					klog.Background().Info("creating CDI file", "node", nodename, "filename", name, "content", string(content))
 					return d.createFile(&pod, name, content)
