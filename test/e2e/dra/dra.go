@@ -53,9 +53,23 @@ const (
 	podStartTimeout = 5 * time.Minute
 )
 
+// networkResources can be passed to NewDriver directly.
 func networkResources() app.Resources {
 	return app.Resources{
 		Shareable: true,
+	}
+}
+
+// perNode returns a function which can be passed to NewDriver. The nodes
+// parameter has be instantiated, but not initialized yet, so the returned
+// function has to capture it and use it when being called.
+func perNode(maxAllocations int64, nodes *Nodes) func() app.Resources {
+	return func() app.Resources {
+		return app.Resources{
+			NodeLocal:      true,
+			MaxAllocations: maxAllocations,
+			Nodes:          nodes.NodeNames,
+		}
 	}
 }
 
@@ -183,7 +197,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 
 	driverTest := func(customParameters bool) {
 		nodes := NewNodes(f, 1, 1)
-		driver := NewDriver(f, nodes, networkResources) // All tests get their own driver instance.
+		driver := NewDriver(f, nodes, perNode(1, nodes)) // All tests get their own driver instance.
 		driver.customParameters = customParameters
 		b := newBuilder(f, driver)
 		// We need the parameters name *before* creating it.
@@ -318,13 +332,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		nodes := NewNodes(f, 1, 4)
 
 		ginkgo.Context("with local unshared resources", func() {
-			driver := NewDriver(f, nodes, func() app.Resources {
-				return app.Resources{
-					NodeLocal:      true,
-					MaxAllocations: 10,
-					Nodes:          nodes.NodeNames,
-				}
-			})
+			driver := NewDriver(f, nodes, perNode(10, nodes))
 			b := newBuilder(f, driver)
 
 			// This test covers some special code paths in the scheduler:
@@ -691,13 +699,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		})
 
 		ginkgo.Context("with node-local resources", func() {
-			driver := NewDriver(f, nodes, func() app.Resources {
-				return app.Resources{
-					NodeLocal:      true,
-					MaxAllocations: 1,
-					Nodes:          nodes.NodeNames,
-				}
-			})
+			driver := NewDriver(f, nodes, perNode(1, nodes))
 			b := newBuilder(f, driver)
 
 			tests := func(allocationMode resourcev1alpha2.AllocationMode) {
@@ -752,13 +754,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 
 		ginkgo.Context("reallocation", func() {
 			var allocateWrapper2 app.AllocateWrapperType
-			driver := NewDriver(f, nodes, func() app.Resources {
-				return app.Resources{
-					NodeLocal:      true,
-					MaxAllocations: 1,
-					Nodes:          nodes.NodeNames,
-				}
-			})
+			driver := NewDriver(f, nodes, perNode(1, nodes))
 			driver2 := NewDriver(f, nodes, func() app.Resources {
 				return app.Resources{
 					NodeLocal:      true,
@@ -889,24 +885,12 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 
 	multipleDrivers := func(nodeV1alpha2, nodeV1alpha3 bool) {
 		nodes := NewNodes(f, 1, 4)
-		driver1 := NewDriver(f, nodes, func() app.Resources {
-			return app.Resources{
-				NodeLocal:      true,
-				MaxAllocations: 2,
-				Nodes:          nodes.NodeNames,
-			}
-		})
+		driver1 := NewDriver(f, nodes, perNode(2, nodes))
 		driver1.NodeV1alpha2 = nodeV1alpha2
 		driver1.NodeV1alpha3 = nodeV1alpha3
 		b1 := newBuilder(f, driver1)
 
-		driver2 := NewDriver(f, nodes, func() app.Resources {
-			return app.Resources{
-				NodeLocal:      true,
-				MaxAllocations: 2,
-				Nodes:          nodes.NodeNames,
-			}
-		})
+		driver2 := NewDriver(f, nodes, perNode(2, nodes))
 		driver2.NameSuffix = "-other"
 		driver2.NodeV1alpha2 = nodeV1alpha2
 		driver2.NodeV1alpha3 = nodeV1alpha3
