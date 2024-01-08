@@ -469,10 +469,10 @@ type ResourceClaimTemplateList struct {
 // it would make scheduling decisions based on the old capacity
 // invalid.
 type NodeResourceCapacity struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// Standard object metadata
 	// +optional
-	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	metav1.ObjectMeta
 
 	// Resources contains information about the capacity
 	// reported by each DRA driver.
@@ -483,7 +483,7 @@ type NodeResourceCapacity struct {
 
 type DriverResources struct {
 	// DriverName identifies the DRA which provided the capacity information.
-	DriverName string `json:"driverName,omitempty" protobuf:"bytes,1,opt,name=driverName"`
+	DriverName string
 
 	// ResourceInstances describes all discrete resource instances that are
 	// managed by the driver. Each entry must be an object of one of the
@@ -498,7 +498,7 @@ type DriverResources struct {
 
 // NodeResourceCapacityList is a collection of claim templates.
 type NodeResourceCapacityList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 	// Standard list metadata
 	// +optional
 	metav1.ListMeta
