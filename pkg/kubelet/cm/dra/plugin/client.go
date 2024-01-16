@@ -25,6 +25,9 @@ import (
 	grpccodes "google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
 
+	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	drapbv1alpha2 "k8s.io/kubelet/pkg/apis/dra/v1alpha2"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1alpha3"
@@ -197,4 +200,53 @@ func (p *plugin) NodeUnprepareResources(
 	response, err := resourceManager.Unprepare(ctx, conn, p, req)
 	logger.V(4).Info(log("done calling NodeUnprepareResources rpc"), "response", response, "err", err)
 	return response, err
+}
+
+func (p *plugin) NodeResources(
+	ctx context.Context,
+	req *drapb.NodeResourcesRequest,
+	opts ...grpc.CallOption,
+) (drapb.Node_NodeResourcesClient, error) {
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info(log("calling NodeResources rpc"), "request", req)
+
+	conn, err := p.getOrCreateGRPCConn()
+	if err != nil {
+		return nil, err
+	}
+
+	nodeClient := drapb.NewNodeClient(conn)
+	return nodeClient.NodeResources(ctx, req, opts...)
+}
+
+func (p *plugin) processNodeResourcesStream(ctx context.Context, kubeClient kubernetes.Interface, nodeName, pluginName string) {
+	logger := klog.FromContext(ctx)
+	logger.Info("processNodeResourcesStream", "plugin", pluginName, "node", nodeName)
+	stream, err := p.NodeResources(ctx, &drapb.NodeResourcesRequest{})
+	if err != nil {
+		logger.Error(err, "NodeResources failed", "plugin", pluginName)
+		return
+	}
+	for {
+		response, err := stream.Recv()
+		if err != nil {
+			logger.Error(err, "Reading from the NodeResourcesResponse stream", "plugin", pluginName)
+			return
+		}
+		klog.V(4).InfoS("Got a NodeResourcesResponse from the stream", "plugin", pluginName, "response", response)
+		// TODO: delete and update existing objects
+		if len(response.Resources) == 1 {
+			slice := &resourcev1alpha2.NodeResourceSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					// TODO: use generated names, this concatenated name might be too long.
+					Name: nodeName + "-" + pluginName + "-slice",
+				},
+				NodeName:          nodeName,
+				DriverName:        pluginName,
+				NodeResourceModel: *response.Resources[0],
+			}
+			_, err = kubeClient.ResourceV1alpha2().NodeResourceSlices().Create(ctx, slice, metav1.CreateOptions{})
+			logger.Info("Create NodeResourceSlice", "slice", klog.KObj(slice), "node", nodeName, "plugin", pluginName, "error", err)
+		}
+	}
 }
