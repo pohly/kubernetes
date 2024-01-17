@@ -25,21 +25,46 @@ import (
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:storageversion
 
-// Capacity defines how much of certain items are available respectively
-// required.
+// Capacity defines how much of certain items are available.
 type Capacity struct {
 	// ObjectMeta may be set when publishing capacity, but is not required.
-	// It is ignored when matching requests against available capacity.
+	// The labels specified here can be used to filter when requesting
+	// capacity.
+	//
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// TypeMeta must have non-empty kind and apiVersion.
 	metav1.TypeMeta `json:",inline"`
 
-	// Count is the total number of available items per node when
-	// publishing capacity and the required number of items when requesting
-	// resources.
+	// Count is the total number of available items per node.
 	Count int64 `json:"count"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// Parameters defines how much and which resources are needed for a claim.
+type Parameters struct {
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	metav1.TypeMeta   `json:",inline"`
+
+	// Count is the required number of items.
+	Count int64 `json:"count"`
+
+	// In addition to the "In", "NotIn", "Exists", "DoesNotExist"
+	// operators from [k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelectorOperator],
+	// additional operators from [k8s.io/dynamic-resource-allocation/apis/meta/v1.LabelSelectorOperator]
+	// are also supported:
+	//
+	// - "Version>=", "Version>", "Version<=", "Version<", "Version=", "Version!=":
+	//   the Selector.MatchExpressions values must
+	//   contain a single semantic version strong. The expression
+	//   matches if the version in the label satisfy the condition
+	//   as defined by semantic versioning 2.0.0.
+	// - ">=", ">", "<=", "<", "=", "!=": the Selector.MatchExpressions values must
+	//   contain a single string which can be parsed as [resource.Quantity],
+	//   with comparison against the labels' value using the numeric operation.
+	Selector metav1.LabelSelector `json:"selector"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

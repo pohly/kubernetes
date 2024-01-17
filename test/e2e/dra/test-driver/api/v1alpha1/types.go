@@ -35,21 +35,20 @@ type ClaimParameter struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	metav1.TypeMeta   `json:",inline"`
 
-	// Spec is used for these reasons:
-	// - Familarity - most types have it, even when they have no status.
-	// - It groups non-standard fields together in a YAML dump.
-	// - It contains metav1.TypeMeta for use as numeric parameters,
-	//   which would clash with the metav1.TypeMeta in the root (could
-	//   be fixed by using a different TypeMeta for numeric parameters).
 	Spec ClaimParameterSpec `json:"spec"`
 }
 
-// ClaimParameterSpec holds the custom values of a ClaimParameter.
-//
-// Some of its fields correspond to k8s.io/dynamic-resource-allocation/apis/counter/v1alpha1/Capacity,
-// which makes it possible for core Kubernetes to handle them.
+// Spec is used above for these reasons:
+// - Familarity - most types have it, even when they have no status.
+// - It groups non-standard fields together in a YAML dump.
+// - It contains metav1.TypeMeta for use as numeric parameters,
+//   which would clash with the metav1.TypeMeta in the root (could
+//   be fixed by using a different TypeMeta for numeric parameters).
+
+// ClaimParameterSpec holds the custom parameters for a ClaimParameter.
 type ClaimParameterSpec struct {
-	// TypeMeta must have non-empty kind and apiVersion.
+	// TypeMeta must have non-empty kind and apiVersion. The defaults
+	// ensure that.
 	TypeMeta `json:",inline"`
 
 	// Count is the required number of items per claim.
@@ -62,6 +61,13 @@ type ClaimParameterSpec struct {
 	// the container sandbox by the driver.
 	Env map[string]string `json:"env,omitempty"`
 }
+
+// Implementation detail, not relevant for users:
+// the Count field above corresponds to k8s.io/dynamic-resource-allocation/apis/counter/v1alpha1/Parameter,
+// which makes it possible for core Kubernetes to handle it.
+//
+// The Selector feature is not supported by the test driver. Users
+// never get to see it.
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -87,10 +93,10 @@ type ClassParameterSpec struct {
 // TypeMeta matches metav1.TypeMeta. It gets re-defined here to add the right
 // defaults.
 type TypeMeta struct {
-	// Kind must be "Capacity".
+	// Kind must be "Parameter".
 	//
-	// +kubebuilder:default=Capacity
-	// +kubebuilder:validation:Enum=Capacity
+	// +kubebuilder:default=Parameter
+	// +kubebuilder:validation:Enum=Parameter
 	Kind string `json:"kind,omitempty"`
 
 	// APIVersion must be one which is supported by the driver.

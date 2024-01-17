@@ -32,11 +32,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: 'Spec is used for these reasons: - Familarity - most types
-              have it, even when they have no status. - It groups non-standard fields
-              together in a YAML dump. - It contains metav1.TypeMeta for use as numeric
-              parameters, which would clash with the metav1.TypeMeta in the root (could
-              be fixed by using a different TypeMeta for numeric parameters).'
+            description: ClaimParameterSpec holds the custom parameters for a ClaimParameter.
             properties:
               apiVersion:
                 default: counter.dra.config.k8s.io/v1alpha1
@@ -47,7 +43,7 @@ spec:
               count:
                 default: 1
                 description: Count is the required number of items per claim.
-                format: int32
+                format: int64
                 minimum: 1
                 type: integer
               env:
@@ -57,10 +53,10 @@ spec:
                   the container sandbox by the driver.
                 type: object
               kind:
-                default: Capacity
-                description: Kind must be "Capacity".
+                default: Parameter
+                description: Kind must be "Parameter".
                 enum:
-                - Capacity
+                - Parameter
                 type: string
             type: object
         required:

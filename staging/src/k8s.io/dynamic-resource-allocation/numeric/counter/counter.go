@@ -40,6 +40,7 @@ import (
 	"k8s.io/dynamic-resource-allocation/builtincontroller"
 	dracache "k8s.io/dynamic-resource-allocation/cache"
 	"k8s.io/dynamic-resource-allocation/internal/nilmap"
+	"k8s.io/dynamic-resource-allocation/labels"
 	"k8s.io/dynamic-resource-allocation/numeric/counter/internal"
 	"k8s.io/klog/v2"
 )
@@ -338,8 +339,8 @@ func parseResourceInstances(logger klog.Logger, in []runtime.RawExtension) inter
 			logger.Error(nil, "Invalid node capacity, got unsupported object", "gvk", gvk, "obj", actual)
 		default:
 			out.PerInstance[capacity.UID] = internal.InstanceResources{
-				Name:     capacity.Name,
-				Capacity: capacity.Count,
+				ObjectMeta: capacity.ObjectMeta,
+				Capacity:   capacity.Count,
 			}
 		}
 	}
@@ -605,7 +606,7 @@ func (c *activeCounterController) HandlesClaim(ctx context.Context, claim *resou
 	numericParametersObj := unstructured.Unstructured{Object: parameters}
 	gvk := numericParametersObj.GetObjectKind().GroupVersionKind()
 	if gvk.Group != counterv1alpha1.SchemeGroupVersion.Group ||
-		gvk.Kind != "Capacity" {
+		gvk.Kind != "Parameters" {
 		// Some unsupported type.
 		return nil, nil
 	}
@@ -613,13 +614,20 @@ func (c *activeCounterController) HandlesClaim(ctx context.Context, claim *resou
 	if err != nil {
 		return nil, fmt.Errorf("encoding %q from claim %q failed: %v", gvk, klog.KRef(claim.Namespace, claim.Spec.ParametersRef.Name), err)
 	}
-	var capacity counterv1alpha1.Capacity
-	actual, actualGVK, err := decoder.Decode(buffer, nil, &capacity)
+	var numericClaimParameters counterv1alpha1.Parameters
+	actual, actualGVK, err := decoder.Decode(buffer, nil, &numericClaimParameters)
 	if err != nil {
 		return nil, fmt.Errorf("decoding of %q from claim %q failed: %v", gvk, klog.KObj(claim), err)
 	}
-	if actual != &capacity {
+	if actual != &numericClaimParameters {
 		return nil, fmt.Errorf("claim %q: internal error: expected claim parameter type %q, got got unsupported object of type %q", klog.KObj(claim), gvk, actualGVK)
+	}
+	labelMatcher, err := labels.Compile(&numericClaimParameters.Selector)
+	if err != nil {
+		// This can happen if the user populated the claim parameters
+		// with some invalid label selector. The error message must be
+		// informative to tell them exactly what was wrong where.
+		return nil, fmt.Errorf("claim %q: parameters %q: %s: %v", klog.KObj(claim), claim.Spec.ParametersRef.Name, claimParameterType.fieldPath, err)
 	}
 
 	// Now we have enough information to check where the claim might be allocated.
@@ -627,11 +635,12 @@ func (c *activeCounterController) HandlesClaim(ctx context.Context, claim *resou
 		activeCounterController: c,
 		claim:                   claim,
 
-		driverName:      class.DriverName,
-		shareable:       claimParameterType.shareable,
-		classParameters: classParameters,
-		claimParameters: claimParameters,
-		claimCapacity:   capacity,
+		driverName:             class.DriverName,
+		shareable:              claimParameterType.shareable,
+		classParameters:        classParameters,
+		claimParameters:        claimParameters,
+		numericClaimParameters: numericClaimParameters,
+		labelMatcher:           labelMatcher,
 	}, nil
 }
 
@@ -643,7 +652,8 @@ type claimCounterController struct {
 	driverName                       string
 	shareable                        bool
 	classParameters, claimParameters runtime.Object
-	claimCapacity                    counterv1alpha1.Capacity
+	numericClaimParameters           counterv1alpha1.Parameters
+	labelMatcher                     *labels.Matcher
 }
 
 var _ builtincontroller.ClaimController = &claimCounterController{}
@@ -653,8 +663,9 @@ func (c *claimCounterController) NodeIsSuitable(ctx context.Context, pod *v1.Pod
 	defer c.mutex.Unlock()
 
 	for _, perInstance := range c.state.Resources[node.Name].PerDriver[c.driverName].PerInstance {
-		if perInstance.Allocated+c.claimCapacity.Count <= perInstance.Capacity {
-			return true, nil
+		if perInstance.Allocated+c.numericClaimParameters.Count <= perInstance.Capacity {
+			matches, err := c.labelMatcher.Matches(perInstance.Labels)
+			return matches, err
 		}
 	}
 	return false, nil
@@ -673,7 +684,7 @@ func (c *claimCounterController) Allocate(ctx context.Context, nodeName string) 
 		}()
 	}
 
-	count := c.claimCapacity.Count
+	count := c.numericClaimParameters.Count
 	resources := c.state.Resources[nodeName]
 	perDriver := resources.PerDriver[c.driverName]
 	for instanceID, perInstance := range perDriver.PerInstance {
@@ -684,7 +695,7 @@ func (c *claimCounterController) Allocate(ctx context.Context, nodeName string) 
 				NodeName:        nodeName,
 				DriverName:      c.driverName,
 				InstanceID:      instanceID,
-				Count:           c.claimCapacity.Count,
+				Count:           count,
 			}
 			var buffer bytes.Buffer
 			if err := decoder.Encode(&result, &buffer); err != nil {

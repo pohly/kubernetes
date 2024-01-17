@@ -22,6 +22,7 @@ limitations under the License.
 package internal
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -50,8 +51,8 @@ type DriverResources struct {
 
 // +k8s:deepcopy-gen=true
 type InstanceResources struct {
-	// Name was reported by the driver for the instance.
-	Name string
+	// ObjectMeta contains the Name and Labels as reported by the driver.
+	metav1.ObjectMeta
 	// Capacity is the total amount of items available.
 	Capacity int64
 	// Allocated is how much of those are in use.

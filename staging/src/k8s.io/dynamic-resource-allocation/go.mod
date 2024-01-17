@@ -5,6 +5,7 @@ module k8s.io/dynamic-resource-allocation
 go 1.21
 
 require (
+	github.com/blang/semver/v4 v4.0.0
 	github.com/go-logr/logr v1.3.0
 	github.com/google/go-cmp v0.6.0
 	github.com/google/gofuzz v1.2.0
