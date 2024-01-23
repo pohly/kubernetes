@@ -44,7 +44,7 @@ func TestState(t *testing.T) {
 			state:  ``,
 			expect: `{"resources": {"node-a": {"perDriver": {"driver-x": {"perInstance": {"abc": {"name": "something", "capacity": 42}}}}}}}`,
 			op: func(tb testing.TB, logger klog.Logger, c *activeCounterController) {
-				c.nodeResourceCapacityAddedOrUpdated(logger, mustParse(tb, `{"metadata":{"name":"node-a"}, "resources":[{"driverName":"driver-x", "resourceInstances": [{"metadata":{"uid": "abc", "name": "something"}, "kind": "Capacity", "apiVersion": "counter.dra.config.k8s.io/v1alpha1", "count": 42}]}]}`, new(resourcev1alpha2.NodeResourceCapacity)))
+				c.nodeResourceCapacityAddedOrUpdated(logger, mustParse(tb, `{"metadata":{"name":"node-a"}, "nodeName": "node-a", "driverName":"driver-x", "resourceInstance": {"metadata":{"uid": "abc", "name": "something"}, "kind": "Capacity", "apiVersion": "counter.dra.config.k8s.io/v1alpha1", "count": 42}}`, new(resourcev1alpha2.NodeResourceCapacity)))
 			},
 		},
 
@@ -52,7 +52,7 @@ func TestState(t *testing.T) {
 			state:  `{"resources": {"node-a": {"perDriver": {"driver-x": {"perInstance": {"abc": {"name": "something", "capacity": 42}}}}}}}`,
 			expect: `{"resources": {"node-a": {"perDriver": {"driver-x": {"perInstance": {"abc": {"name": "something", "capacity": 42}, "xyz": {"name": "else", "capacity": 1}}}}}}}`,
 			op: func(tb testing.TB, logger klog.Logger, c *activeCounterController) {
-				c.nodeResourceCapacityAddedOrUpdated(logger, mustParse(tb, `{"metadata":{"name":"node-a"}, "resources":[{"driverName":"driver-x", "resourceInstances": [{"metadata":{"uid": "abc", "name": "something"}, "kind": "Capacity", "apiVersion": "counter.dra.config.k8s.io/v1alpha1", "count": 42},{"metadata":{"uid": "xyz", "name": "else"}, "kind": "Capacity", "apiVersion": "counter.dra.config.k8s.io/v1alpha1", "count": 1}]}]}`, new(resourcev1alpha2.NodeResourceCapacity)))
+				c.nodeResourceCapacityAddedOrUpdated(logger, mustParse(tb, `{"metadata":{"name":"node-a"}, "nodeName": "node-a", "driverName":"driver-x", "resourceInstance": {"metadata":{"uid": "xyz", "name": "else"}, "kind": "Capacity", "apiVersion": "counter.dra.config.k8s.io/v1alpha1", "count": 1}}`, new(resourcev1alpha2.NodeResourceCapacity)))
 			},
 		},
 
@@ -60,7 +60,7 @@ func TestState(t *testing.T) {
 			state:  `{"resources": {"node-a": {"perDriver": {"driver-x": {"perInstance": {"abc": {"name": "something", "capacity": 42}}}}}}}`,
 			expect: `{"resources": {"node-a": {"perDriver": {"driver-x": {"perInstance": {"abc": {"name": "something", "capacity": 42}}}, "driver-y": {"perInstance": {"xyz": {"name": "else", "capacity": 1}}}}}}}`,
 			op: func(tb testing.TB, logger klog.Logger, c *activeCounterController) {
-				c.nodeResourceCapacityAddedOrUpdated(logger, mustParse(tb, `{"metadata":{"name":"node-a"}, "resources":[{"driverName":"driver-x", "resourceInstances": [{"metadata":{"uid": "abc", "name": "something"}, "kind": "Capacity", "apiVersion": "counter.dra.config.k8s.io/v1alpha1", "count": 42}]},{"driverName":"driver-y", "resourceInstances": [{"metadata":{"uid": "xyz", "name": "else"}, "kind": "Capacity", "apiVersion": "counter.dra.config.k8s.io/v1alpha1", "count": 1}]}]}`, new(resourcev1alpha2.NodeResourceCapacity)))
+				c.nodeResourceCapacityAddedOrUpdated(logger, mustParse(tb, `{"metadata":{"name":"node-a"}, "nodeName": "node-a", "driverName":"driver-y", "resourceInstance": {"metadata":{"uid": "xyz", "name": "else"}, "kind": "Capacity", "apiVersion": "counter.dra.config.k8s.io/v1alpha1", "count": 1}}`, new(resourcev1alpha2.NodeResourceCapacity)))
 			},
 		},
 
@@ -68,7 +68,7 @@ func TestState(t *testing.T) {
 			state:  `{"resources": {"node-a": {"perDriver": {"driver-x": {"perInstance": {"abc": {"name": "something", "capacity": 42}}}}}}}`,
 			expect: `{"resources": {"node-a": {"perDriver": {"driver-x": {"perInstance": {"abc": {"name": "something", "capacity": 42}}}}}, "node-b": {"perDriver": {"driver-y": {"perInstance": {"xyz": {"name": "else", "capacity": 1}}}}}}}`,
 			op: func(tb testing.TB, logger klog.Logger, c *activeCounterController) {
-				c.nodeResourceCapacityAddedOrUpdated(logger, mustParse(tb, `{"metadata":{"name":"node-b"}, "resources":[{"driverName":"driver-y", "resourceInstances": [{"metadata":{"uid": "xyz", "name": "else"}, "kind": "Capacity", "apiVersion": "counter.dra.config.k8s.io/v1alpha1", "count": 1}]}]}`, new(resourcev1alpha2.NodeResourceCapacity)))
+				c.nodeResourceCapacityAddedOrUpdated(logger, mustParse(tb, `{"metadata":{"name":"node-b"}, "nodeName": "node-b", "driverName":"driver-y", "resourceInstance": {"metadata":{"uid": "xyz", "name": "else"}, "kind": "Capacity", "apiVersion": "counter.dra.config.k8s.io/v1alpha1", "count": 1}}`, new(resourcev1alpha2.NodeResourceCapacity)))
 			},
 		},
 
@@ -76,7 +76,7 @@ func TestState(t *testing.T) {
 			state:  full,
 			expect: full,
 			op: func(tb testing.TB, logger klog.Logger, c *activeCounterController) {
-				c.nodeResourceCapacityAddedOrUpdated(logger, mustParse(tb, `{"metadata":{"name":"node-c"}}`, new(resourcev1alpha2.NodeResourceCapacity)))
+				c.nodeResourceCapacityAddedOrUpdated(logger, mustParse(tb, `{"metadata":{"name":"node-c"}, "nodeName": "node-c", "driverName": "driver-x", "resourceInstance": {"metadata":{"uid": "abc", "name": "something"}, "kind": "Capacity", "apiVersion": "counter.dra.config.k8s.io/v1alpha1", "count": 0}}`, new(resourcev1alpha2.NodeResourceCapacity)))
 			},
 		},
 
@@ -84,7 +84,7 @@ func TestState(t *testing.T) {
 			state:  `{"resources": {"node-a": {"perDriver": {"driver-x": {"perInstance": {"abc": {"name": "something", "capacity": 42}}}}}}}`,
 			expect: `{"resources": {"node-a": {"perDriver": {"driver-x": {"perInstance": {"abc": {"name": "something", "capacity": 42}}}}}}}`,
 			op: func(tb testing.TB, logger klog.Logger, c *activeCounterController) {
-				c.nodeResourceCapacityAddedOrUpdated(logger, mustParse(tb, `{"metadata":{"name":"node-a"}, "resources":[{"driverName":"driver-x", "resourceInstances": [{"metadata":{"uid": "abc", "name": "something"}, "kind": "Capacity", "apiVersion": "counter.dra.config.k8s.io/v1alpha1", "count": 42}, {"metadata":{"uid": "xyz", "name": "else"}, "kind": "Unknown", "apiVersion": "counter.dra.config.k8s.io/v1alpha1", "foo": "bar"}]}]}`, new(resourcev1alpha2.NodeResourceCapacity)))
+				c.nodeResourceCapacityAddedOrUpdated(logger, mustParse(tb, `{"metadata":{"name":"node-a"}, "nodeName": "node-a", "driverName":"driver-x", "resourceInstance": {"metadata":{"uid": "xyz", "name": "else"}, "kind": "Unknown", "apiVersion": "counter.dra.config.k8s.io/v1alpha1", "foo": "bar"}}`, new(resourcev1alpha2.NodeResourceCapacity)))
 			},
 		},
 
@@ -92,7 +92,7 @@ func TestState(t *testing.T) {
 			state:  `{"resources": {"node-a": {"perDriver": {"driver-x": {"perInstance": {"abc": {"name": "something", "capacity": 42}}}}}}}`,
 			expect: `{"resources": {"node-a": {"perDriver": {"driver-x": {"perInstance": {"abc": {"name": "something", "capacity": 42}}}}}}}`,
 			op: func(tb testing.TB, logger klog.Logger, c *activeCounterController) {
-				c.nodeResourceCapacityAddedOrUpdated(logger, mustParse(tb, `{"metadata":{"name":"node-a"}, "resources":[{"driverName":"driver-x", "resourceInstances": [{"metadata":{"uid": "abc", "name": "something"}, "kind": "Capacity", "apiVersion": "counter.dra.config.k8s.io/v1alpha1", "count": 42}, {"metadata":{"uid": "xyz", "name": "else"}, "kind": "AllocationResult", "apiVersion": "counter.dra.config.k8s.io/v1alpha1"}]}]}`, new(resourcev1alpha2.NodeResourceCapacity)))
+				c.nodeResourceCapacityAddedOrUpdated(logger, mustParse(tb, `{"metadata":{"name":"node-a"}, "nodeName": "node-a", "driverName":"driver-x", "resourceInstance": {"metadata":{"uid": "xyz", "name": "else"}, "kind": "AllocationResult", "apiVersion": "counter.dra.config.k8s.io/v1alpha1"}}`, new(resourcev1alpha2.NodeResourceCapacity)))
 			},
 		},
 
@@ -103,7 +103,15 @@ func TestState(t *testing.T) {
 			state:  `{"resources": {"node-a": {"perDriver": {"driver-x": {"perInstance": {"abc": {"name": "something", "capacity": 42}}}}}}}`,
 			expect: ``,
 			op: func(tb testing.TB, logger klog.Logger, c *activeCounterController) {
-				c.nodeResourceCapacityRemoved(logger, mustParse(tb, `{"metadata":{"name":"node-a"}}`, new(resourcev1alpha2.NodeResourceCapacity)))
+				c.nodeResourceCapacityRemoved(logger, mustParse(tb, `{"metadata":{"name":"node-a"}, "nodeName": "node-a", "driverName": "driver-x", "resourceInstance": {"metadata":{"uid": "abc", "name": "something"}, "kind": "Capacity", "apiVersion": "counter.dra.config.k8s.io/v1alpha1", "count": 42}}`, new(resourcev1alpha2.NodeResourceCapacity)))
+			},
+		},
+
+		"remove-nop": {
+			state:  `{"resources": {"node-a": {"perDriver": {"driver-x": {"perInstance": {"abc": {"name": "something", "capacity": 42}}}}}}}`,
+			expect: `{"resources": {"node-a": {"perDriver": {"driver-x": {"perInstance": {"abc": {"name": "something", "capacity": 42}}}}}}}`,
+			op: func(tb testing.TB, logger klog.Logger, c *activeCounterController) {
+				c.nodeResourceCapacityRemoved(logger, mustParse(tb, `{"metadata":{"name":"node-a"}, "nodeName": "node-a", "driverName": "driver-y", "resourceInstance": {"metadata":{"uid": "abc", "name": "something"}, "kind": "Capacity", "apiVersion": "counter.dra.config.k8s.io/v1alpha1", "count": 42}}`, new(resourcev1alpha2.NodeResourceCapacity)))
 			},
 		},
 

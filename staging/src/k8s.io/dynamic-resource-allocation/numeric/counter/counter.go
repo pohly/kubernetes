@@ -207,24 +207,27 @@ func (c *activeCounterController) nodeResourceCapacityUpdated(logger klog.Logger
 }
 
 func (c *activeCounterController) nodeResourceCapacityRemoved(logger klog.Logger, nodeResourceCapacity *resourcev1alpha2.NodeResourceCapacity) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-
-	loggerV := logger.V(5)
-	if loggerV.Enabled() {
-		oldState := c.state.DeepCopy()
-		defer func() {
-			loggerV.Info("State updated after node capacity removal", "state", c.state, "diff", cmp.Diff(oldState, c.state))
-		}()
+	instance := parseResourceInstance(logger, nodeResourceCapacity)
+	if instance == nil {
+		return
 	}
 
-	clearCapacityInNode(&c.state.Resources, nodeResourceCapacity.Name)
+	// Clearing the capacity ensures that the update removes the instance.
+	instance.Capacity = 0
+	c.updateCapacity(logger, "State updated after node capacity removal", nodeResourceCapacity, instance)
 
 }
 
 func (c *activeCounterController) nodeResourceCapacityAddedOrUpdated(logger klog.Logger, nodeResourceCapacity *resourcev1alpha2.NodeResourceCapacity) {
-	perDriver := parseDriverResources(logger, nodeResourceCapacity.Resources)
+	instance := parseResourceInstance(logger, nodeResourceCapacity)
+	if instance == nil {
+		return
+	}
 
+	c.updateCapacity(logger, "State updated after node capacity changed", nodeResourceCapacity, instance)
+}
+
+func (c *activeCounterController) updateCapacity(logger klog.Logger, what string, nodeResourceCapacity *resourcev1alpha2.NodeResourceCapacity, instance *internal.InstanceResources) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
@@ -232,49 +235,42 @@ func (c *activeCounterController) nodeResourceCapacityAddedOrUpdated(logger klog
 	if loggerV.Enabled() {
 		oldState := c.state.DeepCopy()
 		defer func() {
-			loggerV.Info("State updated after node capacity changed", "state", c.state, "diff", cmp.Diff(oldState, c.state))
+			loggerV.Info(what, "state", c.state, "diff", cmp.Diff(oldState, c.state))
 		}()
 	}
 
-	// Update capacity information. This must prune unused entries at all levels to prevent
-	// memory leaks (like keeping entries for obsolete nodes).
-	nodeName := nodeResourceCapacity.Name
-	toNodeResources := c.state.Resources[nodeName]
-	for driverName, driverResources := range perDriver {
-		toDriverResources := toNodeResources.PerDriver[driverName]
-		for uid, instanceResources := range driverResources.PerInstance {
-			toInstanceResources := toDriverResources.PerInstance[uid]
-			toInstanceResources.Name = instanceResources.Name
-			toInstanceResources.Capacity = instanceResources.Capacity
-			// Usually the node capacity should not go away while it is in use. But
-			// this is something to be checked elsewhere. Here we allow it and
-			// keep entries with more resources allocated than available.
-			if toInstanceResources.Capacity == 0 && toInstanceResources.Allocated == 0 {
-				nilmap.Delete(&toDriverResources.PerInstance, uid)
-			} else {
-				nilmap.Insert(&toDriverResources.PerInstance, uid, toInstanceResources)
-			}
-		}
-		for uid := range toDriverResources.PerInstance {
-			if !nilmap.Contains(driverResources.PerInstance, uid) {
-				clearCapacityInInstance(&toDriverResources.PerInstance, uid)
-			}
-		}
-		if len(toDriverResources.PerInstance) == 0 {
-			nilmap.Delete(&toNodeResources.PerDriver, driverName)
-		} else {
-			nilmap.Insert(&toNodeResources.PerDriver, driverName, toDriverResources)
-		}
+	// Update capacity information. This must must create maps as needed
+	// and prune unused entries at all levels to prevent memory leaks (like
+	// keeping entries for obsolete nodes). This is done by:
+	// - walking down into the maps as defined by node name, driver name, uid,
+	// - update the leaf,
+	// - and then walk back up.
+	toNodeResources := c.state.Resources[nodeResourceCapacity.NodeName]
+	toDriverResources := toNodeResources.PerDriver[nodeResourceCapacity.DriverName]
+	toInstanceResources := toDriverResources.PerInstance[instance.UID]
+
+	// Only store information that is relevant.
+	toInstanceResources.ObjectMeta.Name = instance.ObjectMeta.Name
+	toInstanceResources.ObjectMeta.Labels = instance.ObjectMeta.Labels
+	toInstanceResources.Capacity = instance.Capacity
+
+	// Usually the node capacity should not go away while it is in use. But
+	// this is something to be checked elsewhere. Here we allow it and
+	// keep entries with more resources allocated than available.
+	if toInstanceResources.Capacity == 0 && toInstanceResources.Allocated == 0 {
+		nilmap.Delete(&toDriverResources.PerInstance, instance.UID)
+	} else {
+		nilmap.Insert(&toDriverResources.PerInstance, instance.UID, toInstanceResources)
 	}
-	for driverName := range toNodeResources.PerDriver {
-		if !nilmap.Contains(perDriver, driverName) {
-			clearCapacityInDriver(&toNodeResources.PerDriver, driverName)
-		}
+	if len(toDriverResources.PerInstance) == 0 {
+		nilmap.Delete(&toNodeResources.PerDriver, nodeResourceCapacity.DriverName)
+	} else {
+		nilmap.Insert(&toNodeResources.PerDriver, nodeResourceCapacity.DriverName, toDriverResources)
 	}
 	if len(toNodeResources.PerDriver) == 0 {
-		nilmap.Delete(&c.state.Resources, nodeName)
+		nilmap.Delete(&c.state.Resources, nodeResourceCapacity.NodeName)
 	} else {
-		nilmap.Insert(&c.state.Resources, nodeName, toNodeResources)
+		nilmap.Insert(&c.state.Resources, nodeResourceCapacity.NodeName, toNodeResources)
 	}
 }
 
@@ -312,39 +308,26 @@ func clearCapacityInNode(resources *map[string]internal.NodeResources, nodeName 
 	}
 }
 
-func parseDriverResources(logger klog.Logger, in []resourcev1alpha2.DriverResources) map[string]internal.DriverResources {
-	out := make(map[string]internal.DriverResources, len(in))
-	for _, perDriver := range in {
-		out[perDriver.DriverName] = parseResourceInstances(logger, perDriver.ResourceInstances)
-	}
-	return out
-}
-
-func parseResourceInstances(logger klog.Logger, in []runtime.RawExtension) internal.DriverResources {
-	out := internal.DriverResources{
-		PerInstance: make(map[types.UID]internal.InstanceResources, len(in)),
-	}
-	for _, instance := range in {
-		capacity := new(counterv1alpha1.Capacity)
-		actual, gvk, err := decoder.Decode(instance.Raw, nil, capacity)
-		switch {
-		case runtime.IsNotRegisteredError(err):
-			// If the parameter object is not recognized, then it
-			// is by definition not something that this controller
-			// can handle and can be ignored.
-			logger.V(6).Info("Ignoring unknown node capacity", "capacity", string(instance.Raw), "err", err)
-		case err != nil:
-			logger.Error(err, "Decoding node capacity failed")
-		case actual != capacity:
-			logger.Error(nil, "Invalid node capacity, got unsupported object", "gvk", gvk, "obj", actual)
-		default:
-			out.PerInstance[capacity.UID] = internal.InstanceResources{
-				ObjectMeta: capacity.ObjectMeta,
-				Capacity:   capacity.Count,
-			}
+func parseResourceInstance(logger klog.Logger, in *resourcev1alpha2.NodeResourceCapacity) *internal.InstanceResources {
+	capacity := new(counterv1alpha1.Capacity)
+	actual, gvk, err := decoder.Decode(in.ResourceInstance.Raw, nil, capacity)
+	switch {
+	case runtime.IsNotRegisteredError(err):
+		// If the parameter object is not recognized, then it
+		// is by definition not something that this controller
+		// can handle and can be ignored.
+		logger.V(6).Info("Ignoring unknown node capacity", "nodeResourceCapacity", klog.KObj(in), "instanceData", string(in.ResourceInstance.Raw), "err", err)
+	case err != nil:
+		logger.Error(err, "Decoding node capacity failed", "nodeResourceCapacity", klog.KObj(in))
+	case actual != capacity:
+		logger.Error(nil, "Invalid node capacity, got unsupported object", "nodeResourceCapacity", klog.KObj(in), "gvk", gvk, "obj", actual)
+	default:
+		return &internal.InstanceResources{
+			ObjectMeta: capacity.ObjectMeta,
+			Capacity:   capacity.Count,
 		}
 	}
-	return out
+	return nil
 }
 
 func (c *activeCounterController) ClaimAllocated(ctx context.Context, claim *resourcev1alpha2.ResourceClaim) {
