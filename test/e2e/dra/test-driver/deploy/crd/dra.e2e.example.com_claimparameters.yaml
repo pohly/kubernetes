@@ -53,10 +53,10 @@ spec:
                   the container sandbox by the driver.
                 type: object
               kind:
-                default: Parameter
+                default: Parameters
                 description: Kind must be "Parameter".
                 enum:
-                - Parameter
+                - Parameters
                 type: string
             type: object
         required:

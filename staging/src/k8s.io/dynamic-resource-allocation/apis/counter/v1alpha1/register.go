@@ -51,6 +51,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&AllocationResult{},
 		&Capacity{},
+		&Parameters{},
 	)
 	return nil
 }

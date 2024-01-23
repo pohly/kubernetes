@@ -95,8 +95,8 @@ type ClassParameterSpec struct {
 type TypeMeta struct {
 	// Kind must be "Parameter".
 	//
-	// +kubebuilder:default=Parameter
-	// +kubebuilder:validation:Enum=Parameter
+	// +kubebuilder:default=Parameters
+	// +kubebuilder:validation:Enum=Parameters
 	Kind string `json:"kind,omitempty"`
 
 	// APIVersion must be one which is supported by the driver.
