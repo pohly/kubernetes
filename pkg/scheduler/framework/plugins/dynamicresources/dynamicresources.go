@@ -343,6 +343,8 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 		return &dynamicResources{}, nil
 	}
 
+	logger := klog.FromContext(ctx)
+
 	// Activate all available plugins, they might be needed.
 	dynClient := fh.DynClientSet()
 	if dynClient == nil {
@@ -361,6 +363,7 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 	if err != nil {
 		return nil, fmt.Errorf("activating claim controllers: %v", err)
 	}
+	logger.V(3).Info("Activated builtin claim controllers", "controllers", builtincontroller.Log(controllers))
 	indexers := indexers{
 		claimNameLookup: resourceclaim.NewNameLookup(fh.ClientSet()),
 		claimIndexer:    fh.SharedInformerFactory().Resource().V1alpha2().ResourceClaims().Informer().GetIndexer(),
@@ -997,6 +1000,9 @@ func (pl *dynamicResources) pre(ctx context.Context, cs *framework.CycleState, p
 			}
 			return statusError(logger, fmt.Errorf("cannot handle resource claim %q, the numeric parameters from resource class %q are not supported: %s",
 				klog.KObj(claim), klog.KObj(class), strings.Join(types, "; ")))
+		}
+		if controller != nil {
+			logger.V(4).Info("Claim is handled by builtin controller", "controller", controller.ControllerName(), "claim", klog.KObj(claim))
 		}
 		state.informationsForClaim[index].controller = controller
 	}
