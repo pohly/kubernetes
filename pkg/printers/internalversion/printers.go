@@ -656,7 +656,8 @@ func AddHandlers(h printers.PrintHandler) {
 
 	nodeResourceCapacityColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		// TODO (?): list all drivers
+		{Name: "Node", Type: "string", Description: resourcev1alpha2.NodeResourceCapacity{}.SwaggerDoc()["nodeName"]},
+		{Name: "Driver", Type: "string", Description: resourcev1alpha2.NodeResourceCapacity{}.SwaggerDoc()["driverName"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
 	_ = h.TableHandler(nodeResourceCapacityColumnDefinitions, printNodeResourceCapacity)
@@ -3028,7 +3029,7 @@ func printNodeResourceCapacity(obj *resource.NodeResourceCapacity, options print
 	row := metav1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
-	row.Cells = append(row.Cells, obj.Name, translateTimestampSince(obj.CreationTimestamp))
+	row.Cells = append(row.Cells, obj.Name, obj.NodeName, obj.DriverName, translateTimestampSince(obj.CreationTimestamp))
 
 	return []metav1.TableRow{row}, nil
 }

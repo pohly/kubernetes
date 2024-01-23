@@ -28,6 +28,8 @@ var nodeResourceCapacity = &resource.NodeResourceCapacity{
 	ObjectMeta: metav1.ObjectMeta{
 		Name: "valid-class",
 	},
+	NodeName:   "valid-node-name",
+	DriverName: "testdriver.example.com",
 }
 
 func TestClassStrategy(t *testing.T) {

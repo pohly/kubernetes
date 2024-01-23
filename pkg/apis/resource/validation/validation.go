@@ -349,11 +349,8 @@ func validateNodeName(name string, fldPath *field.Path) field.ErrorList {
 // ValidateNodeResourceCapacity tests if a NodeResourceCapacity object is valid.
 func ValidateNodeResourceCapacity(nodeResourceCapacity *resource.NodeResourceCapacity) field.ErrorList {
 	allErrs := corevalidation.ValidateObjectMeta(&nodeResourceCapacity.ObjectMeta, false, corevalidation.ValidateNodeName, field.NewPath("metadata"))
-	fld := field.NewPath("resources")
-	for i, resource := range nodeResourceCapacity.Resources {
-		idxPath := fld.Index(i)
-		allErrs = append(allErrs, validateResourceDriverName(resource.DriverName, idxPath.Child("driverName"))...)
-	}
+	allErrs = append(allErrs, validateNodeName(nodeResourceCapacity.NodeName, field.NewPath("nodeName"))...)
+	allErrs = append(allErrs, validateResourceDriverName(nodeResourceCapacity.DriverName, field.NewPath("driverName"))...)
 	return allErrs
 }
 

@@ -496,8 +496,8 @@ type ResourceClaimTemplateList struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.30
 
-// NodeResourceCapacity gets published by kubelet. Its name
-// matches the name of the node and the node is the owner.
+// NodeResourceCapacity provides information about available
+// resources on individual nodes.
 //
 // Capacity may get added, but should not get removed because
 // it would make scheduling decisions based on the old capacity
@@ -508,29 +508,22 @@ type NodeResourceCapacity struct {
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Resources contains information about the capacity
-	// reported by each DRA driver.
-	//
-	// +listType=map
-	// +listMapKey=driverName
-	// +patchStrategy=merge
-	// +patchMergeKey=driverName
-	// +optional
-	Resources []DriverResources `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources" patchStrategy:"merge" patchMergeKey:"driverName"`
-}
+	// NodeName identifies the node where the capacity is available.
+	// A field selector can be used to list only NodeResourceCapacity
+	// objects with a certain node name.
+	NodeName string `json:"nodeName" protobuf:"bytes,2,name=nodeName"`
 
-type DriverResources struct {
-	// DriverName identifies the DRA which provided the capacity information.
-	DriverName string `json:"driverName,omitempty" protobuf:"bytes,1,opt,name=driverName"`
+	// DriverName identifies the DRA driver which provided the capacity information.
+	// A field selector can be used to list only NodeResourceCapacity
+	// objects with a certain driver name.
+	DriverName string `json:"driverName" protobuf:"bytes,3,name=driverName"`
 
-	// ResourceInstances describes all discrete resource instances that are
-	// managed by the driver. Each entry must be an object of one of the
+	// ResourceInstance describes one discrete resource instance that is
+	// managed by the driver. It must be an object of one of the
 	// supported numeric resource capacity types with kind, version and uid
-	// set. The uid only needs to be unique inside the node.
-	//
-	// +listType=atomic
-	// +optional
-	ResourceInstances []runtime.RawExtension `json:"resourceInstances,omitempty" protobuf:"bytes,2,opt,name=resourceInstances"`
+	// set. The uid only needs to be unique for the node and the driver.
+	// It must be stable across node restarts.
+	ResourceInstance runtime.RawExtension `json:"resourceInstance" protobuf:"bytes,4,name=resourceInstance"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

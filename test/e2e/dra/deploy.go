@@ -214,23 +214,20 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 			for _, nodeName := range nodes.NodeNames {
 				nodeResourceCapacity := &resourcev1alpha2.NodeResourceCapacity{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: nodeName,
+						GenerateName: nodeName + "-",
 						// Normally the node would be the owner. Gets skipped here for simplicity's sake.
 					},
-					Resources: []resourcev1alpha2.DriverResources{
-						{
-							DriverName:        d.Name,
-							ResourceInstances: []runtime.RawExtension{{Raw: instance}},
-						},
-					},
+					NodeName:         nodeName,
+					DriverName:       d.Name,
+					ResourceInstance: runtime.RawExtension{Raw: instance},
 				}
-				// We don't even try to clean up after a test and instead do it here.
-				// Tests cannot run in parallel.
-				if err := d.f.ClientSet.ResourceV1alpha2().NodeResourceCapacities().Delete(ctx, nodeResourceCapacity.Name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
-					gomega.Expect(err).To(gomega.Succeed(), "delete NodeResourceCapacity")
-				}
-				_, err := d.f.ClientSet.ResourceV1alpha2().NodeResourceCapacities().Create(ctx, nodeResourceCapacity, metav1.CreateOptions{})
+				nodeResourceCapacity, err := d.f.ClientSet.ResourceV1alpha2().NodeResourceCapacities().Create(ctx, nodeResourceCapacity, metav1.CreateOptions{})
 				gomega.Expect(err).To(gomega.Succeed(), "create NodeResourceCapacity")
+				ginkgo.DeferCleanup(func(ctx context.Context) {
+					if err := d.f.ClientSet.ResourceV1alpha2().NodeResourceCapacities().Delete(ctx, nodeResourceCapacity.Name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+						gomega.Expect(err).To(gomega.Succeed(), "delete NodeResourceCapacity")
+					}
+				})
 			}
 		}
 	} else {

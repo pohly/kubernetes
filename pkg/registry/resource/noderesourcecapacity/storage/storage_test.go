@@ -51,8 +51,10 @@ func validNewNodeResourceCapacity(name string) *resource.NodeResourceCapacity {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Resources: []resource.DriverResources{
-			{DriverName: "cdi.example.com"},
+		NodeName:   name,
+		DriverName: "cdi.example.com",
+		ResourceInstance: runtime.RawExtension{
+			Raw: []byte(`{"metatdata": {"kind": "Capacity", "apiVersion": "test.example.org/v1", "uid": "1"}, "count": 1}`),
 		},
 	}
 }
@@ -85,13 +87,13 @@ func TestUpdate(t *testing.T) {
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*resource.NodeResourceCapacity)
-			object.Resources = append(object.Resources, resource.DriverResources{DriverName: "cdi2.example.com"})
+			object.ResourceInstance.Raw = []byte(`{"metatdata": {"kind": "Capacity", "apiVersion": "test.example.org/v1", "uid": "1"}, "count": 2}`)
 			return object
 		},
 		// invalid update
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*resource.NodeResourceCapacity)
-			object.Resources[0].DriverName = ""
+			object.DriverName = ""
 			return object
 		},
 	)

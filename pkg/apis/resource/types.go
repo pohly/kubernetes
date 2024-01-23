@@ -462,8 +462,8 @@ type ResourceClaimTemplateList struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// NodeResourceCapacity gets published by kubelet. Its name
-// matches the name of the node and the node is the owner.
+// NodeResourceCapacity provides information about available
+// resources on individual nodes.
 //
 // Capacity may get added, but should not get removed because
 // it would make scheduling decisions based on the old capacity
@@ -474,24 +474,22 @@ type NodeResourceCapacity struct {
 	// +optional
 	metav1.ObjectMeta
 
-	// Resources contains information about the capacity
-	// reported by each DRA driver.
-	//
-	// +optional
-	Resources []DriverResources
-}
+	// NodeName identifies the node where the capacity is available.
+	// A field selector can be used to list only NodeResourceCapacity
+	// objects with a certain node name.
+	NodeName string
 
-type DriverResources struct {
-	// DriverName identifies the DRA which provided the capacity information.
+	// DriverName identifies the DRA driver which provided the capacity information.
+	// A field selector can be used to list only NodeResourceCapacity
+	// objects with a certain driver name.
 	DriverName string
 
-	// ResourceInstances describes all discrete resource instances that are
-	// managed by the driver. Each entry must be an object of one of the
+	// ResourceInstance describes one discrete resource instance that is
+	// managed by the driver. It must be an object of one of the
 	// supported numeric resource capacity types with kind, version and uid
-	// set. The uid only needs to be unique inside the node.
-	//
-	// +optional
-	ResourceInstances []runtime.RawExtension
+	// set. The uid only needs to be unique for the node and the driver.
+	// It must be stable across node restarts.
+	ResourceInstance runtime.RawExtension
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
