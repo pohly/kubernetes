@@ -527,6 +527,7 @@ func (c *activeCounterController) Snapshot() builtincontroller.ActiveController 
 }
 
 func (c *activeCounterController) HandlesClaim(ctx context.Context, claim *resourcev1alpha2.ResourceClaim, class *resourcev1alpha2.ResourceClass) (builtincontroller.ClaimController, error) {
+	logger := klog.FromContext(ctx)
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
@@ -535,6 +536,7 @@ func (c *activeCounterController) HandlesClaim(ctx context.Context, claim *resou
 		// If not, then we are not responsible for it.
 		claimResources, ok := c.state.Claims[claim.UID]
 		if !ok {
+			logger.V(6).Info("Claim not handled because the claim is allocated and unknown, so it must be from someone else", "controller", c.ControllerName(), "claim", klog.KObj(claim))
 			return nil, nil
 		}
 		return &claimCounterController{
@@ -608,6 +610,7 @@ func (c *activeCounterController) HandlesClaim(ctx context.Context, claim *resou
 	if gvk.Group != counterv1alpha1.SchemeGroupVersion.Group ||
 		gvk.Kind != "Parameters" {
 		// Some unsupported type.
+		logger.V(6).Info("Claim not handled because the embedded parameter type is unknown", "controller", c.ControllerName(), "claim", klog.KObj(claim), "parameterType", gvk)
 		return nil, nil
 	}
 	buffer, err := numericParametersObj.MarshalJSON()
