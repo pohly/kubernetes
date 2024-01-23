@@ -4,6 +4,23 @@
   "kind": "APIResourceList",
   "resources": [
     {
+      "kind": "NodeResourceCapacity",
+      "name": "noderesourcecapacities",
+      "namespaced": false,
+      "singularName": "noderesourcecapacity",
+      "storageVersionHash": "AGQqOeE4jOo=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
       "kind": "PodSchedulingContext",
       "name": "podschedulingcontexts",
       "namespaced": true,

@@ -11658,24 +11658,16 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: shareable
       type:
         scalar: boolean
-- name: io.k8s.api.resource.v1alpha2.DriverResources
-  map:
-    fields:
-    - name: driverName
-      type:
-        scalar: string
-    - name: resourceInstances
-      type:
-        list:
-          elementType:
-            namedType: __untyped_atomic_
-          elementRelationship: atomic
 - name: io.k8s.api.resource.v1alpha2.NodeResourceCapacity
   map:
     fields:
     - name: apiVersion
       type:
         scalar: string
+    - name: driverName
+      type:
+        scalar: string
+      default: ""
     - name: kind
       type:
         scalar: string
@@ -11683,14 +11675,13 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
       default: {}
-    - name: resources
+    - name: nodeName
       type:
-        list:
-          elementType:
-            namedType: io.k8s.api.resource.v1alpha2.DriverResources
-          elementRelationship: associative
-          keys:
-          - driverName
+        scalar: string
+      default: ""
+    - name: resourceInstance
+      type:
+        namedType: __untyped_atomic_
 - name: io.k8s.api.resource.v1alpha2.NumericParameterType
   map:
     fields:

@@ -38,19 +38,12 @@ func (AllocationResult) SwaggerDoc() map[string]string {
 	return map_AllocationResult
 }
 
-var map_DriverResources = map[string]string{
-	"driverName":        "DriverName identifies the DRA which provided the capacity information.",
-	"resourceInstances": "ResourceInstances describes all discrete resource instances that are managed by the driver. Each entry must be an object of one of the supported numeric resource capacity types with kind, version and uid set. The uid only needs to be unique inside the node.",
-}
-
-func (DriverResources) SwaggerDoc() map[string]string {
-	return map_DriverResources
-}
-
 var map_NodeResourceCapacity = map[string]string{
-	"":          "NodeResourceCapacity gets published by kubelet. Its name matches the name of the node and the node is the owner.\n\nCapacity may get added, but should not get removed because it would make scheduling decisions based on the old capacity invalid.",
-	"metadata":  "Standard object metadata",
-	"resources": "Resources contains information about the capacity reported by each DRA driver.",
+	"":                 "NodeResourceCapacity provides information about available resources on individual nodes.\n\nCapacity may get added, but should not get removed because it would make scheduling decisions based on the old capacity invalid.",
+	"metadata":         "Standard object metadata",
+	"nodeName":         "NodeName identifies the node where the capacity is available. A field selector can be used to list only NodeResourceCapacity objects with a certain node name.",
+	"driverName":       "DriverName identifies the DRA driver which provided the capacity information. A field selector can be used to list only NodeResourceCapacity objects with a certain driver name.",
+	"resourceInstance": "ResourceInstance describes one discrete resource instance that is managed by the driver. It must be an object of one of the supported numeric resource capacity types with kind, version and uid set. The uid only needs to be unique for the node and the driver. It must be stable across node restarts.",
 }
 
 func (NodeResourceCapacity) SwaggerDoc() map[string]string {

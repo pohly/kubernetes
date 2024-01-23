@@ -19,8 +19,9 @@ limitations under the License.
 package v1alpha2
 
 import (
-	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
+	v1alpha2 "k8s.io/api/resource/v1alpha2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	internal "k8s.io/client-go/applyconfigurations/internal"
@@ -32,7 +33,9 @@ import (
 type NodeResourceCapacityApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Resources                        []DriverResourcesApplyConfiguration `json:"resources,omitempty"`
+	NodeName                         *string               `json:"nodeName,omitempty"`
+	DriverName                       *string               `json:"driverName,omitempty"`
+	ResourceInstance                 *runtime.RawExtension `json:"resourceInstance,omitempty"`
 }
 
 // NodeResourceCapacity constructs an declarative configuration of the NodeResourceCapacity type for use with
@@ -56,18 +59,18 @@ func NodeResourceCapacity(name string) *NodeResourceCapacityApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractNodeResourceCapacity(nodeResourceCapacity *resourcev1alpha2.NodeResourceCapacity, fieldManager string) (*NodeResourceCapacityApplyConfiguration, error) {
+func ExtractNodeResourceCapacity(nodeResourceCapacity *v1alpha2.NodeResourceCapacity, fieldManager string) (*NodeResourceCapacityApplyConfiguration, error) {
 	return extractNodeResourceCapacity(nodeResourceCapacity, fieldManager, "")
 }
 
 // ExtractNodeResourceCapacityStatus is the same as ExtractNodeResourceCapacity except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractNodeResourceCapacityStatus(nodeResourceCapacity *resourcev1alpha2.NodeResourceCapacity, fieldManager string) (*NodeResourceCapacityApplyConfiguration, error) {
+func ExtractNodeResourceCapacityStatus(nodeResourceCapacity *v1alpha2.NodeResourceCapacity, fieldManager string) (*NodeResourceCapacityApplyConfiguration, error) {
 	return extractNodeResourceCapacity(nodeResourceCapacity, fieldManager, "status")
 }
 
-func extractNodeResourceCapacity(nodeResourceCapacity *resourcev1alpha2.NodeResourceCapacity, fieldManager string, subresource string) (*NodeResourceCapacityApplyConfiguration, error) {
+func extractNodeResourceCapacity(nodeResourceCapacity *v1alpha2.NodeResourceCapacity, fieldManager string, subresource string) (*NodeResourceCapacityApplyConfiguration, error) {
 	b := &NodeResourceCapacityApplyConfiguration{}
 	err := managedfields.ExtractInto(nodeResourceCapacity, internal.Parser().Type("io.k8s.api.resource.v1alpha2.NodeResourceCapacity"), fieldManager, b, subresource)
 	if err != nil {
@@ -238,15 +241,26 @@ func (b *NodeResourceCapacityApplyConfiguration) ensureObjectMetaApplyConfigurat
 	}
 }
 
-// WithResources adds the given value to the Resources field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the Resources field.
-func (b *NodeResourceCapacityApplyConfiguration) WithResources(values ...*DriverResourcesApplyConfiguration) *NodeResourceCapacityApplyConfiguration {
-	for i := range values {
-		if values[i] == nil {
-			panic("nil value passed to WithResources")
-		}
-		b.Resources = append(b.Resources, *values[i])
-	}
+// WithNodeName sets the NodeName field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the NodeName field is set to the value of the last call.
+func (b *NodeResourceCapacityApplyConfiguration) WithNodeName(value string) *NodeResourceCapacityApplyConfiguration {
+	b.NodeName = &value
+	return b
+}
+
+// WithDriverName sets the DriverName field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the DriverName field is set to the value of the last call.
+func (b *NodeResourceCapacityApplyConfiguration) WithDriverName(value string) *NodeResourceCapacityApplyConfiguration {
+	b.DriverName = &value
+	return b
+}
+
+// WithResourceInstance sets the ResourceInstance field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ResourceInstance field is set to the value of the last call.
+func (b *NodeResourceCapacityApplyConfiguration) WithResourceInstance(value runtime.RawExtension) *NodeResourceCapacityApplyConfiguration {
+	b.ResourceInstance = &value
 	return b
 }

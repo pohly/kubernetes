@@ -849,7 +849,6 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/rbac/v1beta1.RoleRef":                                                                       schema_k8sio_api_rbac_v1beta1_RoleRef(ref),
 		"k8s.io/api/rbac/v1beta1.Subject":                                                                       schema_k8sio_api_rbac_v1beta1_Subject(ref),
 		"k8s.io/api/resource/v1alpha2.AllocationResult":                                                         schema_k8sio_api_resource_v1alpha2_AllocationResult(ref),
-		"k8s.io/api/resource/v1alpha2.DriverResources":                                                          schema_k8sio_api_resource_v1alpha2_DriverResources(ref),
 		"k8s.io/api/resource/v1alpha2.NodeResourceCapacity":                                                     schema_k8sio_api_resource_v1alpha2_NodeResourceCapacity(ref),
 		"k8s.io/api/resource/v1alpha2.NodeResourceCapacityList":                                                 schema_k8sio_api_resource_v1alpha2_NodeResourceCapacityList(ref),
 		"k8s.io/api/resource/v1alpha2.NumericParameterType":                                                     schema_k8sio_api_resource_v1alpha2_NumericParameterType(ref),
@@ -42343,50 +42342,11 @@ func schema_k8sio_api_resource_v1alpha2_AllocationResult(ref common.ReferenceCal
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_DriverResources(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Type: []string{"object"},
-				Properties: map[string]spec.Schema{
-					"driverName": {
-						SchemaProps: spec.SchemaProps{
-							Description: "DriverName identifies the DRA which provided the capacity information.",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"resourceInstances": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
-						SchemaProps: spec.SchemaProps{
-							Description: "ResourceInstances describes all discrete resource instances that are managed by the driver. Each entry must be an object of one of the supported numeric resource capacity types with kind, version and uid set. The uid only needs to be unique inside the node.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Ref: ref("k8s.io/apimachinery/pkg/runtime.RawExtension"),
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/runtime.RawExtension"},
-	}
-}
-
 func schema_k8sio_api_resource_v1alpha2_NodeResourceCapacity(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "NodeResourceCapacity gets published by kubelet. Its name matches the name of the node and the node is the owner.\n\nCapacity may get added, but should not get removed because it would make scheduling decisions based on the old capacity invalid.",
+				Description: "NodeResourceCapacity provides information about available resources on individual nodes.\n\nCapacity may get added, but should not get removed because it would make scheduling decisions based on the old capacity invalid.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
@@ -42410,35 +42370,34 @@ func schema_k8sio_api_resource_v1alpha2_NodeResourceCapacity(ref common.Referenc
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
 						},
 					},
-					"resources": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-map-keys": []interface{}{
-									"driverName",
-								},
-								"x-kubernetes-list-type":       "map",
-								"x-kubernetes-patch-merge-key": "driverName",
-								"x-kubernetes-patch-strategy":  "merge",
-							},
-						},
+					"nodeName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Resources contains information about the capacity reported by each DRA driver.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
-								Schema: &spec.Schema{
-									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha2.DriverResources"),
-									},
-								},
-							},
+							Description: "NodeName identifies the node where the capacity is available. A field selector can be used to list only NodeResourceCapacity objects with a certain node name.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"driverName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DriverName identifies the DRA driver which provided the capacity information. A field selector can be used to list only NodeResourceCapacity objects with a certain driver name.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"resourceInstance": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ResourceInstance describes one discrete resource instance that is managed by the driver. It must be an object of one of the supported numeric resource capacity types with kind, version and uid set. The uid only needs to be unique for the node and the driver. It must be stable across node restarts.",
+							Ref:         ref("k8s.io/apimachinery/pkg/runtime.RawExtension"),
 						},
 					},
 				},
+				Required: []string{"nodeName", "driverName", "resourceInstance"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha2.DriverResources", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta", "k8s.io/apimachinery/pkg/runtime.RawExtension"},
 	}
 }
 

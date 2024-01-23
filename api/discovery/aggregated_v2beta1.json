@@ -1831,6 +1831,26 @@
           "freshness": "Current",
           "resources": [
             {
+              "resource": "noderesourcecapacities",
+              "responseKind": {
+                "group": "",
+                "kind": "NodeResourceCapacity",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "noderesourcecapacity",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
               "resource": "podschedulingcontexts",
               "responseKind": {
                 "group": "",
