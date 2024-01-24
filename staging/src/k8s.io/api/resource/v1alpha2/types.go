@@ -518,12 +518,16 @@ type NodeResourceCapacity struct {
 	// objects with a certain driver name.
 	DriverName string `json:"driverName" protobuf:"bytes,3,name=driverName"`
 
+	// InstanceID is chosen by the driver to distinguish between different
+	// resource instances. It only needs to be unique for the driver and node.
+	// In other words, tuple of NodeName, DriverName, InstanceID needs to
+	// be unique in the cluster.
+	InstanceID string `json:"instanceID" protobuf:"bytes,4,name=instanceID"`
+
 	// ResourceInstance describes one discrete resource instance that is
 	// managed by the driver. It must be an object of one of the
-	// supported numeric resource capacity types with kind, version and uid
-	// set. The uid only needs to be unique for the node and the driver.
-	// It must be stable across node restarts.
-	ResourceInstance runtime.RawExtension `json:"resourceInstance" protobuf:"bytes,4,name=resourceInstance"`
+	// supported numeric resource capacity types with kind and apiVersion set.
+	ResourceInstance runtime.RawExtension `json:"resourceInstance" protobuf:"bytes,5,name=resourceInstance"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
