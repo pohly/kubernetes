@@ -291,6 +291,7 @@ func autoConvert_v1alpha2_NodeResourceCapacity_To_resource_NodeResourceCapacity(
 	out.ObjectMeta = in.ObjectMeta
 	out.NodeName = in.NodeName
 	out.DriverName = in.DriverName
+	out.InstanceID = in.InstanceID
 	out.ResourceInstance = in.ResourceInstance
 	return nil
 }
@@ -304,6 +305,7 @@ func autoConvert_resource_NodeResourceCapacity_To_v1alpha2_NodeResourceCapacity(
 	out.ObjectMeta = in.ObjectMeta
 	out.NodeName = in.NodeName
 	out.DriverName = in.DriverName
+	out.InstanceID = in.InstanceID
 	out.ResourceInstance = in.ResourceInstance
 	return nil
 }

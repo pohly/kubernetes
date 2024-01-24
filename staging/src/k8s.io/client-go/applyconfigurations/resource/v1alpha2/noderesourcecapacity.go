@@ -35,6 +35,7 @@ type NodeResourceCapacityApplyConfiguration struct {
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	NodeName                         *string               `json:"nodeName,omitempty"`
 	DriverName                       *string               `json:"driverName,omitempty"`
+	InstanceID                       *string               `json:"instanceID,omitempty"`
 	ResourceInstance                 *runtime.RawExtension `json:"resourceInstance,omitempty"`
 }
 
@@ -254,6 +255,14 @@ func (b *NodeResourceCapacityApplyConfiguration) WithNodeName(value string) *Nod
 // If called multiple times, the DriverName field is set to the value of the last call.
 func (b *NodeResourceCapacityApplyConfiguration) WithDriverName(value string) *NodeResourceCapacityApplyConfiguration {
 	b.DriverName = &value
+	return b
+}
+
+// WithInstanceID sets the InstanceID field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the InstanceID field is set to the value of the last call.
+func (b *NodeResourceCapacityApplyConfiguration) WithInstanceID(value string) *NodeResourceCapacityApplyConfiguration {
+	b.InstanceID = &value
 	return b
 }
 

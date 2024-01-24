@@ -42386,14 +42386,22 @@ func schema_k8sio_api_resource_v1alpha2_NodeResourceCapacity(ref common.Referenc
 							Format:      "",
 						},
 					},
+					"instanceID": {
+						SchemaProps: spec.SchemaProps{
+							Description: "InstanceID is chosen by the driver to distinguish between different resource instances. It only needs to be unique for the driver and node. In other words, tuple of NodeName, DriverName, InstanceID needs to be unique in the cluster.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 					"resourceInstance": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ResourceInstance describes one discrete resource instance that is managed by the driver. It must be an object of one of the supported numeric resource capacity types with kind, version and uid set. The uid only needs to be unique for the node and the driver. It must be stable across node restarts.",
+							Description: "ResourceInstance describes one discrete resource instance that is managed by the driver. It must be an object of one of the supported numeric resource capacity types with kind and apiVersion set.",
 							Ref:         ref("k8s.io/apimachinery/pkg/runtime.RawExtension"),
 						},
 					},
 				},
-				Required: []string{"nodeName", "driverName", "resourceInstance"},
+				Required: []string{"nodeName", "driverName", "instanceID", "resourceInstance"},
 			},
 		},
 		Dependencies: []string{

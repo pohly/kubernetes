@@ -11668,6 +11668,10 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    - name: instanceID
+      type:
+        scalar: string
+      default: ""
     - name: kind
       type:
         scalar: string

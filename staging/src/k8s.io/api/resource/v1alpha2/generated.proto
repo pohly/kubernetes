@@ -84,12 +84,16 @@ message NodeResourceCapacity {
   // objects with a certain driver name.
   optional string driverName = 3;
 
+  // InstanceID is chosen by the driver to distinguish between different
+  // resource instances. It only needs to be unique for the driver and node.
+  // In other words, tuple of NodeName, DriverName, InstanceID needs to
+  // be unique in the cluster.
+  optional string instanceID = 4;
+
   // ResourceInstance describes one discrete resource instance that is
   // managed by the driver. It must be an object of one of the
-  // supported numeric resource capacity types with kind, version and uid
-  // set. The uid only needs to be unique for the node and the driver.
-  // It must be stable across node restarts.
-  optional k8s.io.apimachinery.pkg.runtime.RawExtension resourceInstance = 4;
+  // supported numeric resource capacity types with kind and apiVersion set.
+  optional k8s.io.apimachinery.pkg.runtime.RawExtension resourceInstance = 5;
 }
 
 // NodeResourceCapacityList is a collection of claim templates.
