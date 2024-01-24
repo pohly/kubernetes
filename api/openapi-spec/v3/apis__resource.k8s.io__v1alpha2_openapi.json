@@ -125,6 +125,11 @@
             "description": "DriverName identifies the DRA driver which provided the capacity information. A field selector can be used to list only NodeResourceCapacity objects with a certain driver name.",
             "type": "string"
           },
+          "instanceID": {
+            "default": "",
+            "description": "InstanceID is chosen by the driver to distinguish between different resource instances. It only needs to be unique for the driver and node. In other words, tuple of NodeName, DriverName, InstanceID needs to be unique in the cluster.",
+            "type": "string"
+          },
           "kind": {
             "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
             "type": "string"
@@ -149,12 +154,13 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.runtime.RawExtension"
               }
             ],
-            "description": "ResourceInstance describes one discrete resource instance that is managed by the driver. It must be an object of one of the supported numeric resource capacity types with kind, version and uid set. The uid only needs to be unique for the node and the driver. It must be stable across node restarts."
+            "description": "ResourceInstance describes one discrete resource instance that is managed by the driver. It must be an object of one of the supported numeric resource capacity types with kind and apiVersion set."
           }
         },
         "required": [
           "nodeName",
           "driverName",
+          "instanceID",
           "resourceInstance"
         ],
         "type": "object",
