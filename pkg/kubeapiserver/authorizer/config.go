@@ -98,6 +98,7 @@ func (config Config) New(ctx context.Context, serverID string) (authorizer.Autho
 				config.VersionedInformerFactory.Core().V1().Pods(),
 				config.VersionedInformerFactory.Core().V1().PersistentVolumes(),
 				config.VersionedInformerFactory.Storage().V1().VolumeAttachments(),
+				config.VersionedInformerFactory.Resource().V1alpha2().NodeResourceSlices(),
 			)
 			r.nodeAuthorizer = node.NewAuthorizer(graph, nodeidentifier.NewDefaultNodeIdentifier(), bootstrappolicy.NodeRules())
 

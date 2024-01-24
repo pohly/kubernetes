@@ -22,9 +22,11 @@ import (
 	"k8s.io/klog/v2"
 
 	corev1 "k8s.io/api/core/v1"
+	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	corev1informers "k8s.io/client-go/informers/core/v1"
+	resourcev1alpha2informers "k8s.io/client-go/informers/resource/v1alpha2"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
 	"k8s.io/client-go/tools/cache"
 )
@@ -39,6 +41,7 @@ func AddGraphEventHandlers(
 	pods corev1informers.PodInformer,
 	pvs corev1informers.PersistentVolumeInformer,
 	attachments storageinformers.VolumeAttachmentInformer,
+	slices resourcev1alpha2informers.NodeResourceSliceInformer,
 ) {
 	g := &graphPopulator{
 		graph: graph,
@@ -62,8 +65,14 @@ func AddGraphEventHandlers(
 		DeleteFunc: g.deleteVolumeAttachment,
 	})
 
+	sliceHandler, _ := slices.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    g.addNodeResourceSlice,
+		UpdateFunc: nil, // Not needed, NodeName is immutable.
+		DeleteFunc: g.deleteNodeResourceSlice,
+	})
+
 	go cache.WaitForNamedCacheSync("node_authorizer", wait.NeverStop,
-		podHandler.HasSynced, pvsHandler.HasSynced, attachHandler.HasSynced)
+		podHandler.HasSynced, pvsHandler.HasSynced, attachHandler.HasSynced, sliceHandler.HasSynced)
 }
 
 func (g *graphPopulator) addPod(obj interface{}) {
@@ -183,4 +192,25 @@ func (g *graphPopulator) deleteVolumeAttachment(obj interface{}) {
 		return
 	}
 	g.graph.DeleteVolumeAttachment(attachment.Name)
+}
+
+func (g *graphPopulator) addNodeResourceSlice(obj interface{}) {
+	slice, ok := obj.(*resourcev1alpha2.NodeResourceSlice)
+	if !ok {
+		klog.Infof("unexpected type %T", obj)
+		return
+	}
+	g.graph.AddNodeResourceSlice(slice.Name, slice.NodeName)
+}
+
+func (g *graphPopulator) deleteNodeResourceSlice(obj interface{}) {
+	if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
+		obj = tombstone.Obj
+	}
+	slice, ok := obj.(*resourcev1alpha2.NodeResourceSlice)
+	if !ok {
+		klog.Infof("unexpected type %T", obj)
+		return
+	}
+	g.graph.DeleteNodeResourceSlice(slice.Name)
 }
