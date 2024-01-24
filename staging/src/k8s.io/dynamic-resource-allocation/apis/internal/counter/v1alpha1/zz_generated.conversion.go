@@ -24,7 +24,6 @@ package v1alpha1
 import (
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	types "k8s.io/apimachinery/pkg/types"
 	v1alpha1 "k8s.io/dynamic-resource-allocation/apis/counter/v1alpha1"
 	counter "k8s.io/dynamic-resource-allocation/apis/internal/counter"
 )
@@ -74,7 +73,7 @@ func autoConvert_v1alpha1_AllocationResult_To_counter_AllocationResult(in *v1alp
 	out.ClaimParameters = in.ClaimParameters
 	out.NodeName = in.NodeName
 	out.DriverName = in.DriverName
-	out.InstanceID = types.UID(in.InstanceID)
+	out.InstanceID = in.InstanceID
 	out.Count = in.Count
 	return nil
 }
@@ -89,7 +88,7 @@ func autoConvert_counter_AllocationResult_To_v1alpha1_AllocationResult(in *count
 	out.ClaimParameters = in.ClaimParameters
 	out.NodeName = in.NodeName
 	out.DriverName = in.DriverName
-	out.InstanceID = types.UID(in.InstanceID)
+	out.InstanceID = in.InstanceID
 	out.Count = in.Count
 	return nil
 }

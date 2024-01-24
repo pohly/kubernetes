@@ -19,7 +19,6 @@ package v1alpha1
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -94,7 +93,7 @@ type AllocationResult struct {
 
 	// InstanceID is the unique ID chosen by that driver for the resource
 	// instance that was picked for the claim.
-	InstanceID types.UID `json:"instanceID"`
+	InstanceID string `json:"instanceID"`
 
 	// Count is the amount that was requested for the claim.
 	Count int64 `json:"count"`

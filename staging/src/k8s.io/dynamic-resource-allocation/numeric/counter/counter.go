@@ -227,7 +227,7 @@ func (c *activeCounterController) nodeResourceCapacityAddedOrUpdated(logger klog
 	c.updateCapacity(logger, "State updated after node capacity changed", nodeResourceCapacity, instance)
 }
 
-func (c *activeCounterController) updateCapacity(logger klog.Logger, what string, nodeResourceCapacity *resourcev1alpha2.NodeResourceCapacity, instance *internal.InstanceResources) {
+func (c *activeCounterController) updateCapacity(logger klog.Logger, what string, nodeResourceCapacity *resourcev1alpha2.NodeResourceCapacity, updatedInstance *internal.Instance) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
@@ -245,70 +245,36 @@ func (c *activeCounterController) updateCapacity(logger klog.Logger, what string
 	// - walking down into the maps as defined by node name, driver name, uid,
 	// - update the leaf,
 	// - and then walk back up.
-	toNodeResources := c.state.Resources[nodeResourceCapacity.NodeName]
-	toDriverResources := toNodeResources.PerDriver[nodeResourceCapacity.DriverName]
-	toInstanceResources := toDriverResources.PerInstance[instance.UID]
+	nodeResources := c.state.PerNode[nodeResourceCapacity.NodeName]
+	driverResources := nodeResources.PerDriver[nodeResourceCapacity.DriverName]
+	instance := driverResources.PerInstance[nodeResourceCapacity.InstanceID]
 
 	// Only store information that is relevant.
-	toInstanceResources.ObjectMeta.Name = instance.ObjectMeta.Name
-	toInstanceResources.ObjectMeta.Labels = instance.ObjectMeta.Labels
-	toInstanceResources.Capacity = instance.Capacity
+	instance.ObjectMeta.Name = updatedInstance.ObjectMeta.Name
+	instance.ObjectMeta.Labels = updatedInstance.ObjectMeta.Labels
+	instance.Capacity = updatedInstance.Capacity
 
 	// Usually the node capacity should not go away while it is in use. But
 	// this is something to be checked elsewhere. Here we allow it and
 	// keep entries with more resources allocated than available.
-	if toInstanceResources.Capacity == 0 && toInstanceResources.Allocated == 0 {
-		nilmap.Delete(&toDriverResources.PerInstance, instance.UID)
+	if instance.Capacity == 0 && instance.Allocated == 0 {
+		nilmap.Delete(&driverResources.PerInstance, nodeResourceCapacity.InstanceID)
 	} else {
-		nilmap.Insert(&toDriverResources.PerInstance, instance.UID, toInstanceResources)
-	}
-	if len(toDriverResources.PerInstance) == 0 {
-		nilmap.Delete(&toNodeResources.PerDriver, nodeResourceCapacity.DriverName)
-	} else {
-		nilmap.Insert(&toNodeResources.PerDriver, nodeResourceCapacity.DriverName, toDriverResources)
-	}
-	if len(toNodeResources.PerDriver) == 0 {
-		nilmap.Delete(&c.state.Resources, nodeResourceCapacity.NodeName)
-	} else {
-		nilmap.Insert(&c.state.Resources, nodeResourceCapacity.NodeName, toNodeResources)
-	}
-}
-
-func clearCapacityInInstance(perInstance *map[types.UID]internal.InstanceResources, uid types.UID) {
-	instanceResources := (*perInstance)[uid]
-	if instanceResources.Allocated == 0 {
-		nilmap.Delete(perInstance, uid)
-	} else {
-		instanceResources.Capacity = 0
-		(*perInstance)[uid] = instanceResources
-	}
-}
-
-func clearCapacityInDriver(perDriver *map[string]internal.DriverResources, driverName string) {
-	driverResources := (*perDriver)[driverName]
-	for uid := range driverResources.PerInstance {
-		clearCapacityInInstance(&driverResources.PerInstance, uid)
+		nilmap.Insert(&driverResources.PerInstance, nodeResourceCapacity.InstanceID, instance)
 	}
 	if len(driverResources.PerInstance) == 0 {
-		nilmap.Delete(perDriver, driverName)
+		nilmap.Delete(&nodeResources.PerDriver, nodeResourceCapacity.DriverName)
 	} else {
-		(*perDriver)[driverName] = driverResources
-	}
-}
-
-func clearCapacityInNode(resources *map[string]internal.NodeResources, nodeName string) {
-	nodeResources := (*resources)[nodeName]
-	for driverName := range nodeResources.PerDriver {
-		clearCapacityInDriver(&nodeResources.PerDriver, driverName)
+		nilmap.Insert(&nodeResources.PerDriver, nodeResourceCapacity.DriverName, driverResources)
 	}
 	if len(nodeResources.PerDriver) == 0 {
-		nilmap.Delete(resources, nodeName)
+		nilmap.Delete(&c.state.PerNode, nodeResourceCapacity.NodeName)
 	} else {
-		(*resources)[nodeName] = nodeResources
+		nilmap.Insert(&c.state.PerNode, nodeResourceCapacity.NodeName, nodeResources)
 	}
 }
 
-func parseResourceInstance(logger klog.Logger, in *resourcev1alpha2.NodeResourceCapacity) *internal.InstanceResources {
+func parseResourceInstance(logger klog.Logger, in *resourcev1alpha2.NodeResourceCapacity) *internal.Instance {
 	capacity := new(counterv1alpha1.Capacity)
 	actual, gvk, err := decoder.Decode(in.ResourceInstance.Raw, nil, capacity)
 	switch {
@@ -322,7 +288,7 @@ func parseResourceInstance(logger klog.Logger, in *resourcev1alpha2.NodeResource
 	case actual != capacity:
 		logger.Error(nil, "Invalid node capacity, got unsupported object", "nodeResourceCapacity", klog.KObj(in), "gvk", gvk, "obj", actual)
 	default:
-		return &internal.InstanceResources{
+		return &internal.Instance{
 			ObjectMeta: capacity.ObjectMeta,
 			Capacity:   capacity.Count,
 		}
@@ -365,13 +331,13 @@ func (c *activeCounterController) ClaimAllocated(ctx context.Context, claim *res
 			}()
 		}
 
-		resources := c.state.Resources[allocationResult.NodeName]
-		perDriver := resources.PerDriver[allocationResult.DriverName]
-		resourceInstance := perDriver.PerInstance[allocationResult.InstanceID]
-		resourceInstance.Allocated += allocationResult.Count
-		nilmap.Insert(&perDriver.PerInstance, allocationResult.InstanceID, resourceInstance)
-		nilmap.Insert(&resources.PerDriver, allocationResult.DriverName, perDriver)
-		nilmap.Insert(&c.state.Resources, allocationResult.NodeName, resources)
+		nodeResources := c.state.PerNode[allocationResult.NodeName]
+		driverResources := nodeResources.PerDriver[allocationResult.DriverName]
+		instance := driverResources.PerInstance[allocationResult.InstanceID]
+		instance.Allocated += allocationResult.Count
+		nilmap.Insert(&driverResources.PerInstance, allocationResult.InstanceID, instance)
+		nilmap.Insert(&nodeResources.PerDriver, allocationResult.DriverName, driverResources)
+		nilmap.Insert(&c.state.PerNode, allocationResult.NodeName, nodeResources)
 		claimResources := internal.ClaimResources{
 			Name:       claim.Name,
 			Namespace:  claim.Namespace,
@@ -408,24 +374,24 @@ func (c *activeCounterController) deallocate(ctx context.Context, claim *resourc
 
 	// Reduce allocated capacity. This may lead to empty leafs and thus
 	// pruning.
-	resources := c.state.Resources[claimResources.NodeName]
-	perDriver := resources.PerDriver[claimResources.DriverName]
-	resourceInstance := perDriver.PerInstance[claimResources.InstanceID]
-	resourceInstance.Allocated -= claimResources.Count
-	if resourceInstance.Allocated == 0 && resourceInstance.Capacity == 0 {
-		nilmap.Delete(&perDriver.PerInstance, claimResources.InstanceID)
+	nodeResources := c.state.PerNode[claimResources.NodeName]
+	driverResources := nodeResources.PerDriver[claimResources.DriverName]
+	instance := driverResources.PerInstance[claimResources.InstanceID]
+	instance.Allocated -= claimResources.Count
+	if instance.Allocated == 0 && instance.Capacity == 0 {
+		nilmap.Delete(&driverResources.PerInstance, claimResources.InstanceID)
 	} else {
-		nilmap.Insert(&perDriver.PerInstance, claimResources.InstanceID, resourceInstance)
+		nilmap.Insert(&driverResources.PerInstance, claimResources.InstanceID, instance)
 	}
-	if len(perDriver.PerInstance) == 0 {
-		nilmap.Delete(&resources.PerDriver, claimResources.DriverName)
+	if len(driverResources.PerInstance) == 0 {
+		nilmap.Delete(&nodeResources.PerDriver, claimResources.DriverName)
 	} else {
-		nilmap.Insert(&resources.PerDriver, claimResources.DriverName, perDriver)
+		nilmap.Insert(&nodeResources.PerDriver, claimResources.DriverName, driverResources)
 	}
-	if len(resources.PerDriver) == 0 {
-		nilmap.Delete(&c.state.Resources, claimResources.NodeName)
+	if len(nodeResources.PerDriver) == 0 {
+		nilmap.Delete(&c.state.PerNode, claimResources.NodeName)
 	} else {
-		nilmap.Insert(&c.state.Resources, claimResources.NodeName, resources)
+		nilmap.Insert(&c.state.PerNode, claimResources.NodeName, nodeResources)
 	}
 
 	delete(c.state.Claims, claim.UID)
@@ -648,9 +614,9 @@ func (c *claimCounterController) NodeIsSuitable(ctx context.Context, pod *v1.Pod
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	for _, perInstance := range c.state.Resources[node.Name].PerDriver[c.driverName].PerInstance {
-		if perInstance.Allocated+c.numericClaimParameters.Count <= perInstance.Capacity {
-			matches, err := c.labelMatcher.Matches(perInstance.Labels)
+	for _, instance := range c.state.PerNode[node.Name].PerDriver[c.driverName].PerInstance {
+		if instance.Allocated+c.numericClaimParameters.Count <= instance.Capacity {
+			matches, err := c.labelMatcher.Matches(instance.Labels)
 			return matches, err
 		}
 	}
@@ -671,10 +637,10 @@ func (c *claimCounterController) Allocate(ctx context.Context, nodeName string) 
 	}
 
 	count := c.numericClaimParameters.Count
-	resources := c.state.Resources[nodeName]
-	perDriver := resources.PerDriver[c.driverName]
-	for instanceID, perInstance := range perDriver.PerInstance {
-		if perInstance.Allocated+count <= perInstance.Capacity {
+	nodeResources := c.state.PerNode[nodeName]
+	driverResources := nodeResources.PerDriver[c.driverName]
+	for instanceID, instance := range driverResources.PerInstance {
+		if instance.Allocated+count <= instance.Capacity {
 			result := counterv1alpha1.AllocationResult{
 				ClassParameters: runtime.RawExtension{Object: c.classParameters},
 				ClaimParameters: runtime.RawExtension{Object: c.claimParameters},
@@ -687,8 +653,8 @@ func (c *claimCounterController) Allocate(ctx context.Context, nodeName string) 
 			if err := decoder.Encode(&result, &buffer); err != nil {
 				return "", nil, fmt.Errorf("failed to encode counter allocation result: %v", err)
 			}
-			perInstance.Allocated += count
-			perDriver.PerInstance[instanceID] = perInstance
+			instance.Allocated += count
+			driverResources.PerInstance[instanceID] = instance
 			c.claimResources = &internal.ClaimResources{
 				Name:       c.claim.Name,
 				Namespace:  c.claim.Namespace,

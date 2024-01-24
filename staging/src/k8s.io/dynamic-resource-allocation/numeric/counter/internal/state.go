@@ -28,8 +28,8 @@ import (
 
 // +k8s:deepcopy-gen=true
 type State struct {
-	// Resources maps node name to resource usage on that node.
-	Resources map[string]NodeResources
+	// PerNode maps node name to resource usage on that node.
+	PerNode map[string]NodeResources
 
 	// AllocatedClaims maps the UID of an allocated claim to
 	// the resources allocated for it.
@@ -44,13 +44,13 @@ type NodeResources struct {
 
 // +k8s:deepcopy-gen=true
 type DriverResources struct {
-	// PerInstance maps the UID of each hardware instance to information
+	// PerInstance maps the ID of each hardware instance to information
 	// published by the driver and how its used.
-	PerInstance map[types.UID]InstanceResources
+	PerInstance map[string]Instance
 }
 
 // +k8s:deepcopy-gen=true
-type InstanceResources struct {
+type Instance struct {
 	// ObjectMeta contains the Name and Labels as reported by the driver.
 	metav1.ObjectMeta
 	// Capacity is the total amount of items available.
@@ -66,6 +66,6 @@ type ClaimResources struct {
 
 	NodeName   string
 	DriverName string
-	InstanceID types.UID
+	InstanceID string
 	Count      int64
 }
