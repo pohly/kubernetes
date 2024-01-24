@@ -90,6 +90,7 @@ func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, erro
 				config.VersionedInformerFactory.Core().V1().Pods(),
 				config.VersionedInformerFactory.Core().V1().PersistentVolumes(),
 				config.VersionedInformerFactory.Storage().V1().VolumeAttachments(),
+				config.VersionedInformerFactory.Resource().V1alpha2().NodeResourceCapacities(),
 			)
 			nodeAuthorizer := node.NewAuthorizer(graph, nodeidentifier.NewDefaultNodeIdentifier(), bootstrappolicy.NodeRules())
 			authorizers = append(authorizers, nodeAuthorizer)

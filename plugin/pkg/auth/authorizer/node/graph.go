@@ -114,6 +114,7 @@ type vertexType byte
 
 const (
 	configMapVertexType vertexType = iota
+	capacityVertexType
 	nodeVertexType
 	podVertexType
 	pvcVertexType
@@ -126,6 +127,7 @@ const (
 
 var vertexTypes = map[vertexType]string{
 	configMapVertexType:      "configmap",
+	capacityVertexType:       "noderesourcecapacity",
 	nodeVertexType:           "node",
 	podVertexType:            "pod",
 	pvcVertexType:            "pvc",
@@ -491,4 +493,35 @@ func (g *Graph) DeleteVolumeAttachment(name string) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 	g.deleteVertex_locked(vaVertexType, "", name)
+}
+
+// AddNodeResourceCapacity sets up edges for the following relationships:
+//
+//	node resource capacity -> node
+func (g *Graph) AddNodeResourceCapacity(capacityName, nodeName string) {
+	start := time.Now()
+	defer func() {
+		graphActionsDuration.WithLabelValues("AddNodeResourceCapacity").Observe(time.Since(start).Seconds())
+	}()
+	g.lock.Lock()
+	defer g.lock.Unlock()
+
+	// clear existing edges
+	g.deleteVertex_locked(capacityVertexType, "", capacityName)
+
+	// if we have a node, establish new edges
+	if len(nodeName) > 0 {
+		capacityVertex := g.getOrCreateVertex_locked(capacityVertexType, "", capacityName)
+		nodeVertex := g.getOrCreateVertex_locked(nodeVertexType, "", nodeName)
+		g.graph.SetEdge(newDestinationEdge(capacityVertex, nodeVertex, nodeVertex))
+	}
+}
+func (g *Graph) DeleteNodeResourceCapacity(capacityName string) {
+	start := time.Now()
+	defer func() {
+		graphActionsDuration.WithLabelValues("DeleteNodeResourceCapacity").Observe(time.Since(start).Seconds())
+	}()
+	g.lock.Lock()
+	defer g.lock.Unlock()
+	g.deleteVertex_locked(capacityVertexType, "", capacityName)
 }

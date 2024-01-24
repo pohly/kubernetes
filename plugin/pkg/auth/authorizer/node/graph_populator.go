@@ -22,9 +22,11 @@ import (
 	"k8s.io/klog/v2"
 
 	corev1 "k8s.io/api/core/v1"
+	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	corev1informers "k8s.io/client-go/informers/core/v1"
+	resourcev1alpha2informers "k8s.io/client-go/informers/resource/v1alpha2"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
 	"k8s.io/client-go/tools/cache"
 )
@@ -39,6 +41,7 @@ func AddGraphEventHandlers(
 	pods corev1informers.PodInformer,
 	pvs corev1informers.PersistentVolumeInformer,
 	attachments storageinformers.VolumeAttachmentInformer,
+	capacities resourcev1alpha2informers.NodeResourceCapacityInformer,
 ) {
 	g := &graphPopulator{
 		graph: graph,
@@ -62,8 +65,14 @@ func AddGraphEventHandlers(
 		DeleteFunc: g.deleteVolumeAttachment,
 	})
 
+	capacityHandler, _ := capacities.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    g.addNodeResourceCapacity,
+		UpdateFunc: nil, // Not needed, NodeName is immutable.
+		DeleteFunc: g.deleteNodeResourceCapacity,
+	})
+
 	go cache.WaitForNamedCacheSync("node_authorizer", wait.NeverStop,
-		podHandler.HasSynced, pvsHandler.HasSynced, attachHandler.HasSynced)
+		podHandler.HasSynced, pvsHandler.HasSynced, attachHandler.HasSynced, capacityHandler.HasSynced)
 }
 
 func (g *graphPopulator) addPod(obj interface{}) {
@@ -183,4 +192,25 @@ func (g *graphPopulator) deleteVolumeAttachment(obj interface{}) {
 		return
 	}
 	g.graph.DeleteVolumeAttachment(attachment.Name)
+}
+
+func (g *graphPopulator) addNodeResourceCapacity(obj interface{}) {
+	capacity, ok := obj.(*resourcev1alpha2.NodeResourceCapacity)
+	if !ok {
+		klog.Infof("unexpected type %T", obj)
+		return
+	}
+	g.graph.AddNodeResourceCapacity(capacity.Name, capacity.NodeName)
+}
+
+func (g *graphPopulator) deleteNodeResourceCapacity(obj interface{}) {
+	if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
+		obj = tombstone.Obj
+	}
+	capacity, ok := obj.(*resourcev1alpha2.NodeResourceCapacity)
+	if !ok {
+		klog.Infof("unexpected type %T", obj)
+		return
+	}
+	g.graph.DeleteNodeResourceCapacity(capacity.Name)
 }
