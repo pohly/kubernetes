@@ -358,5 +358,7 @@ func ValidateNodeResourceCapacity(nodeResourceCapacity *resource.NodeResourceCap
 func ValidateNodeResourceCapacityUpdate(nodeResourceCapacity, oldNodeResourceCapacity *resource.NodeResourceCapacity) field.ErrorList {
 	allErrs := corevalidation.ValidateObjectMetaUpdate(&nodeResourceCapacity.ObjectMeta, &oldNodeResourceCapacity.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateNodeResourceCapacity(nodeResourceCapacity)...)
+	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(nodeResourceCapacity.NodeName, oldNodeResourceCapacity.NodeName, field.NewPath("nodeName"))...)
+	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(nodeResourceCapacity.DriverName, oldNodeResourceCapacity.DriverName, field.NewPath("driverName"))...)
 	return allErrs
 }
