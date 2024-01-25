@@ -126,18 +126,6 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 				}
 			}
 
-			// listNames := func(in []*resourcev1alpha2.NodeResourceCapacity) []resourcev1alpha2.NodeResourceCapacity {
-			// 	out := make([]resourcev1alpha2.NodeResourceCapacity, 0, len(in))
-			// 	for _, capacity := range in {
-			// 		out = append(out, resourcev1alpha2.NodeResourceCapacity{
-			// 			ObjectMeta: metav1.ObjectMeta{Name: capacity.Name},
-			// 			NodeName:   capacity.NodeName,
-			// 			DriverName: capacity.DriverName,
-			// 		})
-			// 	}
-			// 	return out
-			// }
-
 			expected := all[0]
 			actual, err := resourceClient.Get(ctx, expected.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err, "get NodeResourceCapacity")
