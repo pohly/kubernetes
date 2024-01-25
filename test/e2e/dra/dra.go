@@ -38,6 +38,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/dynamic-resource-allocation/controller"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	driverv1alpha1 "k8s.io/kubernetes/test/e2e/dra/test-driver/api/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/dra/test-driver/app"
 	"k8s.io/kubernetes/test/e2e/feature"
@@ -73,12 +74,98 @@ func perNode(maxAllocations int64, nodes *Nodes) func() app.Resources {
 	}
 }
 
-var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, func() {
+var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, framework.WithFeatureGate(features.DynamicResourceAllocation), func() {
 	f := framework.NewDefaultFramework("dra")
 
 	// The driver containers have to run with sufficient privileges to
 	// modify /var/lib/kubelet/plugins.
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+
+	// The tests in this context exercise the API. Eventually these can be
+	// come conformance tests
+	// (https://github.com/kubernetes/kubernetes/issues/114183).
+	ginkgo.Context("API", func() {
+		ginkgo.It("NodeResourceCapacity", func(ctx context.Context) {
+			var all []*resourcev1alpha2.NodeResourceCapacity
+			type names struct {
+				nodeName, driverName string
+			}
+			byDriver := make(map[string][]resourcev1alpha2.NodeResourceCapacity)
+			byNode := make(map[string][]resourcev1alpha2.NodeResourceCapacity)
+			byBoth := make(map[names][]resourcev1alpha2.NodeResourceCapacity)
+			resourceClient := f.ClientSet.ResourceV1alpha2().NodeResourceCapacities()
+
+			ginkgo.DeferCleanup(func(ctx context.Context) {
+				for _, capacity := range all {
+					if capacity == nil {
+						continue
+					}
+					err := resourceClient.Delete(ctx, capacity.Name, metav1.DeleteOptions{})
+					framework.ExpectNoError(err, "delete NodeResourceCapacity")
+				}
+			})
+
+			var key names
+			for i := 0; i < 2; i++ {
+				key.nodeName = fmt.Sprintf("node-%d", i)
+				for j := 0; j < 2; j++ {
+					key.driverName = fmt.Sprintf("driver-%d.example.com", j)
+					capacity := &resourcev1alpha2.NodeResourceCapacity{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: fmt.Sprintf("capacity-%s-%d-%d", f.Namespace.Name, i, j),
+						},
+						NodeName:   key.nodeName,
+						DriverName: key.driverName,
+					}
+					capacity, err := resourceClient.Create(ctx, capacity, metav1.CreateOptions{})
+					framework.ExpectNoError(err, "create NodeResourceCapacity %d %d", i, j)
+					byDriver[key.driverName] = append(byDriver[key.driverName], *capacity)
+					byNode[key.nodeName] = append(byNode[key.nodeName], *capacity)
+					byBoth[key] = append(byBoth[key], *capacity)
+					all = append(all, capacity)
+				}
+			}
+
+			// listNames := func(in []*resourcev1alpha2.NodeResourceCapacity) []resourcev1alpha2.NodeResourceCapacity {
+			// 	out := make([]resourcev1alpha2.NodeResourceCapacity, 0, len(in))
+			// 	for _, capacity := range in {
+			// 		out = append(out, resourcev1alpha2.NodeResourceCapacity{
+			// 			ObjectMeta: metav1.ObjectMeta{Name: capacity.Name},
+			// 			NodeName:   capacity.NodeName,
+			// 			DriverName: capacity.DriverName,
+			// 		})
+			// 	}
+			// 	return out
+			// }
+
+			expected := all[0]
+			actual, err := resourceClient.Get(ctx, expected.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err, "get NodeResourceCapacity")
+			gomega.Expect(actual).To(gomega.Equal(expected))
+
+			capacities, err := resourceClient.List(ctx, metav1.ListOptions{FieldSelector: `nodeName=node-0`})
+			framework.ExpectNoError(err, "list node-0 NodeResourceCapacity")
+			gomega.Expect(capacities.Items).NotTo(gomega.BeEmpty())
+			gomega.Expect(capacities.Items).To(gomega.ContainElements(byNode["node-0"]))
+
+			capacities, err = resourceClient.List(ctx, metav1.ListOptions{FieldSelector: `driverName=driver-0.example.com`})
+			framework.ExpectNoError(err, "list driver-0 NodeResourceCapacity")
+			gomega.Expect(capacities.Items).NotTo(gomega.BeEmpty())
+			gomega.Expect(capacities.Items).To(gomega.ContainElements(byDriver["driver-0.example.com"]))
+
+			err = resourceClient.DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{FieldSelector: `nodeName=node-0`})
+			framework.ExpectNoError(err, "delete node-0 NodeResourceCapacity")
+			for i := range all {
+				if all[i].NodeName == "node-0" {
+					all[i] = nil
+				}
+			}
+
+			capacities, err = resourceClient.List(ctx, metav1.ListOptions{FieldSelector: `nodeName=node-0`})
+			framework.ExpectNoError(err, "list node-0 NodeResourceCapacity")
+			gomega.Expect(capacities.Items).To(gomega.BeEmpty())
+		})
+	})
 
 	ginkgo.Context("kubelet", func() {
 		nodes := NewNodes(f, 1, 1)
