@@ -25,7 +25,7 @@ import (
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	v1alpha1 "k8s.io/dynamic-resource-allocation/apis/counter/v1alpha1"
-	counter "k8s.io/dynamic-resource-allocation/apis/internal/counter"
+	counter "k8s.io/dynamic-resource-allocation/internal/apis/counter"
 )
 
 func init() {
