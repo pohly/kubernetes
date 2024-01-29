@@ -518,16 +518,32 @@ type NodeResourceCapacity struct {
 	// objects with a certain driver name.
 	DriverName string `json:"driverName" protobuf:"bytes,3,name=driverName"`
 
-	// InstanceID is chosen by the driver to distinguish between different
-	// resource instances. It only needs to be unique for the driver and node.
-	// In other words, tuple of NodeName, DriverName, InstanceID needs to
-	// be unique in the cluster.
-	InstanceID string `json:"instanceID" protobuf:"bytes,4,name=instanceID"`
+	// Instances describes discrete resources managed by the driver on
+	// the node. It is possible to create more than one NodeResourceCapacity
+	// object for the same node and driver if this array becomes to large
+	// for a single object.
+	//
+	// +listType=atomic
+	// +optional
+	Instances []NodeResourceInstance `json:"instances" protobuf:"bytes,4,name=instances"`
+}
 
-	// ResourceInstance describes one discrete resource instance that is
-	// managed by the driver. It must be an object of one of the
-	// supported numeric resource capacity types with kind and apiVersion set.
-	ResourceInstance runtime.RawExtension `json:"resourceInstance" protobuf:"bytes,5,name=resourceInstance"`
+// NodeResourceInstance describes one discrete resource instance.
+type NodeResourceInstance struct {
+	// ID is chosen by the driver to distinguish between different resource
+	// instances. It only needs to be unique for the driver and node.  In
+	// other words, the tuple of NodeName, DriverName, InstanceID needs to
+	// be unique in the cluster.
+	ID string `json:"id" protobuf:"bytes,1,name=id"`
+
+	// APIVersion of the capacity type encoded in the data.
+	APIVersion string `json:"apiVersion" yaml:"apiVersion" protobuf:"bytes,2,name=apiVersion"`
+
+	// Kind of the capacity type encoded in the data.
+	Kind string `json:"kind" yaml:"kind" protobuf:"bytes,3,name=kind"`
+
+	// Data holds attributes of the instance, encoded as JSON.
+	Data runtime.RawExtension `json:"data" protobuf:"bytes,4,name=data"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

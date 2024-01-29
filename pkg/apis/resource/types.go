@@ -484,16 +484,29 @@ type NodeResourceCapacity struct {
 	// objects with a certain driver name.
 	DriverName string
 
-	// InstanceID is chosen by the driver to distinguish between different
-	// resource instances. It only needs to be unique for the driver and node.
-	// In other words, tuple of NodeName, DriverName, InstanceID needs to
-	// be unique in the cluster.
-	InstanceID string
+	// Instances describes discrete resources managed by the driver on
+	// the node. It is possible to create more than one NodeResourceCapacity
+	// object for the same node and driver if this array becomes to large
+	// for a single object.
+	Instances []NodeResourceInstance
+}
 
-	// ResourceInstance describes one discrete resource instance that is
-	// managed by the driver. It must be an object of one of the
-	// supported numeric resource capacity types with kind and apiVersion set.
-	ResourceInstance runtime.RawExtension
+// NodeResourceInstance describes one discrete resource instance.
+type NodeResourceInstance struct {
+	// ID is chosen by the driver to distinguish between different resource
+	// instances. It only needs to be unique for the driver and node.  In
+	// other words, the tuple of NodeName, DriverName, InstanceID needs to
+	// be unique in the cluster.
+	ID string
+
+	// APIVersion of the capacity type encoded in the data.
+	APIVersion string
+
+	// Kind of the capacity type encoded in the data.
+	Kind string
+
+	// Data holds attributes of the instance, encoded as JSON.
+	Data runtime.RawExtension
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

@@ -199,10 +199,6 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 			}
 			// TODO: implement NodeResourceCapacity publishing in kubelet and remove this.
 			capacity := &counterv1alpha1.Capacity{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: counterv1alpha1.SchemeGroupVersion.String(),
-					Kind:       "Capacity",
-				},
 				ObjectMeta: metav1.ObjectMeta{
 					UID:  "abc",
 					Name: "thingies",
@@ -217,9 +213,15 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 						GenerateName: nodeName + "-",
 						// Normally the node would be the owner. Gets skipped here for simplicity's sake.
 					},
-					NodeName:         nodeName,
-					DriverName:       d.Name,
-					ResourceInstance: runtime.RawExtension{Raw: instance},
+					NodeName:   nodeName,
+					DriverName: d.Name,
+					Instances: []resourcev1alpha2.NodeResourceInstance{
+						{
+							Kind:       "Capacity",
+							APIVersion: counterv1alpha1.SchemeGroupVersion.String(),
+							Data:       runtime.RawExtension{Raw: instance},
+						},
+					},
 				}
 				nodeResourceCapacity, err := d.f.ClientSet.ResourceV1alpha2().NodeResourceCapacities().Create(ctx, nodeResourceCapacity, metav1.CreateOptions{})
 				gomega.Expect(err).To(gomega.Succeed(), "create NodeResourceCapacity")
