@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
 
-	"k8s.io/dynamic-resource-allocation/apis/internal/counter/fuzzer"
+	"k8s.io/dynamic-resource-allocation/internal/apis/counter/fuzzer"
 )
 
 func TestRoundTripTypes(t *testing.T) {

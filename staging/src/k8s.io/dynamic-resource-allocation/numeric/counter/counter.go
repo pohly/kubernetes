@@ -39,6 +39,7 @@ import (
 	counterv1alpha1 "k8s.io/dynamic-resource-allocation/apis/counter/v1alpha1"
 	"k8s.io/dynamic-resource-allocation/builtincontroller"
 	dracache "k8s.io/dynamic-resource-allocation/cache"
+	counterinternal "k8s.io/dynamic-resource-allocation/internal/apis/counter"
 	"k8s.io/dynamic-resource-allocation/internal/nilmap"
 	"k8s.io/dynamic-resource-allocation/labels"
 	"k8s.io/dynamic-resource-allocation/numeric/counter/internal"
@@ -206,28 +207,27 @@ func (c *activeCounterController) nodeResourceCapacityUpdated(logger klog.Logger
 	c.nodeResourceCapacityAddedOrUpdated(logger, newNodeResourceCapacity)
 }
 
-func (c *activeCounterController) nodeResourceCapacityRemoved(logger klog.Logger, nodeResourceCapacity *resourcev1alpha2.NodeResourceCapacity) {
-	instance := parseResourceInstance(logger, nodeResourceCapacity)
-	if instance == nil {
-		return
-	}
+type instance struct {
+	id                       string
+	counterinternal.Capacity // Empty if deleted or unknown.
+}
 
-	// Clearing the capacity ensures that the update removes the instance.
-	instance.Capacity = 0
-	c.updateCapacity(logger, "State updated after node capacity removal", nodeResourceCapacity, instance)
+func (c *activeCounterController) nodeResourceCapacityRemoved(logger klog.Logger, nodeResourceCapacity *resourcev1alpha2.NodeResourceCapacity) {
+	// Passing just the IDs with no data clears the corresponding entries.
+	instances := make([]instance, len(nodeResourceCapacity.Instances))
+	for i, instance := range nodeResourceCapacity.Instances {
+		instances[i].id = instance.ID
+	}
+	c.updateCapacity(logger, "State updated after node capacity removal", nodeResourceCapacity, instances)
 
 }
 
 func (c *activeCounterController) nodeResourceCapacityAddedOrUpdated(logger klog.Logger, nodeResourceCapacity *resourcev1alpha2.NodeResourceCapacity) {
-	instance := parseResourceInstance(logger, nodeResourceCapacity)
-	if instance == nil {
-		return
-	}
-
-	c.updateCapacity(logger, "State updated after node capacity changed", nodeResourceCapacity, instance)
+	instances := parseResourceInstances(logger, nodeResourceCapacity)
+	c.updateCapacity(logger, "State updated after node capacity changed", nodeResourceCapacity, instances)
 }
 
-func (c *activeCounterController) updateCapacity(logger klog.Logger, what string, nodeResourceCapacity *resourcev1alpha2.NodeResourceCapacity, updatedInstance *internal.Instance) {
+func (c *activeCounterController) updateCapacity(logger klog.Logger, what string, nodeResourceCapacity *resourcev1alpha2.NodeResourceCapacity, instances []instance) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
@@ -247,20 +247,22 @@ func (c *activeCounterController) updateCapacity(logger klog.Logger, what string
 	// - and then walk back up.
 	nodeResources := c.state.PerNode[nodeResourceCapacity.NodeName]
 	driverResources := nodeResources.PerDriver[nodeResourceCapacity.DriverName]
-	instance := driverResources.PerInstance[nodeResourceCapacity.InstanceID]
+	for _, fromInstance := range instances {
+		instance := driverResources.PerInstance[fromInstance.id]
 
-	// Only store information that is relevant.
-	instance.ObjectMeta.Name = updatedInstance.ObjectMeta.Name
-	instance.ObjectMeta.Labels = updatedInstance.ObjectMeta.Labels
-	instance.Capacity = updatedInstance.Capacity
+		// Usually the node capacity should not go away while it is in use. But
+		// this is something to be checked elsewhere. Here we allow it and
+		// keep entries with more resources allocated than available.
+		if fromInstance.Count == 0 && instance.Allocated == 0 {
+			nilmap.Delete(&driverResources.PerInstance, fromInstance.id)
+		} else {
+			// Only store information that is relevant.
+			instance.Name = fromInstance.Name
+			instance.Labels = fromInstance.Labels
+			instance.Capacity = fromInstance.Count
 
-	// Usually the node capacity should not go away while it is in use. But
-	// this is something to be checked elsewhere. Here we allow it and
-	// keep entries with more resources allocated than available.
-	if instance.Capacity == 0 && instance.Allocated == 0 {
-		nilmap.Delete(&driverResources.PerInstance, nodeResourceCapacity.InstanceID)
-	} else {
-		nilmap.Insert(&driverResources.PerInstance, nodeResourceCapacity.InstanceID, instance)
+			nilmap.Insert(&driverResources.PerInstance, fromInstance.id, instance)
+		}
 	}
 	if len(driverResources.PerInstance) == 0 {
 		nilmap.Delete(&nodeResources.PerDriver, nodeResourceCapacity.DriverName)
@@ -274,26 +276,49 @@ func (c *activeCounterController) updateCapacity(logger klog.Logger, what string
 	}
 }
 
-func parseResourceInstance(logger klog.Logger, in *resourcev1alpha2.NodeResourceCapacity) *internal.Instance {
-	capacity := new(counterv1alpha1.Capacity)
-	actual, gvk, err := decoder.Decode(in.ResourceInstance.Raw, nil, capacity)
-	switch {
-	case runtime.IsNotRegisteredError(err):
-		// If the parameter object is not recognized, then it
-		// is by definition not something that this controller
-		// can handle and can be ignored.
-		logger.V(6).Info("Ignoring unknown node capacity", "nodeResourceCapacity", klog.KObj(in), "instanceData", string(in.ResourceInstance.Raw), "err", err)
-	case err != nil:
-		logger.Error(err, "Decoding node capacity failed", "nodeResourceCapacity", klog.KObj(in))
-	case actual != capacity:
-		logger.Error(nil, "Invalid node capacity, got unsupported object", "nodeResourceCapacity", klog.KObj(in), "gvk", gvk, "obj", actual)
-	default:
-		return &internal.Instance{
-			ObjectMeta: capacity.ObjectMeta,
-			Capacity:   capacity.Count,
+func parseResourceInstances(logger klog.Logger, in *resourcev1alpha2.NodeResourceCapacity) []instance {
+	instances := make([]instance, len(in.Instances))
+	for i, fromInstance := range in.Instances {
+		// We always have the ID, the capacity only if it is using the counter model.
+		instances[i].id = fromInstance.ID
+
+		// Logging always includes the same key/value pairs. Because in most cases
+		// (no error, low log level) nothing gets logged, it doesn't make sense
+		// to use klog.LoggerWithValues.
+
+		// Unknown types are normal because each model receives all
+		// NodeResourceCapacity objects, including those with capacity
+		// handled by other models.
+		if fromInstance.Kind != "Capacity" {
+			logger.V(6).Info("Ignoring unsupported node capacity kind", "nodeResourceCapacity", klog.KObj(in), "node", klog.KRef("", in.NodeName), "driver", in.DriverName, "instanceID", fromInstance.ID, "kind", fromInstance.Kind)
+			continue
 		}
+		gv, err := schema.ParseGroupVersion(fromInstance.APIVersion)
+		if err != nil {
+			// Should not happen for valid NodeResourceCapacity.
+			logger.Error(err, "Parsing apiVersion", "nodeResourceCapacity", klog.KObj(in))
+			continue
+		}
+		if gv.Group != counterv1alpha1.GroupName {
+			logger.V(6).Info("Ignoring unsupported node capacity group", "nodeResourceCapacity", klog.KObj(in), "node", klog.KRef("", in.NodeName), "driver", in.DriverName, "instanceID", fromInstance.ID, "groupVersion", gv)
+			continue
+		}
+
+		// The version doesn't matter as long as the scheme can convert
+		// it to the internal type. It's passed into Decode in case that
+		// the data itself doesn't have it (which is okay!).
+		defaultGvk := gv.WithKind(fromInstance.Kind)
+		actual, gvk, err := decoder.Decode(fromInstance.Data.Raw, &defaultGvk, nil)
+		if err != nil {
+			logger.Error(err, "Decoding node capacity failed", "nodeResourceCapacity", klog.KObj(in), "node", klog.KRef("", in.NodeName), "driver", in.DriverName, "instanceID", fromInstance.ID, "gvk", gvk)
+			continue
+		}
+		if err := scheme.Convert(actual, &instances[i].Capacity, nil); err != nil {
+			logger.Error(err, "Converting node capacity failed", "nodeResourceCapacity", klog.KObj(in), "node", klog.KRef("", in.NodeName), "driver", in.DriverName, "instanceID", fromInstance.ID)
+		}
+		logger.V(5).Info("Got node resource capacity", "nodeResourceCapacity", klog.KObj(in), "node", klog.KRef("", in.NodeName), "driver", in.DriverName, "instanceID", fromInstance.ID, "capacity", &instances[i].Capacity)
 	}
-	return nil
+	return instances
 }
 
 func (c *activeCounterController) ClaimAllocated(ctx context.Context, claim *resourcev1alpha2.ResourceClaim) {

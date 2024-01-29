@@ -14,19 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package fuzzer
+// +k8s:conversion-gen=k8s.io/dynamic-resource-allocation/internal/apis/counter
+// +k8s:conversion-gen-external-types=k8s.io/dynamic-resource-allocation/apis/counter/v1alpha1
+// +k8s:defaulter-gen=TypeMeta
+// +k8s:defaulter-gen-input=k8s.io/dynamic-resource-allocation/apis/counter/v1alpha1
 
-import (
-	fuzz "github.com/google/gofuzz"
-	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/dynamic-resource-allocation/apis/internal/counter"
-)
-
-// Funcs returns the fuzzer functions for the counter api group.
-var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
-	return []interface{}{
-		func(s *counter.Capacity, c fuzz.Continue) {
-			c.FuzzNoCustom(s) // fuzz self without calling this function again
-		},
-	}
-}
+package v1alpha1

@@ -18,7 +18,7 @@ package counter
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/dynamic-resource-allocation/apis/internal/counter/install"
+	"k8s.io/dynamic-resource-allocation/internal/apis/counter/install"
 )
 
 // Install registers the API group and adds types to a scheme, including
