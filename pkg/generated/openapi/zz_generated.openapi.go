@@ -851,6 +851,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/resource/v1alpha2.AllocationResult":                                                         schema_k8sio_api_resource_v1alpha2_AllocationResult(ref),
 		"k8s.io/api/resource/v1alpha2.NodeResourceCapacity":                                                     schema_k8sio_api_resource_v1alpha2_NodeResourceCapacity(ref),
 		"k8s.io/api/resource/v1alpha2.NodeResourceCapacityList":                                                 schema_k8sio_api_resource_v1alpha2_NodeResourceCapacityList(ref),
+		"k8s.io/api/resource/v1alpha2.NodeResourceInstance":                                                     schema_k8sio_api_resource_v1alpha2_NodeResourceInstance(ref),
 		"k8s.io/api/resource/v1alpha2.NumericParameterType":                                                     schema_k8sio_api_resource_v1alpha2_NumericParameterType(ref),
 		"k8s.io/api/resource/v1alpha2.PodSchedulingContext":                                                     schema_k8sio_api_resource_v1alpha2_PodSchedulingContext(ref),
 		"k8s.io/api/resource/v1alpha2.PodSchedulingContextList":                                                 schema_k8sio_api_resource_v1alpha2_PodSchedulingContextList(ref),
@@ -42386,26 +42387,31 @@ func schema_k8sio_api_resource_v1alpha2_NodeResourceCapacity(ref common.Referenc
 							Format:      "",
 						},
 					},
-					"instanceID": {
-						SchemaProps: spec.SchemaProps{
-							Description: "InstanceID is chosen by the driver to distinguish between different resource instances. It only needs to be unique for the driver and node. In other words, tuple of NodeName, DriverName, InstanceID needs to be unique in the cluster.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
+					"instances": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
 						},
-					},
-					"resourceInstance": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ResourceInstance describes one discrete resource instance that is managed by the driver. It must be an object of one of the supported numeric resource capacity types with kind and apiVersion set.",
-							Ref:         ref("k8s.io/apimachinery/pkg/runtime.RawExtension"),
+							Description: "Instances describes discrete resources managed by the driver on the node. It is possible to create more than one NodeResourceCapacity object for the same node and driver if this array becomes to large for a single object.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1alpha2.NodeResourceInstance"),
+									},
+								},
+							},
 						},
 					},
 				},
-				Required: []string{"nodeName", "driverName", "instanceID", "resourceInstance"},
+				Required: []string{"nodeName", "driverName"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta", "k8s.io/apimachinery/pkg/runtime.RawExtension"},
+			"k8s.io/api/resource/v1alpha2.NodeResourceInstance", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
 	}
 }
 
@@ -42457,6 +42463,52 @@ func schema_k8sio_api_resource_v1alpha2_NodeResourceCapacityList(ref common.Refe
 		},
 		Dependencies: []string{
 			"k8s.io/api/resource/v1alpha2.NodeResourceCapacity", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha2_NodeResourceInstance(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "NodeResourceInstance describes one discrete resource instance.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"id": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ID is chosen by the driver to distinguish between different resource instances. It only needs to be unique for the driver and node.  In other words, the tuple of NodeName, DriverName, InstanceID needs to be unique in the cluster.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion of the capacity type encoded in the data.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind of the capacity type encoded in the data.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"data": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Data holds attributes of the instance, encoded as JSON.",
+							Ref:         ref("k8s.io/apimachinery/pkg/runtime.RawExtension"),
+						},
+					},
+				},
+				Required: []string{"id", "apiVersion", "kind", "data"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/runtime.RawExtension"},
 	}
 }
 

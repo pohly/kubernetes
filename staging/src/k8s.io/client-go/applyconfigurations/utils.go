@@ -1495,6 +1495,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &resourcev1alpha2.AllocationResultApplyConfiguration{}
 	case v1alpha2.SchemeGroupVersion.WithKind("NodeResourceCapacity"):
 		return &resourcev1alpha2.NodeResourceCapacityApplyConfiguration{}
+	case v1alpha2.SchemeGroupVersion.WithKind("NodeResourceInstance"):
+		return &resourcev1alpha2.NodeResourceInstanceApplyConfiguration{}
 	case v1alpha2.SchemeGroupVersion.WithKind("NumericParameterType"):
 		return &resourcev1alpha2.NumericParameterTypeApplyConfiguration{}
 	case v1alpha2.SchemeGroupVersion.WithKind("PodSchedulingContext"):

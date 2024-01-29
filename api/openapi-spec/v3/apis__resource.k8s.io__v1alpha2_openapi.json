@@ -125,10 +125,18 @@
             "description": "DriverName identifies the DRA driver which provided the capacity information. A field selector can be used to list only NodeResourceCapacity objects with a certain driver name.",
             "type": "string"
           },
-          "instanceID": {
-            "default": "",
-            "description": "InstanceID is chosen by the driver to distinguish between different resource instances. It only needs to be unique for the driver and node. In other words, tuple of NodeName, DriverName, InstanceID needs to be unique in the cluster.",
-            "type": "string"
+          "instances": {
+            "description": "Instances describes discrete resources managed by the driver on the node. It is possible to create more than one NodeResourceCapacity object for the same node and driver if this array becomes to large for a single object.",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha2.NodeResourceInstance"
+                }
+              ],
+              "default": {}
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
           },
           "kind": {
             "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
@@ -147,21 +155,11 @@
             "default": "",
             "description": "NodeName identifies the node where the capacity is available. A field selector can be used to list only NodeResourceCapacity objects with a certain node name.",
             "type": "string"
-          },
-          "resourceInstance": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.runtime.RawExtension"
-              }
-            ],
-            "description": "ResourceInstance describes one discrete resource instance that is managed by the driver. It must be an object of one of the supported numeric resource capacity types with kind and apiVersion set."
           }
         },
         "required": [
           "nodeName",
-          "driverName",
-          "instanceID",
-          "resourceInstance"
+          "driverName"
         ],
         "type": "object",
         "x-kubernetes-group-version-kind": [
@@ -216,6 +214,41 @@
             "version": "v1alpha2"
           }
         ]
+      },
+      "io.k8s.api.resource.v1alpha2.NodeResourceInstance": {
+        "description": "NodeResourceInstance describes one discrete resource instance.",
+        "properties": {
+          "apiVersion": {
+            "default": "",
+            "description": "APIVersion of the capacity type encoded in the data.",
+            "type": "string"
+          },
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.runtime.RawExtension"
+              }
+            ],
+            "description": "Data holds attributes of the instance, encoded as JSON."
+          },
+          "id": {
+            "default": "",
+            "description": "ID is chosen by the driver to distinguish between different resource instances. It only needs to be unique for the driver and node.  In other words, the tuple of NodeName, DriverName, InstanceID needs to be unique in the cluster.",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "description": "Kind of the capacity type encoded in the data.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "apiVersion",
+          "kind",
+          "data"
+        ],
+        "type": "object"
       },
       "io.k8s.api.resource.v1alpha2.NumericParameterType": {
         "properties": {

@@ -11668,10 +11668,12 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
-    - name: instanceID
+    - name: instances
       type:
-        scalar: string
-      default: ""
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha2.NodeResourceInstance
+          elementRelationship: atomic
     - name: kind
       type:
         scalar: string
@@ -11683,9 +11685,24 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
-    - name: resourceInstance
+- name: io.k8s.api.resource.v1alpha2.NodeResourceInstance
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+      default: ""
+    - name: data
       type:
         namedType: __untyped_atomic_
+    - name: id
+      type:
+        scalar: string
+      default: ""
+    - name: kind
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.resource.v1alpha2.NumericParameterType
   map:
     fields:

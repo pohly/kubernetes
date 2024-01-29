@@ -39,12 +39,11 @@ func (AllocationResult) SwaggerDoc() map[string]string {
 }
 
 var map_NodeResourceCapacity = map[string]string{
-	"":                 "NodeResourceCapacity provides information about available resources on individual nodes.\n\nCapacity may get added, but should not get removed because it would make scheduling decisions based on the old capacity invalid.",
-	"metadata":         "Standard object metadata",
-	"nodeName":         "NodeName identifies the node where the capacity is available. A field selector can be used to list only NodeResourceCapacity objects with a certain node name.",
-	"driverName":       "DriverName identifies the DRA driver which provided the capacity information. A field selector can be used to list only NodeResourceCapacity objects with a certain driver name.",
-	"instanceID":       "InstanceID is chosen by the driver to distinguish between different resource instances. It only needs to be unique for the driver and node. In other words, tuple of NodeName, DriverName, InstanceID needs to be unique in the cluster.",
-	"resourceInstance": "ResourceInstance describes one discrete resource instance that is managed by the driver. It must be an object of one of the supported numeric resource capacity types with kind and apiVersion set.",
+	"":           "NodeResourceCapacity provides information about available resources on individual nodes.\n\nCapacity may get added, but should not get removed because it would make scheduling decisions based on the old capacity invalid.",
+	"metadata":   "Standard object metadata",
+	"nodeName":   "NodeName identifies the node where the capacity is available. A field selector can be used to list only NodeResourceCapacity objects with a certain node name.",
+	"driverName": "DriverName identifies the DRA driver which provided the capacity information. A field selector can be used to list only NodeResourceCapacity objects with a certain driver name.",
+	"instances":  "Instances describes discrete resources managed by the driver on the node. It is possible to create more than one NodeResourceCapacity object for the same node and driver if this array becomes to large for a single object.",
 }
 
 func (NodeResourceCapacity) SwaggerDoc() map[string]string {
@@ -59,6 +58,18 @@ var map_NodeResourceCapacityList = map[string]string{
 
 func (NodeResourceCapacityList) SwaggerDoc() map[string]string {
 	return map_NodeResourceCapacityList
+}
+
+var map_NodeResourceInstance = map[string]string{
+	"":           "NodeResourceInstance describes one discrete resource instance.",
+	"id":         "ID is chosen by the driver to distinguish between different resource instances. It only needs to be unique for the driver and node.  In other words, the tuple of NodeName, DriverName, InstanceID needs to be unique in the cluster.",
+	"apiVersion": "APIVersion of the capacity type encoded in the data.",
+	"kind":       "Kind of the capacity type encoded in the data.",
+	"data":       "Data holds attributes of the instance, encoded as JSON.",
+}
+
+func (NodeResourceInstance) SwaggerDoc() map[string]string {
+	return map_NodeResourceInstance
 }
 
 var map_NumericParameterType = map[string]string{
