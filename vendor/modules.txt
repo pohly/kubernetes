@@ -2103,14 +2103,16 @@ k8s.io/csi-translation-lib/plugins
 ## explicit; go 1.21
 k8s.io/dynamic-resource-allocation/apis/counter
 k8s.io/dynamic-resource-allocation/apis/counter/v1alpha1
-k8s.io/dynamic-resource-allocation/apis/internal/counter
-k8s.io/dynamic-resource-allocation/apis/internal/counter/install
-k8s.io/dynamic-resource-allocation/apis/internal/counter/v1alpha1
+k8s.io/dynamic-resource-allocation/apis/meta/v1
 k8s.io/dynamic-resource-allocation/builtincontroller
 k8s.io/dynamic-resource-allocation/cache
 k8s.io/dynamic-resource-allocation/controller
+k8s.io/dynamic-resource-allocation/internal/apis/counter
+k8s.io/dynamic-resource-allocation/internal/apis/counter/install
+k8s.io/dynamic-resource-allocation/internal/apis/counter/v1alpha1
 k8s.io/dynamic-resource-allocation/internal/nilmap
 k8s.io/dynamic-resource-allocation/kubeletplugin
+k8s.io/dynamic-resource-allocation/labels
 k8s.io/dynamic-resource-allocation/leaderelection
 k8s.io/dynamic-resource-allocation/numeric/counter
 k8s.io/dynamic-resource-allocation/numeric/counter/internal
