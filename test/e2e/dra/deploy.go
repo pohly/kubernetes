@@ -54,6 +54,7 @@ const (
 	NodePrepareResourcesMethod   = "/v1alpha3.Node/NodePrepareResources"
 	NodeUnprepareResourceMethod  = "/v1alpha2.Node/NodeUnprepareResource"
 	NodeUnprepareResourcesMethod = "/v1alpha3.Node/NodeUnprepareResources"
+	NodeResourcesMethod          = "/v1alpha3.Node/NodeResources"
 )
 
 type Nodes struct {
@@ -259,7 +260,8 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 		pod := pod
 		nodename := pod.Spec.NodeName
 		logger := klog.LoggerWithValues(klog.LoggerWithName(klog.Background(), "kubelet plugin"), "node", pod.Spec.NodeName, "pod", klog.KObj(&pod))
-		plugin, err := app.StartPlugin(logger, "/cdi", d.Name, nodename,
+		loggerCtx := klog.NewContext(ctx, logger)
+		plugin, err := app.StartPlugin(loggerCtx, "/cdi", d.Name, nodename,
 			app.FileOperations{
 				Create: func(name string, content []byte) error {
 					klog.Background().Info("creating CDI file", "node", nodename, "filename", name, "content", string(content))
@@ -366,12 +368,15 @@ func (d *Driver) interceptor(nodename string, ctx context.Context, req interface
 }
 
 func (d *Driver) streamInterceptor(nodename string, srv interface{}, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+	// Stream calls block for a long time. We must not hold the lock while
+	// they are running.
 	d.mutex.Lock()
-	defer d.mutex.Unlock()
-
 	m := MethodInstance{nodename, info.FullMethod}
 	d.callCounts[m]++
-	if d.fail[m] {
+	fail := d.fail[m]
+	d.mutex.Unlock()
+
+	if fail {
 		return errors.New("injected error")
 	}
 
