@@ -43,6 +43,12 @@ func (f *fakeV1alpha3GRPCServer) NodeUnprepareResource(ctx context.Context, in *
 	return &drapbv1alpha3.NodeUnprepareResourcesResponse{}, nil
 }
 
+func (f *fakeV1alpha3GRPCServer) NodeResources(req *drapbv1alpha3.NodeResourcesRequest, srv drapbv1alpha3.Node_NodeResourcesServer) error {
+	srv.Send(&drapbv1alpha3.NodeResourcesResponse{})
+	srv.Send(&drapbv1alpha3.NodeResourcesResponse{})
+	return nil
+}
+
 type fakeV1alpha2GRPCServer struct {
 	drapbv1alpha2.UnimplementedNodeServer
 }
@@ -285,6 +291,85 @@ func TestNodeUnprepareResource(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+		})
+	}
+}
+
+func TestNodeResources(t *testing.T) {
+	for _, test := range []struct {
+		description   string
+		serverSetup   func(string) (string, tearDown, error)
+		serverVersion string
+		request       *drapbv1alpha3.NodeResourcesRequest
+		responses     []*drapbv1alpha3.NodeResourcesResponse
+		expectError   string
+	}{
+		{
+			description:   "server supports NodeResources API",
+			serverSetup:   setupFakeGRPCServer,
+			serverVersion: v1alpha3Version,
+			request:       &drapbv1alpha3.NodeResourcesRequest{},
+			responses: []*drapbv1alpha3.NodeResourcesResponse{
+				{},
+				{},
+			},
+			expectError: "EOF",
+		},
+		{
+			description:   "server doesn't support NodeResources API",
+			serverSetup:   setupFakeGRPCServer,
+			serverVersion: v1alpha2Version,
+			request:       new(drapbv1alpha3.NodeResourcesRequest),
+			expectError:   "Unimplemented",
+		},
+	} {
+		t.Run(test.description, func(t *testing.T) {
+			addr, teardown, err := setupFakeGRPCServer(test.serverVersion)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer teardown()
+
+			p := &plugin{
+				endpoint: addr,
+				version:  v1alpha3Version,
+			}
+
+			conn, err := p.getOrCreateGRPCConn()
+			defer func() {
+				err := conn.Close()
+				if err != nil {
+					t.Error(err)
+				}
+			}()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			draPlugins.add("dummy-plugin", p)
+			defer draPlugins.delete("dummy-plugin")
+
+			client, err := NewDRAPluginClient("dummy-plugin")
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			stream, err := client.NodeResources(context.Background(), test.request)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var actualResponses []*drapbv1alpha3.NodeResourcesResponse
+			var actualErr error
+			for {
+				resp, err := stream.Recv()
+				if err != nil {
+					actualErr = err
+					break
+				}
+				actualResponses = append(actualResponses, resp)
+			}
+			assert.Equal(t, test.responses, actualResponses)
+			assert.Contains(t, actualErr.Error(), test.expectError)
 		})
 	}
 }
