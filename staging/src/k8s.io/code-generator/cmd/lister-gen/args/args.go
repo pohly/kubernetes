@@ -36,7 +36,7 @@ type CustomArgs struct {
 func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
 	genericArgs := args.Default().WithoutDefaultFlagParsing()
 	customArgs := &CustomArgs{
-		PluralExceptions: []string{"Endpoints:Endpoints"},
+		PluralExceptions: []string{"Endpoints:Endpoints", "ResourceClaimParameters:ResourceClaimParameters", "ResourceClassParameters:ResourceClassParameters"},
 	}
 	genericArgs.CustomArgs = customArgs
 

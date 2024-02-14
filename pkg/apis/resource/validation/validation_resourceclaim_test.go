@@ -413,7 +413,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			},
 		},
 		"invalid-allocation-resource-handle-data": {
-			wantFailures: field.ErrorList{field.TooLongMaxLength(field.NewPath("status", "allocation", "resourceHandles[0]", "data"), resource.ResourceHandleDataMaxSize+1, resource.ResourceHandleDataMaxSize)},
+			wantFailures: field.ErrorList{field.TooLongMaxLength(field.NewPath("status", "allocation", "resourceHandles").Index(0).Child("data"), resource.ResourceHandleDataMaxSize+1, resource.ResourceHandleDataMaxSize)},
 			oldClaim:     validClaim,
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
 				claim.Status.DriverName = "valid"

@@ -66,7 +66,7 @@ func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
 		ClientsetAPIPath:          "/apis",
 		ClientsetOnly:             false,
 		FakeClient:                true,
-		PluralExceptions:          []string{"Endpoints:Endpoints"},
+		PluralExceptions:          []string{"Endpoints:Endpoints", "ResourceClaimParameters:ResourceClaimParameters", "ResourceClassParameters:ResourceClassParameters"},
 		ApplyConfigurationPackage: "",
 	}
 	genericArgs.CustomArgs = customArgs
