@@ -133,14 +133,5 @@ func convertCELErrorToValidationError(fldPath *field.Path, expression string, er
 }
 
 func ValidateAllocationResult(result *namedresources.AllocationResult, fldPath *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
-	for i, instance := range result.Instances {
-		idxPath := fldPath.Index(i)
-		allErrs = append(allErrs, validateAllocatedInstance(instance, idxPath)...)
-	}
-	return allErrs
-}
-
-func validateAllocatedInstance(instance namedresources.AllocatedInstance, fldPath *field.Path) field.ErrorList {
-	return validateInstanceName(instance.Name, fldPath.Child("name"))
+	return validateInstanceName(result.Name, fldPath.Child("name"))
 }

@@ -22,22 +22,16 @@ syntax = "proto2";
 package k8s.io.api.resource.structured.namedresources.v1alpha1;
 
 import "k8s.io/apimachinery/pkg/api/resource/generated.proto";
+import "k8s.io/apimachinery/pkg/runtime/generated.proto";
+import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 
 // Package-wide variables from generator "generated".
 option go_package = "k8s.io/api/resource/structured/namedresources/v1alpha1";
 
-message AllocatedInstance {
-  // Name is the name of the selected resource instance.
-  optional string name = 1;
-}
-
 // AllocationResult is used in AllocationResultModel.
 message AllocationResult {
-  // Instances identifies all allocated resource instances.
-  //
-  // +listType=atomic
-  // +optional
-  repeated AllocatedInstance instances = 1;
+  // Name is the name of the selected resource instance.
+  optional string name = 1;
 }
 
 message Attribute {

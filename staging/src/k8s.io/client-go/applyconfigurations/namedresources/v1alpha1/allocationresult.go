@@ -21,7 +21,7 @@ package v1alpha1
 // AllocationResultApplyConfiguration represents an declarative configuration of the AllocationResult type for use
 // with apply.
 type AllocationResultApplyConfiguration struct {
-	Instances []AllocatedInstanceApplyConfiguration `json:"instances,omitempty"`
+	Name *string `json:"name,omitempty"`
 }
 
 // AllocationResultApplyConfiguration constructs an declarative configuration of the AllocationResult type for use with
@@ -30,15 +30,10 @@ func AllocationResult() *AllocationResultApplyConfiguration {
 	return &AllocationResultApplyConfiguration{}
 }
 
-// WithInstances adds the given value to the Instances field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the Instances field.
-func (b *AllocationResultApplyConfiguration) WithInstances(values ...*AllocatedInstanceApplyConfiguration) *AllocationResultApplyConfiguration {
-	for i := range values {
-		if values[i] == nil {
-			panic("nil value passed to WithInstances")
-		}
-		b.Instances = append(b.Instances, *values[i])
-	}
+// WithName sets the Name field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Name field is set to the value of the last call.
+func (b *AllocationResultApplyConfiguration) WithName(value string) *AllocationResultApplyConfiguration {
+	b.Name = &value
 	return b
 }

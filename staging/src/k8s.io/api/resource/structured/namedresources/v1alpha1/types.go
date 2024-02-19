@@ -103,14 +103,6 @@ type Filter struct {
 
 // AllocationResult is used in AllocationResultModel.
 type AllocationResult struct {
-	// Instances identifies all allocated resource instances.
-	//
-	// +listType=atomic
-	// +optional
-	Instances []AllocatedInstance `json:"instances" protobuf:"bytes,1,name=instances"`
-}
-
-type AllocatedInstance struct {
 	// Name is the name of the selected resource instance.
 	Name string `json:"name" protobuf:"bytes,1,name=name"`
 }
