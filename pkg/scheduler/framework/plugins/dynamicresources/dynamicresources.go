@@ -1268,6 +1268,7 @@ func (pl *dynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 		if err := pl.claimAssumeCache.Assume(claim); err != nil {
 			return statusError(logger, fmt.Errorf("update claim assume cache: %v", err))
 		}
+		logger.V(5).Info("prepared allocation result", "claim", klog.KObj(claim), "driver", driverName, "allocation", allocation)
 	}
 
 	// When there is only one pending resource, we can go ahead with
@@ -1434,8 +1435,11 @@ func (pl *dynamicResources) reserveClaim(ctx context.Context, state *stateData, 
 	allocationPatch := ""
 	finalizerPatch := ""
 
+	allocation := state.informationsForClaim[index].allocation
+	logger.V(5).Info("preparing claim status patch", "claim", klog.KObj(state.claims[index]), "allocation", allocation)
+
 	// Do we need to store an allocation result from Reserve?
-	if allocation := state.informationsForClaim[index].allocation; allocation != nil {
+	if allocation != nil {
 		buffer, err := json.Marshal(allocation)
 		if err != nil {
 			return nil, fmt.Errorf("marshaling AllocationResult failed: %v", err)
