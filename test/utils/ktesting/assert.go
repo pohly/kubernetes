@@ -63,9 +63,13 @@ func expect(tCtx TContext, actual interface{}, extra ...interface{}) gomega.Asse
 }
 
 func expectNoError(tCtx TContext, err error, explain ...interface{}) {
+	if err == nil {
+		return
+	}
+
 	tCtx.Helper()
 
-	description := buildDescription(explain)
+	description := buildDescription(explain...)
 
 	var failure FailureError
 	if errors.As(err, &failure) {
