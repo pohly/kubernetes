@@ -1,0 +1,8 @@
+apiVersion: resource.k8s.io/v1alpha2
+kind: ResourceClaimParameters
+metadata:
+  name: test-claim-parameters
+requests:
+- driverName: test-driver.cdi.k8s.io
+  namedResources:
+    selector: "true"
