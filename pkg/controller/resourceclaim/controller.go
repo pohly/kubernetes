@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -834,7 +835,8 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 
 	logger.V(5).Info("claim reserved for counts", "currentCount", len(claim.Status.ReservedFor), "claim", klog.KRef(namespace, name), "updatedCount", len(valid))
 	if len(valid) < len(claim.Status.ReservedFor) {
-		// TODO (#113700): patch
+		// This is not using a patch because we want the update to fail if anything
+		// changed in the meantime.
 		claim := claim.DeepCopy()
 		claim.Status.ReservedFor = valid
 
@@ -856,7 +858,16 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 		// for such claims and not checking for them keeps this code simpler.
 		if len(valid) == 0 &&
 			claim.Spec.AllocationMode == resourcev1alpha2.AllocationModeWaitForFirstConsumer {
-			claim.Status.DeallocationRequested = true
+			if index := slices.Index(claim.Finalizers, resourcev1alpha2.Finalizer); index >= 0 {
+				// Allocated by scheduler with structured parameters. We can "deallocate"
+				// by clearing the allocation.
+				claim.Status.Allocation = nil
+				claim.Finalizers = slices.Delete(claim.Finalizers, index, index+1)
+			} else {
+				// DRA driver controller in the control plane
+				// needs to do the deallocation.
+				claim.Status.DeallocationRequested = true
+			}
 		}
 
 		_, err := ec.kubeClient.ResourceV1alpha2().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
