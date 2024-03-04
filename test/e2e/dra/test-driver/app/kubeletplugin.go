@@ -32,6 +32,7 @@ import (
 	resourceapi "k8s.io/api/resource/v1alpha2"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
+	"k8s.io/dynamic-resource-allocation/kubeletplugin/restproxy"
 	"k8s.io/klog/v2"
 	drapbv1alpha2 "k8s.io/kubelet/pkg/apis/dra/v1alpha2"
 	drapbv1alpha3 "k8s.io/kubelet/pkg/apis/dra/v1alpha3"
@@ -42,6 +43,7 @@ type ExamplePlugin struct {
 	logger  klog.Logger
 	d       kubeletplugin.DRAPlugin
 	fileOps FileOperations
+	*restproxy.Client
 
 	cdiDir     string
 	driverName string
@@ -116,10 +118,12 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, nodeName string
 			return nil
 		}
 	}
+	logger := klog.FromContext(ctx)
 	ex := &ExamplePlugin{
 		stopCh:     ctx.Done(),
 		logger:     logger,
 		fileOps:    fileOps,
+		Client:     restproxy.NewClient(ctx),
 		cdiDir:     cdiDir,
 		driverName: driverName,
 		nodeName:   nodeName,

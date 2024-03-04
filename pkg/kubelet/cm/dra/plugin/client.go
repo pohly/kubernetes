@@ -141,6 +141,36 @@ func NewDRAPluginClient(pluginName string) (drapb.NodeClient, error) {
 	return existingPlugin, nil
 }
 
+func (p *plugin) NodeStartRESTProxy(ctx context.Context, req *drapb.NodeStartRESTProxyMessage, opts ...grpc.CallOption) (drapb.Node_NodeStartRESTProxyClient, error) {
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info(log("calling NodeStartRESTProxy rpc"), "request", req)
+
+	conn, err := p.getOrCreateGRPCConn()
+	var resp drapb.Node_NodeStartRESTProxyClient
+	if err == nil {
+		nodeClient := drapb.NewNodeClient(conn)
+		resp, err = nodeClient.NodeStartRESTProxy(ctx, req, opts...)
+	}
+
+	logger.V(4).Info(log("done calling NodeStartRESTProxy rpc"), "err", err)
+	return resp, err
+}
+
+func (p *plugin) NodeRESTReply(ctx context.Context, req *drapb.NodeRESTReplyRequest, opts ...grpc.CallOption) (*drapb.NodeRESTReplyResponse, error) {
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info(log("calling NodeRESTReply rpc"), "request", req)
+
+	conn, err := p.getOrCreateGRPCConn()
+	var resp *drapb.NodeRESTReplyResponse
+	if err == nil {
+		nodeClient := drapb.NewNodeClient(conn)
+		resp, err = nodeClient.NodeRESTReply(ctx, req, opts...)
+	}
+
+	logger.V(4).Info(log("done calling NodeRESTReply rpc"), "response", resp, "err", err)
+	return resp, err
+}
+
 func (p *plugin) NodePrepareResources(
 	ctx context.Context,
 	req *drapb.NodePrepareResourcesRequest,

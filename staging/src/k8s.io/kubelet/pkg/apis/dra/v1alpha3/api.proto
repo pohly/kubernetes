@@ -33,6 +33,18 @@ option (gogoproto.unmarshaler_all) = true;
 option (gogoproto.goproto_unrecognized_all) = false;
 
 service Node {
+  // NodeStartRESTProxy is called once per registered plugin.
+  // It enables the plugin to make REST calls through kubelet.
+  // Each stream response is a single REST call. The response
+  // is returned by kubelet through one or more NodeRESTResult
+  // calls.
+  rpc NodeStartRESTProxy (NodeStartRESTProxyMessage)
+    returns (stream NodeRESTProxyRequest) {}
+
+  // NodeRESTReply provides part of the response for a REST request.
+  rpc NodeRESTReply (NodeRESTReplyRequest)
+    returns (NodeRESTReplyResponse) {}
+
   // NodePrepareResources prepares several ResourceClaims
   // for use on the node. If an error is returned, the
   // response is ignored. Failures for individual claims
@@ -50,6 +62,54 @@ service Node {
   // plugin must send one such object with all information to the Kubelet.
   rpc NodeListAndWatchResources(NodeListAndWatchResourcesRequest)
     returns (stream NodeListAndWatchResourcesResponse) {}
+}
+
+message NodeStartRESTProxyMessage {
+}
+
+message NodeRESTProxyRequest {
+  // id is used as identifier for all response messages for this
+  // request.
+  int64 id = 1;
+
+  string method = 2;
+  string path = 3;
+  map<string, RESTHeader> header = 4;
+  bytes body = 5;
+}
+
+message RESTHeader {
+  repeated string values = 1;
+}
+
+// NodeRESTProxyReplyRequest is one of many replies that are sent
+// by kubelet for each NodeRESTProxyRequest. If the error is non-empty,
+// then the request has failed and no further messages are going to
+// be sent. The first message contains the response header and potentially
+// some data. All following messages contain additional data.
+message NodeRESTReplyRequest {
+  int64 id = 1;
+  string error = 2;
+  int64 closeAt = 3;
+  RESTResponseHeader header = 4;
+  int64 body_offset = 5;
+  bytes body = 6;
+}
+
+message RESTResponseHeader {
+  string status = 1; // e.g. "200 OK"
+  int32 status_code = 2;   // e.g. 200
+  string proto = 3; // e.g. "HTTP/1.0"
+  int32 proto_major = 4;    // e.g. 1
+  int32 proto_minor = 5;   // e.g. 0
+  map<string, RESTHeader> header = 6;
+
+  // content_length is the total expect length of the response body.
+  int64 content_length = 7;
+}
+
+message NodeRESTReplyResponse {
+  bool close = 1;
 }
 
 message NodePrepareResourcesRequest {
