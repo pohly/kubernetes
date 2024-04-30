@@ -54,7 +54,8 @@ type ExamplePlugin struct {
 	prepared       map[ClaimID]any
 	gRPCCalls      []GRPCCall
 
-	block bool
+	block   bool
+	failure error
 }
 
 type GRPCCall struct {
@@ -166,6 +167,10 @@ func (ex *ExamplePlugin) IsRegistered() bool {
 // to emulate time consuming or stuck calls
 func (ex *ExamplePlugin) Block() {
 	ex.block = true
+}
+
+func (ex *ExamplePlugin) SetFailure(err error) {
+	ex.failure = err
 }
 
 // NodePrepareResource ensures that the CDI file for the claim exists. It uses
@@ -309,6 +314,9 @@ func (ex *ExamplePlugin) NodePrepareResources(ctx context.Context, req *drapbv1a
 	resp := &drapbv1alpha3.NodePrepareResourcesResponse{
 		Claims: make(map[string]*drapbv1alpha3.NodePrepareResourceResponse),
 	}
+	if ex.failure != nil {
+		return resp, ex.failure
+	}
 	for _, claimReq := range req.Claims {
 		cdiDevices, err := ex.nodePrepareResource(ctx, claimReq.Name, claimReq.Uid, claimReq.ResourceHandle, claimReq.StructuredResourceHandle)
 		if err != nil {
@@ -380,6 +388,9 @@ func (ex *ExamplePlugin) nodeUnprepareResource(ctx context.Context, claimName st
 func (ex *ExamplePlugin) NodeUnprepareResources(ctx context.Context, req *drapbv1alpha3.NodeUnprepareResourcesRequest) (*drapbv1alpha3.NodeUnprepareResourcesResponse, error) {
 	resp := &drapbv1alpha3.NodeUnprepareResourcesResponse{
 		Claims: make(map[string]*drapbv1alpha3.NodeUnprepareResourceResponse),
+	}
+	if ex.failure != nil {
+		return resp, ex.failure
 	}
 	for _, claimReq := range req.Claims {
 		err := ex.nodeUnprepareResource(ctx, claimReq.Name, claimReq.Uid, claimReq.ResourceHandle, claimReq.StructuredResourceHandle)
