@@ -33,22 +33,42 @@ var BeRegistered = gcustom.MakeMatcher(func(actualCalls []GRPCCall) (bool, error
 	return false, nil
 }).WithMessage("contain successful NotifyRegistrationStatus call")
 
-// NodePrepareResouceCalled checks that NodePrepareResource API has been called
-var NodePrepareResourceCalled = gcustom.MakeMatcher(func(actualCalls []GRPCCall) (bool, error) {
-	for _, call := range actualCalls {
-		if strings.HasSuffix(call.FullMethod, "/NodePrepareResource") && call.Err == nil {
-			return true, nil
-		}
-	}
-	return false, nil
-}).WithMessage("contain NodePrepareResource call")
-
-// NodePrepareResoucesCalled checks that NodePrepareResources API has been called
-var NodePrepareResourcesCalled = gcustom.MakeMatcher(func(actualCalls []GRPCCall) (bool, error) {
+// NodePrepareResoucesSucceeded checks that NodePrepareResources API has been called and succeeded
+var NodePrepareResourcesSucceeded = gcustom.MakeMatcher(func(actualCalls []GRPCCall) (bool, error) {
 	for _, call := range actualCalls {
 		if strings.HasSuffix(call.FullMethod, "/NodePrepareResources") && call.Err == nil {
 			return true, nil
 		}
 	}
 	return false, nil
-}).WithMessage("contain NodePrepareResources call")
+}).WithMessage("contain successful NodePrepareResources call")
+
+// NodePrepareResoucesErrored checks that NodePrepareResources API has been called and returned an error
+var NodePrepareResourcesErrored = gcustom.MakeMatcher(func(actualCalls []GRPCCall) (bool, error) {
+	for _, call := range actualCalls {
+		if strings.HasSuffix(call.FullMethod, "/NodePrepareResources") && call.Err != nil {
+			return true, nil
+		}
+	}
+	return false, nil
+}).WithMessage("contain unsuccessful NodePrepareResources call")
+
+// NodeUnprepareResoucesSucceeded checks that NodeUnprepareResources API has been called and succeeded
+var NodeUnprepareResourcesSucceeded = gcustom.MakeMatcher(func(actualCalls []GRPCCall) (bool, error) {
+	for _, call := range actualCalls {
+		if strings.HasSuffix(call.FullMethod, "/NodeUnprepareResources") && call.Err == nil {
+			return true, nil
+		}
+	}
+	return false, nil
+}).WithMessage("contain successful NodeUnprepareResources call")
+
+// NodeUnprepareResoucesErrored checks that NodeUnprepareResources API has been called and returned an error
+var NodeUnprepareResourcesErrored = gcustom.MakeMatcher(func(actualCalls []GRPCCall) (bool, error) {
+	for _, call := range actualCalls {
+		if strings.HasSuffix(call.FullMethod, "/NodeUnprepareResources") && call.Err != nil {
+			return true, nil
+		}
+	}
+	return false, nil
+}).WithMessage("contain unsuccessful NodeUnprepareResources call")
