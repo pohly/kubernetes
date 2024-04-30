@@ -26,6 +26,7 @@ package e2enode
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path"
 	"path/filepath"
@@ -97,7 +98,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		ginkgo.It("must process pod created when kubelet is not running", func(ctx context.Context) {
 			// Stop Kubelet
 			startKubelet := stopKubelet()
-			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod")
+			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod", 0, true)
 			// Pod must be in pending state
 			err := e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, pod.Name, "Pending", framework.PodStartShortTimeout, func(pod *v1.Pod) (bool, error) {
 				return pod.Status.Phase == v1.PodPending, nil
@@ -113,7 +114,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		ginkgo.It("must keep pod in pending state if NodePrepareResources times out", func(ctx context.Context) {
 			ginkgo.By("set delay for the NodePrepareResources call")
 			kubeletPlugin.Block()
-			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod")
+			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod", 0, true)
 
 			ginkgo.By("wait for pod to be in Pending state")
 			err := e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, pod.Name, "Pending", framework.PodStartShortTimeout, func(pod *v1.Pod) (bool, error) {
@@ -170,7 +171,7 @@ func newKubeletPlugin(ctx context.Context, nodeName string) *testdriver.ExampleP
 // NOTE: as scheduler and controller manager are not running by the Node e2e,
 // the objects must contain all required data to be processed correctly by the API server
 // and placed on the node without involving the scheduler and the DRA controller
-func createTestObjects(ctx context.Context, clientSet kubernetes.Interface, nodename, namespace, className, claimName, podName string) *v1.Pod {
+func createTestObjects(ctx context.Context, clientSet kubernetes.Interface, nodename, namespace, className, claimName, podName string, sleepTime int, deferPodDeletion bool) *v1.Pod {
 	// ResourceClass
 	class := &resourcev1alpha2.ResourceClass{
 		ObjectMeta: metav1.ObjectMeta{
@@ -222,7 +223,7 @@ func createTestObjects(ctx context.Context, clientSet kubernetes.Interface, node
 					Resources: v1.ResourceRequirements{
 						Claims: []v1.ResourceClaim{{Name: podClaimName}},
 					},
-					Command: []string{"/bin/sh", "-c", "env | grep DRA_PARAM1=PARAM1_VALUE"},
+					Command: []string{"/bin/sh", "-c", fmt.Sprintf("env | grep DRA_PARAM1=PARAM1_VALUE && sleep %d", sleepTime)},
 				},
 			},
 			RestartPolicy: v1.RestartPolicyNever,
@@ -231,7 +232,9 @@ func createTestObjects(ctx context.Context, clientSet kubernetes.Interface, node
 	createdPod, err := clientSet.CoreV1().Pods(namespace).Create(ctx, pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
-	ginkgo.DeferCleanup(clientSet.CoreV1().Pods(namespace).Delete, podName, metav1.DeleteOptions{})
+	if deferPodDeletion {
+		ginkgo.DeferCleanup(clientSet.CoreV1().Pods(namespace).Delete, podName, metav1.DeleteOptions{})
+	}
 
 	// Update claim status: set ReservedFor and AllocationResult
 	// NOTE: This is usually done by the DRA controller
