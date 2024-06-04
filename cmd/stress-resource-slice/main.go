@@ -26,21 +26,22 @@ func main() {
 	}
 
 	ctx := context.Background()
-	attributeNameLen := 10
 	for numDevices := 0; numDevices <= 200; numDevices += 10 {
 		for numAttributes := 0; numAttributes <= 50; numAttributes += 10 {
-			slice := generateResourceSlice(numDevices, numAttributes, attributeNameLen)
-			slice, err := clientset.ResourceV1alpha2().ResourceSlices().Create(ctx, slice, metav1.CreateOptions{})
-			if err != nil {
-				klog.Infof("%d/%d: %v", numDevices, numAttributes, err)
-				continue
+			for _, attributeNameLen := range []int{10, 96} {
+				slice := generateResourceSlice(numDevices, numAttributes, attributeNameLen)
+				slice, err := clientset.ResourceV1alpha2().ResourceSlices().Create(ctx, slice, metav1.CreateOptions{})
+				if err != nil {
+					klog.Infof("%d/%d: %v", numDevices, numAttributes, err)
+					continue
+				}
+				total := slice.Size()
+				managedFields := 0
+				for _, managed := range slice.ManagedFields {
+					managedFields += managed.Size()
+				}
+				klog.Infof("%d/%d/%d: total %d, managed fields %d (%d%%)", numDevices, numAttributes, attributeNameLen, total, managedFields, managedFields*100/total)
 			}
-			total := slice.Size()
-			managedFields := 0
-			for _, managed := range slice.ManagedFields {
-				managedFields += managed.Size()
-			}
-			klog.Infof("%d/%d: total %d, managed fields %d (%d%%)", numDevices, numAttributes, total, managedFields, managedFields*100/total)
 		}
 	}
 }
