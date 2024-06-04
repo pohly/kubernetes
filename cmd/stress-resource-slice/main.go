@@ -25,25 +25,30 @@ func main() {
 		klog.Fatalf("create client: %v", err)
 	}
 
-	ctx := context.Background()
 	for numDevices := 0; numDevices <= 200; numDevices += 10 {
 		for numAttributes := 0; numAttributes <= 50; numAttributes += 10 {
 			for _, attributeNameLen := range []int{10, 96} {
-				slice := generateResourceSlice(numDevices, numAttributes, attributeNameLen)
-				slice, err := clientset.ResourceV1alpha2().ResourceSlices().Create(ctx, slice, metav1.CreateOptions{})
-				if err != nil {
-					klog.Infof("%d/%d: %v", numDevices, numAttributes, err)
-					continue
-				}
-				total := slice.Size()
-				managedFields := 0
-				for _, managed := range slice.ManagedFields {
-					managedFields += managed.Size()
-				}
-				klog.Infof("%d/%d/%d: total %d, managed fields %d (%d%%)", numDevices, numAttributes, attributeNameLen, total, managedFields, managedFields*100/total)
+				measureResourceSlice(clientset, numDevices, numAttributes, attributeNameLen)
 			}
 		}
 	}
+
+	measureResourceSlice(clientset, 128, 32, 96)
+}
+
+func measureResourceSlice(clientset kubernetes.Interface, numDevices, numAttributes, attributeNameLen int) {
+	slice := generateResourceSlice(numDevices, numAttributes, attributeNameLen)
+	slice, err := clientset.ResourceV1alpha2().ResourceSlices().Create(context.Background(), slice, metav1.CreateOptions{})
+	if err != nil {
+		klog.Infof("%d/%d: %v", numDevices, numAttributes, err)
+		return
+	}
+	total := slice.Size()
+	managedFields := 0
+	for _, managed := range slice.ManagedFields {
+		managedFields += managed.Size()
+	}
+	klog.Infof("%d/%d/%d: total %d, managed fields %d (%d%%)", numDevices, numAttributes, attributeNameLen, total, managedFields, managedFields*100/total)
 }
 
 func generateResourceSlice(numDevices, numAttributes, attributeNameLen int) *resourceapi.ResourceSlice {
