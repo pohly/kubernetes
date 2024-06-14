@@ -475,7 +475,7 @@ func addAllEventHandlers(
 			handlers = append(handlers, handlerRegistration)
 		case framework.PodSchedulingContext:
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				if handlerRegistration, err = informerFactory.Resource().V1alpha2().PodSchedulingContexts().Informer().AddEventHandler(
+				if handlerRegistration, err = informerFactory.Resource().V1alpha3().PodSchedulingContexts().Informer().AddEventHandler(
 					buildEvtResHandler(at, framework.PodSchedulingContext, "PodSchedulingContext"),
 				); err != nil {
 					return err
@@ -491,7 +491,7 @@ func addAllEventHandlers(
 			}
 		case framework.ResourceClass:
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				if handlerRegistration, err = informerFactory.Resource().V1alpha2().ResourceClasses().Informer().AddEventHandler(
+				if handlerRegistration, err = informerFactory.Resource().V1alpha3().ResourceClasses().Informer().AddEventHandler(
 					buildEvtResHandler(at, framework.ResourceClass, "ResourceClass"),
 				); err != nil {
 					return err
@@ -500,7 +500,7 @@ func addAllEventHandlers(
 			}
 		case framework.ResourceClaimParameters:
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				if handlerRegistration, err = informerFactory.Resource().V1alpha2().ResourceClaimParameters().Informer().AddEventHandler(
+				if handlerRegistration, err = informerFactory.Resource().V1alpha3().ResourceClaimParameters().Informer().AddEventHandler(
 					buildEvtResHandler(at, framework.ResourceClaimParameters, "ResourceClaimParameters"),
 				); err != nil {
 					return err
@@ -509,7 +509,7 @@ func addAllEventHandlers(
 			}
 		case framework.ResourceClassParameters:
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				if handlerRegistration, err = informerFactory.Resource().V1alpha2().ResourceClassParameters().Informer().AddEventHandler(
+				if handlerRegistration, err = informerFactory.Resource().V1alpha3().ResourceClassParameters().Informer().AddEventHandler(
 					buildEvtResHandler(at, framework.ResourceClassParameters, "ResourceClassParameters"),
 				); err != nil {
 					return err
