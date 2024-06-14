@@ -14959,7 +14959,7 @@
       "type": "object",
       "x-kubernetes-map-type": "atomic"
     },
-    "io.k8s.api.resource.v1alpha2.AllocationResult": {
+    "io.k8s.api.resource.v1alpha3.AllocationResult": {
       "description": "AllocationResult contains attributes of an allocated resource.",
       "properties": {
         "availableOnNodes": {
@@ -14969,7 +14969,7 @@
         "resourceHandles": {
           "description": "ResourceHandles contain the state associated with an allocation that should be maintained throughout the lifetime of a claim. Each ResourceHandle contains data that should be passed to a specific kubelet plugin once it lands on a node. This data is returned by the driver after a successful allocation and is opaque to Kubernetes. Driver documentation may explain to users how to interpret this data if needed.\n\nSetting this field is optional. It has a maximum size of 32 entries. If null (or empty), it is assumed this allocation will be processed by a single kubelet plugin with no ResourceHandle data attached. The name of the kubelet plugin invoked will match the DriverName set in the ResourceClaimStatus this AllocationResult is embedded in.",
           "items": {
-            "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceHandle"
+            "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceHandle"
           },
           "type": "array",
           "x-kubernetes-list-type": "atomic"
@@ -14977,11 +14977,11 @@
       },
       "type": "object"
     },
-    "io.k8s.api.resource.v1alpha2.DriverAllocationResult": {
+    "io.k8s.api.resource.v1alpha3.DriverAllocationResult": {
       "description": "DriverAllocationResult contains vendor parameters and the allocation result for one request.",
       "properties": {
         "namedResources": {
-          "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.NamedResourcesAllocationResult",
+          "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.NamedResourcesAllocationResult",
           "description": "NamedResources describes the allocation result when using the named resources model."
         },
         "vendorRequestParameters": {
@@ -14991,7 +14991,7 @@
       },
       "type": "object"
     },
-    "io.k8s.api.resource.v1alpha2.DriverRequests": {
+    "io.k8s.api.resource.v1alpha3.DriverRequests": {
       "description": "DriverRequests describes all resources that are needed from one particular driver.",
       "properties": {
         "driverName": {
@@ -15001,7 +15001,7 @@
         "requests": {
           "description": "Requests describes all resources that are needed from the driver.",
           "items": {
-            "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceRequest"
+            "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceRequest"
           },
           "type": "array",
           "x-kubernetes-list-type": "atomic"
@@ -15013,7 +15013,7 @@
       },
       "type": "object"
     },
-    "io.k8s.api.resource.v1alpha2.NamedResourcesAllocationResult": {
+    "io.k8s.api.resource.v1alpha3.NamedResourcesAllocationResult": {
       "description": "NamedResourcesAllocationResult is used in AllocationResultModel.",
       "properties": {
         "name": {
@@ -15026,7 +15026,7 @@
       ],
       "type": "object"
     },
-    "io.k8s.api.resource.v1alpha2.NamedResourcesAttribute": {
+    "io.k8s.api.resource.v1alpha3.NamedResourcesAttribute": {
       "description": "NamedResourcesAttribute is a combination of an attribute name and its value.",
       "properties": {
         "bool": {
@@ -15039,7 +15039,7 @@
           "type": "integer"
         },
         "intSlice": {
-          "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.NamedResourcesIntSlice",
+          "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.NamedResourcesIntSlice",
           "description": "IntSliceValue is an array of 64-bit integers."
         },
         "name": {
@@ -15055,7 +15055,7 @@
           "type": "string"
         },
         "stringSlice": {
-          "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.NamedResourcesStringSlice",
+          "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.NamedResourcesStringSlice",
           "description": "StringSliceValue is an array of strings."
         },
         "version": {
@@ -15068,7 +15068,7 @@
       ],
       "type": "object"
     },
-    "io.k8s.api.resource.v1alpha2.NamedResourcesFilter": {
+    "io.k8s.api.resource.v1alpha3.NamedResourcesFilter": {
       "description": "NamedResourcesFilter is used in ResourceFilterModel.",
       "properties": {
         "selector": {
@@ -15081,13 +15081,13 @@
       ],
       "type": "object"
     },
-    "io.k8s.api.resource.v1alpha2.NamedResourcesInstance": {
+    "io.k8s.api.resource.v1alpha3.NamedResourcesInstance": {
       "description": "NamedResourcesInstance represents one individual hardware instance that can be selected based on its attributes.",
       "properties": {
         "attributes": {
           "description": "Attributes defines the attributes of this resource instance. The name of each attribute must be unique.",
           "items": {
-            "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.NamedResourcesAttribute"
+            "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.NamedResourcesAttribute"
           },
           "type": "array",
           "x-kubernetes-list-type": "atomic"
@@ -15102,7 +15102,7 @@
       ],
       "type": "object"
     },
-    "io.k8s.api.resource.v1alpha2.NamedResourcesIntSlice": {
+    "io.k8s.api.resource.v1alpha3.NamedResourcesIntSlice": {
       "description": "NamedResourcesIntSlice contains a slice of 64-bit integers.",
       "properties": {
         "ints": {
@@ -15120,7 +15120,7 @@
       ],
       "type": "object"
     },
-    "io.k8s.api.resource.v1alpha2.NamedResourcesRequest": {
+    "io.k8s.api.resource.v1alpha3.NamedResourcesRequest": {
       "description": "NamedResourcesRequest is used in ResourceRequestModel.",
       "properties": {
         "selector": {
@@ -15133,13 +15133,13 @@
       ],
       "type": "object"
     },
-    "io.k8s.api.resource.v1alpha2.NamedResourcesResources": {
+    "io.k8s.api.resource.v1alpha3.NamedResourcesResources": {
       "description": "NamedResourcesResources is used in ResourceModel.",
       "properties": {
         "instances": {
           "description": "The list of all individual resources instances currently available.",
           "items": {
-            "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.NamedResourcesInstance"
+            "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.NamedResourcesInstance"
           },
           "type": "array",
           "x-kubernetes-list-type": "atomic"
@@ -15150,7 +15150,7 @@
       ],
       "type": "object"
     },
-    "io.k8s.api.resource.v1alpha2.NamedResourcesStringSlice": {
+    "io.k8s.api.resource.v1alpha3.NamedResourcesStringSlice": {
       "description": "NamedResourcesStringSlice contains a slice of strings.",
       "properties": {
         "strings": {
@@ -15167,7 +15167,7 @@
       ],
       "type": "object"
     },
-    "io.k8s.api.resource.v1alpha2.PodSchedulingContext": {
+    "io.k8s.api.resource.v1alpha3.PodSchedulingContext": {
       "description": "PodSchedulingContext objects hold information that is needed to schedule a Pod with ResourceClaims that use \"WaitForFirstConsumer\" allocation mode.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
       "properties": {
         "apiVersion": {
@@ -15183,11 +15183,11 @@
           "description": "Standard object metadata"
         },
         "spec": {
-          "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.PodSchedulingContextSpec",
+          "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.PodSchedulingContextSpec",
           "description": "Spec describes where resources for the Pod are needed."
         },
         "status": {
-          "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.PodSchedulingContextStatus",
+          "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.PodSchedulingContextStatus",
           "description": "Status describes where resources for the Pod can be allocated."
         }
       },
@@ -15199,11 +15199,11 @@
         {
           "group": "resource.k8s.io",
           "kind": "PodSchedulingContext",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       ]
     },
-    "io.k8s.api.resource.v1alpha2.PodSchedulingContextList": {
+    "io.k8s.api.resource.v1alpha3.PodSchedulingContextList": {
       "description": "PodSchedulingContextList is a collection of Pod scheduling objects.",
       "properties": {
         "apiVersion": {
@@ -15213,7 +15213,7 @@
         "items": {
           "description": "Items is the list of PodSchedulingContext objects.",
           "items": {
-            "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.PodSchedulingContext"
+            "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.PodSchedulingContext"
           },
           "type": "array"
         },
@@ -15234,11 +15234,11 @@
         {
           "group": "resource.k8s.io",
           "kind": "PodSchedulingContextList",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       ]
     },
-    "io.k8s.api.resource.v1alpha2.PodSchedulingContextSpec": {
+    "io.k8s.api.resource.v1alpha3.PodSchedulingContextSpec": {
       "description": "PodSchedulingContextSpec describes where resources for the Pod are needed.",
       "properties": {
         "potentialNodes": {
@@ -15256,13 +15256,13 @@
       },
       "type": "object"
     },
-    "io.k8s.api.resource.v1alpha2.PodSchedulingContextStatus": {
+    "io.k8s.api.resource.v1alpha3.PodSchedulingContextStatus": {
       "description": "PodSchedulingContextStatus describes where resources for the Pod can be allocated.",
       "properties": {
         "resourceClaims": {
           "description": "ResourceClaims describes resource availability for each pod.spec.resourceClaim entry where the corresponding ResourceClaim uses \"WaitForFirstConsumer\" allocation mode.",
           "items": {
-            "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaimSchedulingStatus"
+            "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaimSchedulingStatus"
           },
           "type": "array",
           "x-kubernetes-list-map-keys": [
@@ -15273,7 +15273,7 @@
       },
       "type": "object"
     },
-    "io.k8s.api.resource.v1alpha2.ResourceClaim": {
+    "io.k8s.api.resource.v1alpha3.ResourceClaim": {
       "description": "ResourceClaim describes which resources are needed by a resource consumer. Its status tracks whether the resource has been allocated and what the resulting attributes are.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
       "properties": {
         "apiVersion": {
@@ -15289,11 +15289,11 @@
           "description": "Standard object metadata"
         },
         "spec": {
-          "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaimSpec",
+          "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaimSpec",
           "description": "Spec describes the desired attributes of a resource that then needs to be allocated. It can only be set once when creating the ResourceClaim."
         },
         "status": {
-          "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaimStatus",
+          "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaimStatus",
           "description": "Status describes whether the resource is available and with which attributes."
         }
       },
@@ -15305,11 +15305,11 @@
         {
           "group": "resource.k8s.io",
           "kind": "ResourceClaim",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       ]
     },
-    "io.k8s.api.resource.v1alpha2.ResourceClaimConsumerReference": {
+    "io.k8s.api.resource.v1alpha3.ResourceClaimConsumerReference": {
       "description": "ResourceClaimConsumerReference contains enough information to let you locate the consumer of a ResourceClaim. The user must be a resource in the same namespace as the ResourceClaim.",
       "properties": {
         "apiGroup": {
@@ -15336,7 +15336,7 @@
       ],
       "type": "object"
     },
-    "io.k8s.api.resource.v1alpha2.ResourceClaimList": {
+    "io.k8s.api.resource.v1alpha3.ResourceClaimList": {
       "description": "ResourceClaimList is a collection of claims.",
       "properties": {
         "apiVersion": {
@@ -15346,7 +15346,7 @@
         "items": {
           "description": "Items is the list of resource claims.",
           "items": {
-            "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaim"
+            "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaim"
           },
           "type": "array"
         },
@@ -15367,11 +15367,11 @@
         {
           "group": "resource.k8s.io",
           "kind": "ResourceClaimList",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       ]
     },
-    "io.k8s.api.resource.v1alpha2.ResourceClaimParameters": {
+    "io.k8s.api.resource.v1alpha3.ResourceClaimParameters": {
       "description": "ResourceClaimParameters defines resource requests for a ResourceClaim in an in-tree format understood by Kubernetes.",
       "properties": {
         "apiVersion": {
@@ -15381,13 +15381,13 @@
         "driverRequests": {
           "description": "DriverRequests describes all resources that are needed for the allocated claim. A single claim may use resources coming from different drivers. For each driver, this array has at most one entry which then may have one or more per-driver requests.\n\nMay be empty, in which case the claim can always be allocated.",
           "items": {
-            "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.DriverRequests"
+            "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.DriverRequests"
           },
           "type": "array",
           "x-kubernetes-list-type": "atomic"
         },
         "generatedFrom": {
-          "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaimParametersReference",
+          "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaimParametersReference",
           "description": "If this object was created from some other resource, then this links back to that resource. This field is used to find the in-tree representation of the claim parameters when the parameter reference of the claim refers to some unknown type."
         },
         "kind": {
@@ -15404,11 +15404,11 @@
         {
           "group": "resource.k8s.io",
           "kind": "ResourceClaimParameters",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       ]
     },
-    "io.k8s.api.resource.v1alpha2.ResourceClaimParametersList": {
+    "io.k8s.api.resource.v1alpha3.ResourceClaimParametersList": {
       "description": "ResourceClaimParametersList is a collection of ResourceClaimParameters.",
       "properties": {
         "apiVersion": {
@@ -15418,7 +15418,7 @@
         "items": {
           "description": "Items is the list of node resource capacity objects.",
           "items": {
-            "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaimParameters"
+            "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaimParameters"
           },
           "type": "array"
         },
@@ -15439,11 +15439,11 @@
         {
           "group": "resource.k8s.io",
           "kind": "ResourceClaimParametersList",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       ]
     },
-    "io.k8s.api.resource.v1alpha2.ResourceClaimParametersReference": {
+    "io.k8s.api.resource.v1alpha3.ResourceClaimParametersReference": {
       "description": "ResourceClaimParametersReference contains enough information to let you locate the parameters for a ResourceClaim. The object must be in the same namespace as the ResourceClaim.",
       "properties": {
         "apiGroup": {
@@ -15465,7 +15465,7 @@
       ],
       "type": "object"
     },
-    "io.k8s.api.resource.v1alpha2.ResourceClaimSchedulingStatus": {
+    "io.k8s.api.resource.v1alpha3.ResourceClaimSchedulingStatus": {
       "description": "ResourceClaimSchedulingStatus contains information about one particular ResourceClaim with \"WaitForFirstConsumer\" allocation mode.",
       "properties": {
         "name": {
@@ -15483,11 +15483,11 @@
       },
       "type": "object"
     },
-    "io.k8s.api.resource.v1alpha2.ResourceClaimSpec": {
+    "io.k8s.api.resource.v1alpha3.ResourceClaimSpec": {
       "description": "ResourceClaimSpec defines how a resource is to be allocated.",
       "properties": {
         "parametersRef": {
-          "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaimParametersReference",
+          "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaimParametersReference",
           "description": "ParametersRef references a separate object with arbitrary parameters that will be used by the driver when allocating a resource for the claim.\n\nThe object must be in the same namespace as the ResourceClaim."
         },
         "resourceClassName": {
@@ -15500,11 +15500,11 @@
       ],
       "type": "object"
     },
-    "io.k8s.api.resource.v1alpha2.ResourceClaimStatus": {
+    "io.k8s.api.resource.v1alpha3.ResourceClaimStatus": {
       "description": "ResourceClaimStatus tracks whether the resource has been allocated and what the resulting attributes are.",
       "properties": {
         "allocation": {
-          "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.AllocationResult",
+          "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.AllocationResult",
           "description": "Allocation is set by the resource driver once a resource or set of resources has been allocated successfully. If this is not specified, the resources have not been allocated yet."
         },
         "deallocationRequested": {
@@ -15518,7 +15518,7 @@
         "reservedFor": {
           "description": "ReservedFor indicates which entities are currently allowed to use the claim. A Pod which references a ResourceClaim which is not reserved for that Pod will not be started.\n\nThere can be at most 32 such reservations. This may get increased in the future, but not reduced.",
           "items": {
-            "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaimConsumerReference"
+            "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaimConsumerReference"
           },
           "type": "array",
           "x-kubernetes-list-map-keys": [
@@ -15531,7 +15531,7 @@
       },
       "type": "object"
     },
-    "io.k8s.api.resource.v1alpha2.ResourceClaimTemplate": {
+    "io.k8s.api.resource.v1alpha3.ResourceClaimTemplate": {
       "description": "ResourceClaimTemplate is used to produce ResourceClaim objects.",
       "properties": {
         "apiVersion": {
@@ -15547,7 +15547,7 @@
           "description": "Standard object metadata"
         },
         "spec": {
-          "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaimTemplateSpec",
+          "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaimTemplateSpec",
           "description": "Describes the ResourceClaim that is to be generated.\n\nThis field is immutable. A ResourceClaim will get created by the control plane for a Pod when needed and then not get updated anymore."
         }
       },
@@ -15559,11 +15559,11 @@
         {
           "group": "resource.k8s.io",
           "kind": "ResourceClaimTemplate",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       ]
     },
-    "io.k8s.api.resource.v1alpha2.ResourceClaimTemplateList": {
+    "io.k8s.api.resource.v1alpha3.ResourceClaimTemplateList": {
       "description": "ResourceClaimTemplateList is a collection of claim templates.",
       "properties": {
         "apiVersion": {
@@ -15573,7 +15573,7 @@
         "items": {
           "description": "Items is the list of resource claim templates.",
           "items": {
-            "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaimTemplate"
+            "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaimTemplate"
           },
           "type": "array"
         },
@@ -15594,11 +15594,11 @@
         {
           "group": "resource.k8s.io",
           "kind": "ResourceClaimTemplateList",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       ]
     },
-    "io.k8s.api.resource.v1alpha2.ResourceClaimTemplateSpec": {
+    "io.k8s.api.resource.v1alpha3.ResourceClaimTemplateSpec": {
       "description": "ResourceClaimTemplateSpec contains the metadata and fields for a ResourceClaim.",
       "properties": {
         "metadata": {
@@ -15606,7 +15606,7 @@
           "description": "ObjectMeta may contain labels and annotations that will be copied into the PVC when creating it. No other fields are allowed and will be rejected during validation."
         },
         "spec": {
-          "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaimSpec",
+          "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaimSpec",
           "description": "Spec for the ResourceClaim. The entire content is copied unchanged into the ResourceClaim that gets created from this template. The same fields as in a ResourceClaim are also valid here."
         }
       },
@@ -15615,7 +15615,7 @@
       ],
       "type": "object"
     },
-    "io.k8s.api.resource.v1alpha2.ResourceClass": {
+    "io.k8s.api.resource.v1alpha3.ResourceClass": {
       "description": "ResourceClass is used by administrators to influence how resources are allocated.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
       "properties": {
         "apiVersion": {
@@ -15635,7 +15635,7 @@
           "description": "Standard object metadata"
         },
         "parametersRef": {
-          "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClassParametersReference",
+          "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClassParametersReference",
           "description": "ParametersRef references an arbitrary separate object that may hold parameters that will be used by the driver when allocating a resource that uses this class. A dynamic resource driver can distinguish between parameters stored here and and those stored in ResourceClaimSpec."
         },
         "structuredParameters": {
@@ -15655,11 +15655,11 @@
         {
           "group": "resource.k8s.io",
           "kind": "ResourceClass",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       ]
     },
-    "io.k8s.api.resource.v1alpha2.ResourceClassList": {
+    "io.k8s.api.resource.v1alpha3.ResourceClassList": {
       "description": "ResourceClassList is a collection of classes.",
       "properties": {
         "apiVersion": {
@@ -15669,7 +15669,7 @@
         "items": {
           "description": "Items is the list of resource classes.",
           "items": {
-            "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClass"
+            "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClass"
           },
           "type": "array"
         },
@@ -15690,11 +15690,11 @@
         {
           "group": "resource.k8s.io",
           "kind": "ResourceClassList",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       ]
     },
-    "io.k8s.api.resource.v1alpha2.ResourceClassParameters": {
+    "io.k8s.api.resource.v1alpha3.ResourceClassParameters": {
       "description": "ResourceClassParameters defines resource requests for a ResourceClass in an in-tree format understood by Kubernetes.",
       "properties": {
         "apiVersion": {
@@ -15704,13 +15704,13 @@
         "filters": {
           "description": "Filters describes additional contraints that must be met when using the class.",
           "items": {
-            "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceFilter"
+            "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceFilter"
           },
           "type": "array",
           "x-kubernetes-list-type": "atomic"
         },
         "generatedFrom": {
-          "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClassParametersReference",
+          "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClassParametersReference",
           "description": "If this object was created from some other resource, then this links back to that resource. This field is used to find the in-tree representation of the class parameters when the parameter reference of the class refers to some unknown type."
         },
         "kind": {
@@ -15724,7 +15724,7 @@
         "vendorParameters": {
           "description": "VendorParameters are arbitrary setup parameters for all claims using this class. They are ignored while allocating the claim. There must not be more than one entry per driver.",
           "items": {
-            "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.VendorParameters"
+            "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.VendorParameters"
           },
           "type": "array",
           "x-kubernetes-list-type": "atomic"
@@ -15735,11 +15735,11 @@
         {
           "group": "resource.k8s.io",
           "kind": "ResourceClassParameters",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       ]
     },
-    "io.k8s.api.resource.v1alpha2.ResourceClassParametersList": {
+    "io.k8s.api.resource.v1alpha3.ResourceClassParametersList": {
       "description": "ResourceClassParametersList is a collection of ResourceClassParameters.",
       "properties": {
         "apiVersion": {
@@ -15749,7 +15749,7 @@
         "items": {
           "description": "Items is the list of node resource capacity objects.",
           "items": {
-            "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClassParameters"
+            "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClassParameters"
           },
           "type": "array"
         },
@@ -15770,11 +15770,11 @@
         {
           "group": "resource.k8s.io",
           "kind": "ResourceClassParametersList",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       ]
     },
-    "io.k8s.api.resource.v1alpha2.ResourceClassParametersReference": {
+    "io.k8s.api.resource.v1alpha3.ResourceClassParametersReference": {
       "description": "ResourceClassParametersReference contains enough information to let you locate the parameters for a ResourceClass.",
       "properties": {
         "apiGroup": {
@@ -15800,7 +15800,7 @@
       ],
       "type": "object"
     },
-    "io.k8s.api.resource.v1alpha2.ResourceFilter": {
+    "io.k8s.api.resource.v1alpha3.ResourceFilter": {
       "description": "ResourceFilter is a filter for resources from one particular driver.",
       "properties": {
         "driverName": {
@@ -15808,13 +15808,13 @@
           "type": "string"
         },
         "namedResources": {
-          "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.NamedResourcesFilter",
+          "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.NamedResourcesFilter",
           "description": "NamedResources describes a resource filter using the named resources model."
         }
       },
       "type": "object"
     },
-    "io.k8s.api.resource.v1alpha2.ResourceHandle": {
+    "io.k8s.api.resource.v1alpha3.ResourceHandle": {
       "description": "ResourceHandle holds opaque resource data for processing by a specific kubelet plugin.",
       "properties": {
         "data": {
@@ -15826,7 +15826,7 @@
           "type": "string"
         },
         "structuredData": {
-          "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.StructuredResourceHandle",
+          "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.StructuredResourceHandle",
           "description": "If StructuredData is set, then it needs to be used instead of Data."
         }
       },
@@ -15835,11 +15835,11 @@
       ],
       "type": "object"
     },
-    "io.k8s.api.resource.v1alpha2.ResourceRequest": {
+    "io.k8s.api.resource.v1alpha3.ResourceRequest": {
       "description": "ResourceRequest is a request for resources from one particular driver.",
       "properties": {
         "namedResources": {
-          "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.NamedResourcesRequest",
+          "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.NamedResourcesRequest",
           "description": "NamedResources describes a request for resources with the named resources model."
         },
         "vendorParameters": {
@@ -15849,7 +15849,7 @@
       },
       "type": "object"
     },
-    "io.k8s.api.resource.v1alpha2.ResourceSlice": {
+    "io.k8s.api.resource.v1alpha3.ResourceSlice": {
       "description": "ResourceSlice provides information about available resources on individual nodes.",
       "properties": {
         "apiVersion": {
@@ -15869,7 +15869,7 @@
           "description": "Standard object metadata"
         },
         "namedResources": {
-          "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.NamedResourcesResources",
+          "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.NamedResourcesResources",
           "description": "NamedResources describes available resources using the named resources model."
         },
         "nodeName": {
@@ -15885,11 +15885,11 @@
         {
           "group": "resource.k8s.io",
           "kind": "ResourceSlice",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       ]
     },
-    "io.k8s.api.resource.v1alpha2.ResourceSliceList": {
+    "io.k8s.api.resource.v1alpha3.ResourceSliceList": {
       "description": "ResourceSliceList is a collection of ResourceSlices.",
       "properties": {
         "apiVersion": {
@@ -15899,7 +15899,7 @@
         "items": {
           "description": "Items is the list of node resource capacity objects.",
           "items": {
-            "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceSlice"
+            "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceSlice"
           },
           "type": "array"
         },
@@ -15920,11 +15920,11 @@
         {
           "group": "resource.k8s.io",
           "kind": "ResourceSliceList",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       ]
     },
-    "io.k8s.api.resource.v1alpha2.StructuredResourceHandle": {
+    "io.k8s.api.resource.v1alpha3.StructuredResourceHandle": {
       "description": "StructuredResourceHandle is the in-tree representation of the allocation result.",
       "properties": {
         "nodeName": {
@@ -15934,7 +15934,7 @@
         "results": {
           "description": "Results lists all allocated driver resources.",
           "items": {
-            "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.DriverAllocationResult"
+            "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.DriverAllocationResult"
           },
           "type": "array",
           "x-kubernetes-list-type": "atomic"
@@ -15953,7 +15953,7 @@
       ],
       "type": "object"
     },
-    "io.k8s.api.resource.v1alpha2.VendorParameters": {
+    "io.k8s.api.resource.v1alpha3.VendorParameters": {
       "description": "VendorParameters are opaque parameters for one particular driver.",
       "properties": {
         "driverName": {
@@ -18145,7 +18145,7 @@
         {
           "group": "resource.k8s.io",
           "kind": "DeleteOptions",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         },
         {
           "group": "scheduling.k8s.io",
@@ -18529,7 +18529,7 @@
         {
           "group": "resource.k8s.io",
           "kind": "Status",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       ]
     },
@@ -18866,7 +18866,7 @@
         {
           "group": "resource.k8s.io",
           "kind": "WatchEvent",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         },
         {
           "group": "scheduling.k8s.io",
@@ -70422,7 +70422,7 @@
         ]
       }
     },
-    "/apis/resource.k8s.io/v1alpha2/": {
+    "/apis/resource.k8s.io/v1alpha3/": {
       "get": {
         "consumes": [
           "application/json",
@@ -70430,7 +70430,7 @@
           "application/vnd.kubernetes.protobuf"
         ],
         "description": "get available resources",
-        "operationId": "getResourceV1alpha2APIResources",
+        "operationId": "getResourceV1alpha3APIResources",
         "produces": [
           "application/json",
           "application/yaml",
@@ -70451,17 +70451,17 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ]
       }
     },
-    "/apis/resource.k8s.io/v1alpha2/namespaces/{namespace}/podschedulingcontexts": {
+    "/apis/resource.k8s.io/v1alpha3/namespaces/{namespace}/podschedulingcontexts": {
       "delete": {
         "consumes": [
           "*/*"
         ],
         "description": "delete collection of PodSchedulingContext",
-        "operationId": "deleteResourceV1alpha2CollectionNamespacedPodSchedulingContext",
+        "operationId": "deleteResourceV1alpha3CollectionNamespacedPodSchedulingContext",
         "parameters": [
           {
             "$ref": "#/parameters/body-2Y1dVQaQ"
@@ -70527,13 +70527,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "deletecollection",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "PodSchedulingContext",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "get": {
@@ -70541,7 +70541,7 @@
           "*/*"
         ],
         "description": "list or watch objects of kind PodSchedulingContext",
-        "operationId": "listResourceV1alpha2NamespacedPodSchedulingContext",
+        "operationId": "listResourceV1alpha3NamespacedPodSchedulingContext",
         "parameters": [
           {
             "$ref": "#/parameters/allowWatchBookmarks-HC2hJt-J"
@@ -70585,7 +70585,7 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.PodSchedulingContextList"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.PodSchedulingContextList"
             }
           },
           "401": {
@@ -70596,13 +70596,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "list",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "PodSchedulingContext",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "parameters": [
@@ -70618,14 +70618,14 @@
           "*/*"
         ],
         "description": "create a PodSchedulingContext",
-        "operationId": "createResourceV1alpha2NamespacedPodSchedulingContext",
+        "operationId": "createResourceV1alpha3NamespacedPodSchedulingContext",
         "parameters": [
           {
             "in": "body",
             "name": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.PodSchedulingContext"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.PodSchedulingContext"
             }
           },
           {
@@ -70655,19 +70655,19 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.PodSchedulingContext"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.PodSchedulingContext"
             }
           },
           "201": {
             "description": "Created",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.PodSchedulingContext"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.PodSchedulingContext"
             }
           },
           "202": {
             "description": "Accepted",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.PodSchedulingContext"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.PodSchedulingContext"
             }
           },
           "401": {
@@ -70678,23 +70678,23 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "post",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "PodSchedulingContext",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       }
     },
-    "/apis/resource.k8s.io/v1alpha2/namespaces/{namespace}/podschedulingcontexts/{name}": {
+    "/apis/resource.k8s.io/v1alpha3/namespaces/{namespace}/podschedulingcontexts/{name}": {
       "delete": {
         "consumes": [
           "*/*"
         ],
         "description": "delete a PodSchedulingContext",
-        "operationId": "deleteResourceV1alpha2NamespacedPodSchedulingContext",
+        "operationId": "deleteResourceV1alpha3NamespacedPodSchedulingContext",
         "parameters": [
           {
             "$ref": "#/parameters/body-2Y1dVQaQ"
@@ -70725,13 +70725,13 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.PodSchedulingContext"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.PodSchedulingContext"
             }
           },
           "202": {
             "description": "Accepted",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.PodSchedulingContext"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.PodSchedulingContext"
             }
           },
           "401": {
@@ -70742,13 +70742,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "delete",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "PodSchedulingContext",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "get": {
@@ -70756,7 +70756,7 @@
           "*/*"
         ],
         "description": "read the specified PodSchedulingContext",
-        "operationId": "readResourceV1alpha2NamespacedPodSchedulingContext",
+        "operationId": "readResourceV1alpha3NamespacedPodSchedulingContext",
         "produces": [
           "application/json",
           "application/yaml",
@@ -70766,7 +70766,7 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.PodSchedulingContext"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.PodSchedulingContext"
             }
           },
           "401": {
@@ -70777,13 +70777,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "get",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "PodSchedulingContext",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "parameters": [
@@ -70810,7 +70810,7 @@
           "application/apply-patch+yaml"
         ],
         "description": "partially update the specified PodSchedulingContext",
-        "operationId": "patchResourceV1alpha2NamespacedPodSchedulingContext",
+        "operationId": "patchResourceV1alpha3NamespacedPodSchedulingContext",
         "parameters": [
           {
             "$ref": "#/parameters/body-78PwaGsr"
@@ -70845,13 +70845,13 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.PodSchedulingContext"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.PodSchedulingContext"
             }
           },
           "201": {
             "description": "Created",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.PodSchedulingContext"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.PodSchedulingContext"
             }
           },
           "401": {
@@ -70862,13 +70862,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "patch",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "PodSchedulingContext",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "put": {
@@ -70876,14 +70876,14 @@
           "*/*"
         ],
         "description": "replace the specified PodSchedulingContext",
-        "operationId": "replaceResourceV1alpha2NamespacedPodSchedulingContext",
+        "operationId": "replaceResourceV1alpha3NamespacedPodSchedulingContext",
         "parameters": [
           {
             "in": "body",
             "name": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.PodSchedulingContext"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.PodSchedulingContext"
             }
           },
           {
@@ -70913,13 +70913,13 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.PodSchedulingContext"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.PodSchedulingContext"
             }
           },
           "201": {
             "description": "Created",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.PodSchedulingContext"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.PodSchedulingContext"
             }
           },
           "401": {
@@ -70930,23 +70930,23 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "put",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "PodSchedulingContext",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       }
     },
-    "/apis/resource.k8s.io/v1alpha2/namespaces/{namespace}/podschedulingcontexts/{name}/status": {
+    "/apis/resource.k8s.io/v1alpha3/namespaces/{namespace}/podschedulingcontexts/{name}/status": {
       "get": {
         "consumes": [
           "*/*"
         ],
         "description": "read status of the specified PodSchedulingContext",
-        "operationId": "readResourceV1alpha2NamespacedPodSchedulingContextStatus",
+        "operationId": "readResourceV1alpha3NamespacedPodSchedulingContextStatus",
         "produces": [
           "application/json",
           "application/yaml",
@@ -70956,7 +70956,7 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.PodSchedulingContext"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.PodSchedulingContext"
             }
           },
           "401": {
@@ -70967,13 +70967,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "get",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "PodSchedulingContext",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "parameters": [
@@ -71000,7 +71000,7 @@
           "application/apply-patch+yaml"
         ],
         "description": "partially update status of the specified PodSchedulingContext",
-        "operationId": "patchResourceV1alpha2NamespacedPodSchedulingContextStatus",
+        "operationId": "patchResourceV1alpha3NamespacedPodSchedulingContextStatus",
         "parameters": [
           {
             "$ref": "#/parameters/body-78PwaGsr"
@@ -71035,13 +71035,13 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.PodSchedulingContext"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.PodSchedulingContext"
             }
           },
           "201": {
             "description": "Created",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.PodSchedulingContext"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.PodSchedulingContext"
             }
           },
           "401": {
@@ -71052,13 +71052,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "patch",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "PodSchedulingContext",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "put": {
@@ -71066,14 +71066,14 @@
           "*/*"
         ],
         "description": "replace status of the specified PodSchedulingContext",
-        "operationId": "replaceResourceV1alpha2NamespacedPodSchedulingContextStatus",
+        "operationId": "replaceResourceV1alpha3NamespacedPodSchedulingContextStatus",
         "parameters": [
           {
             "in": "body",
             "name": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.PodSchedulingContext"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.PodSchedulingContext"
             }
           },
           {
@@ -71103,13 +71103,13 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.PodSchedulingContext"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.PodSchedulingContext"
             }
           },
           "201": {
             "description": "Created",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.PodSchedulingContext"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.PodSchedulingContext"
             }
           },
           "401": {
@@ -71120,23 +71120,23 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "put",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "PodSchedulingContext",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       }
     },
-    "/apis/resource.k8s.io/v1alpha2/namespaces/{namespace}/resourceclaimparameters": {
+    "/apis/resource.k8s.io/v1alpha3/namespaces/{namespace}/resourceclaimparameters": {
       "delete": {
         "consumes": [
           "*/*"
         ],
         "description": "delete collection of ResourceClaimParameters",
-        "operationId": "deleteResourceV1alpha2CollectionNamespacedResourceClaimParameters",
+        "operationId": "deleteResourceV1alpha3CollectionNamespacedResourceClaimParameters",
         "parameters": [
           {
             "$ref": "#/parameters/body-2Y1dVQaQ"
@@ -71202,13 +71202,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "deletecollection",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClaimParameters",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "get": {
@@ -71216,7 +71216,7 @@
           "*/*"
         ],
         "description": "list or watch objects of kind ResourceClaimParameters",
-        "operationId": "listResourceV1alpha2NamespacedResourceClaimParameters",
+        "operationId": "listResourceV1alpha3NamespacedResourceClaimParameters",
         "parameters": [
           {
             "$ref": "#/parameters/allowWatchBookmarks-HC2hJt-J"
@@ -71260,7 +71260,7 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaimParametersList"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaimParametersList"
             }
           },
           "401": {
@@ -71271,13 +71271,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "list",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClaimParameters",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "parameters": [
@@ -71293,14 +71293,14 @@
           "*/*"
         ],
         "description": "create ResourceClaimParameters",
-        "operationId": "createResourceV1alpha2NamespacedResourceClaimParameters",
+        "operationId": "createResourceV1alpha3NamespacedResourceClaimParameters",
         "parameters": [
           {
             "in": "body",
             "name": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaimParameters"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaimParameters"
             }
           },
           {
@@ -71330,19 +71330,19 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaimParameters"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaimParameters"
             }
           },
           "201": {
             "description": "Created",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaimParameters"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaimParameters"
             }
           },
           "202": {
             "description": "Accepted",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaimParameters"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaimParameters"
             }
           },
           "401": {
@@ -71353,23 +71353,23 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "post",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClaimParameters",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       }
     },
-    "/apis/resource.k8s.io/v1alpha2/namespaces/{namespace}/resourceclaimparameters/{name}": {
+    "/apis/resource.k8s.io/v1alpha3/namespaces/{namespace}/resourceclaimparameters/{name}": {
       "delete": {
         "consumes": [
           "*/*"
         ],
         "description": "delete ResourceClaimParameters",
-        "operationId": "deleteResourceV1alpha2NamespacedResourceClaimParameters",
+        "operationId": "deleteResourceV1alpha3NamespacedResourceClaimParameters",
         "parameters": [
           {
             "$ref": "#/parameters/body-2Y1dVQaQ"
@@ -71400,13 +71400,13 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaimParameters"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaimParameters"
             }
           },
           "202": {
             "description": "Accepted",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaimParameters"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaimParameters"
             }
           },
           "401": {
@@ -71417,13 +71417,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "delete",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClaimParameters",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "get": {
@@ -71431,7 +71431,7 @@
           "*/*"
         ],
         "description": "read the specified ResourceClaimParameters",
-        "operationId": "readResourceV1alpha2NamespacedResourceClaimParameters",
+        "operationId": "readResourceV1alpha3NamespacedResourceClaimParameters",
         "produces": [
           "application/json",
           "application/yaml",
@@ -71441,7 +71441,7 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaimParameters"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaimParameters"
             }
           },
           "401": {
@@ -71452,13 +71452,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "get",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClaimParameters",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "parameters": [
@@ -71485,7 +71485,7 @@
           "application/apply-patch+yaml"
         ],
         "description": "partially update the specified ResourceClaimParameters",
-        "operationId": "patchResourceV1alpha2NamespacedResourceClaimParameters",
+        "operationId": "patchResourceV1alpha3NamespacedResourceClaimParameters",
         "parameters": [
           {
             "$ref": "#/parameters/body-78PwaGsr"
@@ -71520,13 +71520,13 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaimParameters"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaimParameters"
             }
           },
           "201": {
             "description": "Created",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaimParameters"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaimParameters"
             }
           },
           "401": {
@@ -71537,13 +71537,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "patch",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClaimParameters",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "put": {
@@ -71551,14 +71551,14 @@
           "*/*"
         ],
         "description": "replace the specified ResourceClaimParameters",
-        "operationId": "replaceResourceV1alpha2NamespacedResourceClaimParameters",
+        "operationId": "replaceResourceV1alpha3NamespacedResourceClaimParameters",
         "parameters": [
           {
             "in": "body",
             "name": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaimParameters"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaimParameters"
             }
           },
           {
@@ -71588,13 +71588,13 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaimParameters"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaimParameters"
             }
           },
           "201": {
             "description": "Created",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaimParameters"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaimParameters"
             }
           },
           "401": {
@@ -71605,23 +71605,23 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "put",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClaimParameters",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       }
     },
-    "/apis/resource.k8s.io/v1alpha2/namespaces/{namespace}/resourceclaims": {
+    "/apis/resource.k8s.io/v1alpha3/namespaces/{namespace}/resourceclaims": {
       "delete": {
         "consumes": [
           "*/*"
         ],
         "description": "delete collection of ResourceClaim",
-        "operationId": "deleteResourceV1alpha2CollectionNamespacedResourceClaim",
+        "operationId": "deleteResourceV1alpha3CollectionNamespacedResourceClaim",
         "parameters": [
           {
             "$ref": "#/parameters/body-2Y1dVQaQ"
@@ -71687,13 +71687,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "deletecollection",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClaim",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "get": {
@@ -71701,7 +71701,7 @@
           "*/*"
         ],
         "description": "list or watch objects of kind ResourceClaim",
-        "operationId": "listResourceV1alpha2NamespacedResourceClaim",
+        "operationId": "listResourceV1alpha3NamespacedResourceClaim",
         "parameters": [
           {
             "$ref": "#/parameters/allowWatchBookmarks-HC2hJt-J"
@@ -71745,7 +71745,7 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaimList"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaimList"
             }
           },
           "401": {
@@ -71756,13 +71756,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "list",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClaim",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "parameters": [
@@ -71778,14 +71778,14 @@
           "*/*"
         ],
         "description": "create a ResourceClaim",
-        "operationId": "createResourceV1alpha2NamespacedResourceClaim",
+        "operationId": "createResourceV1alpha3NamespacedResourceClaim",
         "parameters": [
           {
             "in": "body",
             "name": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaim"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaim"
             }
           },
           {
@@ -71815,19 +71815,19 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaim"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaim"
             }
           },
           "201": {
             "description": "Created",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaim"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaim"
             }
           },
           "202": {
             "description": "Accepted",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaim"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaim"
             }
           },
           "401": {
@@ -71838,23 +71838,23 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "post",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClaim",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       }
     },
-    "/apis/resource.k8s.io/v1alpha2/namespaces/{namespace}/resourceclaims/{name}": {
+    "/apis/resource.k8s.io/v1alpha3/namespaces/{namespace}/resourceclaims/{name}": {
       "delete": {
         "consumes": [
           "*/*"
         ],
         "description": "delete a ResourceClaim",
-        "operationId": "deleteResourceV1alpha2NamespacedResourceClaim",
+        "operationId": "deleteResourceV1alpha3NamespacedResourceClaim",
         "parameters": [
           {
             "$ref": "#/parameters/body-2Y1dVQaQ"
@@ -71885,13 +71885,13 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaim"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaim"
             }
           },
           "202": {
             "description": "Accepted",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaim"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaim"
             }
           },
           "401": {
@@ -71902,13 +71902,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "delete",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClaim",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "get": {
@@ -71916,7 +71916,7 @@
           "*/*"
         ],
         "description": "read the specified ResourceClaim",
-        "operationId": "readResourceV1alpha2NamespacedResourceClaim",
+        "operationId": "readResourceV1alpha3NamespacedResourceClaim",
         "produces": [
           "application/json",
           "application/yaml",
@@ -71926,7 +71926,7 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaim"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaim"
             }
           },
           "401": {
@@ -71937,13 +71937,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "get",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClaim",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "parameters": [
@@ -71970,7 +71970,7 @@
           "application/apply-patch+yaml"
         ],
         "description": "partially update the specified ResourceClaim",
-        "operationId": "patchResourceV1alpha2NamespacedResourceClaim",
+        "operationId": "patchResourceV1alpha3NamespacedResourceClaim",
         "parameters": [
           {
             "$ref": "#/parameters/body-78PwaGsr"
@@ -72005,13 +72005,13 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaim"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaim"
             }
           },
           "201": {
             "description": "Created",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaim"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaim"
             }
           },
           "401": {
@@ -72022,13 +72022,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "patch",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClaim",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "put": {
@@ -72036,14 +72036,14 @@
           "*/*"
         ],
         "description": "replace the specified ResourceClaim",
-        "operationId": "replaceResourceV1alpha2NamespacedResourceClaim",
+        "operationId": "replaceResourceV1alpha3NamespacedResourceClaim",
         "parameters": [
           {
             "in": "body",
             "name": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaim"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaim"
             }
           },
           {
@@ -72073,13 +72073,13 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaim"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaim"
             }
           },
           "201": {
             "description": "Created",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaim"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaim"
             }
           },
           "401": {
@@ -72090,23 +72090,23 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "put",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClaim",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       }
     },
-    "/apis/resource.k8s.io/v1alpha2/namespaces/{namespace}/resourceclaims/{name}/status": {
+    "/apis/resource.k8s.io/v1alpha3/namespaces/{namespace}/resourceclaims/{name}/status": {
       "get": {
         "consumes": [
           "*/*"
         ],
         "description": "read status of the specified ResourceClaim",
-        "operationId": "readResourceV1alpha2NamespacedResourceClaimStatus",
+        "operationId": "readResourceV1alpha3NamespacedResourceClaimStatus",
         "produces": [
           "application/json",
           "application/yaml",
@@ -72116,7 +72116,7 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaim"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaim"
             }
           },
           "401": {
@@ -72127,13 +72127,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "get",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClaim",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "parameters": [
@@ -72160,7 +72160,7 @@
           "application/apply-patch+yaml"
         ],
         "description": "partially update status of the specified ResourceClaim",
-        "operationId": "patchResourceV1alpha2NamespacedResourceClaimStatus",
+        "operationId": "patchResourceV1alpha3NamespacedResourceClaimStatus",
         "parameters": [
           {
             "$ref": "#/parameters/body-78PwaGsr"
@@ -72195,13 +72195,13 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaim"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaim"
             }
           },
           "201": {
             "description": "Created",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaim"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaim"
             }
           },
           "401": {
@@ -72212,13 +72212,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "patch",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClaim",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "put": {
@@ -72226,14 +72226,14 @@
           "*/*"
         ],
         "description": "replace status of the specified ResourceClaim",
-        "operationId": "replaceResourceV1alpha2NamespacedResourceClaimStatus",
+        "operationId": "replaceResourceV1alpha3NamespacedResourceClaimStatus",
         "parameters": [
           {
             "in": "body",
             "name": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaim"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaim"
             }
           },
           {
@@ -72263,13 +72263,13 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaim"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaim"
             }
           },
           "201": {
             "description": "Created",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaim"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaim"
             }
           },
           "401": {
@@ -72280,23 +72280,23 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "put",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClaim",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       }
     },
-    "/apis/resource.k8s.io/v1alpha2/namespaces/{namespace}/resourceclaimtemplates": {
+    "/apis/resource.k8s.io/v1alpha3/namespaces/{namespace}/resourceclaimtemplates": {
       "delete": {
         "consumes": [
           "*/*"
         ],
         "description": "delete collection of ResourceClaimTemplate",
-        "operationId": "deleteResourceV1alpha2CollectionNamespacedResourceClaimTemplate",
+        "operationId": "deleteResourceV1alpha3CollectionNamespacedResourceClaimTemplate",
         "parameters": [
           {
             "$ref": "#/parameters/body-2Y1dVQaQ"
@@ -72362,13 +72362,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "deletecollection",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClaimTemplate",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "get": {
@@ -72376,7 +72376,7 @@
           "*/*"
         ],
         "description": "list or watch objects of kind ResourceClaimTemplate",
-        "operationId": "listResourceV1alpha2NamespacedResourceClaimTemplate",
+        "operationId": "listResourceV1alpha3NamespacedResourceClaimTemplate",
         "parameters": [
           {
             "$ref": "#/parameters/allowWatchBookmarks-HC2hJt-J"
@@ -72420,7 +72420,7 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaimTemplateList"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaimTemplateList"
             }
           },
           "401": {
@@ -72431,13 +72431,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "list",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClaimTemplate",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "parameters": [
@@ -72453,14 +72453,14 @@
           "*/*"
         ],
         "description": "create a ResourceClaimTemplate",
-        "operationId": "createResourceV1alpha2NamespacedResourceClaimTemplate",
+        "operationId": "createResourceV1alpha3NamespacedResourceClaimTemplate",
         "parameters": [
           {
             "in": "body",
             "name": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaimTemplate"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaimTemplate"
             }
           },
           {
@@ -72490,19 +72490,19 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaimTemplate"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaimTemplate"
             }
           },
           "201": {
             "description": "Created",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaimTemplate"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaimTemplate"
             }
           },
           "202": {
             "description": "Accepted",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaimTemplate"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaimTemplate"
             }
           },
           "401": {
@@ -72513,23 +72513,23 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "post",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClaimTemplate",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       }
     },
-    "/apis/resource.k8s.io/v1alpha2/namespaces/{namespace}/resourceclaimtemplates/{name}": {
+    "/apis/resource.k8s.io/v1alpha3/namespaces/{namespace}/resourceclaimtemplates/{name}": {
       "delete": {
         "consumes": [
           "*/*"
         ],
         "description": "delete a ResourceClaimTemplate",
-        "operationId": "deleteResourceV1alpha2NamespacedResourceClaimTemplate",
+        "operationId": "deleteResourceV1alpha3NamespacedResourceClaimTemplate",
         "parameters": [
           {
             "$ref": "#/parameters/body-2Y1dVQaQ"
@@ -72560,13 +72560,13 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaimTemplate"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaimTemplate"
             }
           },
           "202": {
             "description": "Accepted",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaimTemplate"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaimTemplate"
             }
           },
           "401": {
@@ -72577,13 +72577,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "delete",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClaimTemplate",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "get": {
@@ -72591,7 +72591,7 @@
           "*/*"
         ],
         "description": "read the specified ResourceClaimTemplate",
-        "operationId": "readResourceV1alpha2NamespacedResourceClaimTemplate",
+        "operationId": "readResourceV1alpha3NamespacedResourceClaimTemplate",
         "produces": [
           "application/json",
           "application/yaml",
@@ -72601,7 +72601,7 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaimTemplate"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaimTemplate"
             }
           },
           "401": {
@@ -72612,13 +72612,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "get",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClaimTemplate",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "parameters": [
@@ -72645,7 +72645,7 @@
           "application/apply-patch+yaml"
         ],
         "description": "partially update the specified ResourceClaimTemplate",
-        "operationId": "patchResourceV1alpha2NamespacedResourceClaimTemplate",
+        "operationId": "patchResourceV1alpha3NamespacedResourceClaimTemplate",
         "parameters": [
           {
             "$ref": "#/parameters/body-78PwaGsr"
@@ -72680,13 +72680,13 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaimTemplate"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaimTemplate"
             }
           },
           "201": {
             "description": "Created",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaimTemplate"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaimTemplate"
             }
           },
           "401": {
@@ -72697,13 +72697,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "patch",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClaimTemplate",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "put": {
@@ -72711,14 +72711,14 @@
           "*/*"
         ],
         "description": "replace the specified ResourceClaimTemplate",
-        "operationId": "replaceResourceV1alpha2NamespacedResourceClaimTemplate",
+        "operationId": "replaceResourceV1alpha3NamespacedResourceClaimTemplate",
         "parameters": [
           {
             "in": "body",
             "name": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaimTemplate"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaimTemplate"
             }
           },
           {
@@ -72748,13 +72748,13 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaimTemplate"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaimTemplate"
             }
           },
           "201": {
             "description": "Created",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaimTemplate"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaimTemplate"
             }
           },
           "401": {
@@ -72765,23 +72765,23 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "put",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClaimTemplate",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       }
     },
-    "/apis/resource.k8s.io/v1alpha2/namespaces/{namespace}/resourceclassparameters": {
+    "/apis/resource.k8s.io/v1alpha3/namespaces/{namespace}/resourceclassparameters": {
       "delete": {
         "consumes": [
           "*/*"
         ],
         "description": "delete collection of ResourceClassParameters",
-        "operationId": "deleteResourceV1alpha2CollectionNamespacedResourceClassParameters",
+        "operationId": "deleteResourceV1alpha3CollectionNamespacedResourceClassParameters",
         "parameters": [
           {
             "$ref": "#/parameters/body-2Y1dVQaQ"
@@ -72847,13 +72847,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "deletecollection",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClassParameters",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "get": {
@@ -72861,7 +72861,7 @@
           "*/*"
         ],
         "description": "list or watch objects of kind ResourceClassParameters",
-        "operationId": "listResourceV1alpha2NamespacedResourceClassParameters",
+        "operationId": "listResourceV1alpha3NamespacedResourceClassParameters",
         "parameters": [
           {
             "$ref": "#/parameters/allowWatchBookmarks-HC2hJt-J"
@@ -72905,7 +72905,7 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClassParametersList"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClassParametersList"
             }
           },
           "401": {
@@ -72916,13 +72916,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "list",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClassParameters",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "parameters": [
@@ -72938,14 +72938,14 @@
           "*/*"
         ],
         "description": "create ResourceClassParameters",
-        "operationId": "createResourceV1alpha2NamespacedResourceClassParameters",
+        "operationId": "createResourceV1alpha3NamespacedResourceClassParameters",
         "parameters": [
           {
             "in": "body",
             "name": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClassParameters"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClassParameters"
             }
           },
           {
@@ -72975,19 +72975,19 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClassParameters"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClassParameters"
             }
           },
           "201": {
             "description": "Created",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClassParameters"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClassParameters"
             }
           },
           "202": {
             "description": "Accepted",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClassParameters"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClassParameters"
             }
           },
           "401": {
@@ -72998,23 +72998,23 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "post",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClassParameters",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       }
     },
-    "/apis/resource.k8s.io/v1alpha2/namespaces/{namespace}/resourceclassparameters/{name}": {
+    "/apis/resource.k8s.io/v1alpha3/namespaces/{namespace}/resourceclassparameters/{name}": {
       "delete": {
         "consumes": [
           "*/*"
         ],
         "description": "delete ResourceClassParameters",
-        "operationId": "deleteResourceV1alpha2NamespacedResourceClassParameters",
+        "operationId": "deleteResourceV1alpha3NamespacedResourceClassParameters",
         "parameters": [
           {
             "$ref": "#/parameters/body-2Y1dVQaQ"
@@ -73045,13 +73045,13 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClassParameters"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClassParameters"
             }
           },
           "202": {
             "description": "Accepted",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClassParameters"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClassParameters"
             }
           },
           "401": {
@@ -73062,13 +73062,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "delete",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClassParameters",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "get": {
@@ -73076,7 +73076,7 @@
           "*/*"
         ],
         "description": "read the specified ResourceClassParameters",
-        "operationId": "readResourceV1alpha2NamespacedResourceClassParameters",
+        "operationId": "readResourceV1alpha3NamespacedResourceClassParameters",
         "produces": [
           "application/json",
           "application/yaml",
@@ -73086,7 +73086,7 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClassParameters"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClassParameters"
             }
           },
           "401": {
@@ -73097,13 +73097,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "get",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClassParameters",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "parameters": [
@@ -73130,7 +73130,7 @@
           "application/apply-patch+yaml"
         ],
         "description": "partially update the specified ResourceClassParameters",
-        "operationId": "patchResourceV1alpha2NamespacedResourceClassParameters",
+        "operationId": "patchResourceV1alpha3NamespacedResourceClassParameters",
         "parameters": [
           {
             "$ref": "#/parameters/body-78PwaGsr"
@@ -73165,13 +73165,13 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClassParameters"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClassParameters"
             }
           },
           "201": {
             "description": "Created",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClassParameters"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClassParameters"
             }
           },
           "401": {
@@ -73182,13 +73182,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "patch",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClassParameters",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "put": {
@@ -73196,14 +73196,14 @@
           "*/*"
         ],
         "description": "replace the specified ResourceClassParameters",
-        "operationId": "replaceResourceV1alpha2NamespacedResourceClassParameters",
+        "operationId": "replaceResourceV1alpha3NamespacedResourceClassParameters",
         "parameters": [
           {
             "in": "body",
             "name": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClassParameters"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClassParameters"
             }
           },
           {
@@ -73233,13 +73233,13 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClassParameters"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClassParameters"
             }
           },
           "201": {
             "description": "Created",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClassParameters"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClassParameters"
             }
           },
           "401": {
@@ -73250,23 +73250,23 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "put",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClassParameters",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       }
     },
-    "/apis/resource.k8s.io/v1alpha2/podschedulingcontexts": {
+    "/apis/resource.k8s.io/v1alpha3/podschedulingcontexts": {
       "get": {
         "consumes": [
           "*/*"
         ],
         "description": "list or watch objects of kind PodSchedulingContext",
-        "operationId": "listResourceV1alpha2PodSchedulingContextForAllNamespaces",
+        "operationId": "listResourceV1alpha3PodSchedulingContextForAllNamespaces",
         "produces": [
           "application/json",
           "application/yaml",
@@ -73278,7 +73278,7 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.PodSchedulingContextList"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.PodSchedulingContextList"
             }
           },
           "401": {
@@ -73289,13 +73289,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "list",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "PodSchedulingContext",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "parameters": [
@@ -73334,13 +73334,13 @@
         }
       ]
     },
-    "/apis/resource.k8s.io/v1alpha2/resourceclaimparameters": {
+    "/apis/resource.k8s.io/v1alpha3/resourceclaimparameters": {
       "get": {
         "consumes": [
           "*/*"
         ],
         "description": "list or watch objects of kind ResourceClaimParameters",
-        "operationId": "listResourceV1alpha2ResourceClaimParametersForAllNamespaces",
+        "operationId": "listResourceV1alpha3ResourceClaimParametersForAllNamespaces",
         "produces": [
           "application/json",
           "application/yaml",
@@ -73352,7 +73352,7 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaimParametersList"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaimParametersList"
             }
           },
           "401": {
@@ -73363,13 +73363,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "list",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClaimParameters",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "parameters": [
@@ -73408,13 +73408,13 @@
         }
       ]
     },
-    "/apis/resource.k8s.io/v1alpha2/resourceclaims": {
+    "/apis/resource.k8s.io/v1alpha3/resourceclaims": {
       "get": {
         "consumes": [
           "*/*"
         ],
         "description": "list or watch objects of kind ResourceClaim",
-        "operationId": "listResourceV1alpha2ResourceClaimForAllNamespaces",
+        "operationId": "listResourceV1alpha3ResourceClaimForAllNamespaces",
         "produces": [
           "application/json",
           "application/yaml",
@@ -73426,7 +73426,7 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaimList"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaimList"
             }
           },
           "401": {
@@ -73437,13 +73437,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "list",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClaim",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "parameters": [
@@ -73482,13 +73482,13 @@
         }
       ]
     },
-    "/apis/resource.k8s.io/v1alpha2/resourceclaimtemplates": {
+    "/apis/resource.k8s.io/v1alpha3/resourceclaimtemplates": {
       "get": {
         "consumes": [
           "*/*"
         ],
         "description": "list or watch objects of kind ResourceClaimTemplate",
-        "operationId": "listResourceV1alpha2ResourceClaimTemplateForAllNamespaces",
+        "operationId": "listResourceV1alpha3ResourceClaimTemplateForAllNamespaces",
         "produces": [
           "application/json",
           "application/yaml",
@@ -73500,7 +73500,7 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClaimTemplateList"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClaimTemplateList"
             }
           },
           "401": {
@@ -73511,13 +73511,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "list",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClaimTemplate",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "parameters": [
@@ -73556,13 +73556,13 @@
         }
       ]
     },
-    "/apis/resource.k8s.io/v1alpha2/resourceclasses": {
+    "/apis/resource.k8s.io/v1alpha3/resourceclasses": {
       "delete": {
         "consumes": [
           "*/*"
         ],
         "description": "delete collection of ResourceClass",
-        "operationId": "deleteResourceV1alpha2CollectionResourceClass",
+        "operationId": "deleteResourceV1alpha3CollectionResourceClass",
         "parameters": [
           {
             "$ref": "#/parameters/body-2Y1dVQaQ"
@@ -73628,13 +73628,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "deletecollection",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClass",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "get": {
@@ -73642,7 +73642,7 @@
           "*/*"
         ],
         "description": "list or watch objects of kind ResourceClass",
-        "operationId": "listResourceV1alpha2ResourceClass",
+        "operationId": "listResourceV1alpha3ResourceClass",
         "parameters": [
           {
             "$ref": "#/parameters/allowWatchBookmarks-HC2hJt-J"
@@ -73686,7 +73686,7 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClassList"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClassList"
             }
           },
           "401": {
@@ -73697,13 +73697,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "list",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClass",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "parameters": [
@@ -73716,14 +73716,14 @@
           "*/*"
         ],
         "description": "create a ResourceClass",
-        "operationId": "createResourceV1alpha2ResourceClass",
+        "operationId": "createResourceV1alpha3ResourceClass",
         "parameters": [
           {
             "in": "body",
             "name": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClass"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClass"
             }
           },
           {
@@ -73753,19 +73753,19 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClass"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClass"
             }
           },
           "201": {
             "description": "Created",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClass"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClass"
             }
           },
           "202": {
             "description": "Accepted",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClass"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClass"
             }
           },
           "401": {
@@ -73776,23 +73776,23 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "post",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClass",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       }
     },
-    "/apis/resource.k8s.io/v1alpha2/resourceclasses/{name}": {
+    "/apis/resource.k8s.io/v1alpha3/resourceclasses/{name}": {
       "delete": {
         "consumes": [
           "*/*"
         ],
         "description": "delete a ResourceClass",
-        "operationId": "deleteResourceV1alpha2ResourceClass",
+        "operationId": "deleteResourceV1alpha3ResourceClass",
         "parameters": [
           {
             "$ref": "#/parameters/body-2Y1dVQaQ"
@@ -73823,13 +73823,13 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClass"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClass"
             }
           },
           "202": {
             "description": "Accepted",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClass"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClass"
             }
           },
           "401": {
@@ -73840,13 +73840,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "delete",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClass",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "get": {
@@ -73854,7 +73854,7 @@
           "*/*"
         ],
         "description": "read the specified ResourceClass",
-        "operationId": "readResourceV1alpha2ResourceClass",
+        "operationId": "readResourceV1alpha3ResourceClass",
         "produces": [
           "application/json",
           "application/yaml",
@@ -73864,7 +73864,7 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClass"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClass"
             }
           },
           "401": {
@@ -73875,13 +73875,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "get",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClass",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "parameters": [
@@ -73905,7 +73905,7 @@
           "application/apply-patch+yaml"
         ],
         "description": "partially update the specified ResourceClass",
-        "operationId": "patchResourceV1alpha2ResourceClass",
+        "operationId": "patchResourceV1alpha3ResourceClass",
         "parameters": [
           {
             "$ref": "#/parameters/body-78PwaGsr"
@@ -73940,13 +73940,13 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClass"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClass"
             }
           },
           "201": {
             "description": "Created",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClass"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClass"
             }
           },
           "401": {
@@ -73957,13 +73957,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "patch",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClass",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "put": {
@@ -73971,14 +73971,14 @@
           "*/*"
         ],
         "description": "replace the specified ResourceClass",
-        "operationId": "replaceResourceV1alpha2ResourceClass",
+        "operationId": "replaceResourceV1alpha3ResourceClass",
         "parameters": [
           {
             "in": "body",
             "name": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClass"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClass"
             }
           },
           {
@@ -74008,13 +74008,13 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClass"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClass"
             }
           },
           "201": {
             "description": "Created",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClass"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClass"
             }
           },
           "401": {
@@ -74025,23 +74025,23 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "put",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClass",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       }
     },
-    "/apis/resource.k8s.io/v1alpha2/resourceclassparameters": {
+    "/apis/resource.k8s.io/v1alpha3/resourceclassparameters": {
       "get": {
         "consumes": [
           "*/*"
         ],
         "description": "list or watch objects of kind ResourceClassParameters",
-        "operationId": "listResourceV1alpha2ResourceClassParametersForAllNamespaces",
+        "operationId": "listResourceV1alpha3ResourceClassParametersForAllNamespaces",
         "produces": [
           "application/json",
           "application/yaml",
@@ -74053,7 +74053,7 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceClassParametersList"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceClassParametersList"
             }
           },
           "401": {
@@ -74064,13 +74064,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "list",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClassParameters",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "parameters": [
@@ -74109,13 +74109,13 @@
         }
       ]
     },
-    "/apis/resource.k8s.io/v1alpha2/resourceslices": {
+    "/apis/resource.k8s.io/v1alpha3/resourceslices": {
       "delete": {
         "consumes": [
           "*/*"
         ],
         "description": "delete collection of ResourceSlice",
-        "operationId": "deleteResourceV1alpha2CollectionResourceSlice",
+        "operationId": "deleteResourceV1alpha3CollectionResourceSlice",
         "parameters": [
           {
             "$ref": "#/parameters/body-2Y1dVQaQ"
@@ -74181,13 +74181,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "deletecollection",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceSlice",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "get": {
@@ -74195,7 +74195,7 @@
           "*/*"
         ],
         "description": "list or watch objects of kind ResourceSlice",
-        "operationId": "listResourceV1alpha2ResourceSlice",
+        "operationId": "listResourceV1alpha3ResourceSlice",
         "parameters": [
           {
             "$ref": "#/parameters/allowWatchBookmarks-HC2hJt-J"
@@ -74239,7 +74239,7 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceSliceList"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceSliceList"
             }
           },
           "401": {
@@ -74250,13 +74250,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "list",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceSlice",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "parameters": [
@@ -74269,14 +74269,14 @@
           "*/*"
         ],
         "description": "create a ResourceSlice",
-        "operationId": "createResourceV1alpha2ResourceSlice",
+        "operationId": "createResourceV1alpha3ResourceSlice",
         "parameters": [
           {
             "in": "body",
             "name": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceSlice"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceSlice"
             }
           },
           {
@@ -74306,19 +74306,19 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceSlice"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceSlice"
             }
           },
           "201": {
             "description": "Created",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceSlice"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceSlice"
             }
           },
           "202": {
             "description": "Accepted",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceSlice"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceSlice"
             }
           },
           "401": {
@@ -74329,23 +74329,23 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "post",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceSlice",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       }
     },
-    "/apis/resource.k8s.io/v1alpha2/resourceslices/{name}": {
+    "/apis/resource.k8s.io/v1alpha3/resourceslices/{name}": {
       "delete": {
         "consumes": [
           "*/*"
         ],
         "description": "delete a ResourceSlice",
-        "operationId": "deleteResourceV1alpha2ResourceSlice",
+        "operationId": "deleteResourceV1alpha3ResourceSlice",
         "parameters": [
           {
             "$ref": "#/parameters/body-2Y1dVQaQ"
@@ -74376,13 +74376,13 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceSlice"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceSlice"
             }
           },
           "202": {
             "description": "Accepted",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceSlice"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceSlice"
             }
           },
           "401": {
@@ -74393,13 +74393,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "delete",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceSlice",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "get": {
@@ -74407,7 +74407,7 @@
           "*/*"
         ],
         "description": "read the specified ResourceSlice",
-        "operationId": "readResourceV1alpha2ResourceSlice",
+        "operationId": "readResourceV1alpha3ResourceSlice",
         "produces": [
           "application/json",
           "application/yaml",
@@ -74417,7 +74417,7 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceSlice"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceSlice"
             }
           },
           "401": {
@@ -74428,13 +74428,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "get",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceSlice",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "parameters": [
@@ -74458,7 +74458,7 @@
           "application/apply-patch+yaml"
         ],
         "description": "partially update the specified ResourceSlice",
-        "operationId": "patchResourceV1alpha2ResourceSlice",
+        "operationId": "patchResourceV1alpha3ResourceSlice",
         "parameters": [
           {
             "$ref": "#/parameters/body-78PwaGsr"
@@ -74493,13 +74493,13 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceSlice"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceSlice"
             }
           },
           "201": {
             "description": "Created",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceSlice"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceSlice"
             }
           },
           "401": {
@@ -74510,13 +74510,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "patch",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceSlice",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "put": {
@@ -74524,14 +74524,14 @@
           "*/*"
         ],
         "description": "replace the specified ResourceSlice",
-        "operationId": "replaceResourceV1alpha2ResourceSlice",
+        "operationId": "replaceResourceV1alpha3ResourceSlice",
         "parameters": [
           {
             "in": "body",
             "name": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceSlice"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceSlice"
             }
           },
           {
@@ -74561,13 +74561,13 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceSlice"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceSlice"
             }
           },
           "201": {
             "description": "Created",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.resource.v1alpha2.ResourceSlice"
+              "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.ResourceSlice"
             }
           },
           "401": {
@@ -74578,23 +74578,23 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "put",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceSlice",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       }
     },
-    "/apis/resource.k8s.io/v1alpha2/watch/namespaces/{namespace}/podschedulingcontexts": {
+    "/apis/resource.k8s.io/v1alpha3/watch/namespaces/{namespace}/podschedulingcontexts": {
       "get": {
         "consumes": [
           "*/*"
         ],
         "description": "watch individual changes to a list of PodSchedulingContext. deprecated: use the 'watch' parameter with a list operation instead.",
-        "operationId": "watchResourceV1alpha2NamespacedPodSchedulingContextList",
+        "operationId": "watchResourceV1alpha3NamespacedPodSchedulingContextList",
         "produces": [
           "application/json",
           "application/yaml",
@@ -74617,13 +74617,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "watchlist",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "PodSchedulingContext",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "parameters": [
@@ -74665,13 +74665,13 @@
         }
       ]
     },
-    "/apis/resource.k8s.io/v1alpha2/watch/namespaces/{namespace}/podschedulingcontexts/{name}": {
+    "/apis/resource.k8s.io/v1alpha3/watch/namespaces/{namespace}/podschedulingcontexts/{name}": {
       "get": {
         "consumes": [
           "*/*"
         ],
         "description": "watch changes to an object of kind PodSchedulingContext. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
-        "operationId": "watchResourceV1alpha2NamespacedPodSchedulingContext",
+        "operationId": "watchResourceV1alpha3NamespacedPodSchedulingContext",
         "produces": [
           "application/json",
           "application/yaml",
@@ -74694,13 +74694,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "watch",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "PodSchedulingContext",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "parameters": [
@@ -74750,13 +74750,13 @@
         }
       ]
     },
-    "/apis/resource.k8s.io/v1alpha2/watch/namespaces/{namespace}/resourceclaimparameters": {
+    "/apis/resource.k8s.io/v1alpha3/watch/namespaces/{namespace}/resourceclaimparameters": {
       "get": {
         "consumes": [
           "*/*"
         ],
         "description": "watch individual changes to a list of ResourceClaimParameters. deprecated: use the 'watch' parameter with a list operation instead.",
-        "operationId": "watchResourceV1alpha2NamespacedResourceClaimParametersList",
+        "operationId": "watchResourceV1alpha3NamespacedResourceClaimParametersList",
         "produces": [
           "application/json",
           "application/yaml",
@@ -74779,13 +74779,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "watchlist",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClaimParameters",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "parameters": [
@@ -74827,13 +74827,13 @@
         }
       ]
     },
-    "/apis/resource.k8s.io/v1alpha2/watch/namespaces/{namespace}/resourceclaimparameters/{name}": {
+    "/apis/resource.k8s.io/v1alpha3/watch/namespaces/{namespace}/resourceclaimparameters/{name}": {
       "get": {
         "consumes": [
           "*/*"
         ],
         "description": "watch changes to an object of kind ResourceClaimParameters. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
-        "operationId": "watchResourceV1alpha2NamespacedResourceClaimParameters",
+        "operationId": "watchResourceV1alpha3NamespacedResourceClaimParameters",
         "produces": [
           "application/json",
           "application/yaml",
@@ -74856,13 +74856,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "watch",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClaimParameters",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "parameters": [
@@ -74912,13 +74912,13 @@
         }
       ]
     },
-    "/apis/resource.k8s.io/v1alpha2/watch/namespaces/{namespace}/resourceclaims": {
+    "/apis/resource.k8s.io/v1alpha3/watch/namespaces/{namespace}/resourceclaims": {
       "get": {
         "consumes": [
           "*/*"
         ],
         "description": "watch individual changes to a list of ResourceClaim. deprecated: use the 'watch' parameter with a list operation instead.",
-        "operationId": "watchResourceV1alpha2NamespacedResourceClaimList",
+        "operationId": "watchResourceV1alpha3NamespacedResourceClaimList",
         "produces": [
           "application/json",
           "application/yaml",
@@ -74941,13 +74941,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "watchlist",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClaim",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "parameters": [
@@ -74989,13 +74989,13 @@
         }
       ]
     },
-    "/apis/resource.k8s.io/v1alpha2/watch/namespaces/{namespace}/resourceclaims/{name}": {
+    "/apis/resource.k8s.io/v1alpha3/watch/namespaces/{namespace}/resourceclaims/{name}": {
       "get": {
         "consumes": [
           "*/*"
         ],
         "description": "watch changes to an object of kind ResourceClaim. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
-        "operationId": "watchResourceV1alpha2NamespacedResourceClaim",
+        "operationId": "watchResourceV1alpha3NamespacedResourceClaim",
         "produces": [
           "application/json",
           "application/yaml",
@@ -75018,13 +75018,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "watch",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClaim",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "parameters": [
@@ -75074,13 +75074,13 @@
         }
       ]
     },
-    "/apis/resource.k8s.io/v1alpha2/watch/namespaces/{namespace}/resourceclaimtemplates": {
+    "/apis/resource.k8s.io/v1alpha3/watch/namespaces/{namespace}/resourceclaimtemplates": {
       "get": {
         "consumes": [
           "*/*"
         ],
         "description": "watch individual changes to a list of ResourceClaimTemplate. deprecated: use the 'watch' parameter with a list operation instead.",
-        "operationId": "watchResourceV1alpha2NamespacedResourceClaimTemplateList",
+        "operationId": "watchResourceV1alpha3NamespacedResourceClaimTemplateList",
         "produces": [
           "application/json",
           "application/yaml",
@@ -75103,13 +75103,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "watchlist",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClaimTemplate",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "parameters": [
@@ -75151,13 +75151,13 @@
         }
       ]
     },
-    "/apis/resource.k8s.io/v1alpha2/watch/namespaces/{namespace}/resourceclaimtemplates/{name}": {
+    "/apis/resource.k8s.io/v1alpha3/watch/namespaces/{namespace}/resourceclaimtemplates/{name}": {
       "get": {
         "consumes": [
           "*/*"
         ],
         "description": "watch changes to an object of kind ResourceClaimTemplate. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
-        "operationId": "watchResourceV1alpha2NamespacedResourceClaimTemplate",
+        "operationId": "watchResourceV1alpha3NamespacedResourceClaimTemplate",
         "produces": [
           "application/json",
           "application/yaml",
@@ -75180,13 +75180,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "watch",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClaimTemplate",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "parameters": [
@@ -75236,13 +75236,13 @@
         }
       ]
     },
-    "/apis/resource.k8s.io/v1alpha2/watch/namespaces/{namespace}/resourceclassparameters": {
+    "/apis/resource.k8s.io/v1alpha3/watch/namespaces/{namespace}/resourceclassparameters": {
       "get": {
         "consumes": [
           "*/*"
         ],
         "description": "watch individual changes to a list of ResourceClassParameters. deprecated: use the 'watch' parameter with a list operation instead.",
-        "operationId": "watchResourceV1alpha2NamespacedResourceClassParametersList",
+        "operationId": "watchResourceV1alpha3NamespacedResourceClassParametersList",
         "produces": [
           "application/json",
           "application/yaml",
@@ -75265,13 +75265,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "watchlist",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClassParameters",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "parameters": [
@@ -75313,13 +75313,13 @@
         }
       ]
     },
-    "/apis/resource.k8s.io/v1alpha2/watch/namespaces/{namespace}/resourceclassparameters/{name}": {
+    "/apis/resource.k8s.io/v1alpha3/watch/namespaces/{namespace}/resourceclassparameters/{name}": {
       "get": {
         "consumes": [
           "*/*"
         ],
         "description": "watch changes to an object of kind ResourceClassParameters. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
-        "operationId": "watchResourceV1alpha2NamespacedResourceClassParameters",
+        "operationId": "watchResourceV1alpha3NamespacedResourceClassParameters",
         "produces": [
           "application/json",
           "application/yaml",
@@ -75342,13 +75342,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "watch",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClassParameters",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "parameters": [
@@ -75398,13 +75398,13 @@
         }
       ]
     },
-    "/apis/resource.k8s.io/v1alpha2/watch/podschedulingcontexts": {
+    "/apis/resource.k8s.io/v1alpha3/watch/podschedulingcontexts": {
       "get": {
         "consumes": [
           "*/*"
         ],
         "description": "watch individual changes to a list of PodSchedulingContext. deprecated: use the 'watch' parameter with a list operation instead.",
-        "operationId": "watchResourceV1alpha2PodSchedulingContextListForAllNamespaces",
+        "operationId": "watchResourceV1alpha3PodSchedulingContextListForAllNamespaces",
         "produces": [
           "application/json",
           "application/yaml",
@@ -75427,13 +75427,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "watchlist",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "PodSchedulingContext",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "parameters": [
@@ -75472,13 +75472,13 @@
         }
       ]
     },
-    "/apis/resource.k8s.io/v1alpha2/watch/resourceclaimparameters": {
+    "/apis/resource.k8s.io/v1alpha3/watch/resourceclaimparameters": {
       "get": {
         "consumes": [
           "*/*"
         ],
         "description": "watch individual changes to a list of ResourceClaimParameters. deprecated: use the 'watch' parameter with a list operation instead.",
-        "operationId": "watchResourceV1alpha2ResourceClaimParametersListForAllNamespaces",
+        "operationId": "watchResourceV1alpha3ResourceClaimParametersListForAllNamespaces",
         "produces": [
           "application/json",
           "application/yaml",
@@ -75501,13 +75501,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "watchlist",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClaimParameters",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "parameters": [
@@ -75546,13 +75546,13 @@
         }
       ]
     },
-    "/apis/resource.k8s.io/v1alpha2/watch/resourceclaims": {
+    "/apis/resource.k8s.io/v1alpha3/watch/resourceclaims": {
       "get": {
         "consumes": [
           "*/*"
         ],
         "description": "watch individual changes to a list of ResourceClaim. deprecated: use the 'watch' parameter with a list operation instead.",
-        "operationId": "watchResourceV1alpha2ResourceClaimListForAllNamespaces",
+        "operationId": "watchResourceV1alpha3ResourceClaimListForAllNamespaces",
         "produces": [
           "application/json",
           "application/yaml",
@@ -75575,13 +75575,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "watchlist",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClaim",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "parameters": [
@@ -75620,13 +75620,13 @@
         }
       ]
     },
-    "/apis/resource.k8s.io/v1alpha2/watch/resourceclaimtemplates": {
+    "/apis/resource.k8s.io/v1alpha3/watch/resourceclaimtemplates": {
       "get": {
         "consumes": [
           "*/*"
         ],
         "description": "watch individual changes to a list of ResourceClaimTemplate. deprecated: use the 'watch' parameter with a list operation instead.",
-        "operationId": "watchResourceV1alpha2ResourceClaimTemplateListForAllNamespaces",
+        "operationId": "watchResourceV1alpha3ResourceClaimTemplateListForAllNamespaces",
         "produces": [
           "application/json",
           "application/yaml",
@@ -75649,13 +75649,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "watchlist",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClaimTemplate",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "parameters": [
@@ -75694,13 +75694,13 @@
         }
       ]
     },
-    "/apis/resource.k8s.io/v1alpha2/watch/resourceclasses": {
+    "/apis/resource.k8s.io/v1alpha3/watch/resourceclasses": {
       "get": {
         "consumes": [
           "*/*"
         ],
         "description": "watch individual changes to a list of ResourceClass. deprecated: use the 'watch' parameter with a list operation instead.",
-        "operationId": "watchResourceV1alpha2ResourceClassList",
+        "operationId": "watchResourceV1alpha3ResourceClassList",
         "produces": [
           "application/json",
           "application/yaml",
@@ -75723,13 +75723,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "watchlist",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClass",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "parameters": [
@@ -75768,13 +75768,13 @@
         }
       ]
     },
-    "/apis/resource.k8s.io/v1alpha2/watch/resourceclasses/{name}": {
+    "/apis/resource.k8s.io/v1alpha3/watch/resourceclasses/{name}": {
       "get": {
         "consumes": [
           "*/*"
         ],
         "description": "watch changes to an object of kind ResourceClass. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
-        "operationId": "watchResourceV1alpha2ResourceClass",
+        "operationId": "watchResourceV1alpha3ResourceClass",
         "produces": [
           "application/json",
           "application/yaml",
@@ -75797,13 +75797,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "watch",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClass",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "parameters": [
@@ -75850,13 +75850,13 @@
         }
       ]
     },
-    "/apis/resource.k8s.io/v1alpha2/watch/resourceclassparameters": {
+    "/apis/resource.k8s.io/v1alpha3/watch/resourceclassparameters": {
       "get": {
         "consumes": [
           "*/*"
         ],
         "description": "watch individual changes to a list of ResourceClassParameters. deprecated: use the 'watch' parameter with a list operation instead.",
-        "operationId": "watchResourceV1alpha2ResourceClassParametersListForAllNamespaces",
+        "operationId": "watchResourceV1alpha3ResourceClassParametersListForAllNamespaces",
         "produces": [
           "application/json",
           "application/yaml",
@@ -75879,13 +75879,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "watchlist",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceClassParameters",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "parameters": [
@@ -75924,13 +75924,13 @@
         }
       ]
     },
-    "/apis/resource.k8s.io/v1alpha2/watch/resourceslices": {
+    "/apis/resource.k8s.io/v1alpha3/watch/resourceslices": {
       "get": {
         "consumes": [
           "*/*"
         ],
         "description": "watch individual changes to a list of ResourceSlice. deprecated: use the 'watch' parameter with a list operation instead.",
-        "operationId": "watchResourceV1alpha2ResourceSliceList",
+        "operationId": "watchResourceV1alpha3ResourceSliceList",
         "produces": [
           "application/json",
           "application/yaml",
@@ -75953,13 +75953,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "watchlist",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceSlice",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "parameters": [
@@ -75998,13 +75998,13 @@
         }
       ]
     },
-    "/apis/resource.k8s.io/v1alpha2/watch/resourceslices/{name}": {
+    "/apis/resource.k8s.io/v1alpha3/watch/resourceslices/{name}": {
       "get": {
         "consumes": [
           "*/*"
         ],
         "description": "watch changes to an object of kind ResourceSlice. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
-        "operationId": "watchResourceV1alpha2ResourceSlice",
+        "operationId": "watchResourceV1alpha3ResourceSlice",
         "produces": [
           "application/json",
           "application/yaml",
@@ -76027,13 +76027,13 @@
           "https"
         ],
         "tags": [
-          "resource_v1alpha2"
+          "resource_v1alpha3"
         ],
         "x-kubernetes-action": "watch",
         "x-kubernetes-group-version-kind": {
           "group": "resource.k8s.io",
           "kind": "ResourceSlice",
-          "version": "v1alpha2"
+          "version": "v1alpha3"
         }
       },
       "parameters": [

@@ -882,50 +882,50 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/rbac/v1beta1.RoleList":                                                                      schema_k8sio_api_rbac_v1beta1_RoleList(ref),
 		"k8s.io/api/rbac/v1beta1.RoleRef":                                                                       schema_k8sio_api_rbac_v1beta1_RoleRef(ref),
 		"k8s.io/api/rbac/v1beta1.Subject":                                                                       schema_k8sio_api_rbac_v1beta1_Subject(ref),
-		"k8s.io/api/resource/v1alpha2.AllocationResult":                                                         schema_k8sio_api_resource_v1alpha2_AllocationResult(ref),
-		"k8s.io/api/resource/v1alpha2.AllocationResultModel":                                                    schema_k8sio_api_resource_v1alpha2_AllocationResultModel(ref),
-		"k8s.io/api/resource/v1alpha2.DriverAllocationResult":                                                   schema_k8sio_api_resource_v1alpha2_DriverAllocationResult(ref),
-		"k8s.io/api/resource/v1alpha2.DriverRequests":                                                           schema_k8sio_api_resource_v1alpha2_DriverRequests(ref),
-		"k8s.io/api/resource/v1alpha2.NamedResourcesAllocationResult":                                           schema_k8sio_api_resource_v1alpha2_NamedResourcesAllocationResult(ref),
-		"k8s.io/api/resource/v1alpha2.NamedResourcesAttribute":                                                  schema_k8sio_api_resource_v1alpha2_NamedResourcesAttribute(ref),
-		"k8s.io/api/resource/v1alpha2.NamedResourcesAttributeValue":                                             schema_k8sio_api_resource_v1alpha2_NamedResourcesAttributeValue(ref),
-		"k8s.io/api/resource/v1alpha2.NamedResourcesFilter":                                                     schema_k8sio_api_resource_v1alpha2_NamedResourcesFilter(ref),
-		"k8s.io/api/resource/v1alpha2.NamedResourcesInstance":                                                   schema_k8sio_api_resource_v1alpha2_NamedResourcesInstance(ref),
-		"k8s.io/api/resource/v1alpha2.NamedResourcesIntSlice":                                                   schema_k8sio_api_resource_v1alpha2_NamedResourcesIntSlice(ref),
-		"k8s.io/api/resource/v1alpha2.NamedResourcesRequest":                                                    schema_k8sio_api_resource_v1alpha2_NamedResourcesRequest(ref),
-		"k8s.io/api/resource/v1alpha2.NamedResourcesResources":                                                  schema_k8sio_api_resource_v1alpha2_NamedResourcesResources(ref),
-		"k8s.io/api/resource/v1alpha2.NamedResourcesStringSlice":                                                schema_k8sio_api_resource_v1alpha2_NamedResourcesStringSlice(ref),
-		"k8s.io/api/resource/v1alpha2.PodSchedulingContext":                                                     schema_k8sio_api_resource_v1alpha2_PodSchedulingContext(ref),
-		"k8s.io/api/resource/v1alpha2.PodSchedulingContextList":                                                 schema_k8sio_api_resource_v1alpha2_PodSchedulingContextList(ref),
-		"k8s.io/api/resource/v1alpha2.PodSchedulingContextSpec":                                                 schema_k8sio_api_resource_v1alpha2_PodSchedulingContextSpec(ref),
-		"k8s.io/api/resource/v1alpha2.PodSchedulingContextStatus":                                               schema_k8sio_api_resource_v1alpha2_PodSchedulingContextStatus(ref),
-		"k8s.io/api/resource/v1alpha2.ResourceClaim":                                                            schema_k8sio_api_resource_v1alpha2_ResourceClaim(ref),
-		"k8s.io/api/resource/v1alpha2.ResourceClaimConsumerReference":                                           schema_k8sio_api_resource_v1alpha2_ResourceClaimConsumerReference(ref),
-		"k8s.io/api/resource/v1alpha2.ResourceClaimList":                                                        schema_k8sio_api_resource_v1alpha2_ResourceClaimList(ref),
-		"k8s.io/api/resource/v1alpha2.ResourceClaimParameters":                                                  schema_k8sio_api_resource_v1alpha2_ResourceClaimParameters(ref),
-		"k8s.io/api/resource/v1alpha2.ResourceClaimParametersList":                                              schema_k8sio_api_resource_v1alpha2_ResourceClaimParametersList(ref),
-		"k8s.io/api/resource/v1alpha2.ResourceClaimParametersReference":                                         schema_k8sio_api_resource_v1alpha2_ResourceClaimParametersReference(ref),
-		"k8s.io/api/resource/v1alpha2.ResourceClaimSchedulingStatus":                                            schema_k8sio_api_resource_v1alpha2_ResourceClaimSchedulingStatus(ref),
-		"k8s.io/api/resource/v1alpha2.ResourceClaimSpec":                                                        schema_k8sio_api_resource_v1alpha2_ResourceClaimSpec(ref),
-		"k8s.io/api/resource/v1alpha2.ResourceClaimStatus":                                                      schema_k8sio_api_resource_v1alpha2_ResourceClaimStatus(ref),
-		"k8s.io/api/resource/v1alpha2.ResourceClaimTemplate":                                                    schema_k8sio_api_resource_v1alpha2_ResourceClaimTemplate(ref),
-		"k8s.io/api/resource/v1alpha2.ResourceClaimTemplateList":                                                schema_k8sio_api_resource_v1alpha2_ResourceClaimTemplateList(ref),
-		"k8s.io/api/resource/v1alpha2.ResourceClaimTemplateSpec":                                                schema_k8sio_api_resource_v1alpha2_ResourceClaimTemplateSpec(ref),
-		"k8s.io/api/resource/v1alpha2.ResourceClass":                                                            schema_k8sio_api_resource_v1alpha2_ResourceClass(ref),
-		"k8s.io/api/resource/v1alpha2.ResourceClassList":                                                        schema_k8sio_api_resource_v1alpha2_ResourceClassList(ref),
-		"k8s.io/api/resource/v1alpha2.ResourceClassParameters":                                                  schema_k8sio_api_resource_v1alpha2_ResourceClassParameters(ref),
-		"k8s.io/api/resource/v1alpha2.ResourceClassParametersList":                                              schema_k8sio_api_resource_v1alpha2_ResourceClassParametersList(ref),
-		"k8s.io/api/resource/v1alpha2.ResourceClassParametersReference":                                         schema_k8sio_api_resource_v1alpha2_ResourceClassParametersReference(ref),
-		"k8s.io/api/resource/v1alpha2.ResourceFilter":                                                           schema_k8sio_api_resource_v1alpha2_ResourceFilter(ref),
-		"k8s.io/api/resource/v1alpha2.ResourceFilterModel":                                                      schema_k8sio_api_resource_v1alpha2_ResourceFilterModel(ref),
-		"k8s.io/api/resource/v1alpha2.ResourceHandle":                                                           schema_k8sio_api_resource_v1alpha2_ResourceHandle(ref),
-		"k8s.io/api/resource/v1alpha2.ResourceModel":                                                            schema_k8sio_api_resource_v1alpha2_ResourceModel(ref),
-		"k8s.io/api/resource/v1alpha2.ResourceRequest":                                                          schema_k8sio_api_resource_v1alpha2_ResourceRequest(ref),
-		"k8s.io/api/resource/v1alpha2.ResourceRequestModel":                                                     schema_k8sio_api_resource_v1alpha2_ResourceRequestModel(ref),
-		"k8s.io/api/resource/v1alpha2.ResourceSlice":                                                            schema_k8sio_api_resource_v1alpha2_ResourceSlice(ref),
-		"k8s.io/api/resource/v1alpha2.ResourceSliceList":                                                        schema_k8sio_api_resource_v1alpha2_ResourceSliceList(ref),
-		"k8s.io/api/resource/v1alpha2.StructuredResourceHandle":                                                 schema_k8sio_api_resource_v1alpha2_StructuredResourceHandle(ref),
-		"k8s.io/api/resource/v1alpha2.VendorParameters":                                                         schema_k8sio_api_resource_v1alpha2_VendorParameters(ref),
+		"k8s.io/api/resource/v1alpha3.AllocationResult":                                                         schema_k8sio_api_resource_v1alpha3_AllocationResult(ref),
+		"k8s.io/api/resource/v1alpha3.AllocationResultModel":                                                    schema_k8sio_api_resource_v1alpha3_AllocationResultModel(ref),
+		"k8s.io/api/resource/v1alpha3.DriverAllocationResult":                                                   schema_k8sio_api_resource_v1alpha3_DriverAllocationResult(ref),
+		"k8s.io/api/resource/v1alpha3.DriverRequests":                                                           schema_k8sio_api_resource_v1alpha3_DriverRequests(ref),
+		"k8s.io/api/resource/v1alpha3.NamedResourcesAllocationResult":                                           schema_k8sio_api_resource_v1alpha3_NamedResourcesAllocationResult(ref),
+		"k8s.io/api/resource/v1alpha3.NamedResourcesAttribute":                                                  schema_k8sio_api_resource_v1alpha3_NamedResourcesAttribute(ref),
+		"k8s.io/api/resource/v1alpha3.NamedResourcesAttributeValue":                                             schema_k8sio_api_resource_v1alpha3_NamedResourcesAttributeValue(ref),
+		"k8s.io/api/resource/v1alpha3.NamedResourcesFilter":                                                     schema_k8sio_api_resource_v1alpha3_NamedResourcesFilter(ref),
+		"k8s.io/api/resource/v1alpha3.NamedResourcesInstance":                                                   schema_k8sio_api_resource_v1alpha3_NamedResourcesInstance(ref),
+		"k8s.io/api/resource/v1alpha3.NamedResourcesIntSlice":                                                   schema_k8sio_api_resource_v1alpha3_NamedResourcesIntSlice(ref),
+		"k8s.io/api/resource/v1alpha3.NamedResourcesRequest":                                                    schema_k8sio_api_resource_v1alpha3_NamedResourcesRequest(ref),
+		"k8s.io/api/resource/v1alpha3.NamedResourcesResources":                                                  schema_k8sio_api_resource_v1alpha3_NamedResourcesResources(ref),
+		"k8s.io/api/resource/v1alpha3.NamedResourcesStringSlice":                                                schema_k8sio_api_resource_v1alpha3_NamedResourcesStringSlice(ref),
+		"k8s.io/api/resource/v1alpha3.PodSchedulingContext":                                                     schema_k8sio_api_resource_v1alpha3_PodSchedulingContext(ref),
+		"k8s.io/api/resource/v1alpha3.PodSchedulingContextList":                                                 schema_k8sio_api_resource_v1alpha3_PodSchedulingContextList(ref),
+		"k8s.io/api/resource/v1alpha3.PodSchedulingContextSpec":                                                 schema_k8sio_api_resource_v1alpha3_PodSchedulingContextSpec(ref),
+		"k8s.io/api/resource/v1alpha3.PodSchedulingContextStatus":                                               schema_k8sio_api_resource_v1alpha3_PodSchedulingContextStatus(ref),
+		"k8s.io/api/resource/v1alpha3.ResourceClaim":                                                            schema_k8sio_api_resource_v1alpha3_ResourceClaim(ref),
+		"k8s.io/api/resource/v1alpha3.ResourceClaimConsumerReference":                                           schema_k8sio_api_resource_v1alpha3_ResourceClaimConsumerReference(ref),
+		"k8s.io/api/resource/v1alpha3.ResourceClaimList":                                                        schema_k8sio_api_resource_v1alpha3_ResourceClaimList(ref),
+		"k8s.io/api/resource/v1alpha3.ResourceClaimParameters":                                                  schema_k8sio_api_resource_v1alpha3_ResourceClaimParameters(ref),
+		"k8s.io/api/resource/v1alpha3.ResourceClaimParametersList":                                              schema_k8sio_api_resource_v1alpha3_ResourceClaimParametersList(ref),
+		"k8s.io/api/resource/v1alpha3.ResourceClaimParametersReference":                                         schema_k8sio_api_resource_v1alpha3_ResourceClaimParametersReference(ref),
+		"k8s.io/api/resource/v1alpha3.ResourceClaimSchedulingStatus":                                            schema_k8sio_api_resource_v1alpha3_ResourceClaimSchedulingStatus(ref),
+		"k8s.io/api/resource/v1alpha3.ResourceClaimSpec":                                                        schema_k8sio_api_resource_v1alpha3_ResourceClaimSpec(ref),
+		"k8s.io/api/resource/v1alpha3.ResourceClaimStatus":                                                      schema_k8sio_api_resource_v1alpha3_ResourceClaimStatus(ref),
+		"k8s.io/api/resource/v1alpha3.ResourceClaimTemplate":                                                    schema_k8sio_api_resource_v1alpha3_ResourceClaimTemplate(ref),
+		"k8s.io/api/resource/v1alpha3.ResourceClaimTemplateList":                                                schema_k8sio_api_resource_v1alpha3_ResourceClaimTemplateList(ref),
+		"k8s.io/api/resource/v1alpha3.ResourceClaimTemplateSpec":                                                schema_k8sio_api_resource_v1alpha3_ResourceClaimTemplateSpec(ref),
+		"k8s.io/api/resource/v1alpha3.ResourceClass":                                                            schema_k8sio_api_resource_v1alpha3_ResourceClass(ref),
+		"k8s.io/api/resource/v1alpha3.ResourceClassList":                                                        schema_k8sio_api_resource_v1alpha3_ResourceClassList(ref),
+		"k8s.io/api/resource/v1alpha3.ResourceClassParameters":                                                  schema_k8sio_api_resource_v1alpha3_ResourceClassParameters(ref),
+		"k8s.io/api/resource/v1alpha3.ResourceClassParametersList":                                              schema_k8sio_api_resource_v1alpha3_ResourceClassParametersList(ref),
+		"k8s.io/api/resource/v1alpha3.ResourceClassParametersReference":                                         schema_k8sio_api_resource_v1alpha3_ResourceClassParametersReference(ref),
+		"k8s.io/api/resource/v1alpha3.ResourceFilter":                                                           schema_k8sio_api_resource_v1alpha3_ResourceFilter(ref),
+		"k8s.io/api/resource/v1alpha3.ResourceFilterModel":                                                      schema_k8sio_api_resource_v1alpha3_ResourceFilterModel(ref),
+		"k8s.io/api/resource/v1alpha3.ResourceHandle":                                                           schema_k8sio_api_resource_v1alpha3_ResourceHandle(ref),
+		"k8s.io/api/resource/v1alpha3.ResourceModel":                                                            schema_k8sio_api_resource_v1alpha3_ResourceModel(ref),
+		"k8s.io/api/resource/v1alpha3.ResourceRequest":                                                          schema_k8sio_api_resource_v1alpha3_ResourceRequest(ref),
+		"k8s.io/api/resource/v1alpha3.ResourceRequestModel":                                                     schema_k8sio_api_resource_v1alpha3_ResourceRequestModel(ref),
+		"k8s.io/api/resource/v1alpha3.ResourceSlice":                                                            schema_k8sio_api_resource_v1alpha3_ResourceSlice(ref),
+		"k8s.io/api/resource/v1alpha3.ResourceSliceList":                                                        schema_k8sio_api_resource_v1alpha3_ResourceSliceList(ref),
+		"k8s.io/api/resource/v1alpha3.StructuredResourceHandle":                                                 schema_k8sio_api_resource_v1alpha3_StructuredResourceHandle(ref),
+		"k8s.io/api/resource/v1alpha3.VendorParameters":                                                         schema_k8sio_api_resource_v1alpha3_VendorParameters(ref),
 		"k8s.io/api/scheduling/v1.PriorityClass":                                                                schema_k8sio_api_scheduling_v1_PriorityClass(ref),
 		"k8s.io/api/scheduling/v1.PriorityClassList":                                                            schema_k8sio_api_scheduling_v1_PriorityClassList(ref),
 		"k8s.io/api/scheduling/v1alpha1.PriorityClass":                                                          schema_k8sio_api_scheduling_v1alpha1_PriorityClass(ref),
@@ -45352,7 +45352,7 @@ func schema_k8sio_api_rbac_v1beta1_Subject(ref common.ReferenceCallback) common.
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_AllocationResult(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_AllocationResult(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -45372,7 +45372,7 @@ func schema_k8sio_api_resource_v1alpha2_AllocationResult(ref common.ReferenceCal
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha2.ResourceHandle"),
+										Ref:     ref("k8s.io/api/resource/v1alpha3.ResourceHandle"),
 									},
 								},
 							},
@@ -45388,11 +45388,11 @@ func schema_k8sio_api_resource_v1alpha2_AllocationResult(ref common.ReferenceCal
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/core/v1.NodeSelector", "k8s.io/api/resource/v1alpha2.ResourceHandle"},
+			"k8s.io/api/core/v1.NodeSelector", "k8s.io/api/resource/v1alpha3.ResourceHandle"},
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_AllocationResultModel(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_AllocationResultModel(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -45402,18 +45402,18 @@ func schema_k8sio_api_resource_v1alpha2_AllocationResultModel(ref common.Referen
 					"namedResources": {
 						SchemaProps: spec.SchemaProps{
 							Description: "NamedResources describes the allocation result when using the named resources model.",
-							Ref:         ref("k8s.io/api/resource/v1alpha2.NamedResourcesAllocationResult"),
+							Ref:         ref("k8s.io/api/resource/v1alpha3.NamedResourcesAllocationResult"),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha2.NamedResourcesAllocationResult"},
+			"k8s.io/api/resource/v1alpha3.NamedResourcesAllocationResult"},
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_DriverAllocationResult(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_DriverAllocationResult(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -45429,18 +45429,18 @@ func schema_k8sio_api_resource_v1alpha2_DriverAllocationResult(ref common.Refere
 					"namedResources": {
 						SchemaProps: spec.SchemaProps{
 							Description: "NamedResources describes the allocation result when using the named resources model.",
-							Ref:         ref("k8s.io/api/resource/v1alpha2.NamedResourcesAllocationResult"),
+							Ref:         ref("k8s.io/api/resource/v1alpha3.NamedResourcesAllocationResult"),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha2.NamedResourcesAllocationResult", "k8s.io/apimachinery/pkg/runtime.RawExtension"},
+			"k8s.io/api/resource/v1alpha3.NamedResourcesAllocationResult", "k8s.io/apimachinery/pkg/runtime.RawExtension"},
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_DriverRequests(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_DriverRequests(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -45473,7 +45473,7 @@ func schema_k8sio_api_resource_v1alpha2_DriverRequests(ref common.ReferenceCallb
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha2.ResourceRequest"),
+										Ref:     ref("k8s.io/api/resource/v1alpha3.ResourceRequest"),
 									},
 								},
 							},
@@ -45483,11 +45483,11 @@ func schema_k8sio_api_resource_v1alpha2_DriverRequests(ref common.ReferenceCallb
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha2.ResourceRequest", "k8s.io/apimachinery/pkg/runtime.RawExtension"},
+			"k8s.io/api/resource/v1alpha3.ResourceRequest", "k8s.io/apimachinery/pkg/runtime.RawExtension"},
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_NamedResourcesAllocationResult(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_NamedResourcesAllocationResult(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -45509,7 +45509,7 @@ func schema_k8sio_api_resource_v1alpha2_NamedResourcesAllocationResult(ref commo
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_NamedResourcesAttribute(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_NamedResourcesAttribute(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -45547,7 +45547,7 @@ func schema_k8sio_api_resource_v1alpha2_NamedResourcesAttribute(ref common.Refer
 					"intSlice": {
 						SchemaProps: spec.SchemaProps{
 							Description: "IntSliceValue is an array of 64-bit integers.",
-							Ref:         ref("k8s.io/api/resource/v1alpha2.NamedResourcesIntSlice"),
+							Ref:         ref("k8s.io/api/resource/v1alpha3.NamedResourcesIntSlice"),
 						},
 					},
 					"string": {
@@ -45560,7 +45560,7 @@ func schema_k8sio_api_resource_v1alpha2_NamedResourcesAttribute(ref common.Refer
 					"stringSlice": {
 						SchemaProps: spec.SchemaProps{
 							Description: "StringSliceValue is an array of strings.",
-							Ref:         ref("k8s.io/api/resource/v1alpha2.NamedResourcesStringSlice"),
+							Ref:         ref("k8s.io/api/resource/v1alpha3.NamedResourcesStringSlice"),
 						},
 					},
 					"version": {
@@ -45575,11 +45575,11 @@ func schema_k8sio_api_resource_v1alpha2_NamedResourcesAttribute(ref common.Refer
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha2.NamedResourcesIntSlice", "k8s.io/api/resource/v1alpha2.NamedResourcesStringSlice", "k8s.io/apimachinery/pkg/api/resource.Quantity"},
+			"k8s.io/api/resource/v1alpha3.NamedResourcesIntSlice", "k8s.io/api/resource/v1alpha3.NamedResourcesStringSlice", "k8s.io/apimachinery/pkg/api/resource.Quantity"},
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_NamedResourcesAttributeValue(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_NamedResourcesAttributeValue(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -45609,7 +45609,7 @@ func schema_k8sio_api_resource_v1alpha2_NamedResourcesAttributeValue(ref common.
 					"intSlice": {
 						SchemaProps: spec.SchemaProps{
 							Description: "IntSliceValue is an array of 64-bit integers.",
-							Ref:         ref("k8s.io/api/resource/v1alpha2.NamedResourcesIntSlice"),
+							Ref:         ref("k8s.io/api/resource/v1alpha3.NamedResourcesIntSlice"),
 						},
 					},
 					"string": {
@@ -45622,7 +45622,7 @@ func schema_k8sio_api_resource_v1alpha2_NamedResourcesAttributeValue(ref common.
 					"stringSlice": {
 						SchemaProps: spec.SchemaProps{
 							Description: "StringSliceValue is an array of strings.",
-							Ref:         ref("k8s.io/api/resource/v1alpha2.NamedResourcesStringSlice"),
+							Ref:         ref("k8s.io/api/resource/v1alpha3.NamedResourcesStringSlice"),
 						},
 					},
 					"version": {
@@ -45636,11 +45636,11 @@ func schema_k8sio_api_resource_v1alpha2_NamedResourcesAttributeValue(ref common.
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha2.NamedResourcesIntSlice", "k8s.io/api/resource/v1alpha2.NamedResourcesStringSlice", "k8s.io/apimachinery/pkg/api/resource.Quantity"},
+			"k8s.io/api/resource/v1alpha3.NamedResourcesIntSlice", "k8s.io/api/resource/v1alpha3.NamedResourcesStringSlice", "k8s.io/apimachinery/pkg/api/resource.Quantity"},
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_NamedResourcesFilter(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_NamedResourcesFilter(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -45662,7 +45662,7 @@ func schema_k8sio_api_resource_v1alpha2_NamedResourcesFilter(ref common.Referenc
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_NamedResourcesInstance(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_NamedResourcesInstance(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -45690,7 +45690,7 @@ func schema_k8sio_api_resource_v1alpha2_NamedResourcesInstance(ref common.Refere
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha2.NamedResourcesAttribute"),
+										Ref:     ref("k8s.io/api/resource/v1alpha3.NamedResourcesAttribute"),
 									},
 								},
 							},
@@ -45701,11 +45701,11 @@ func schema_k8sio_api_resource_v1alpha2_NamedResourcesInstance(ref common.Refere
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha2.NamedResourcesAttribute"},
+			"k8s.io/api/resource/v1alpha3.NamedResourcesAttribute"},
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_NamedResourcesIntSlice(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_NamedResourcesIntSlice(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -45739,7 +45739,7 @@ func schema_k8sio_api_resource_v1alpha2_NamedResourcesIntSlice(ref common.Refere
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_NamedResourcesRequest(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_NamedResourcesRequest(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -45761,7 +45761,7 @@ func schema_k8sio_api_resource_v1alpha2_NamedResourcesRequest(ref common.Referen
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_NamedResourcesResources(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_NamedResourcesResources(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -45781,7 +45781,7 @@ func schema_k8sio_api_resource_v1alpha2_NamedResourcesResources(ref common.Refer
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha2.NamedResourcesInstance"),
+										Ref:     ref("k8s.io/api/resource/v1alpha3.NamedResourcesInstance"),
 									},
 								},
 							},
@@ -45792,11 +45792,11 @@ func schema_k8sio_api_resource_v1alpha2_NamedResourcesResources(ref common.Refer
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha2.NamedResourcesInstance"},
+			"k8s.io/api/resource/v1alpha3.NamedResourcesInstance"},
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_NamedResourcesStringSlice(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_NamedResourcesStringSlice(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -45830,7 +45830,7 @@ func schema_k8sio_api_resource_v1alpha2_NamedResourcesStringSlice(ref common.Ref
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_PodSchedulingContext(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_PodSchedulingContext(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -45862,14 +45862,14 @@ func schema_k8sio_api_resource_v1alpha2_PodSchedulingContext(ref common.Referenc
 						SchemaProps: spec.SchemaProps{
 							Description: "Spec describes where resources for the Pod are needed.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/api/resource/v1alpha2.PodSchedulingContextSpec"),
+							Ref:         ref("k8s.io/api/resource/v1alpha3.PodSchedulingContextSpec"),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Status describes where resources for the Pod can be allocated.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/api/resource/v1alpha2.PodSchedulingContextStatus"),
+							Ref:         ref("k8s.io/api/resource/v1alpha3.PodSchedulingContextStatus"),
 						},
 					},
 				},
@@ -45877,11 +45877,11 @@ func schema_k8sio_api_resource_v1alpha2_PodSchedulingContext(ref common.Referenc
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha2.PodSchedulingContextSpec", "k8s.io/api/resource/v1alpha2.PodSchedulingContextStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			"k8s.io/api/resource/v1alpha3.PodSchedulingContextSpec", "k8s.io/api/resource/v1alpha3.PodSchedulingContextStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_PodSchedulingContextList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_PodSchedulingContextList(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -45917,7 +45917,7 @@ func schema_k8sio_api_resource_v1alpha2_PodSchedulingContextList(ref common.Refe
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha2.PodSchedulingContext"),
+										Ref:     ref("k8s.io/api/resource/v1alpha3.PodSchedulingContext"),
 									},
 								},
 							},
@@ -45928,11 +45928,11 @@ func schema_k8sio_api_resource_v1alpha2_PodSchedulingContextList(ref common.Refe
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha2.PodSchedulingContext", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+			"k8s.io/api/resource/v1alpha3.PodSchedulingContext", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_PodSchedulingContextSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_PodSchedulingContextSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -45972,7 +45972,7 @@ func schema_k8sio_api_resource_v1alpha2_PodSchedulingContextSpec(ref common.Refe
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_PodSchedulingContextStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_PodSchedulingContextStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -45995,7 +45995,7 @@ func schema_k8sio_api_resource_v1alpha2_PodSchedulingContextStatus(ref common.Re
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha2.ResourceClaimSchedulingStatus"),
+										Ref:     ref("k8s.io/api/resource/v1alpha3.ResourceClaimSchedulingStatus"),
 									},
 								},
 							},
@@ -46005,11 +46005,11 @@ func schema_k8sio_api_resource_v1alpha2_PodSchedulingContextStatus(ref common.Re
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha2.ResourceClaimSchedulingStatus"},
+			"k8s.io/api/resource/v1alpha3.ResourceClaimSchedulingStatus"},
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_ResourceClaim(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_ResourceClaim(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -46041,14 +46041,14 @@ func schema_k8sio_api_resource_v1alpha2_ResourceClaim(ref common.ReferenceCallba
 						SchemaProps: spec.SchemaProps{
 							Description: "Spec describes the desired attributes of a resource that then needs to be allocated. It can only be set once when creating the ResourceClaim.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/api/resource/v1alpha2.ResourceClaimSpec"),
+							Ref:         ref("k8s.io/api/resource/v1alpha3.ResourceClaimSpec"),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Status describes whether the resource is available and with which attributes.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/api/resource/v1alpha2.ResourceClaimStatus"),
+							Ref:         ref("k8s.io/api/resource/v1alpha3.ResourceClaimStatus"),
 						},
 					},
 				},
@@ -46056,11 +46056,11 @@ func schema_k8sio_api_resource_v1alpha2_ResourceClaim(ref common.ReferenceCallba
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha2.ResourceClaimSpec", "k8s.io/api/resource/v1alpha2.ResourceClaimStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			"k8s.io/api/resource/v1alpha3.ResourceClaimSpec", "k8s.io/api/resource/v1alpha3.ResourceClaimStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_ResourceClaimConsumerReference(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_ResourceClaimConsumerReference(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -46105,7 +46105,7 @@ func schema_k8sio_api_resource_v1alpha2_ResourceClaimConsumerReference(ref commo
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_ResourceClaimList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_ResourceClaimList(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -46141,7 +46141,7 @@ func schema_k8sio_api_resource_v1alpha2_ResourceClaimList(ref common.ReferenceCa
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha2.ResourceClaim"),
+										Ref:     ref("k8s.io/api/resource/v1alpha3.ResourceClaim"),
 									},
 								},
 							},
@@ -46152,11 +46152,11 @@ func schema_k8sio_api_resource_v1alpha2_ResourceClaimList(ref common.ReferenceCa
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha2.ResourceClaim", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+			"k8s.io/api/resource/v1alpha3.ResourceClaim", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_ResourceClaimParameters(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_ResourceClaimParameters(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -46187,7 +46187,7 @@ func schema_k8sio_api_resource_v1alpha2_ResourceClaimParameters(ref common.Refer
 					"generatedFrom": {
 						SchemaProps: spec.SchemaProps{
 							Description: "If this object was created from some other resource, then this links back to that resource. This field is used to find the in-tree representation of the claim parameters when the parameter reference of the claim refers to some unknown type.",
-							Ref:         ref("k8s.io/api/resource/v1alpha2.ResourceClaimParametersReference"),
+							Ref:         ref("k8s.io/api/resource/v1alpha3.ResourceClaimParametersReference"),
 						},
 					},
 					"driverRequests": {
@@ -46203,7 +46203,7 @@ func schema_k8sio_api_resource_v1alpha2_ResourceClaimParameters(ref common.Refer
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha2.DriverRequests"),
+										Ref:     ref("k8s.io/api/resource/v1alpha3.DriverRequests"),
 									},
 								},
 							},
@@ -46213,11 +46213,11 @@ func schema_k8sio_api_resource_v1alpha2_ResourceClaimParameters(ref common.Refer
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha2.DriverRequests", "k8s.io/api/resource/v1alpha2.ResourceClaimParametersReference", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			"k8s.io/api/resource/v1alpha3.DriverRequests", "k8s.io/api/resource/v1alpha3.ResourceClaimParametersReference", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_ResourceClaimParametersList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_ResourceClaimParametersList(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -46253,7 +46253,7 @@ func schema_k8sio_api_resource_v1alpha2_ResourceClaimParametersList(ref common.R
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha2.ResourceClaimParameters"),
+										Ref:     ref("k8s.io/api/resource/v1alpha3.ResourceClaimParameters"),
 									},
 								},
 							},
@@ -46264,11 +46264,11 @@ func schema_k8sio_api_resource_v1alpha2_ResourceClaimParametersList(ref common.R
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha2.ResourceClaimParameters", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+			"k8s.io/api/resource/v1alpha3.ResourceClaimParameters", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_ResourceClaimParametersReference(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_ResourceClaimParametersReference(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -46305,7 +46305,7 @@ func schema_k8sio_api_resource_v1alpha2_ResourceClaimParametersReference(ref com
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_ResourceClaimSchedulingStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_ResourceClaimSchedulingStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -46345,7 +46345,7 @@ func schema_k8sio_api_resource_v1alpha2_ResourceClaimSchedulingStatus(ref common
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_ResourceClaimSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_ResourceClaimSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -46363,7 +46363,7 @@ func schema_k8sio_api_resource_v1alpha2_ResourceClaimSpec(ref common.ReferenceCa
 					"parametersRef": {
 						SchemaProps: spec.SchemaProps{
 							Description: "ParametersRef references a separate object with arbitrary parameters that will be used by the driver when allocating a resource for the claim.\n\nThe object must be in the same namespace as the ResourceClaim.",
-							Ref:         ref("k8s.io/api/resource/v1alpha2.ResourceClaimParametersReference"),
+							Ref:         ref("k8s.io/api/resource/v1alpha3.ResourceClaimParametersReference"),
 						},
 					},
 				},
@@ -46371,11 +46371,11 @@ func schema_k8sio_api_resource_v1alpha2_ResourceClaimSpec(ref common.ReferenceCa
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha2.ResourceClaimParametersReference"},
+			"k8s.io/api/resource/v1alpha3.ResourceClaimParametersReference"},
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_ResourceClaimStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_ResourceClaimStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -46392,7 +46392,7 @@ func schema_k8sio_api_resource_v1alpha2_ResourceClaimStatus(ref common.Reference
 					"allocation": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Allocation is set by the resource driver once a resource or set of resources has been allocated successfully. If this is not specified, the resources have not been allocated yet.",
-							Ref:         ref("k8s.io/api/resource/v1alpha2.AllocationResult"),
+							Ref:         ref("k8s.io/api/resource/v1alpha3.AllocationResult"),
 						},
 					},
 					"reservedFor": {
@@ -46413,7 +46413,7 @@ func schema_k8sio_api_resource_v1alpha2_ResourceClaimStatus(ref common.Reference
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha2.ResourceClaimConsumerReference"),
+										Ref:     ref("k8s.io/api/resource/v1alpha3.ResourceClaimConsumerReference"),
 									},
 								},
 							},
@@ -46430,11 +46430,11 @@ func schema_k8sio_api_resource_v1alpha2_ResourceClaimStatus(ref common.Reference
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha2.AllocationResult", "k8s.io/api/resource/v1alpha2.ResourceClaimConsumerReference"},
+			"k8s.io/api/resource/v1alpha3.AllocationResult", "k8s.io/api/resource/v1alpha3.ResourceClaimConsumerReference"},
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_ResourceClaimTemplate(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_ResourceClaimTemplate(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -46466,7 +46466,7 @@ func schema_k8sio_api_resource_v1alpha2_ResourceClaimTemplate(ref common.Referen
 						SchemaProps: spec.SchemaProps{
 							Description: "Describes the ResourceClaim that is to be generated.\n\nThis field is immutable. A ResourceClaim will get created by the control plane for a Pod when needed and then not get updated anymore.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/api/resource/v1alpha2.ResourceClaimTemplateSpec"),
+							Ref:         ref("k8s.io/api/resource/v1alpha3.ResourceClaimTemplateSpec"),
 						},
 					},
 				},
@@ -46474,11 +46474,11 @@ func schema_k8sio_api_resource_v1alpha2_ResourceClaimTemplate(ref common.Referen
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha2.ResourceClaimTemplateSpec", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			"k8s.io/api/resource/v1alpha3.ResourceClaimTemplateSpec", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_ResourceClaimTemplateList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_ResourceClaimTemplateList(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -46514,7 +46514,7 @@ func schema_k8sio_api_resource_v1alpha2_ResourceClaimTemplateList(ref common.Ref
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha2.ResourceClaimTemplate"),
+										Ref:     ref("k8s.io/api/resource/v1alpha3.ResourceClaimTemplate"),
 									},
 								},
 							},
@@ -46525,11 +46525,11 @@ func schema_k8sio_api_resource_v1alpha2_ResourceClaimTemplateList(ref common.Ref
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha2.ResourceClaimTemplate", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+			"k8s.io/api/resource/v1alpha3.ResourceClaimTemplate", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_ResourceClaimTemplateSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_ResourceClaimTemplateSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -46547,7 +46547,7 @@ func schema_k8sio_api_resource_v1alpha2_ResourceClaimTemplateSpec(ref common.Ref
 						SchemaProps: spec.SchemaProps{
 							Description: "Spec for the ResourceClaim. The entire content is copied unchanged into the ResourceClaim that gets created from this template. The same fields as in a ResourceClaim are also valid here.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/api/resource/v1alpha2.ResourceClaimSpec"),
+							Ref:         ref("k8s.io/api/resource/v1alpha3.ResourceClaimSpec"),
 						},
 					},
 				},
@@ -46555,11 +46555,11 @@ func schema_k8sio_api_resource_v1alpha2_ResourceClaimTemplateSpec(ref common.Ref
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha2.ResourceClaimSpec", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			"k8s.io/api/resource/v1alpha3.ResourceClaimSpec", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_ResourceClass(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_ResourceClass(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -46598,7 +46598,7 @@ func schema_k8sio_api_resource_v1alpha2_ResourceClass(ref common.ReferenceCallba
 					"parametersRef": {
 						SchemaProps: spec.SchemaProps{
 							Description: "ParametersRef references an arbitrary separate object that may hold parameters that will be used by the driver when allocating a resource that uses this class. A dynamic resource driver can distinguish between parameters stored here and and those stored in ResourceClaimSpec.",
-							Ref:         ref("k8s.io/api/resource/v1alpha2.ResourceClassParametersReference"),
+							Ref:         ref("k8s.io/api/resource/v1alpha3.ResourceClassParametersReference"),
 						},
 					},
 					"suitableNodes": {
@@ -46619,11 +46619,11 @@ func schema_k8sio_api_resource_v1alpha2_ResourceClass(ref common.ReferenceCallba
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/core/v1.NodeSelector", "k8s.io/api/resource/v1alpha2.ResourceClassParametersReference", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			"k8s.io/api/core/v1.NodeSelector", "k8s.io/api/resource/v1alpha3.ResourceClassParametersReference", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_ResourceClassList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_ResourceClassList(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -46659,7 +46659,7 @@ func schema_k8sio_api_resource_v1alpha2_ResourceClassList(ref common.ReferenceCa
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha2.ResourceClass"),
+										Ref:     ref("k8s.io/api/resource/v1alpha3.ResourceClass"),
 									},
 								},
 							},
@@ -46670,11 +46670,11 @@ func schema_k8sio_api_resource_v1alpha2_ResourceClassList(ref common.ReferenceCa
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha2.ResourceClass", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+			"k8s.io/api/resource/v1alpha3.ResourceClass", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_ResourceClassParameters(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_ResourceClassParameters(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -46705,7 +46705,7 @@ func schema_k8sio_api_resource_v1alpha2_ResourceClassParameters(ref common.Refer
 					"generatedFrom": {
 						SchemaProps: spec.SchemaProps{
 							Description: "If this object was created from some other resource, then this links back to that resource. This field is used to find the in-tree representation of the class parameters when the parameter reference of the class refers to some unknown type.",
-							Ref:         ref("k8s.io/api/resource/v1alpha2.ResourceClassParametersReference"),
+							Ref:         ref("k8s.io/api/resource/v1alpha3.ResourceClassParametersReference"),
 						},
 					},
 					"vendorParameters": {
@@ -46721,7 +46721,7 @@ func schema_k8sio_api_resource_v1alpha2_ResourceClassParameters(ref common.Refer
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha2.VendorParameters"),
+										Ref:     ref("k8s.io/api/resource/v1alpha3.VendorParameters"),
 									},
 								},
 							},
@@ -46740,7 +46740,7 @@ func schema_k8sio_api_resource_v1alpha2_ResourceClassParameters(ref common.Refer
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha2.ResourceFilter"),
+										Ref:     ref("k8s.io/api/resource/v1alpha3.ResourceFilter"),
 									},
 								},
 							},
@@ -46750,11 +46750,11 @@ func schema_k8sio_api_resource_v1alpha2_ResourceClassParameters(ref common.Refer
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha2.ResourceClassParametersReference", "k8s.io/api/resource/v1alpha2.ResourceFilter", "k8s.io/api/resource/v1alpha2.VendorParameters", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			"k8s.io/api/resource/v1alpha3.ResourceClassParametersReference", "k8s.io/api/resource/v1alpha3.ResourceFilter", "k8s.io/api/resource/v1alpha3.VendorParameters", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_ResourceClassParametersList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_ResourceClassParametersList(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -46790,7 +46790,7 @@ func schema_k8sio_api_resource_v1alpha2_ResourceClassParametersList(ref common.R
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha2.ResourceClassParameters"),
+										Ref:     ref("k8s.io/api/resource/v1alpha3.ResourceClassParameters"),
 									},
 								},
 							},
@@ -46801,11 +46801,11 @@ func schema_k8sio_api_resource_v1alpha2_ResourceClassParametersList(ref common.R
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha2.ResourceClassParameters", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+			"k8s.io/api/resource/v1alpha3.ResourceClassParameters", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_ResourceClassParametersReference(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_ResourceClassParametersReference(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -46849,7 +46849,7 @@ func schema_k8sio_api_resource_v1alpha2_ResourceClassParametersReference(ref com
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_ResourceFilter(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_ResourceFilter(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -46866,18 +46866,18 @@ func schema_k8sio_api_resource_v1alpha2_ResourceFilter(ref common.ReferenceCallb
 					"namedResources": {
 						SchemaProps: spec.SchemaProps{
 							Description: "NamedResources describes a resource filter using the named resources model.",
-							Ref:         ref("k8s.io/api/resource/v1alpha2.NamedResourcesFilter"),
+							Ref:         ref("k8s.io/api/resource/v1alpha3.NamedResourcesFilter"),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha2.NamedResourcesFilter"},
+			"k8s.io/api/resource/v1alpha3.NamedResourcesFilter"},
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_ResourceFilterModel(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_ResourceFilterModel(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -46887,18 +46887,18 @@ func schema_k8sio_api_resource_v1alpha2_ResourceFilterModel(ref common.Reference
 					"namedResources": {
 						SchemaProps: spec.SchemaProps{
 							Description: "NamedResources describes a resource filter using the named resources model.",
-							Ref:         ref("k8s.io/api/resource/v1alpha2.NamedResourcesFilter"),
+							Ref:         ref("k8s.io/api/resource/v1alpha3.NamedResourcesFilter"),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha2.NamedResourcesFilter"},
+			"k8s.io/api/resource/v1alpha3.NamedResourcesFilter"},
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_ResourceHandle(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_ResourceHandle(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -46923,7 +46923,7 @@ func schema_k8sio_api_resource_v1alpha2_ResourceHandle(ref common.ReferenceCallb
 					"structuredData": {
 						SchemaProps: spec.SchemaProps{
 							Description: "If StructuredData is set, then it needs to be used instead of Data.",
-							Ref:         ref("k8s.io/api/resource/v1alpha2.StructuredResourceHandle"),
+							Ref:         ref("k8s.io/api/resource/v1alpha3.StructuredResourceHandle"),
 						},
 					},
 				},
@@ -46931,11 +46931,11 @@ func schema_k8sio_api_resource_v1alpha2_ResourceHandle(ref common.ReferenceCallb
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha2.StructuredResourceHandle"},
+			"k8s.io/api/resource/v1alpha3.StructuredResourceHandle"},
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_ResourceModel(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_ResourceModel(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -46945,18 +46945,18 @@ func schema_k8sio_api_resource_v1alpha2_ResourceModel(ref common.ReferenceCallba
 					"namedResources": {
 						SchemaProps: spec.SchemaProps{
 							Description: "NamedResources describes available resources using the named resources model.",
-							Ref:         ref("k8s.io/api/resource/v1alpha2.NamedResourcesResources"),
+							Ref:         ref("k8s.io/api/resource/v1alpha3.NamedResourcesResources"),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha2.NamedResourcesResources"},
+			"k8s.io/api/resource/v1alpha3.NamedResourcesResources"},
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_ResourceRequest(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_ResourceRequest(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -46972,18 +46972,18 @@ func schema_k8sio_api_resource_v1alpha2_ResourceRequest(ref common.ReferenceCall
 					"namedResources": {
 						SchemaProps: spec.SchemaProps{
 							Description: "NamedResources describes a request for resources with the named resources model.",
-							Ref:         ref("k8s.io/api/resource/v1alpha2.NamedResourcesRequest"),
+							Ref:         ref("k8s.io/api/resource/v1alpha3.NamedResourcesRequest"),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha2.NamedResourcesRequest", "k8s.io/apimachinery/pkg/runtime.RawExtension"},
+			"k8s.io/api/resource/v1alpha3.NamedResourcesRequest", "k8s.io/apimachinery/pkg/runtime.RawExtension"},
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_ResourceRequestModel(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_ResourceRequestModel(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -46993,18 +46993,18 @@ func schema_k8sio_api_resource_v1alpha2_ResourceRequestModel(ref common.Referenc
 					"namedResources": {
 						SchemaProps: spec.SchemaProps{
 							Description: "NamedResources describes a request for resources with the named resources model.",
-							Ref:         ref("k8s.io/api/resource/v1alpha2.NamedResourcesRequest"),
+							Ref:         ref("k8s.io/api/resource/v1alpha3.NamedResourcesRequest"),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha2.NamedResourcesRequest"},
+			"k8s.io/api/resource/v1alpha3.NamedResourcesRequest"},
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_ResourceSlice(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_ResourceSlice(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -47050,7 +47050,7 @@ func schema_k8sio_api_resource_v1alpha2_ResourceSlice(ref common.ReferenceCallba
 					"namedResources": {
 						SchemaProps: spec.SchemaProps{
 							Description: "NamedResources describes available resources using the named resources model.",
-							Ref:         ref("k8s.io/api/resource/v1alpha2.NamedResourcesResources"),
+							Ref:         ref("k8s.io/api/resource/v1alpha3.NamedResourcesResources"),
 						},
 					},
 				},
@@ -47058,11 +47058,11 @@ func schema_k8sio_api_resource_v1alpha2_ResourceSlice(ref common.ReferenceCallba
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha2.NamedResourcesResources", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			"k8s.io/api/resource/v1alpha3.NamedResourcesResources", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_ResourceSliceList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_ResourceSliceList(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -47098,7 +47098,7 @@ func schema_k8sio_api_resource_v1alpha2_ResourceSliceList(ref common.ReferenceCa
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha2.ResourceSlice"),
+										Ref:     ref("k8s.io/api/resource/v1alpha3.ResourceSlice"),
 									},
 								},
 							},
@@ -47109,11 +47109,11 @@ func schema_k8sio_api_resource_v1alpha2_ResourceSliceList(ref common.ReferenceCa
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha2.ResourceSlice", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+			"k8s.io/api/resource/v1alpha3.ResourceSlice", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_StructuredResourceHandle(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_StructuredResourceHandle(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -47152,7 +47152,7 @@ func schema_k8sio_api_resource_v1alpha2_StructuredResourceHandle(ref common.Refe
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/resource/v1alpha2.DriverAllocationResult"),
+										Ref:     ref("k8s.io/api/resource/v1alpha3.DriverAllocationResult"),
 									},
 								},
 							},
@@ -47163,11 +47163,11 @@ func schema_k8sio_api_resource_v1alpha2_StructuredResourceHandle(ref common.Refe
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha2.DriverAllocationResult", "k8s.io/apimachinery/pkg/runtime.RawExtension"},
+			"k8s.io/api/resource/v1alpha3.DriverAllocationResult", "k8s.io/apimachinery/pkg/runtime.RawExtension"},
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha2_VendorParameters(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_VendorParameters(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
