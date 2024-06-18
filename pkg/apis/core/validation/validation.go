@@ -6735,9 +6735,20 @@ func validateResourceClaimNames(claims []core.ResourceClaim, podClaimNames sets.
 			allErrs = append(allErrs, field.Required(fldPath.Index(i), ""))
 		} else {
 			if names.Has(name) {
+				// All requests of that claim already referenced.
 				allErrs = append(allErrs, field.Duplicate(fldPath.Index(i), name))
 			} else {
-				names.Insert(name)
+				key := name
+				if claim.Request != "" {
+					allErrs = append(allErrs, ValidateDNS1123Label(claim.Request, fldPath.Index(i).Child("request"))...)
+					key += "/" + claim.Request
+				}
+				if names.Has(key) {
+					// The specific request was already referenced.
+					allErrs = append(allErrs, field.Duplicate(fldPath.Index(i), key))
+				} else {
+					names.Insert(key)
+				}
 			}
 			if !podClaimNames.Has(name) {
 				// field.NotFound doesn't accept an
