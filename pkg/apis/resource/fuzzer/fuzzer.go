@@ -17,10 +17,30 @@ limitations under the License.
 package fuzzer
 
 import (
+	fuzz "github.com/google/gofuzz"
+	"k8s.io/apimachinery/pkg/runtime"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/kubernetes/pkg/apis/resource"
 )
 
 // Funcs contains the fuzzer functions for the resource group.
 var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
-	return nil
+	return []interface{}{
+		func(r *resource.DeviceRequest, c fuzz.Continue) {
+			c.FuzzNoCustom(r) // fuzz self without calling this function again
+
+			// Match defaulter.
+			if r.CountMode == "" {
+				r.CountMode = []resource.DeviceCountMode{resource.DeviceCountModeAll, resource.DeviceCountModeExact}[c.Int31n(2)]
+			}
+			if r.CountMode == resource.DeviceCountModeExact && r.Count == 0 {
+				r.Count = 1
+			}
+		},
+		func(r *resource.OpaqueDeviceConfiguration, c fuzz.Continue) {
+			c.FuzzNoCustom(r)
+			// Match the fuzzer default content for runtime.Object.
+			r.Parameters = runtime.RawExtension{Raw: []byte(`{"apiVersion":"unknown.group/unknown","kind":"Something","someKey":"someValue"}`)}
+		},
+	}
 }
