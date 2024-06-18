@@ -17,10 +17,49 @@ limitations under the License.
 package fuzzer
 
 import (
+	fuzz "github.com/google/gofuzz"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/kubernetes/pkg/apis/resource"
 )
 
 // Funcs contains the fuzzer functions for the resource group.
+//
+// The goal is to produce actual, real values with a non-zero probability.
+// This kicks in whenever the fuzzer produces a null value,
+// but not when fields already contain random data.
 var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
-	return nil
+	return []interface{}{
+		func(r *resource.DeviceRequest, c fuzz.Continue) {
+			c.FuzzNoCustom(r) // fuzz self without calling this function again
+
+			if r.AllocationMode == "" {
+				r.AllocationMode = []resource.DeviceAllocationMode{
+					"",
+					resource.DeviceAllocationModeAll,
+					resource.DeviceAllocationModeExactCount,
+				}[c.Int31n(3)]
+			}
+		},
+		func(r *resource.DeviceAllocationConfiguration, c fuzz.Continue) {
+			c.FuzzNoCustom(r)
+			if r.Source == "" {
+				r.Source = []resource.AllocationConfigSource{
+					"",
+					resource.AllocationConfigSourceClass,
+					resource.AllocationConfigSourceClaim,
+				}[c.Int31n(3)]
+			}
+		},
+		func(r *resource.OpaqueDeviceConfiguration, c fuzz.Continue) {
+			c.FuzzNoCustom(r)
+			if len(r.Parameters.Raw) == 0 {
+				r.Parameters.Raw = [][]byte{
+					nil,
+					[]byte{},
+					// default content for runtime.Object.
+					[]byte(`{"apiVersion":"unknown.group/unknown","kind":"Something","someKey":"someValue"}`),
+				}[c.Int31n(3)]
+			}
+		},
+	}
 }
