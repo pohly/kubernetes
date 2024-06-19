@@ -18,8 +18,18 @@ package errors
 
 import "fmt"
 
-// ErrCorruptCheckpoint error is reported when checksum does not match
-var ErrCorruptCheckpoint = fmt.Errorf("checkpoint is corrupted")
+// ErrCorruptCheckpoint error is reported when checksum does not match.
+// Check for it with:
+//
+//	var csErr CorruptCheckpointError
+//	if errors.As(err, &csErr) { ... }
+type CorruptCheckpointError struct {
+	ActualCS, ExpectedCS uint64
+}
+
+func (err CorruptCheckpointError) Error() string {
+	return "checkpoint is corrupted"
+}
 
 // ErrCheckpointNotFound is reported when checkpoint is not found for a given key
 var ErrCheckpointNotFound = fmt.Errorf("checkpoint is not found")
