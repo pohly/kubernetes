@@ -29,6 +29,7 @@ import (
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/gstruct"
 
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1alpha3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -36,6 +37,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	applyv1 "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/dynamic-resource-allocation/controller"
 	"k8s.io/klog/v2"
@@ -864,6 +866,63 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		nodes := NewNodes(f, 1, 1)
 		driver := NewDriver(f, nodes, networkResources)
 		b := newBuilder(f, driver)
+
+		ginkgo.It("support validating admission policy for admin access", func(ctx context.Context) {
+			// Create VAP, after making it unique to the current test.
+			adminAccessPolicyYAML := strings.ReplaceAll(adminAccessPolicyYAML, "dra.example.com", b.f.UniqueName)
+			driver.createFromYAML(ctx, []byte(adminAccessPolicyYAML), "")
+
+			// Wait for both VAPs to be processed. This ensures that there are no check errors in the status.
+			matchStatus := gomega.Equal(admissionregistrationv1.ValidatingAdmissionPolicyStatus{ObservedGeneration: 1, TypeChecking: &admissionregistrationv1.TypeChecking{}})
+			gomega.Eventually(ctx, framework.ListObjects(b.f.ClientSet.AdmissionregistrationV1().ValidatingAdmissionPolicies().List, metav1.ListOptions{})).Should(gomega.HaveField("Items", gomega.ContainElements(
+				gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+					"ObjectMeta": gomega.HaveField("Name", "resourceclaim-policy."+b.f.UniqueName),
+					"Status":     matchStatus,
+				}),
+				gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+					"ObjectMeta": gomega.HaveField("Name", "resourceclaimtemplate-policy."+b.f.UniqueName),
+					"Status":     matchStatus,
+				}),
+			)))
+
+			// Attempt to create claim and claim template with admin access. Must fail eventually.
+			claim := b.externalClaim()
+			claim.Spec.Devices.Requests[0].AdminAccess = true
+			_, claimTemplate := b.podInline()
+			claimTemplate.Spec.Spec.Devices.Requests[0].AdminAccess = true
+			matchVAPError := gomega.MatchError(gomega.ContainSubstring("admin access to devices not enabled" /* in namespace " + b.f.Namespace.Name */))
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				// First delete, in case that it succeeded earlier.
+				if err := b.f.ClientSet.ResourceV1alpha3().ResourceClaims(b.f.Namespace.Name).Delete(ctx, claim.Name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+					return err
+				}
+				_, err := b.f.ClientSet.ResourceV1alpha3().ResourceClaims(b.f.Namespace.Name).Create(ctx, claim, metav1.CreateOptions{})
+				return err
+			}).Should(matchVAPError)
+
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				// First delete, in case that it succeeded earlier.
+				if err := b.f.ClientSet.ResourceV1alpha3().ResourceClaimTemplates(b.f.Namespace.Name).Delete(ctx, claimTemplate.Name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+					return err
+				}
+				_, err := b.f.ClientSet.ResourceV1alpha3().ResourceClaimTemplates(b.f.Namespace.Name).Create(ctx, claimTemplate, metav1.CreateOptions{})
+				return err
+			}).Should(matchVAPError)
+
+			// After labeling the namespace, creation must (eventually...) succeed.
+			_, err := b.f.ClientSet.CoreV1().Namespaces().Apply(ctx,
+				applyv1.Namespace(b.f.Namespace.Name).WithLabels(map[string]string{"admin-access." + b.f.UniqueName: "on"}),
+				metav1.ApplyOptions{FieldManager: b.f.UniqueName})
+			framework.ExpectNoError(err)
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				_, err := b.f.ClientSet.ResourceV1alpha3().ResourceClaims(b.f.Namespace.Name).Create(ctx, claim, metav1.CreateOptions{})
+				return err
+			}).Should(gomega.Succeed())
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				_, err := b.f.ClientSet.ResourceV1alpha3().ResourceClaimTemplates(b.f.Namespace.Name).Create(ctx, claimTemplate, metav1.CreateOptions{})
+				return err
+			}).Should(gomega.Succeed())
+		})
 
 		ginkgo.It("truncates the name of a generated resource claim", func(ctx context.Context) {
 			pod, template := b.podInline()
