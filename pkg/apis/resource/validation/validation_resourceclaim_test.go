@@ -54,7 +54,7 @@ var (
 			Requests: []resource.DeviceRequest{{
 				Name:            goodName,
 				DeviceClassName: goodName,
-				CountMode:       resource.DeviceCountModeExact,
+				AllocationMode:  resource.DeviceAllocationModeExactCount,
 				Count:           1,
 			}},
 		},
