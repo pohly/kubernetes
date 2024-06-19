@@ -86,7 +86,6 @@ func TestListPodResourcesV1(t *testing.T) {
 	pluginCDIDevices := []*podresourcesapi.CDIDevice{{Name: "dra-dev0"}, {Name: "dra-dev1"}}
 	draDevs := []*podresourcesapi.DynamicResource{
 		{
-			ClassName:      "resource-class",
 			ClaimName:      "claim-name",
 			ClaimNamespace: "default",
 			ClaimResources: []*podresourcesapi.ClaimResource{{CDIDevices: pluginCDIDevices}},
@@ -891,7 +890,6 @@ func TestGetPodResourcesV1(t *testing.T) {
 	pluginCDIDevices := []*podresourcesapi.CDIDevice{{Name: "dra-dev0"}, {Name: "dra-dev1"}}
 	draDevs := []*podresourcesapi.DynamicResource{
 		{
-			ClassName:      "resource-class",
 			ClaimName:      "claim-name",
 			ClaimNamespace: "default",
 			ClaimResources: []*podresourcesapi.ClaimResource{{CDIDevices: pluginCDIDevices}},
@@ -1352,9 +1350,6 @@ func equalDynamicResources(draResA, draResB []*podresourcesapi.DynamicResource) 
 		cntDraResA := draResA[idx]
 		cntDraResB := draResB[idx]
 
-		if cntDraResA.ClassName != cntDraResB.ClassName {
-			return false
-		}
 		if cntDraResA.ClaimName != cntDraResB.ClaimName {
 			return false
 		}
@@ -1376,6 +1371,15 @@ func equalDynamicResources(draResA, draResB []*podresourcesapi.DynamicResource) 
 				if cdiDeviceA.Name != cdiDeviceB.Name {
 					return false
 				}
+			}
+			if claimResA.DriverName != claimResB.DriverName {
+				return false
+			}
+			if claimResA.PoolName != claimResB.PoolName {
+				return false
+			}
+			if claimResA.DeviceName != claimResB.DeviceName {
+				return false
 			}
 		}
 	}
