@@ -306,7 +306,7 @@ func validateResourceSliceSpec(spec *resource.ResourceSliceSpec, fldPath *field.
 	if spec.NodeName != nil {
 		allErrs = append(allErrs, validateNodeName(*spec.NodeName, field.NewPath("nodeName"))...)
 	}
-	allErrs = append(allErrs, validateDriverName(spec.DriverName, field.NewPath("driverName"))...)
+	allErrs = append(allErrs, validateDriverName(spec.Driver, field.NewPath("driverName"))...)
 	return allErrs
 }
 
@@ -321,7 +321,7 @@ func ValidateResourceSliceUpdate(resourceSlice, oldResourceSlice *resource.Resou
 func validateResourceSliceSpecUpdate(spec, oldSpec *resource.ResourceSliceSpec, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(spec.NodeName, spec.NodeName, fldPath.Child("nodeName"))...)
-	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(spec.DriverName, spec.DriverName, fldPath.Child("driverName"))...)
+	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(spec.Driver, spec.Driver, fldPath.Child("driverName"))...)
 	return allErrs
 }
 
@@ -352,7 +352,7 @@ func validateOpaqueConfiguration(parameters []resource.OpaqueConfiguration, fldP
 	driverNames := sets.New[string]()
 	for i, parameters := range parameters {
 		idxPath := fldPath.Index(i)
-		driverName := parameters.DriverName
+		driverName := parameters.Driver
 		allErrs = append(allErrs, validateDriverName(driverName, idxPath.Child("driverName"))...)
 		if driverNames.Has(driverName) {
 			allErrs = append(allErrs, field.Duplicate(idxPath.Child("driverName"), driverName))

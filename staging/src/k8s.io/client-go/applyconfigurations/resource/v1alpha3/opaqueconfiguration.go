@@ -25,7 +25,7 @@ import (
 // OpaqueConfigurationApplyConfiguration represents a declarative configuration of the OpaqueConfiguration type for use
 // with apply.
 type OpaqueConfigurationApplyConfiguration struct {
-	DriverName *string               `json:"driverName,omitempty"`
+	Driver     *string               `json:"driver,omitempty"`
 	Parameters *runtime.RawExtension `json:"parameters,omitempty"`
 }
 
@@ -35,11 +35,11 @@ func OpaqueConfiguration() *OpaqueConfigurationApplyConfiguration {
 	return &OpaqueConfigurationApplyConfiguration{}
 }
 
-// WithDriverName sets the DriverName field in the declarative configuration to the given value
+// WithDriver sets the Driver field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the DriverName field is set to the value of the last call.
-func (b *OpaqueConfigurationApplyConfiguration) WithDriverName(value string) *OpaqueConfigurationApplyConfiguration {
-	b.DriverName = &value
+// If called multiple times, the Driver field is set to the value of the last call.
+func (b *OpaqueConfigurationApplyConfiguration) WithDriver(value string) *OpaqueConfigurationApplyConfiguration {
+	b.Driver = &value
 	return b
 }
 

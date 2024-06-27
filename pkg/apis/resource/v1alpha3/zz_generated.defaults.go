@@ -45,6 +45,9 @@ func SetObjectDefaults_ResourceClaim(in *v1alpha3.ResourceClaim) {
 		if a.RequestDetail != nil {
 			if a.RequestDetail.Device != nil {
 				SetDefaults_DeviceRequest(a.RequestDetail.Device)
+				if a.RequestDetail.Device.CountMode == "" {
+					a.RequestDetail.Device.CountMode = "Exact"
+				}
 			}
 		}
 	}
@@ -63,6 +66,9 @@ func SetObjectDefaults_ResourceClaimTemplate(in *v1alpha3.ResourceClaimTemplate)
 		if a.RequestDetail != nil {
 			if a.RequestDetail.Device != nil {
 				SetDefaults_DeviceRequest(a.RequestDetail.Device)
+				if a.RequestDetail.Device.CountMode == "" {
+					a.RequestDetail.Device.CountMode = "Exact"
+				}
 			}
 		}
 	}

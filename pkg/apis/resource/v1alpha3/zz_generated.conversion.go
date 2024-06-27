@@ -171,6 +171,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha3.DeviceConstraint)(nil), (*resource.DeviceConstraint)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha3_DeviceConstraint_To_resource_DeviceConstraint(a.(*v1alpha3.DeviceConstraint), b.(*resource.DeviceConstraint), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resource.DeviceConstraint)(nil), (*v1alpha3.DeviceConstraint)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_DeviceConstraint_To_v1alpha3_DeviceConstraint(a.(*resource.DeviceConstraint), b.(*v1alpha3.DeviceConstraint), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*v1alpha3.DeviceRequest)(nil), (*resource.DeviceRequest)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1alpha3_DeviceRequest_To_resource_DeviceRequest(a.(*v1alpha3.DeviceRequest), b.(*resource.DeviceRequest), scope)
 	}); err != nil {
@@ -351,6 +361,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha3.ResourcePool)(nil), (*resource.ResourcePool)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha3_ResourcePool_To_resource_ResourcePool(a.(*v1alpha3.ResourcePool), b.(*resource.ResourcePool), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resource.ResourcePool)(nil), (*v1alpha3.ResourcePool)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_ResourcePool_To_v1alpha3_ResourcePool(a.(*resource.ResourcePool), b.(*v1alpha3.ResourcePool), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*v1alpha3.ResourceSlice)(nil), (*resource.ResourceSlice)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1alpha3_ResourceSlice_To_resource_ResourceSlice(a.(*v1alpha3.ResourceSlice), b.(*resource.ResourceSlice), scope)
 	}); err != nil {
@@ -396,7 +416,7 @@ func RegisterConversions(s *runtime.Scheme) error {
 
 func autoConvert_v1alpha3_AllocationConfiguration_To_resource_AllocationConfiguration(in *v1alpha3.AllocationConfiguration, out *resource.AllocationConfiguration, s conversion.Scope) error {
 	out.Admin = in.Admin
-	out.RequestNames = *(*[]string)(unsafe.Pointer(&in.RequestNames))
+	out.Requests = *(*[]string)(unsafe.Pointer(&in.Requests))
 	if err := Convert_v1alpha3_Configuration_To_resource_Configuration(&in.Configuration, &out.Configuration, s); err != nil {
 		return err
 	}
@@ -410,7 +430,7 @@ func Convert_v1alpha3_AllocationConfiguration_To_resource_AllocationConfiguratio
 
 func autoConvert_resource_AllocationConfiguration_To_v1alpha3_AllocationConfiguration(in *resource.AllocationConfiguration, out *v1alpha3.AllocationConfiguration, s conversion.Scope) error {
 	out.Admin = in.Admin
-	out.RequestNames = *(*[]string)(unsafe.Pointer(&in.RequestNames))
+	out.Requests = *(*[]string)(unsafe.Pointer(&in.Requests))
 	if err := Convert_resource_Configuration_To_v1alpha3_Configuration(&in.Configuration, &out.Configuration, s); err != nil {
 		return err
 	}
@@ -426,7 +446,7 @@ func autoConvert_v1alpha3_AllocationResult_To_resource_AllocationResult(in *v1al
 	out.Results = *(*[]resource.RequestAllocationResult)(unsafe.Pointer(&in.Results))
 	out.Config = *(*[]resource.AllocationConfiguration)(unsafe.Pointer(&in.Config))
 	out.AvailableOnNodes = (*core.NodeSelector)(unsafe.Pointer(in.AvailableOnNodes))
-	out.ControllerName = (*string)(unsafe.Pointer(in.ControllerName))
+	out.Controller = (*string)(unsafe.Pointer(in.Controller))
 	return nil
 }
 
@@ -439,7 +459,7 @@ func autoConvert_resource_AllocationResult_To_v1alpha3_AllocationResult(in *reso
 	out.Results = *(*[]v1alpha3.RequestAllocationResult)(unsafe.Pointer(&in.Results))
 	out.Config = *(*[]v1alpha3.AllocationConfiguration)(unsafe.Pointer(&in.Config))
 	out.AvailableOnNodes = (*v1.NodeSelector)(unsafe.Pointer(in.AvailableOnNodes))
-	out.ControllerName = (*string)(unsafe.Pointer(in.ControllerName))
+	out.Controller = (*string)(unsafe.Pointer(in.Controller))
 	return nil
 }
 
@@ -469,7 +489,7 @@ func Convert_resource_CELSelector_To_v1alpha3_CELSelector(in *resource.CELSelect
 }
 
 func autoConvert_v1alpha3_ClaimConfiguration_To_resource_ClaimConfiguration(in *v1alpha3.ClaimConfiguration, out *resource.ClaimConfiguration, s conversion.Scope) error {
-	out.RequestNames = *(*[]string)(unsafe.Pointer(&in.RequestNames))
+	out.Requests = *(*[]string)(unsafe.Pointer(&in.Requests))
 	if err := Convert_v1alpha3_Configuration_To_resource_Configuration(&in.Configuration, &out.Configuration, s); err != nil {
 		return err
 	}
@@ -482,7 +502,7 @@ func Convert_v1alpha3_ClaimConfiguration_To_resource_ClaimConfiguration(in *v1al
 }
 
 func autoConvert_resource_ClaimConfiguration_To_v1alpha3_ClaimConfiguration(in *resource.ClaimConfiguration, out *v1alpha3.ClaimConfiguration, s conversion.Scope) error {
-	out.RequestNames = *(*[]string)(unsafe.Pointer(&in.RequestNames))
+	out.Requests = *(*[]string)(unsafe.Pointer(&in.Requests))
 	if err := Convert_resource_Configuration_To_v1alpha3_Configuration(&in.Configuration, &out.Configuration, s); err != nil {
 		return err
 	}
@@ -539,8 +559,8 @@ func Convert_resource_Configuration_To_v1alpha3_Configuration(in *resource.Confi
 }
 
 func autoConvert_v1alpha3_Constraint_To_resource_Constraint(in *v1alpha3.Constraint, out *resource.Constraint, s conversion.Scope) error {
-	out.RequestNames = *(*[]string)(unsafe.Pointer(&in.RequestNames))
-	out.MatchAttribute = (*string)(unsafe.Pointer(in.MatchAttribute))
+	out.Requests = *(*[]string)(unsafe.Pointer(&in.Requests))
+	out.Device = (*resource.DeviceConstraint)(unsafe.Pointer(in.Device))
 	return nil
 }
 
@@ -550,8 +570,8 @@ func Convert_v1alpha3_Constraint_To_resource_Constraint(in *v1alpha3.Constraint,
 }
 
 func autoConvert_resource_Constraint_To_v1alpha3_Constraint(in *resource.Constraint, out *v1alpha3.Constraint, s conversion.Scope) error {
-	out.RequestNames = *(*[]string)(unsafe.Pointer(&in.RequestNames))
-	out.MatchAttribute = (*string)(unsafe.Pointer(in.MatchAttribute))
+	out.Requests = *(*[]string)(unsafe.Pointer(&in.Requests))
+	out.Device = (*v1alpha3.DeviceConstraint)(unsafe.Pointer(in.Device))
 	return nil
 }
 
@@ -706,10 +726,30 @@ func Convert_resource_DeviceClassSpec_To_v1alpha3_DeviceClassSpec(in *resource.D
 	return autoConvert_resource_DeviceClassSpec_To_v1alpha3_DeviceClassSpec(in, out, s)
 }
 
+func autoConvert_v1alpha3_DeviceConstraint_To_resource_DeviceConstraint(in *v1alpha3.DeviceConstraint, out *resource.DeviceConstraint, s conversion.Scope) error {
+	out.MatchAttribute = (*string)(unsafe.Pointer(in.MatchAttribute))
+	return nil
+}
+
+// Convert_v1alpha3_DeviceConstraint_To_resource_DeviceConstraint is an autogenerated conversion function.
+func Convert_v1alpha3_DeviceConstraint_To_resource_DeviceConstraint(in *v1alpha3.DeviceConstraint, out *resource.DeviceConstraint, s conversion.Scope) error {
+	return autoConvert_v1alpha3_DeviceConstraint_To_resource_DeviceConstraint(in, out, s)
+}
+
+func autoConvert_resource_DeviceConstraint_To_v1alpha3_DeviceConstraint(in *resource.DeviceConstraint, out *v1alpha3.DeviceConstraint, s conversion.Scope) error {
+	out.MatchAttribute = (*string)(unsafe.Pointer(in.MatchAttribute))
+	return nil
+}
+
+// Convert_resource_DeviceConstraint_To_v1alpha3_DeviceConstraint is an autogenerated conversion function.
+func Convert_resource_DeviceConstraint_To_v1alpha3_DeviceConstraint(in *resource.DeviceConstraint, out *v1alpha3.DeviceConstraint, s conversion.Scope) error {
+	return autoConvert_resource_DeviceConstraint_To_v1alpha3_DeviceConstraint(in, out, s)
+}
+
 func autoConvert_v1alpha3_DeviceRequest_To_resource_DeviceRequest(in *v1alpha3.DeviceRequest, out *resource.DeviceRequest, s conversion.Scope) error {
 	out.DeviceClassName = in.DeviceClassName
 	out.Selectors = *(*[]resource.Selector)(unsafe.Pointer(&in.Selectors))
-	out.CountMode = in.CountMode
+	out.CountMode = resource.CountMode(in.CountMode)
 	out.Count = (*int64)(unsafe.Pointer(in.Count))
 	out.AdminAccess = (*bool)(unsafe.Pointer(in.AdminAccess))
 	return nil
@@ -723,7 +763,7 @@ func Convert_v1alpha3_DeviceRequest_To_resource_DeviceRequest(in *v1alpha3.Devic
 func autoConvert_resource_DeviceRequest_To_v1alpha3_DeviceRequest(in *resource.DeviceRequest, out *v1alpha3.DeviceRequest, s conversion.Scope) error {
 	out.DeviceClassName = in.DeviceClassName
 	out.Selectors = *(*[]v1alpha3.Selector)(unsafe.Pointer(&in.Selectors))
-	out.CountMode = in.CountMode
+	out.CountMode = v1alpha3.CountMode(in.CountMode)
 	out.Count = (*int64)(unsafe.Pointer(in.Count))
 	out.AdminAccess = (*bool)(unsafe.Pointer(in.AdminAccess))
 	return nil
@@ -735,7 +775,7 @@ func Convert_resource_DeviceRequest_To_v1alpha3_DeviceRequest(in *resource.Devic
 }
 
 func autoConvert_v1alpha3_OpaqueConfiguration_To_resource_OpaqueConfiguration(in *v1alpha3.OpaqueConfiguration, out *resource.OpaqueConfiguration, s conversion.Scope) error {
-	out.DriverName = in.DriverName
+	out.Driver = in.Driver
 	out.Parameters = in.Parameters
 	return nil
 }
@@ -746,7 +786,7 @@ func Convert_v1alpha3_OpaqueConfiguration_To_resource_OpaqueConfiguration(in *v1
 }
 
 func autoConvert_resource_OpaqueConfiguration_To_v1alpha3_OpaqueConfiguration(in *resource.OpaqueConfiguration, out *v1alpha3.OpaqueConfiguration, s conversion.Scope) error {
-	out.DriverName = in.DriverName
+	out.Driver = in.Driver
 	out.Parameters = in.Parameters
 	return nil
 }
@@ -875,10 +915,10 @@ func Convert_resource_Request_To_v1alpha3_Request(in *resource.Request, out *v1a
 }
 
 func autoConvert_v1alpha3_RequestAllocationResult_To_resource_RequestAllocationResult(in *v1alpha3.RequestAllocationResult, out *resource.RequestAllocationResult, s conversion.Scope) error {
-	out.RequestName = in.RequestName
-	out.DriverName = in.DriverName
-	out.PoolName = in.PoolName
-	out.DeviceName = in.DeviceName
+	out.Request = in.Request
+	out.Driver = in.Driver
+	out.Pool = in.Pool
+	out.Device = in.Device
 	return nil
 }
 
@@ -888,10 +928,10 @@ func Convert_v1alpha3_RequestAllocationResult_To_resource_RequestAllocationResul
 }
 
 func autoConvert_resource_RequestAllocationResult_To_v1alpha3_RequestAllocationResult(in *resource.RequestAllocationResult, out *v1alpha3.RequestAllocationResult, s conversion.Scope) error {
-	out.RequestName = in.RequestName
-	out.DriverName = in.DriverName
-	out.PoolName = in.PoolName
-	out.DeviceName = in.DeviceName
+	out.Request = in.Request
+	out.Driver = in.Driver
+	out.Pool = in.Pool
+	out.Device = in.Device
 	return nil
 }
 
@@ -1026,7 +1066,7 @@ func autoConvert_v1alpha3_ResourceClaimSpec_To_resource_ResourceClaimSpec(in *v1
 	out.Requests = *(*[]resource.Request)(unsafe.Pointer(&in.Requests))
 	out.Constraints = *(*[]resource.Constraint)(unsafe.Pointer(&in.Constraints))
 	out.Config = *(*[]resource.ClaimConfiguration)(unsafe.Pointer(&in.Config))
-	out.ControllerName = (*string)(unsafe.Pointer(in.ControllerName))
+	out.Controller = (*string)(unsafe.Pointer(in.Controller))
 	return nil
 }
 
@@ -1039,7 +1079,7 @@ func autoConvert_resource_ResourceClaimSpec_To_v1alpha3_ResourceClaimSpec(in *re
 	out.Requests = *(*[]v1alpha3.Request)(unsafe.Pointer(&in.Requests))
 	out.Constraints = *(*[]v1alpha3.Constraint)(unsafe.Pointer(&in.Constraints))
 	out.Config = *(*[]v1alpha3.ClaimConfiguration)(unsafe.Pointer(&in.Config))
-	out.ControllerName = (*string)(unsafe.Pointer(in.ControllerName))
+	out.Controller = (*string)(unsafe.Pointer(in.Controller))
 	return nil
 }
 
@@ -1146,6 +1186,30 @@ func Convert_resource_ResourceClaimTemplateSpec_To_v1alpha3_ResourceClaimTemplat
 	return autoConvert_resource_ResourceClaimTemplateSpec_To_v1alpha3_ResourceClaimTemplateSpec(in, out, s)
 }
 
+func autoConvert_v1alpha3_ResourcePool_To_resource_ResourcePool(in *v1alpha3.ResourcePool, out *resource.ResourcePool, s conversion.Scope) error {
+	out.Name = in.Name
+	out.Generation = in.Generation
+	out.ResourceSliceCount = in.ResourceSliceCount
+	return nil
+}
+
+// Convert_v1alpha3_ResourcePool_To_resource_ResourcePool is an autogenerated conversion function.
+func Convert_v1alpha3_ResourcePool_To_resource_ResourcePool(in *v1alpha3.ResourcePool, out *resource.ResourcePool, s conversion.Scope) error {
+	return autoConvert_v1alpha3_ResourcePool_To_resource_ResourcePool(in, out, s)
+}
+
+func autoConvert_resource_ResourcePool_To_v1alpha3_ResourcePool(in *resource.ResourcePool, out *v1alpha3.ResourcePool, s conversion.Scope) error {
+	out.Name = in.Name
+	out.Generation = in.Generation
+	out.ResourceSliceCount = in.ResourceSliceCount
+	return nil
+}
+
+// Convert_resource_ResourcePool_To_v1alpha3_ResourcePool is an autogenerated conversion function.
+func Convert_resource_ResourcePool_To_v1alpha3_ResourcePool(in *resource.ResourcePool, out *v1alpha3.ResourcePool, s conversion.Scope) error {
+	return autoConvert_resource_ResourcePool_To_v1alpha3_ResourcePool(in, out, s)
+}
+
 func autoConvert_v1alpha3_ResourceSlice_To_resource_ResourceSlice(in *v1alpha3.ResourceSlice, out *resource.ResourceSlice, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1alpha3_ResourceSliceSpec_To_resource_ResourceSliceSpec(&in.Spec, &out.Spec, s); err != nil {
@@ -1195,12 +1259,12 @@ func Convert_resource_ResourceSliceList_To_v1alpha3_ResourceSliceList(in *resour
 }
 
 func autoConvert_v1alpha3_ResourceSliceSpec_To_resource_ResourceSliceSpec(in *v1alpha3.ResourceSliceSpec, out *resource.ResourceSliceSpec, s conversion.Scope) error {
-	out.DriverName = in.DriverName
-	out.PoolName = in.PoolName
+	out.Driver = in.Driver
+	if err := Convert_v1alpha3_ResourcePool_To_resource_ResourcePool(&in.Pool, &out.Pool, s); err != nil {
+		return err
+	}
 	out.NodeName = (*string)(unsafe.Pointer(in.NodeName))
 	out.NodeSelector = (*core.NodeSelector)(unsafe.Pointer(in.NodeSelector))
-	out.PoolGeneration = in.PoolGeneration
-	out.PoolSliceCount = in.PoolSliceCount
 	out.Devices = *(*[]resource.Device)(unsafe.Pointer(&in.Devices))
 	return nil
 }
@@ -1211,12 +1275,12 @@ func Convert_v1alpha3_ResourceSliceSpec_To_resource_ResourceSliceSpec(in *v1alph
 }
 
 func autoConvert_resource_ResourceSliceSpec_To_v1alpha3_ResourceSliceSpec(in *resource.ResourceSliceSpec, out *v1alpha3.ResourceSliceSpec, s conversion.Scope) error {
-	out.DriverName = in.DriverName
-	out.PoolName = in.PoolName
+	out.Driver = in.Driver
+	if err := Convert_resource_ResourcePool_To_v1alpha3_ResourcePool(&in.Pool, &out.Pool, s); err != nil {
+		return err
+	}
 	out.NodeName = (*string)(unsafe.Pointer(in.NodeName))
 	out.NodeSelector = (*v1.NodeSelector)(unsafe.Pointer(in.NodeSelector))
-	out.PoolGeneration = in.PoolGeneration
-	out.PoolSliceCount = in.PoolSliceCount
 	out.Devices = *(*[]v1alpha3.Device)(unsafe.Pointer(&in.Devices))
 	return nil
 }

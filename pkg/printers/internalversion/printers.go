@@ -658,7 +658,7 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Node", Type: "string", Description: resourceapi.ResourceSlice{}.SwaggerDoc()["nodeName"]},
 		{Name: "Driver", Type: "string", Description: resourceapi.ResourceSlice{}.SwaggerDoc()["driverName"]},
-		{Name: "Pool", Type: "string", Description: resourceapi.ResourceSlice{}.SwaggerDoc()["poolName"]},
+		{Name: "Pool", Type: "string", Description: resourceapi.ResourcePool{}.SwaggerDoc()["name"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
 	_ = h.TableHandler(nodeResourceSliceColumnDefinitions, printResourceSlice)
@@ -3066,7 +3066,7 @@ func printResourceSlice(obj *resource.ResourceSlice, options printers.GenerateOp
 	row := metav1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
-	row.Cells = append(row.Cells, obj.Name, ptr.Deref(obj.Spec.NodeName, ""), obj.Spec.DriverName, obj.Spec.PoolName, translateTimestampSince(obj.CreationTimestamp))
+	row.Cells = append(row.Cells, obj.Name, ptr.Deref(obj.Spec.NodeName, ""), obj.Spec.Driver, obj.Spec.Pool.Name, translateTimestampSince(obj.CreationTimestamp))
 
 	return []metav1.TableRow{row}, nil
 }

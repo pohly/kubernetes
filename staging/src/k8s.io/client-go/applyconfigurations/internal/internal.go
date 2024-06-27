@@ -12139,7 +12139,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: opaque
       type:
         namedType: io.k8s.api.resource.v1alpha3.OpaqueConfiguration
-    - name: requestNames
+    - name: requests
       type:
         list:
           elementType:
@@ -12157,7 +12157,7 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1alpha3.AllocationConfiguration
           elementRelationship: atomic
-    - name: controllerName
+    - name: controller
       type:
         scalar: string
     - name: results
@@ -12179,7 +12179,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: opaque
       type:
         namedType: io.k8s.api.resource.v1alpha3.OpaqueConfiguration
-    - name: requestNames
+    - name: requests
       type:
         list:
           elementType:
@@ -12194,10 +12194,10 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.resource.v1alpha3.Constraint
   map:
     fields:
-    - name: matchAttribute
+    - name: device
       type:
-        scalar: string
-    - name: requestNames
+        namedType: io.k8s.api.resource.v1alpha3.DeviceConstraint
+    - name: requests
       type:
         list:
           elementType:
@@ -12286,6 +12286,12 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: suitableNodes
       type:
         namedType: io.k8s.api.core.v1.NodeSelector
+- name: io.k8s.api.resource.v1alpha3.DeviceConstraint
+  map:
+    fields:
+    - name: matchAttribute
+      type:
+        scalar: string
 - name: io.k8s.api.resource.v1alpha3.DeviceRequest
   map:
     fields:
@@ -12298,6 +12304,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: countMode
       type:
         scalar: string
+      default: Exact
     - name: deviceClassName
       type:
         scalar: string
@@ -12311,7 +12318,7 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.resource.v1alpha3.OpaqueConfiguration
   map:
     fields:
-    - name: driverName
+    - name: driver
       type:
         scalar: string
       default: ""
@@ -12375,19 +12382,19 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.resource.v1alpha3.RequestAllocationResult
   map:
     fields:
-    - name: deviceName
+    - name: device
       type:
         scalar: string
       default: ""
-    - name: driverName
+    - name: driver
       type:
         scalar: string
       default: ""
-    - name: poolName
+    - name: pool
       type:
         scalar: string
       default: ""
-    - name: requestName
+    - name: request
       type:
         scalar: string
       default: ""
@@ -12458,7 +12465,7 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1alpha3.Constraint
           elementRelationship: atomic
-    - name: controllerName
+    - name: controller
       type:
         scalar: string
     - name: requests
@@ -12512,6 +12519,21 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.resource.v1alpha3.ResourceClaimSpec
       default: {}
+- name: io.k8s.api.resource.v1alpha3.ResourcePool
+  map:
+    fields:
+    - name: generation
+      type:
+        scalar: numeric
+      default: 0
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: resourceSliceCount
+      type:
+        scalar: numeric
+      default: 0
 - name: io.k8s.api.resource.v1alpha3.ResourceSlice
   map:
     fields:
@@ -12538,7 +12560,7 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1alpha3.Device
           elementRelationship: atomic
-    - name: driverName
+    - name: driver
       type:
         scalar: string
       default: ""
@@ -12548,18 +12570,10 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: nodeSelector
       type:
         namedType: io.k8s.api.core.v1.NodeSelector
-    - name: poolGeneration
+    - name: pool
       type:
-        scalar: numeric
-      default: 0
-    - name: poolName
-      type:
-        scalar: string
-      default: ""
-    - name: poolSliceCount
-      type:
-        scalar: numeric
-      default: 0
+        namedType: io.k8s.api.resource.v1alpha3.ResourcePool
+      default: {}
 - name: io.k8s.api.resource.v1alpha3.Selector
   map:
     fields:

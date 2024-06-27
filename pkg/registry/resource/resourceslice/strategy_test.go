@@ -31,7 +31,7 @@ var slice = &resource.ResourceSlice{
 	},
 	Spec: resource.ResourceSliceSpec{
 		NodeName:   ptr.To("valid-node-name"),
-		DriverName: "testdriver.example.com",
+		Driver: "testdriver.example.com",
 	},
 }
 

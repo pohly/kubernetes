@@ -25,13 +25,11 @@ import (
 // ResourceSliceSpecApplyConfiguration represents a declarative configuration of the ResourceSliceSpec type for use
 // with apply.
 type ResourceSliceSpecApplyConfiguration struct {
-	DriverName     *string                            `json:"driverName,omitempty"`
-	PoolName       *string                            `json:"poolName,omitempty"`
-	NodeName       *string                            `json:"nodeName,omitempty"`
-	NodeSelector   *v1.NodeSelectorApplyConfiguration `json:"nodeSelector,omitempty"`
-	PoolGeneration *int64                             `json:"poolGeneration,omitempty"`
-	PoolSliceCount *int64                             `json:"poolSliceCount,omitempty"`
-	Devices        []DeviceApplyConfiguration         `json:"devices,omitempty"`
+	Driver       *string                            `json:"driver,omitempty"`
+	Pool         *ResourcePoolApplyConfiguration    `json:"pool,omitempty"`
+	NodeName     *string                            `json:"nodeName,omitempty"`
+	NodeSelector *v1.NodeSelectorApplyConfiguration `json:"nodeSelector,omitempty"`
+	Devices      []DeviceApplyConfiguration         `json:"devices,omitempty"`
 }
 
 // ResourceSliceSpecApplyConfiguration constructs a declarative configuration of the ResourceSliceSpec type for use with
@@ -40,19 +38,19 @@ func ResourceSliceSpec() *ResourceSliceSpecApplyConfiguration {
 	return &ResourceSliceSpecApplyConfiguration{}
 }
 
-// WithDriverName sets the DriverName field in the declarative configuration to the given value
+// WithDriver sets the Driver field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the DriverName field is set to the value of the last call.
-func (b *ResourceSliceSpecApplyConfiguration) WithDriverName(value string) *ResourceSliceSpecApplyConfiguration {
-	b.DriverName = &value
+// If called multiple times, the Driver field is set to the value of the last call.
+func (b *ResourceSliceSpecApplyConfiguration) WithDriver(value string) *ResourceSliceSpecApplyConfiguration {
+	b.Driver = &value
 	return b
 }
 
-// WithPoolName sets the PoolName field in the declarative configuration to the given value
+// WithPool sets the Pool field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the PoolName field is set to the value of the last call.
-func (b *ResourceSliceSpecApplyConfiguration) WithPoolName(value string) *ResourceSliceSpecApplyConfiguration {
-	b.PoolName = &value
+// If called multiple times, the Pool field is set to the value of the last call.
+func (b *ResourceSliceSpecApplyConfiguration) WithPool(value *ResourcePoolApplyConfiguration) *ResourceSliceSpecApplyConfiguration {
+	b.Pool = value
 	return b
 }
 
@@ -69,22 +67,6 @@ func (b *ResourceSliceSpecApplyConfiguration) WithNodeName(value string) *Resour
 // If called multiple times, the NodeSelector field is set to the value of the last call.
 func (b *ResourceSliceSpecApplyConfiguration) WithNodeSelector(value *v1.NodeSelectorApplyConfiguration) *ResourceSliceSpecApplyConfiguration {
 	b.NodeSelector = value
-	return b
-}
-
-// WithPoolGeneration sets the PoolGeneration field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the PoolGeneration field is set to the value of the last call.
-func (b *ResourceSliceSpecApplyConfiguration) WithPoolGeneration(value int64) *ResourceSliceSpecApplyConfiguration {
-	b.PoolGeneration = &value
-	return b
-}
-
-// WithPoolSliceCount sets the PoolSliceCount field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the PoolSliceCount field is set to the value of the last call.
-func (b *ResourceSliceSpecApplyConfiguration) WithPoolSliceCount(value int64) *ResourceSliceSpecApplyConfiguration {
-	b.PoolSliceCount = &value
 	return b
 }
 

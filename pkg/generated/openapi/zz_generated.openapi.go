@@ -895,6 +895,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/resource/v1alpha3.DeviceClass":                                                              schema_k8sio_api_resource_v1alpha3_DeviceClass(ref),
 		"k8s.io/api/resource/v1alpha3.DeviceClassList":                                                          schema_k8sio_api_resource_v1alpha3_DeviceClassList(ref),
 		"k8s.io/api/resource/v1alpha3.DeviceClassSpec":                                                          schema_k8sio_api_resource_v1alpha3_DeviceClassSpec(ref),
+		"k8s.io/api/resource/v1alpha3.DeviceConstraint":                                                         schema_k8sio_api_resource_v1alpha3_DeviceConstraint(ref),
 		"k8s.io/api/resource/v1alpha3.DeviceRequest":                                                            schema_k8sio_api_resource_v1alpha3_DeviceRequest(ref),
 		"k8s.io/api/resource/v1alpha3.OpaqueConfiguration":                                                      schema_k8sio_api_resource_v1alpha3_OpaqueConfiguration(ref),
 		"k8s.io/api/resource/v1alpha3.PodSchedulingContext":                                                     schema_k8sio_api_resource_v1alpha3_PodSchedulingContext(ref),
@@ -913,6 +914,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/resource/v1alpha3.ResourceClaimTemplate":                                                    schema_k8sio_api_resource_v1alpha3_ResourceClaimTemplate(ref),
 		"k8s.io/api/resource/v1alpha3.ResourceClaimTemplateList":                                                schema_k8sio_api_resource_v1alpha3_ResourceClaimTemplateList(ref),
 		"k8s.io/api/resource/v1alpha3.ResourceClaimTemplateSpec":                                                schema_k8sio_api_resource_v1alpha3_ResourceClaimTemplateSpec(ref),
+		"k8s.io/api/resource/v1alpha3.ResourcePool":                                                             schema_k8sio_api_resource_v1alpha3_ResourcePool(ref),
 		"k8s.io/api/resource/v1alpha3.ResourceSlice":                                                            schema_k8sio_api_resource_v1alpha3_ResourceSlice(ref),
 		"k8s.io/api/resource/v1alpha3.ResourceSliceList":                                                        schema_k8sio_api_resource_v1alpha3_ResourceSliceList(ref),
 		"k8s.io/api/resource/v1alpha3.ResourceSliceSpec":                                                        schema_k8sio_api_resource_v1alpha3_ResourceSliceSpec(ref),
@@ -45353,14 +45355,14 @@ func schema_k8sio_api_resource_v1alpha3_AllocationConfiguration(ref common.Refer
 							Format:      "",
 						},
 					},
-					"requestNames": {
+					"requests": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
 								"x-kubernetes-list-type": "atomic",
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "The configuration applies to devices in these requests.\n\nIf empty, the configuration applies to all devices in the claim.",
+							Description: "Requests lists the names of requests where the configuration applies. If empty, its applies to all requests.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -45439,9 +45441,9 @@ func schema_k8sio_api_resource_v1alpha3_AllocationResult(ref common.ReferenceCal
 							Ref:         ref("k8s.io/api/core/v1.NodeSelector"),
 						},
 					},
-					"controllerName": {
+					"controller": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ControllerName is the name of the DRA driver which handled the allocation. That driver is also responsible for deallocating the claim. It is empty when the claim can be deallocated without involving a driver.\n\nA driver may allocate devices provided by other drivers, so this driver name here can be different from the driver names listed for the results.\n\nThis is an alpha field and requires enabling the DRAControlPlaneController feature gate.",
+							Description: "Controller is the name of the DRA driver which handled the allocation. That driver is also responsible for deallocating the claim. It is empty when the claim can be deallocated without involving a driver.\n\nA driver may allocate devices provided by other drivers, so this driver name here can be different from the driver names listed for the results.\n\nThis is an alpha field and requires enabling the DRAControlPlaneController feature gate.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -45463,7 +45465,7 @@ func schema_k8sio_api_resource_v1alpha3_CELSelector(ref common.ReferenceCallback
 				Properties: map[string]spec.Schema{
 					"expression": {
 						SchemaProps: spec.SchemaProps{
-							Description: "This CEL expression must evaluate to true if a device is suitable. This covers qualitative aspects of device selection.\n\nThe language is as defined in https://kubernetes.io/docs/reference/using-api/cel/ with several additions that are specific to device selectors.\n\nAttributes of a device are made available through a nested `device.attributes` map with the domain part of the attribute name as key in the outer map and the identifier as key in the inner map. All identifiers can be used in a field lookup:\n\n   device.attributes[\"dra.example.com\"].driverVersion\n\nThe type of each entry varies, depending on the attribute that is being looked up. The domain lookup returns an empty map if there is no attribute with that domain. However, unknown identifiers then trigger a runtime error.\n\nThe `cel.bind` function is enabled and can be used to simplify expressions that access multiple attributes with the same domain:\n\n   cel.bind(dra, device.attributes[\"dra.example.com\"], dra.someBool && dra.anotherBool)\n\nCapacities associated with a device are made available through a nested `device.capacities` map the same way as attributes.\n\nThe `device.driverName` string variable can be used to check for a specific driver explicitly in a filter that is meant to work for devices from different vendors. It is provided by Kubernetes and matches the `driverName` from the ResourceSlice which provides the device.\n\nThe CEL expression is applied to *all* available devices from any driver. The expression has to check for existence of an attribute when it is not certain that it is provided because runtime errors are not automatically treated as \"don't select device\". Instead, device selection fails completely and reports the error.\n\nSome more examples:\n\n   \"memory\" in device.capacities[\"dra.example.com\"] && # Is the capacity available?\n      device.capacities[\"dra.example.com\"].memory.isGreaterThan(quantity(\"1Gi\")) # >= 1Gi\n\n   device.attributes[\"dra.example.com\"].driverVersion.isGreaterThan(semver(\"1.0.0\")) # >= v1.0.0, runtime error if not available\n\n   device.driverName == \"dra.example.com\" # any device from that driver",
+							Description: "Expression is a CEL expression which evaluates a single device. It must evaluate to true when the device under consideration satisfies the desired criteria, and false when it does not. Any other result is an error and causes allocation of devices to abort.\n\nThe expression's input is an object named \"device\", which carries the following properties:\n - driver (string): the name of the driver which defines this device.\n - attributes (map[string]object): the device's attributes, grouped by prefix\n   (e.g. device.attributes[\"example.com\"] evaluates to an object with all\n   of the attributes which were prefixed by \"dra.example.com\".\n - capacity (map[string]object): the device's capacities, grouped by prefix.\n\nExample: Consider a device with driver=\"example.com\", which exposes two attributes named \"model\" and \"ext.example.com/family\" and which exposes one capacity named \"modules\". This input to this expression would have the following fields:\n\n    device.driver\n    device.attributes[\"example.com\"].model\n    device.attributes[\"ext.example.com\"].family\n    device.capacity[\"example.com\"].modules\n\nThe device.driver field can be used to check for a specific driver, either as a high-level precondition (i.e. you only want to consider devices from this driver) or as part of a multi-clause expression that is meant to consider devices from different drivers.\n\nThe value type of each attribute is defined by the device definition, and users who write these expressions must consult the documentation for their specific drivers. The value type of each capacity is Quantity.\n\nIf an unknown prefix is used as a lookup in either device.attributes or device.capacity, an empty map will be returned. Any reference to an unknown field will cause an evaluation error and allocation to abort.\n\nA robust expression should check for the existence of attributes before referencing them.\n\nFor ease of use, the cel.bind() function is enabled, and can be used to simplify expressions that access multiple attributes with the same domain. For example:\n\n    cel.bind(dra, device.attributes[\"dra.example.com\"], dra.someBool && dra.anotherBool)",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -45483,14 +45485,14 @@ func schema_k8sio_api_resource_v1alpha3_ClaimConfiguration(ref common.ReferenceC
 				Description: "ClaimConfiguration is used for configuration parameters in ResourcClaimSpec.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
-					"requestNames": {
+					"requests": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
 								"x-kubernetes-list-type": "atomic",
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "The configuration applies to devices in these requests.\n\nIf empty, the configuration applies to all devices in the claim.",
+							Description: "Requests lists the names of requests where the configuration applies. If empty, its applies to all requests.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -45566,17 +45568,17 @@ func schema_k8sio_api_resource_v1alpha3_Constraint(ref common.ReferenceCallback)
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "Besides the request name slice, constraint must have exactly one field set.",
+				Description: "Besides the request names, constraint must have exactly one field set.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
-					"requestNames": {
+					"requests": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
 								"x-kubernetes-list-type": "atomic",
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "The constraint applies to devices in these requests. A single entry is okay and used when that request is for multiple devices.\n\nIf empty, the constrain applies to all devices in the claim.",
+							Description: "Requests is a list of the one or more requests in this claim which must co-satisfy this constraint. If a request is fulfilled by multiple devices, then all of the devices must satisfy the constraint. If this is not specified, this constraint applies to all requests in this claim.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -45589,17 +45591,17 @@ func schema_k8sio_api_resource_v1alpha3_Constraint(ref common.ReferenceCallback)
 							},
 						},
 					},
-					"matchAttribute": {
+					"device": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The devices must have this attribute and its value must be the same.\n\nFor example, if you specified \"dra.example.com/numa\" (a hypothetical example!), then only devices in the same NUMA node will be chosen.",
-							Type:        []string{"string"},
-							Format:      "",
+							Description: "Device defines the constraint for devices.",
+							Ref:         ref("k8s.io/api/resource/v1alpha3.DeviceConstraint"),
 						},
 					},
 				},
-				Required: []string{"matchAttribute"},
 			},
 		},
+		Dependencies: []string{
+			"k8s.io/api/resource/v1alpha3.DeviceConstraint"},
 	}
 }
 
@@ -45625,7 +45627,7 @@ func schema_k8sio_api_resource_v1alpha3_Device(ref common.ReferenceCallback) com
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Attributes defines the set of attributes for this device. The name of each attribute must be unique in that set.\n\nThe maximum number of attributes and capacities is 32.",
+							Description: "Attributes defines the set of attributes for this device. The name of each attribute must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -45644,7 +45646,7 @@ func schema_k8sio_api_resource_v1alpha3_Device(ref common.ReferenceCallback) com
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Capacities defines the set of capacities for this device. The name of each capacity must be unique in that set.\n\nThe maximum number of attributes and capacities is 32.",
+							Description: "Capacities defines the set of capacities for this device. The name of each capacity must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -45674,7 +45676,7 @@ func schema_k8sio_api_resource_v1alpha3_DeviceAttribute(ref common.ReferenceCall
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Name is a unique identifier for this attribute, which will be referenced when selecting devices.\n\nAttributes are defined either by the owner of the specific driver (usually the vendor) or by some 3rd party (e.g. the Kubernetes project). Because attributes are sometimes compared across devices, a given name is expected to mean the same thing and have the same type on all devices.\n\nAttribute names must be either a DNS label (e.g. \"theName\") or a DNS subdomain followed by a slash (\"/\") followed by a DNS label (e.g. \"example.com/theName\"). Attributes whose name do not include the domain prefix are assumed to be part of the driver's domain. Attributes defined by 3rd parties must include the domain prefix.\n\nThe maximum length for the DNS subdomain is 63 characters (same as for driver names) and the maximum length of the DNS label identifier is 32.",
+							Description: "Name is a unique identifier for this attribute, which will be referenced when selecting devices.\n\nAttributes are defined either by the owner of the specific driver (usually the vendor) or by some 3rd party (e.g. the Kubernetes project). Because attributes are sometimes compared across devices, a given name is expected to mean the same thing and have the same type on all devices.\n\nAttribute names must be either a C identifier (e.g. \"theName\") or a DNS subdomain followed by a slash (\"/\") followed by a C identifier (e.g. \"example.com/theName\"). Attributes whose name do not include the domain prefix are assumed to be part of the driver's domain. Attributes defined by 3rd parties must include the domain prefix.\n\nThe maximum length for the DNS subdomain is 63 characters (same as for driver names) and the maximum length of the C identifier is 32.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -45724,7 +45726,7 @@ func schema_k8sio_api_resource_v1alpha3_DeviceCapacity(ref common.ReferenceCallb
 				Properties: map[string]spec.Schema{
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Name is a unique identifier for this capacity, which will be referenced when selecting devices.\n\nCapacities are defined either by the owner of the specific driver (usually the vendor) or by some 3rd party (e.g. the Kubernetes project). Because capacities are sometimes compared across devices, a given name is expected to mean the same thing and have the same type on all devices.\n\nCapacity names must be either a DNS label (e.g. \"theName\") or a DNS subdomain followed by a slash (\"/\") followed by a DNS label (e.g. \"example.com/theName\"). Capacities whose name do not include the domain prefix are assumed to be part of the driver's domain. Capacities defined by 3rd parties must include the domain prefix.\n\nThe maximum length for the DNS subdomain is 63 characters (same as for driver names) and the maximum length of the DNS label identifier is 32.",
+							Description: "Name is a unique identifier for this capacity, which will be referenced when selecting devices.\n\nCapacities are defined either by the owner of the specific driver (usually the vendor) or by some 3rd party (e.g. the Kubernetes project). Because capacities are sometimes compared across devices, a given name is expected to mean the same thing and have the same type on all devices.\n\nCapacity names must be either a C identifier (e.g. \"theName\") or a DNS subdomain followed by a slash (\"/\") followed by a C identifier (e.g. \"example.com/theName\"). Capacities whose name do not include the domain prefix are assumed to be part of the driver's domain. Capacities defined by 3rd parties must include the domain prefix.\n\nThe maximum length for the DNS subdomain is 63 characters (same as for driver names) and the maximum length of the C identifier is 32.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -45749,7 +45751,7 @@ func schema_k8sio_api_resource_v1alpha3_DeviceClass(ref common.ReferenceCallback
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "DeviceClass is a vendor or admin-provided resource that contains device configuration and selectors. It can be referenced in the device requests of a claim to apply these presets. Cluster scoped.",
+				Description: "DeviceClass is a vendor or admin-provided resource that contains device configuration and selectors. It can be referenced in the device requests of a claim to apply these presets. Cluster scoped.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
@@ -45775,7 +45777,7 @@ func schema_k8sio_api_resource_v1alpha3_DeviceClass(ref common.ReferenceCallback
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Spec defines what can be allocated and how to configure it.\n\nThis is mutable. Consumers have to be prepared for classes changing at any time, either because they get updated or replaced. Claim allocations are done once based on whatever was set in classes at the time of allocation.\n\nChanging the spec bumps up the generation number.",
+							Description: "Spec defines what can be allocated and how to configure it.\n\nThis is mutable. Consumers have to be prepared for classes changing at any time, either because they get updated or replaced. Claim allocations are done once based on whatever was set in classes at the time of allocation.\n\nChanging the spec increments the generation number.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/api/resource/v1alpha3.DeviceClassSpec"),
 						},
@@ -45898,6 +45900,26 @@ func schema_k8sio_api_resource_v1alpha3_DeviceClassSpec(ref common.ReferenceCall
 	}
 }
 
+func schema_k8sio_api_resource_v1alpha3_DeviceConstraint(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DeviceConstraint defines one constraint for devices. Exactly one field must be set.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"matchAttribute": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The devices must have this attribute and its value must be the same.\n\nFor example, if you specified \"dra.example.com/numa\" (a hypothetical example!), then only devices in the same NUMA node will be chosen. A device which does not have that attribute will not be chosen. All devices should use a value of the same type for this attribute because that is part of its specification, but if one device doesn't, then it also will not be chosen.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func schema_k8sio_api_resource_v1alpha3_DeviceRequest(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -45907,7 +45929,7 @@ func schema_k8sio_api_resource_v1alpha3_DeviceRequest(ref common.ReferenceCallba
 				Properties: map[string]spec.Schema{
 					"deviceClassName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "By referencing a DeviceClass, a request inherits additional configuration parameters and selectors.\n\nA class is required. Which classes are available depends on the cluster.\n\nAdministrators may use this to restrict which devices may get requested by only installing classes with selectors for permitted devices. If users are free to request anything without restrictions, then an empty class called \"none\" can get created to permit `deviceClassName: none`.",
+							Description: "DeviceClassName references a specific DeviceClass, which can define additional configuration and selectors to be inherited by this request.\n\nA class is required. Which classes are available depends on the cluster.\n\nAdministrators may use this to restrict which devices may get requested by only installing classes with selectors for permitted devices. If users are free to request anything without restrictions, then administrators can create an empty DeviceClass for users to reference.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -45920,7 +45942,7 @@ func schema_k8sio_api_resource_v1alpha3_DeviceRequest(ref common.ReferenceCallba
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Each selector must be satisfied by a device which is requested.",
+							Description: "Selectors define criteria which must be satisfied by a specific device in order for that device to be considered for this request. All selectors must be satisfied for a device to be considered.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -45934,21 +45956,22 @@ func schema_k8sio_api_resource_v1alpha3_DeviceRequest(ref common.ReferenceCallba
 					},
 					"countMode": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The count mode together with, for some modes, additional fields determines how many devices to allocate for the request.\n\nThe default if unset is exactly one device:\n    countMode: Exact\n    count: 1\n\n\"countMode: All\" asks for all devices matching the selectors. Allocation fails if not all of them are available, unless admin access is requested. Admin access is granted also for devices which are in use.\n\nMore modes may get added in the future.",
+							Description: "CountMode and its related fields define how many devices are needed to satisfy this request. Supported values are:\n\n- All: This request is for all of the matching devices in a pool.\n  Allocation will fail if some devices are already allocated,\n  unless adminAccess is requested.\n\n- Exact: This request is for a specific number of devices. The exact\n  number is provided in the count field.\n\nIf countMode is not specified, the default countMode is Exact. If countMode is Exact and count is not specified, the default count is one. Any other requests must specify this field.\n\nMore modes may get added in the future. Clients must refuse to handle requests with unknown modes.",
+							Default:     "Exact",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"count": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Count is used only when the count mode is \"Exact\". Must be larger than zero.",
+							Description: "Count is used only when the count mode is \"Exact\". Must be greater than zero. If CountMode is Exact and this field is not specified, the default is one.",
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},
 					},
 					"adminAccess": {
 						SchemaProps: spec.SchemaProps{
-							Description: "AdminAccess indicates that this is a claim for administrative access to the device(s). Claims with AdminAccess are expected to be used for monitoring or other management services for a device.  They ignore all ordinary claims to the device with respect to access modes and any resource allocations. Ability to request this kind of access is controlled via ResourceQuota in the resource.k8s.io API.\n\nDefault is false.",
+							Description: "AdminAccess indicates that this is a claim for administrative access to the device(s). Claims with AdminAccess are expected to be used for monitoring or other management services for a device.  They ignore all ordinary claims to the device with respect to access modes and any resource allocations.\n\nDefault is false.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -45969,9 +45992,9 @@ func schema_k8sio_api_resource_v1alpha3_OpaqueConfiguration(ref common.Reference
 				Description: "OpaqueConfiguration contains configuration parameters for a driver in a format defined by the driver vendor.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
-					"driverName": {
+					"driver": {
 						SchemaProps: spec.SchemaProps{
-							Description: "DriverName is used to determine which kubelet plugin needs to be passed these configuration parameters.\n\nAn admission webhook provided by the driver developer could use this to decide whether it needs to validate them.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver.",
+							Description: "Driver is used to determine which kubelet plugin needs to be passed these configuration parameters.\n\nAn admission policy provided by the driver developer could use this to decide whether it needs to validate them.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -45984,7 +46007,7 @@ func schema_k8sio_api_resource_v1alpha3_OpaqueConfiguration(ref common.Reference
 						},
 					},
 				},
-				Required: []string{"driverName", "parameters"},
+				Required: []string{"driver", "parameters"},
 			},
 		},
 		Dependencies: []string{
@@ -45996,7 +46019,7 @@ func schema_k8sio_api_resource_v1alpha3_PodSchedulingContext(ref common.Referenc
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "PodSchedulingContext objects hold information that is needed to schedule a Pod with ResourceClaims that use \"WaitForFirstConsumer\" allocation mode.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
+				Description: "PodSchedulingContext objects hold information that is needed to schedule a Pod with ResourceClaims that use \"WaitForFirstConsumer\" allocation mode.\n\nThis is an alpha type and requires enabling the DRAControlPlaneController feature gate.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
@@ -46175,7 +46198,7 @@ func schema_k8sio_api_resource_v1alpha3_Request(ref common.ReferenceCallback) co
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "Request is a request for one of many resources required for a claim. This is typically a request for a single resource like a device, but can also ask for several identical devices. It might get extended to support asking for one of several different alternatives.",
+				Description: "Request is a request for one of many resources required for a claim. This is typically a request for a single resource like a device, but can also ask for several identical devices.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"name": {
@@ -46193,7 +46216,7 @@ func schema_k8sio_api_resource_v1alpha3_Request(ref common.ReferenceCallback) co
 						},
 					},
 				},
-				Required: []string{"name", "device"},
+				Required: []string{"name"},
 			},
 		},
 		Dependencies: []string{
@@ -46208,23 +46231,23 @@ func schema_k8sio_api_resource_v1alpha3_RequestAllocationResult(ref common.Refer
 				Description: "RequestAllocationResult contains the allocation result for one request.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
-					"requestName": {
+					"request": {
 						SchemaProps: spec.SchemaProps{
-							Description: "RequestName identifies the request in the claim which caused this device to be allocated. Multiple devices may have been allocated per request.",
+							Description: "Request is the name of the request in the claim which caused this device to be allocated. Multiple devices may have been allocated per request.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
-					"driverName": {
+					"driver": {
 						SchemaProps: spec.SchemaProps{
-							Description: "DriverName specifies the name of the DRA driver whose kubelet plugin should be invoked to process the allocation once the claim is needed on a node.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver.",
+							Description: "Driver specifies the name of the DRA driver whose kubelet plugin should be invoked to process the allocation once the claim is needed on a node.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
-					"poolName": {
+					"pool": {
 						SchemaProps: spec.SchemaProps{
 							Description: "This name together with the driver name and the device name field identify which device was allocated (`<driver name>/<pool name>/<device name>`).\n\nMust not be longer than 253 characters and may contain one or more DNS sub-domains separated by slashes.",
 							Default:     "",
@@ -46232,16 +46255,16 @@ func schema_k8sio_api_resource_v1alpha3_RequestAllocationResult(ref common.Refer
 							Format:      "",
 						},
 					},
-					"deviceName": {
+					"device": {
 						SchemaProps: spec.SchemaProps{
-							Description: "DeviceName references one device instance via its name in the driver's resource pool. It must be a DNS label.",
+							Description: "Device references one device instance via its name in the driver's resource pool. It must be a DNS label.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 				},
-				Required: []string{"requestName", "driverName", "poolName", "deviceName"},
+				Required: []string{"request", "driver", "pool", "device"},
 			},
 		},
 	}
@@ -46261,7 +46284,6 @@ func schema_k8sio_api_resource_v1alpha3_RequestDetail(ref common.ReferenceCallba
 						},
 					},
 				},
-				Required: []string{"device"},
 			},
 		},
 		Dependencies: []string{
@@ -46273,7 +46295,7 @@ func schema_k8sio_api_resource_v1alpha3_ResourceClaim(ref common.ReferenceCallba
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "ResourceClaim describes which resources (typically one or more devices) are needed by a claim consumer. Its status tracks whether the claim has been allocated and what the resulting attributes are.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
+				Description: "ResourceClaim describes a request for access to resources in the cluster, for use by workloads. For example, if a workload needs an accelerator device with specific properties, this is how that request is expressed. The status stanza tracks whether this claim has been satisfied and what specific resources have been allocated.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
@@ -46299,14 +46321,14 @@ func schema_k8sio_api_resource_v1alpha3_ResourceClaim(ref common.ReferenceCallba
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Spec defines what to allocated and how to configure it. The spec is immutable.",
+							Description: "Spec describes what is being requested and how to configure it. The spec is immutable.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/api/resource/v1alpha3.ResourceClaimSpec"),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Status describes whether the claim is ready for use.",
+							Description: "Status describes whether the claim is ready to use and what has been allocated.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/api/resource/v1alpha3.ResourceClaimStatus"),
 						},
@@ -46472,7 +46494,7 @@ func schema_k8sio_api_resource_v1alpha3_ResourceClaimSpec(ref common.ReferenceCa
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Requests are individual requests for separate resources for the claim. An empty list is valid and means that the claim can always be allocated without needing anything. A class can be referenced to use the default requests from that class.",
+							Description: "Requests represent individual requests for distinct resources which must all be satisfied. If empty, nothing needs to be allocated.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -46522,15 +46544,14 @@ func schema_k8sio_api_resource_v1alpha3_ResourceClaimSpec(ref common.ReferenceCa
 							},
 						},
 					},
-					"controllerName": {
+					"controller": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ControllerName defines the name of the DRA driver that is meant to handle allocation of this claim. If empty, allocation is handled by the scheduler while scheduling a pod.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver.\n\nThis is an alpha field and requires enabling the DRAControlPlaneController feature gate.",
+							Description: "Controller is the name of the DRA driver that is meant to handle allocation of this claim. If empty, allocation is handled by the scheduler while scheduling a pod.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver.\n\nThis is an alpha field and requires enabling the DRAControlPlaneController feature gate.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 				},
-				Required: []string{"requests"},
 			},
 		},
 		Dependencies: []string{
@@ -46594,7 +46615,7 @@ func schema_k8sio_api_resource_v1alpha3_ResourceClaimTemplate(ref common.Referen
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "ResourceClaimTemplate is used to produce ResourceClaim objects.",
+				Description: "ResourceClaimTemplate is used to produce ResourceClaim objects.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
@@ -46715,11 +46736,49 @@ func schema_k8sio_api_resource_v1alpha3_ResourceClaimTemplateSpec(ref common.Ref
 	}
 }
 
+func schema_k8sio_api_resource_v1alpha3_ResourcePool(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ResourcePool describes the pool that ResourceSlices belong to.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name is used to identify the pool. For node-local devices, this is often the node name, but this is not required.\n\nIt must not be longer than 253 characters and must consist of one or more DNS sub-domains separated by slashes.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"generation": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Generation gets incremented in all ResourceSlices of a pool whenever resource definitions change. A consumer must only use definitions from ResourceSlices with the highest generation number and ignore all others.",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"resourceSliceCount": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ResourceSliceCount is the total number of ResourceSlices in the pool at this generation number.\n\nConsumers can use this to check whether they have seen all ResourceSlices belonging to the same pool.",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+				},
+				Required: []string{"name", "generation", "resourceSliceCount"},
+			},
+		},
+	}
+}
+
 func schema_k8sio_api_resource_v1alpha3_ResourceSlice(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "One or more slices represent a pool of devices managed by a given driver. How many slices the driver uses to publish that pool is driver-specific. Each device in a given pool must have a unique name.\n\nThe slice in which a device gets published may change over time. The unique identifier for a device is the tuple `<driver name>/<pool name>/<device name>`. Driver name and device name don't contain slashes, so it is okay to concatenate them like this in a string with a slash as separator. The pool name itself may contain additional slashes.\n\nWhenever a driver needs to update a pool, it bumps the pool generation number and updates all slices with that new number and any new device definitions. A consumer must only use device definitions from slices with the highest generation number and ignore all others.\n\nIf necessary, a consumer can check the number of total devices in a pool (included in each slice) to determine whether its view of a pool is complete.\n\nFor devices that are not local to a node, the node name is not set. Instead, the driver may use a node selector to specify where the devices are available.",
+				Description: "ResourceSlice represents one or more resources in a pool of similar resources, managed by a given driver. A pool may span more than one ResourceSlice, and exactly how many ResourceSlices comprise a pool is determined by the driver.\n\nAt the moment, the only resource type are devices with attributes and capacities. Each device in a given pool, regardless of how many ResourceSlices, must have a unique name. The ResourceSlice in which a device gets published may change over time. The unique identifier for a device is the tuple <driver name>, <pool name>, <device name>.\n\nWhenever a driver needs to update a pool, it increments the pool.Spec.Pool.Generation number and updates all ResourceSlices with that new number and new resource definitions. A consumer must only use ResourceSlices with the highest generation number and ignore all others.\n\nWhen allocating all resources in a pool matching certain criteria or when looking for the best solution among several different alternatives, a consumer should check the number of ResourceSlices in a pool (included in each ResourceSlice) to determine whether its view of a pool is complete and if not, should wait until the driver has completed updating the pool.\n\nFor resources that are not local to a node, the node name is not set. Instead, the driver may use a node selector to specify where the devices are available.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
@@ -46745,7 +46804,7 @@ func schema_k8sio_api_resource_v1alpha3_ResourceSlice(ref common.ReferenceCallba
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Contains the information published by the driver.\n\nChanging the spec bumps up the generation number.",
+							Description: "Contains the information published by the driver.\n\nChanging the spec increments the generation number.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/api/resource/v1alpha3.ResourceSliceSpec"),
 						},
@@ -46763,7 +46822,7 @@ func schema_k8sio_api_resource_v1alpha3_ResourceSliceList(ref common.ReferenceCa
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "ResourceSliceList is a collection of slices.",
+				Description: "ResourceSliceList is a collection of ResourceSlices.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
@@ -46789,7 +46848,7 @@ func schema_k8sio_api_resource_v1alpha3_ResourceSliceList(ref common.ReferenceCa
 					},
 					"items": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Items is the list of resource slices.",
+							Description: "Items is the list of resource ResourceSlices.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -46817,49 +46876,32 @@ func schema_k8sio_api_resource_v1alpha3_ResourceSliceSpec(ref common.ReferenceCa
 				Description: "ResourceSliceSpec contains the information published by the driver in one ResourceSlice.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
-					"driverName": {
+					"driver": {
 						SchemaProps: spec.SchemaProps{
-							Description: "DriverName identifies the DRA driver providing the capacity information. A field selector can be used to list only ResourceSlice objects with a certain driver name.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver.",
+							Description: "Driver identifies the DRA driver providing the capacity information. A field selector can be used to list only ResourceSlice objects with a certain driver name.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
-					"poolName": {
+					"pool": {
 						SchemaProps: spec.SchemaProps{
-							Description: "PoolName is used to identify devices. For node-local devices, this is often the node name, but this is not required.\n\nIt must not be longer than 253 and must consist of one or more DNS sub-domains separated by slashes.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
+							Description: "Pool describes the pool that this ResourceSlice belongs to.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/api/resource/v1alpha3.ResourcePool"),
 						},
 					},
 					"nodeName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "NodeName identifies the node which provides the devices. A field selector can be used to list only ResourceSlice objects belonging to a certain node.\n\nThis field can be used to limit access from nodes to slices with the same node name. It also indicates to autoscalers that adding new nodes of the same type as some old node might also make new devices available.\n\nNodeName and NodeSelector are mutually exclusive. One of them must be set.",
+							Description: "NodeName identifies the node which provides the devices. A field selector can be used to list only ResourceSlice objects belonging to a certain node.\n\nThis field can be used to limit access from nodes to ResourceSlices with the same node name. It also indicates to autoscalers that adding new nodes of the same type as some old node might also make new devices available.\n\nExactly one of NodeName and NodeSelector must be set.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"nodeSelector": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Defines which nodes have access to the devices in the pool. If the node selector is empty, all nodes have access.\n\nNodeName and NodeSelector are mutually exclusive. One of them must be set.",
+							Description: "NodeSelector defines which nodes have access to the devices in the pool. If it is specified, but empty (has no terms), all nodes have access.\n\nExactly one of NodeName and NodeSelector must be set.",
 							Ref:         ref("k8s.io/api/core/v1.NodeSelector"),
-						},
-					},
-					"poolGeneration": {
-						SchemaProps: spec.SchemaProps{
-							Description: "The generation gets bumped in all slices of a pool whenever device definitions change. A consumer must only use device definitions from slices with the highest generation number and ignore all others.",
-							Default:     0,
-							Type:        []string{"integer"},
-							Format:      "int64",
-						},
-					},
-					"poolSliceCount": {
-						SchemaProps: spec.SchemaProps{
-							Description: "The total number of slices in the pool. Consumers can use this to check whether they have seen all slices.",
-							Default:     0,
-							Type:        []string{"integer"},
-							Format:      "int64",
 						},
 					},
 					"devices": {
@@ -46869,7 +46911,7 @@ func schema_k8sio_api_resource_v1alpha3_ResourceSliceSpec(ref common.ReferenceCa
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "Devices lists all available devices in this pool.\n\nMust not have more than 128 entries.",
+							Description: "Devices lists some or all of the devices in this pool.\n\nMust not have more than 128 entries.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -46882,11 +46924,11 @@ func schema_k8sio_api_resource_v1alpha3_ResourceSliceSpec(ref common.ReferenceCa
 						},
 					},
 				},
-				Required: []string{"driverName", "poolName", "poolGeneration", "poolSliceCount", "devices"},
+				Required: []string{"driver", "pool"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/core/v1.NodeSelector", "k8s.io/api/resource/v1alpha3.Device"},
+			"k8s.io/api/core/v1.NodeSelector", "k8s.io/api/resource/v1alpha3.Device", "k8s.io/api/resource/v1alpha3.ResourcePool"},
 	}
 }
 

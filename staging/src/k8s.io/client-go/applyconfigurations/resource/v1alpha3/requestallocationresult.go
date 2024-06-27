@@ -21,10 +21,10 @@ package v1alpha3
 // RequestAllocationResultApplyConfiguration represents a declarative configuration of the RequestAllocationResult type for use
 // with apply.
 type RequestAllocationResultApplyConfiguration struct {
-	RequestName *string `json:"requestName,omitempty"`
-	DriverName  *string `json:"driverName,omitempty"`
-	PoolName    *string `json:"poolName,omitempty"`
-	DeviceName  *string `json:"deviceName,omitempty"`
+	Request *string `json:"request,omitempty"`
+	Driver  *string `json:"driver,omitempty"`
+	Pool    *string `json:"pool,omitempty"`
+	Device  *string `json:"device,omitempty"`
 }
 
 // RequestAllocationResultApplyConfiguration constructs a declarative configuration of the RequestAllocationResult type for use with
@@ -33,34 +33,34 @@ func RequestAllocationResult() *RequestAllocationResultApplyConfiguration {
 	return &RequestAllocationResultApplyConfiguration{}
 }
 
-// WithRequestName sets the RequestName field in the declarative configuration to the given value
+// WithRequest sets the Request field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the RequestName field is set to the value of the last call.
-func (b *RequestAllocationResultApplyConfiguration) WithRequestName(value string) *RequestAllocationResultApplyConfiguration {
-	b.RequestName = &value
+// If called multiple times, the Request field is set to the value of the last call.
+func (b *RequestAllocationResultApplyConfiguration) WithRequest(value string) *RequestAllocationResultApplyConfiguration {
+	b.Request = &value
 	return b
 }
 
-// WithDriverName sets the DriverName field in the declarative configuration to the given value
+// WithDriver sets the Driver field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the DriverName field is set to the value of the last call.
-func (b *RequestAllocationResultApplyConfiguration) WithDriverName(value string) *RequestAllocationResultApplyConfiguration {
-	b.DriverName = &value
+// If called multiple times, the Driver field is set to the value of the last call.
+func (b *RequestAllocationResultApplyConfiguration) WithDriver(value string) *RequestAllocationResultApplyConfiguration {
+	b.Driver = &value
 	return b
 }
 
-// WithPoolName sets the PoolName field in the declarative configuration to the given value
+// WithPool sets the Pool field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the PoolName field is set to the value of the last call.
-func (b *RequestAllocationResultApplyConfiguration) WithPoolName(value string) *RequestAllocationResultApplyConfiguration {
-	b.PoolName = &value
+// If called multiple times, the Pool field is set to the value of the last call.
+func (b *RequestAllocationResultApplyConfiguration) WithPool(value string) *RequestAllocationResultApplyConfiguration {
+	b.Pool = &value
 	return b
 }
 
-// WithDeviceName sets the DeviceName field in the declarative configuration to the given value
+// WithDevice sets the Device field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the DeviceName field is set to the value of the last call.
-func (b *RequestAllocationResultApplyConfiguration) WithDeviceName(value string) *RequestAllocationResultApplyConfiguration {
-	b.DeviceName = &value
+// If called multiple times, the Device field is set to the value of the last call.
+func (b *RequestAllocationResultApplyConfiguration) WithDevice(value string) *RequestAllocationResultApplyConfiguration {
+	b.Device = &value
 	return b
 }

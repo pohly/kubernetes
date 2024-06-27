@@ -1574,6 +1574,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &resourcev1alpha3.DeviceClassApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("DeviceClassSpec"):
 		return &resourcev1alpha3.DeviceClassSpecApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("DeviceConstraint"):
+		return &resourcev1alpha3.DeviceConstraintApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("DeviceRequest"):
 		return &resourcev1alpha3.DeviceRequestApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("OpaqueConfiguration"):
@@ -1604,6 +1606,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &resourcev1alpha3.ResourceClaimTemplateApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("ResourceClaimTemplateSpec"):
 		return &resourcev1alpha3.ResourceClaimTemplateSpecApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("ResourcePool"):
+		return &resourcev1alpha3.ResourcePoolApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("ResourceSlice"):
 		return &resourcev1alpha3.ResourceSliceApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("ResourceSliceSpec"):

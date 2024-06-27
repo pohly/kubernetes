@@ -18,12 +18,16 @@ limitations under the License.
 
 package v1alpha3
 
+import (
+	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
+)
+
 // DeviceRequestApplyConfiguration represents a declarative configuration of the DeviceRequest type for use
 // with apply.
 type DeviceRequestApplyConfiguration struct {
 	DeviceClassName *string                      `json:"deviceClassName,omitempty"`
 	Selectors       []SelectorApplyConfiguration `json:"selectors,omitempty"`
-	CountMode       *string                      `json:"countMode,omitempty"`
+	CountMode       *resourcev1alpha3.CountMode  `json:"countMode,omitempty"`
 	Count           *int64                       `json:"count,omitempty"`
 	AdminAccess     *bool                        `json:"adminAccess,omitempty"`
 }
@@ -58,7 +62,7 @@ func (b *DeviceRequestApplyConfiguration) WithSelectors(values ...*SelectorApply
 // WithCountMode sets the CountMode field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CountMode field is set to the value of the last call.
-func (b *DeviceRequestApplyConfiguration) WithCountMode(value string) *DeviceRequestApplyConfiguration {
+func (b *DeviceRequestApplyConfiguration) WithCountMode(value resourcev1alpha3.CountMode) *DeviceRequestApplyConfiguration {
 	b.CountMode = &value
 	return b
 }

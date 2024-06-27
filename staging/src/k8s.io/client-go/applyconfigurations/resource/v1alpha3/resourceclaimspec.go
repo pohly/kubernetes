@@ -21,10 +21,10 @@ package v1alpha3
 // ResourceClaimSpecApplyConfiguration represents a declarative configuration of the ResourceClaimSpec type for use
 // with apply.
 type ResourceClaimSpecApplyConfiguration struct {
-	Requests       []RequestApplyConfiguration            `json:"requests,omitempty"`
-	Constraints    []ConstraintApplyConfiguration         `json:"constraints,omitempty"`
-	Config         []ClaimConfigurationApplyConfiguration `json:"config,omitempty"`
-	ControllerName *string                                `json:"controllerName,omitempty"`
+	Requests    []RequestApplyConfiguration            `json:"requests,omitempty"`
+	Constraints []ConstraintApplyConfiguration         `json:"constraints,omitempty"`
+	Config      []ClaimConfigurationApplyConfiguration `json:"config,omitempty"`
+	Controller  *string                                `json:"controller,omitempty"`
 }
 
 // ResourceClaimSpecApplyConfiguration constructs a declarative configuration of the ResourceClaimSpec type for use with
@@ -72,10 +72,10 @@ func (b *ResourceClaimSpecApplyConfiguration) WithConfig(values ...*ClaimConfigu
 	return b
 }
 
-// WithControllerName sets the ControllerName field in the declarative configuration to the given value
+// WithController sets the Controller field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the ControllerName field is set to the value of the last call.
-func (b *ResourceClaimSpecApplyConfiguration) WithControllerName(value string) *ResourceClaimSpecApplyConfiguration {
-	b.ControllerName = &value
+// If called multiple times, the Controller field is set to the value of the last call.
+func (b *ResourceClaimSpecApplyConfiguration) WithController(value string) *ResourceClaimSpecApplyConfiguration {
+	b.Controller = &value
 	return b
 }

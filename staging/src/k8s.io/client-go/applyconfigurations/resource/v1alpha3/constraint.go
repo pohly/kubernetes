@@ -21,8 +21,8 @@ package v1alpha3
 // ConstraintApplyConfiguration represents a declarative configuration of the Constraint type for use
 // with apply.
 type ConstraintApplyConfiguration struct {
-	RequestNames   []string `json:"requestNames,omitempty"`
-	MatchAttribute *string  `json:"matchAttribute,omitempty"`
+	Requests []string                            `json:"requests,omitempty"`
+	Device   *DeviceConstraintApplyConfiguration `json:"device,omitempty"`
 }
 
 // ConstraintApplyConfiguration constructs a declarative configuration of the Constraint type for use with
@@ -31,20 +31,20 @@ func Constraint() *ConstraintApplyConfiguration {
 	return &ConstraintApplyConfiguration{}
 }
 
-// WithRequestNames adds the given value to the RequestNames field in the declarative configuration
+// WithRequests adds the given value to the Requests field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the RequestNames field.
-func (b *ConstraintApplyConfiguration) WithRequestNames(values ...string) *ConstraintApplyConfiguration {
+// If called multiple times, values provided by each call will be appended to the Requests field.
+func (b *ConstraintApplyConfiguration) WithRequests(values ...string) *ConstraintApplyConfiguration {
 	for i := range values {
-		b.RequestNames = append(b.RequestNames, values[i])
+		b.Requests = append(b.Requests, values[i])
 	}
 	return b
 }
 
-// WithMatchAttribute sets the MatchAttribute field in the declarative configuration to the given value
+// WithDevice sets the Device field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the MatchAttribute field is set to the value of the last call.
-func (b *ConstraintApplyConfiguration) WithMatchAttribute(value string) *ConstraintApplyConfiguration {
-	b.MatchAttribute = &value
+// If called multiple times, the Device field is set to the value of the last call.
+func (b *ConstraintApplyConfiguration) WithDevice(value *DeviceConstraintApplyConfiguration) *ConstraintApplyConfiguration {
+	b.Device = value
 	return b
 }

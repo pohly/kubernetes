@@ -22,7 +22,7 @@ package v1alpha3
 // with apply.
 type AllocationConfigurationApplyConfiguration struct {
 	Admin                           *bool    `json:"admin,omitempty"`
-	RequestNames                    []string `json:"requestNames,omitempty"`
+	Requests                        []string `json:"requests,omitempty"`
 	ConfigurationApplyConfiguration `json:",inline"`
 }
 
@@ -40,12 +40,12 @@ func (b *AllocationConfigurationApplyConfiguration) WithAdmin(value bool) *Alloc
 	return b
 }
 
-// WithRequestNames adds the given value to the RequestNames field in the declarative configuration
+// WithRequests adds the given value to the Requests field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the RequestNames field.
-func (b *AllocationConfigurationApplyConfiguration) WithRequestNames(values ...string) *AllocationConfigurationApplyConfiguration {
+// If called multiple times, values provided by each call will be appended to the Requests field.
+func (b *AllocationConfigurationApplyConfiguration) WithRequests(values ...string) *AllocationConfigurationApplyConfiguration {
 	for i := range values {
-		b.RequestNames = append(b.RequestNames, values[i])
+		b.Requests = append(b.Requests, values[i])
 	}
 	return b
 }

@@ -28,7 +28,7 @@ type AllocationResultApplyConfiguration struct {
 	Results          []RequestAllocationResultApplyConfiguration `json:"results,omitempty"`
 	Config           []AllocationConfigurationApplyConfiguration `json:"config,omitempty"`
 	AvailableOnNodes *v1.NodeSelectorApplyConfiguration          `json:"availableOnNodes,omitempty"`
-	ControllerName   *string                                     `json:"controllerName,omitempty"`
+	Controller       *string                                     `json:"controller,omitempty"`
 }
 
 // AllocationResultApplyConfiguration constructs a declarative configuration of the AllocationResult type for use with
@@ -71,10 +71,10 @@ func (b *AllocationResultApplyConfiguration) WithAvailableOnNodes(value *v1.Node
 	return b
 }
 
-// WithControllerName sets the ControllerName field in the declarative configuration to the given value
+// WithController sets the Controller field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the ControllerName field is set to the value of the last call.
-func (b *AllocationResultApplyConfiguration) WithControllerName(value string) *AllocationResultApplyConfiguration {
-	b.ControllerName = &value
+// If called multiple times, the Controller field is set to the value of the last call.
+func (b *AllocationResultApplyConfiguration) WithController(value string) *AllocationResultApplyConfiguration {
+	b.Controller = &value
 	return b
 }

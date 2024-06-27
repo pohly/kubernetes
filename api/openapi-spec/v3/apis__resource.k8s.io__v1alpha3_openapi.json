@@ -101,8 +101,8 @@
             ],
             "description": "Opaque provides driver-specific configuration parameters."
           },
-          "requestNames": {
-            "description": "The configuration applies to devices in these requests.\n\nIf empty, the configuration applies to all devices in the claim.",
+          "requests": {
+            "description": "Requests lists the names of requests where the configuration applies. If empty, its applies to all requests.",
             "items": {
               "default": "",
               "type": "string"
@@ -165,7 +165,7 @@
         "properties": {
           "expression": {
             "default": "",
-            "description": "This CEL expression must evaluate to true if a device is suitable. This covers qualitative aspects of device selection.\n\nThe language is as defined in https://kubernetes.io/docs/reference/using-api/cel/ with several additions that are specific to device selectors.\n\nAttributes of a device are made available through a nested `device.attributes` map with the domain part of the attribute name as key in the outer map and the identifier as key in the inner map. All identifiers can be used in a field lookup:\n\n   device.attributes[\"dra.example.com\"].driverVersion\n\nThe type of each entry varies, depending on the attribute that is being looked up. The domain lookup returns an empty map if there is no attribute with that domain. However, unknown identifiers then trigger a runtime error.\n\nThe `cel.bind` function is enabled and can be used to simplify expressions that access multiple attributes with the same domain:\n\n   cel.bind(dra, device.attributes[\"dra.example.com\"], dra.someBool && dra.anotherBool)\n\nCapacities associated with a device are made available through a nested `device.capacities` map the same way as attributes.\n\nThe `device.driverName` string variable can be used to check for a specific driver explicitly in a filter that is meant to work for devices from different vendors. It is provided by Kubernetes and matches the `driverName` from the ResourceSlice which provides the device.\n\nThe CEL expression is applied to *all* available devices from any driver. The expression has to check for existence of an attribute when it is not certain that it is provided because runtime errors are not automatically treated as \"don't select device\". Instead, device selection fails completely and reports the error.\n\nSome more examples:\n\n   \"memory\" in device.capacities[\"dra.example.com\"] && # Is the capacity available?\n      device.capacities[\"dra.example.com\"].memory.isGreaterThan(quantity(\"1Gi\")) # >= 1Gi\n\n   device.attributes[\"dra.example.com\"].driverVersion.isGreaterThan(semver(\"1.0.0\")) # >= v1.0.0, runtime error if not available\n\n   device.driverName == \"dra.example.com\" # any device from that driver",
+            "description": "Expression is a CEL expression which evaluates a single device. It must evaluate to true when the device under consideration satisfies the desired criteria, and false when it does not. Any other result is an error and causes allocation of devices to abort.\n\nThe expression's input is an object named \"device\", which carries the following properties:\n - driver (string): the name of the driver which defines this device.\n - attributes (map[string]object): the device's attributes, grouped by prefix\n   (e.g. device.attributes[\"example.com\"] evaluates to an object with all\n   of the attributes which were prefixed by \"dra.example.com\".\n - capacity (map[string]object): the device's capacities, grouped by prefix.\n\nExample: Consider a device with driver=\"example.com\", which exposes two attributes named \"model\" and \"ext.example.com/family\" and which exposes one capacity named \"modules\". This input to this expression would have the following fields:\n\n    device.driver\n    device.attributes[\"example.com\"].model\n    device.attributes[\"ext.example.com\"].family\n    device.capacity[\"example.com\"].modules\n\nThe device.driver field can be used to check for a specific driver, either as a high-level precondition (i.e. you only want to consider devices from this driver) or as part of a multi-clause expression that is meant to consider devices from different drivers.\n\nThe value type of each attribute is defined by the device definition, and users who write these expressions must consult the documentation for their specific drivers. The value type of each capacity is Quantity.\n\nIf an unknown prefix is used as a lookup in either device.attributes or device.capacity, an empty map will be returned. Any reference to an unknown field will cause an evaluation error and allocation to abort.\n\nA robust expression should check for the existence of attributes before referencing them.\n\nFor ease of use, the cel.bind() function is enabled, and can be used to simplify expressions that access multiple attributes with the same domain. For example:\n\n    cel.bind(dra, device.attributes[\"dra.example.com\"], dra.someBool && dra.anotherBool)",
             "type": "string"
           }
         },
@@ -185,8 +185,8 @@
             ],
             "description": "Opaque provides driver-specific configuration parameters."
           },
-          "requestNames": {
-            "description": "The configuration applies to devices in these requests.\n\nIf empty, the configuration applies to all devices in the claim.",
+          "requests": {
+            "description": "Requests lists the names of requests where the configuration applies. If empty, its applies to all requests.",
             "items": {
               "default": "",
               "type": "string"
@@ -218,14 +218,18 @@
         "type": "object"
       },
       "io.k8s.api.resource.v1alpha3.Constraint": {
-        "description": "Besides the request name slice, constraint must have exactly one field set.",
+        "description": "Besides the request names, constraint must have exactly one field set.",
         "properties": {
-          "matchAttribute": {
-            "description": "The devices must have this attribute and its value must be the same.\n\nFor example, if you specified \"dra.example.com/numa\" (a hypothetical example!), then only devices in the same NUMA node will be chosen.",
-            "type": "string"
+          "device": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha3.DeviceConstraint"
+              }
+            ],
+            "description": "Device defines the constraint for devices."
           },
-          "requestNames": {
-            "description": "The constraint applies to devices in these requests. A single entry is okay and used when that request is for multiple devices.\n\nIf empty, the constrain applies to all devices in the claim.",
+          "requests": {
+            "description": "Requests is a list of the one or more requests in this claim which must co-satisfy this constraint. If a request is fulfilled by multiple devices, then all of the devices must satisfy the constraint. If this is not specified, this constraint applies to all requests in this claim.",
             "items": {
               "default": "",
               "type": "string"
@@ -234,16 +238,13 @@
             "x-kubernetes-list-type": "atomic"
           }
         },
-        "required": [
-          "matchAttribute"
-        ],
         "type": "object"
       },
       "io.k8s.api.resource.v1alpha3.Device": {
         "description": "Device represents one individual hardware instance that can be selected based on its attributes.",
         "properties": {
           "attributes": {
-            "description": "Attributes defines the set of attributes for this device. The name of each attribute must be unique in that set.\n\nThe maximum number of attributes and capacities is 32.",
+            "description": "Attributes defines the set of attributes for this device. The name of each attribute must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
             "items": {
               "allOf": [
                 {
@@ -256,7 +257,7 @@
             "x-kubernetes-list-type": "atomic"
           },
           "capacities": {
-            "description": "Capacities defines the set of capacities for this device. The name of each capacity must be unique in that set.\n\nThe maximum number of attributes and capacities is 32.",
+            "description": "Capacities defines the set of capacities for this device. The name of each capacity must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
             "items": {
               "allOf": [
                 {
@@ -293,7 +294,7 @@
           },
           "name": {
             "default": "",
-            "description": "Name is a unique identifier for this attribute, which will be referenced when selecting devices.\n\nAttributes are defined either by the owner of the specific driver (usually the vendor) or by some 3rd party (e.g. the Kubernetes project). Because attributes are sometimes compared across devices, a given name is expected to mean the same thing and have the same type on all devices.\n\nAttribute names must be either a DNS label (e.g. \"theName\") or a DNS subdomain followed by a slash (\"/\") followed by a DNS label (e.g. \"example.com/theName\"). Attributes whose name do not include the domain prefix are assumed to be part of the driver's domain. Attributes defined by 3rd parties must include the domain prefix.\n\nThe maximum length for the DNS subdomain is 63 characters (same as for driver names) and the maximum length of the DNS label identifier is 32.",
+            "description": "Name is a unique identifier for this attribute, which will be referenced when selecting devices.\n\nAttributes are defined either by the owner of the specific driver (usually the vendor) or by some 3rd party (e.g. the Kubernetes project). Because attributes are sometimes compared across devices, a given name is expected to mean the same thing and have the same type on all devices.\n\nAttribute names must be either a C identifier (e.g. \"theName\") or a DNS subdomain followed by a slash (\"/\") followed by a C identifier (e.g. \"example.com/theName\"). Attributes whose name do not include the domain prefix are assumed to be part of the driver's domain. Attributes defined by 3rd parties must include the domain prefix.\n\nThe maximum length for the DNS subdomain is 63 characters (same as for driver names) and the maximum length of the C identifier is 32.",
             "type": "string"
           },
           "string": {
@@ -315,7 +316,7 @@
         "properties": {
           "name": {
             "default": "",
-            "description": "Name is a unique identifier for this capacity, which will be referenced when selecting devices.\n\nCapacities are defined either by the owner of the specific driver (usually the vendor) or by some 3rd party (e.g. the Kubernetes project). Because capacities are sometimes compared across devices, a given name is expected to mean the same thing and have the same type on all devices.\n\nCapacity names must be either a DNS label (e.g. \"theName\") or a DNS subdomain followed by a slash (\"/\") followed by a DNS label (e.g. \"example.com/theName\"). Capacities whose name do not include the domain prefix are assumed to be part of the driver's domain. Capacities defined by 3rd parties must include the domain prefix.\n\nThe maximum length for the DNS subdomain is 63 characters (same as for driver names) and the maximum length of the DNS label identifier is 32.",
+            "description": "Name is a unique identifier for this capacity, which will be referenced when selecting devices.\n\nCapacities are defined either by the owner of the specific driver (usually the vendor) or by some 3rd party (e.g. the Kubernetes project). Because capacities are sometimes compared across devices, a given name is expected to mean the same thing and have the same type on all devices.\n\nCapacity names must be either a C identifier (e.g. \"theName\") or a DNS subdomain followed by a slash (\"/\") followed by a C identifier (e.g. \"example.com/theName\"). Capacities whose name do not include the domain prefix are assumed to be part of the driver's domain. Capacities defined by 3rd parties must include the domain prefix.\n\nThe maximum length for the DNS subdomain is 63 characters (same as for driver names) and the maximum length of the C identifier is 32.",
             "type": "string"
           },
           "quantity": {
@@ -334,7 +335,7 @@
         "type": "object"
       },
       "io.k8s.api.resource.v1alpha3.DeviceClass": {
-        "description": "DeviceClass is a vendor or admin-provided resource that contains device configuration and selectors. It can be referenced in the device requests of a claim to apply these presets. Cluster scoped.",
+        "description": "DeviceClass is a vendor or admin-provided resource that contains device configuration and selectors. It can be referenced in the device requests of a claim to apply these presets. Cluster scoped.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
         "properties": {
           "apiVersion": {
             "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -360,7 +361,7 @@
               }
             ],
             "default": {},
-            "description": "Spec defines what can be allocated and how to configure it.\n\nThis is mutable. Consumers have to be prepared for classes changing at any time, either because they get updated or replaced. Claim allocations are done once based on whatever was set in classes at the time of allocation.\n\nChanging the spec bumps up the generation number."
+            "description": "Spec defines what can be allocated and how to configure it.\n\nThis is mutable. Consumers have to be prepared for classes changing at any time, either because they get updated or replaced. Claim allocations are done once based on whatever was set in classes at the time of allocation.\n\nChanging the spec increments the generation number."
           }
         },
         "required": [
@@ -459,29 +460,40 @@
         },
         "type": "object"
       },
+      "io.k8s.api.resource.v1alpha3.DeviceConstraint": {
+        "description": "DeviceConstraint defines one constraint for devices. Exactly one field must be set.",
+        "properties": {
+          "matchAttribute": {
+            "description": "The devices must have this attribute and its value must be the same.\n\nFor example, if you specified \"dra.example.com/numa\" (a hypothetical example!), then only devices in the same NUMA node will be chosen. A device which does not have that attribute will not be chosen. All devices should use a value of the same type for this attribute because that is part of its specification, but if one device doesn't, then it also will not be chosen.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "io.k8s.api.resource.v1alpha3.DeviceRequest": {
         "description": "DeviceRequest is currently the only permitted alternative in RequestDetail.",
         "properties": {
           "adminAccess": {
-            "description": "AdminAccess indicates that this is a claim for administrative access to the device(s). Claims with AdminAccess are expected to be used for monitoring or other management services for a device.  They ignore all ordinary claims to the device with respect to access modes and any resource allocations. Ability to request this kind of access is controlled via ResourceQuota in the resource.k8s.io API.\n\nDefault is false.",
+            "description": "AdminAccess indicates that this is a claim for administrative access to the device(s). Claims with AdminAccess are expected to be used for monitoring or other management services for a device.  They ignore all ordinary claims to the device with respect to access modes and any resource allocations.\n\nDefault is false.",
             "type": "boolean"
           },
           "count": {
-            "description": "Count is used only when the count mode is \"Exact\". Must be larger than zero.",
+            "description": "Count is used only when the count mode is \"Exact\". Must be greater than zero. If CountMode is Exact and this field is not specified, the default is one.",
             "format": "int64",
             "type": "integer"
           },
           "countMode": {
-            "description": "The count mode together with, for some modes, additional fields determines how many devices to allocate for the request.\n\nThe default if unset is exactly one device:\n    countMode: Exact\n    count: 1\n\n\"countMode: All\" asks for all devices matching the selectors. Allocation fails if not all of them are available, unless admin access is requested. Admin access is granted also for devices which are in use.\n\nMore modes may get added in the future.",
+            "default": "Exact",
+            "description": "CountMode and its related fields define how many devices are needed to satisfy this request. Supported values are:\n\n- All: This request is for all of the matching devices in a pool.\n  Allocation will fail if some devices are already allocated,\n  unless adminAccess is requested.\n\n- Exact: This request is for a specific number of devices. The exact\n  number is provided in the count field.\n\nIf countMode is not specified, the default countMode is Exact. If countMode is Exact and count is not specified, the default count is one. Any other requests must specify this field.\n\nMore modes may get added in the future. Clients must refuse to handle requests with unknown modes.",
             "type": "string"
           },
           "deviceClassName": {
             "default": "",
-            "description": "By referencing a DeviceClass, a request inherits additional configuration parameters and selectors.\n\nA class is required. Which classes are available depends on the cluster.\n\nAdministrators may use this to restrict which devices may get requested by only installing classes with selectors for permitted devices. If users are free to request anything without restrictions, then an empty class called \"none\" can get created to permit `deviceClassName: none`.",
+            "description": "DeviceClassName references a specific DeviceClass, which can define additional configuration and selectors to be inherited by this request.\n\nA class is required. Which classes are available depends on the cluster.\n\nAdministrators may use this to restrict which devices may get requested by only installing classes with selectors for permitted devices. If users are free to request anything without restrictions, then administrators can create an empty DeviceClass for users to reference.",
             "type": "string"
           },
           "selectors": {
-            "description": "Each selector must be satisfied by a device which is requested.",
+            "description": "Selectors define criteria which must be satisfied by a specific device in order for that device to be considered for this request. All selectors must be satisfied for a device to be considered.",
             "items": {
               "allOf": [
                 {
@@ -502,9 +514,9 @@
       "io.k8s.api.resource.v1alpha3.OpaqueConfiguration": {
         "description": "OpaqueConfiguration contains configuration parameters for a driver in a format defined by the driver vendor.",
         "properties": {
-          "driverName": {
+          "driver": {
             "default": "",
-            "description": "DriverName is used to determine which kubelet plugin needs to be passed these configuration parameters.\n\nAn admission webhook provided by the driver developer could use this to decide whether it needs to validate them.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver.",
+            "description": "Driver is used to determine which kubelet plugin needs to be passed these configuration parameters.\n\nAn admission policy provided by the driver developer could use this to decide whether it needs to validate them.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver.",
             "type": "string"
           },
           "parameters": {
@@ -517,13 +529,13 @@
           }
         },
         "required": [
-          "driverName",
+          "driver",
           "parameters"
         ],
         "type": "object"
       },
       "io.k8s.api.resource.v1alpha3.PodSchedulingContext": {
-        "description": "PodSchedulingContext objects hold information that is needed to schedule a Pod with ResourceClaims that use \"WaitForFirstConsumer\" allocation mode.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
+        "description": "PodSchedulingContext objects hold information that is needed to schedule a Pod with ResourceClaims that use \"WaitForFirstConsumer\" allocation mode.\n\nThis is an alpha type and requires enabling the DRAControlPlaneController feature gate.",
         "properties": {
           "apiVersion": {
             "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -660,7 +672,7 @@
         "type": "object"
       },
       "io.k8s.api.resource.v1alpha3.Request": {
-        "description": "Request is a request for one of many resources required for a claim. This is typically a request for a single resource like a device, but can also ask for several identical devices. It might get extended to support asking for one of several different alternatives.",
+        "description": "Request is a request for one of many resources required for a claim. This is typically a request for a single resource like a device, but can also ask for several identical devices.",
         "properties": {
           "device": {
             "allOf": [
@@ -677,45 +689,44 @@
           }
         },
         "required": [
-          "name",
-          "device"
+          "name"
         ],
         "type": "object"
       },
       "io.k8s.api.resource.v1alpha3.RequestAllocationResult": {
         "description": "RequestAllocationResult contains the allocation result for one request.",
         "properties": {
-          "deviceName": {
+          "device": {
             "default": "",
-            "description": "DeviceName references one device instance via its name in the driver's resource pool. It must be a DNS label.",
+            "description": "Device references one device instance via its name in the driver's resource pool. It must be a DNS label.",
             "type": "string"
           },
-          "driverName": {
+          "driver": {
             "default": "",
-            "description": "DriverName specifies the name of the DRA driver whose kubelet plugin should be invoked to process the allocation once the claim is needed on a node.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver.",
+            "description": "Driver specifies the name of the DRA driver whose kubelet plugin should be invoked to process the allocation once the claim is needed on a node.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver.",
             "type": "string"
           },
-          "poolName": {
+          "pool": {
             "default": "",
             "description": "This name together with the driver name and the device name field identify which device was allocated (`<driver name>/<pool name>/<device name>`).\n\nMust not be longer than 253 characters and may contain one or more DNS sub-domains separated by slashes.",
             "type": "string"
           },
-          "requestName": {
+          "request": {
             "default": "",
-            "description": "RequestName identifies the request in the claim which caused this device to be allocated. Multiple devices may have been allocated per request.",
+            "description": "Request is the name of the request in the claim which caused this device to be allocated. Multiple devices may have been allocated per request.",
             "type": "string"
           }
         },
         "required": [
-          "requestName",
-          "driverName",
-          "poolName",
-          "deviceName"
+          "request",
+          "driver",
+          "pool",
+          "device"
         ],
         "type": "object"
       },
       "io.k8s.api.resource.v1alpha3.ResourceClaim": {
-        "description": "ResourceClaim describes which resources (typically one or more devices) are needed by a claim consumer. Its status tracks whether the claim has been allocated and what the resulting attributes are.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
+        "description": "ResourceClaim describes a request for access to resources in the cluster, for use by workloads. For example, if a workload needs an accelerator device with specific properties, this is how that request is expressed. The status stanza tracks whether this claim has been satisfied and what specific resources have been allocated.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
         "properties": {
           "apiVersion": {
             "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -741,7 +752,7 @@
               }
             ],
             "default": {},
-            "description": "Spec defines what to allocated and how to configure it. The spec is immutable."
+            "description": "Spec describes what is being requested and how to configure it. The spec is immutable."
           },
           "status": {
             "allOf": [
@@ -750,7 +761,7 @@
               }
             ],
             "default": {},
-            "description": "Status describes whether the claim is ready for use."
+            "description": "Status describes whether the claim is ready to use and what has been allocated."
           }
         },
         "required": [
@@ -897,7 +908,7 @@
             "type": "string"
           },
           "requests": {
-            "description": "Requests are individual requests for separate resources for the claim. An empty list is valid and means that the claim can always be allocated without needing anything. A class can be referenced to use the default requests from that class.",
+            "description": "Requests represent individual requests for distinct resources which must all be satisfied. If empty, nothing needs to be allocated.",
             "items": {
               "allOf": [
                 {
@@ -910,9 +921,6 @@
             "x-kubernetes-list-type": "atomic"
           }
         },
-        "required": [
-          "requests"
-        ],
         "type": "object"
       },
       "io.k8s.api.resource.v1alpha3.ResourceClaimStatus": {
@@ -952,7 +960,7 @@
         "type": "object"
       },
       "io.k8s.api.resource.v1alpha3.ResourceClaimTemplate": {
-        "description": "ResourceClaimTemplate is used to produce ResourceClaim objects.",
+        "description": "ResourceClaimTemplate is used to produce ResourceClaim objects.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
         "properties": {
           "apiVersion": {
             "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -1065,8 +1073,36 @@
         ],
         "type": "object"
       },
+      "io.k8s.api.resource.v1alpha3.ResourcePool": {
+        "description": "ResourcePool describes the pool that ResourceSlices belong to.",
+        "properties": {
+          "generation": {
+            "default": 0,
+            "description": "Generation gets incremented in all ResourceSlices of a pool whenever resource definitions change. A consumer must only use definitions from ResourceSlices with the highest generation number and ignore all others.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "name": {
+            "default": "",
+            "description": "Name is used to identify the pool. For node-local devices, this is often the node name, but this is not required.\n\nIt must not be longer than 253 characters and must consist of one or more DNS sub-domains separated by slashes.",
+            "type": "string"
+          },
+          "resourceSliceCount": {
+            "default": 0,
+            "description": "ResourceSliceCount is the total number of ResourceSlices in the pool at this generation number.\n\nConsumers can use this to check whether they have seen all ResourceSlices belonging to the same pool.",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "generation",
+          "resourceSliceCount"
+        ],
+        "type": "object"
+      },
       "io.k8s.api.resource.v1alpha3.ResourceSlice": {
-        "description": "One or more slices represent a pool of devices managed by a given driver. How many slices the driver uses to publish that pool is driver-specific. Each device in a given pool must have a unique name.\n\nThe slice in which a device gets published may change over time. The unique identifier for a device is the tuple `<driver name>/<pool name>/<device name>`. Driver name and device name don't contain slashes, so it is okay to concatenate them like this in a string with a slash as separator. The pool name itself may contain additional slashes.\n\nWhenever a driver needs to update a pool, it bumps the pool generation number and updates all slices with that new number and any new device definitions. A consumer must only use device definitions from slices with the highest generation number and ignore all others.\n\nIf necessary, a consumer can check the number of total devices in a pool (included in each slice) to determine whether its view of a pool is complete.\n\nFor devices that are not local to a node, the node name is not set. Instead, the driver may use a node selector to specify where the devices are available.",
+        "description": "ResourceSlice represents one or more resources in a pool of similar resources, managed by a given driver. A pool may span more than one ResourceSlice, and exactly how many ResourceSlices comprise a pool is determined by the driver.\n\nAt the moment, the only resource type are devices with attributes and capacities. Each device in a given pool, regardless of how many ResourceSlices, must have a unique name. The ResourceSlice in which a device gets published may change over time. The unique identifier for a device is the tuple <driver name>, <pool name>, <device name>.\n\nWhenever a driver needs to update a pool, it increments the pool.Spec.Pool.Generation number and updates all ResourceSlices with that new number and new resource definitions. A consumer must only use ResourceSlices with the highest generation number and ignore all others.\n\nWhen allocating all resources in a pool matching certain criteria or when looking for the best solution among several different alternatives, a consumer should check the number of ResourceSlices in a pool (included in each ResourceSlice) to determine whether its view of a pool is complete and if not, should wait until the driver has completed updating the pool.\n\nFor resources that are not local to a node, the node name is not set. Instead, the driver may use a node selector to specify where the devices are available.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
         "properties": {
           "apiVersion": {
             "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -1092,7 +1128,7 @@
               }
             ],
             "default": {},
-            "description": "Contains the information published by the driver.\n\nChanging the spec bumps up the generation number."
+            "description": "Contains the information published by the driver.\n\nChanging the spec increments the generation number."
           }
         },
         "required": [
@@ -1108,14 +1144,14 @@
         ]
       },
       "io.k8s.api.resource.v1alpha3.ResourceSliceList": {
-        "description": "ResourceSliceList is a collection of slices.",
+        "description": "ResourceSliceList is a collection of ResourceSlices.",
         "properties": {
           "apiVersion": {
             "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
             "type": "string"
           },
           "items": {
-            "description": "Items is the list of resource slices.",
+            "description": "Items is the list of resource ResourceSlices.",
             "items": {
               "allOf": [
                 {
@@ -1156,7 +1192,7 @@
         "description": "ResourceSliceSpec contains the information published by the driver in one ResourceSlice.",
         "properties": {
           "devices": {
-            "description": "Devices lists all available devices in this pool.\n\nMust not have more than 128 entries.",
+            "description": "Devices lists some or all of the devices in this pool.\n\nMust not have more than 128 entries.",
             "items": {
               "allOf": [
                 {
@@ -1168,13 +1204,13 @@
             "type": "array",
             "x-kubernetes-list-type": "atomic"
           },
-          "driverName": {
+          "driver": {
             "default": "",
-            "description": "DriverName identifies the DRA driver providing the capacity information. A field selector can be used to list only ResourceSlice objects with a certain driver name.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver.",
+            "description": "Driver identifies the DRA driver providing the capacity information. A field selector can be used to list only ResourceSlice objects with a certain driver name.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver.",
             "type": "string"
           },
           "nodeName": {
-            "description": "NodeName identifies the node which provides the devices. A field selector can be used to list only ResourceSlice objects belonging to a certain node.\n\nThis field can be used to limit access from nodes to slices with the same node name. It also indicates to autoscalers that adding new nodes of the same type as some old node might also make new devices available.\n\nNodeName and NodeSelector are mutually exclusive. One of them must be set.",
+            "description": "NodeName identifies the node which provides the devices. A field selector can be used to list only ResourceSlice objects belonging to a certain node.\n\nThis field can be used to limit access from nodes to ResourceSlices with the same node name. It also indicates to autoscalers that adding new nodes of the same type as some old node might also make new devices available.\n\nExactly one of NodeName and NodeSelector must be set.",
             "type": "string"
           },
           "nodeSelector": {
@@ -1183,32 +1219,21 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeSelector"
               }
             ],
-            "description": "Defines which nodes have access to the devices in the pool. If the node selector is empty, all nodes have access.\n\nNodeName and NodeSelector are mutually exclusive. One of them must be set."
+            "description": "NodeSelector defines which nodes have access to the devices in the pool. If it is specified, but empty (has no terms), all nodes have access.\n\nExactly one of NodeName and NodeSelector must be set."
           },
-          "poolGeneration": {
-            "default": 0,
-            "description": "The generation gets bumped in all slices of a pool whenever device definitions change. A consumer must only use device definitions from slices with the highest generation number and ignore all others.",
-            "format": "int64",
-            "type": "integer"
-          },
-          "poolName": {
-            "default": "",
-            "description": "PoolName is used to identify devices. For node-local devices, this is often the node name, but this is not required.\n\nIt must not be longer than 253 and must consist of one or more DNS sub-domains separated by slashes.",
-            "type": "string"
-          },
-          "poolSliceCount": {
-            "default": 0,
-            "description": "The total number of slices in the pool. Consumers can use this to check whether they have seen all slices.",
-            "format": "int64",
-            "type": "integer"
+          "pool": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha3.ResourcePool"
+              }
+            ],
+            "default": {},
+            "description": "Pool describes the pool that this ResourceSlice belongs to."
           }
         },
         "required": [
-          "driverName",
-          "poolName",
-          "poolGeneration",
-          "poolSliceCount",
-          "devices"
+          "driver",
+          "pool"
         ],
         "type": "object"
       },

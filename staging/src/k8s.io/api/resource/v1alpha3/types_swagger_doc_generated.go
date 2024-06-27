@@ -28,9 +28,9 @@ package v1alpha3
 
 // AUTO-GENERATED FUNCTIONS START HERE. DO NOT EDIT.
 var map_AllocationConfiguration = map[string]string{
-	"":             "AllocationConfiguration gets embedded in an AllocationResult.",
-	"admin":        "Admins is true if the source of the configuration was a class and thus not something that a normal user would have been able to set.",
-	"requestNames": "The configuration applies to devices in these requests.\n\nIf empty, the configuration applies to all devices in the claim.",
+	"":         "AllocationConfiguration gets embedded in an AllocationResult.",
+	"admin":    "Admins is true if the source of the configuration was a class and thus not something that a normal user would have been able to set.",
+	"requests": "Requests lists the names of requests where the configuration applies. If empty, its applies to all requests.",
 }
 
 func (AllocationConfiguration) SwaggerDoc() map[string]string {
@@ -42,7 +42,7 @@ var map_AllocationResult = map[string]string{
 	"results":          "Results lists all allocated devices.",
 	"config":           "This field is a combination of all the claim and class configuration parameters. Drivers can distinguish between those based on a flag.\n\nThis includes configuration parameters for drivers which have no allocated devices in the result because it is up to the drivers which configuration parameters they support. They can silently ignore unknown configuration parameters.",
 	"availableOnNodes": "Setting this field is optional. If unset, the allocated devices are available everywhere.",
-	"controllerName":   "ControllerName is the name of the DRA driver which handled the allocation. That driver is also responsible for deallocating the claim. It is empty when the claim can be deallocated without involving a driver.\n\nA driver may allocate devices provided by other drivers, so this driver name here can be different from the driver names listed for the results.\n\nThis is an alpha field and requires enabling the DRAControlPlaneController feature gate.",
+	"controller":       "Controller is the name of the DRA driver which handled the allocation. That driver is also responsible for deallocating the claim. It is empty when the claim can be deallocated without involving a driver.\n\nA driver may allocate devices provided by other drivers, so this driver name here can be different from the driver names listed for the results.\n\nThis is an alpha field and requires enabling the DRAControlPlaneController feature gate.",
 }
 
 func (AllocationResult) SwaggerDoc() map[string]string {
@@ -51,7 +51,7 @@ func (AllocationResult) SwaggerDoc() map[string]string {
 
 var map_CELSelector = map[string]string{
 	"":           "CELSelector contains a CEL expression for selecting a device.",
-	"expression": "This CEL expression must evaluate to true if a device is suitable. This covers qualitative aspects of device selection.\n\nThe language is as defined in https://kubernetes.io/docs/reference/using-api/cel/ with several additions that are specific to device selectors.\n\nAttributes of a device are made available through a nested `device.attributes` map with the domain part of the attribute name as key in the outer map and the identifier as key in the inner map. All identifiers can be used in a field lookup:\n\n   device.attributes[\"dra.example.com\"].driverVersion\n\nThe type of each entry varies, depending on the attribute that is being looked up. The domain lookup returns an empty map if there is no attribute with that domain. However, unknown identifiers then trigger a runtime error.\n\nThe `cel.bind` function is enabled and can be used to simplify expressions that access multiple attributes with the same domain:\n\n   cel.bind(dra, device.attributes[\"dra.example.com\"], dra.someBool && dra.anotherBool)\n\nCapacities associated with a device are made available through a nested `device.capacities` map the same way as attributes.\n\nThe `device.driverName` string variable can be used to check for a specific driver explicitly in a filter that is meant to work for devices from different vendors. It is provided by Kubernetes and matches the `driverName` from the ResourceSlice which provides the device.\n\nThe CEL expression is applied to *all* available devices from any driver. The expression has to check for existence of an attribute when it is not certain that it is provided because runtime errors are not automatically treated as \"don't select device\". Instead, device selection fails completely and reports the error.\n\nSome more examples:\n\n   \"memory\" in device.capacities[\"dra.example.com\"] && # Is the capacity available?\n      device.capacities[\"dra.example.com\"].memory.isGreaterThan(quantity(\"1Gi\")) # >= 1Gi\n\n   device.attributes[\"dra.example.com\"].driverVersion.isGreaterThan(semver(\"1.0.0\")) # >= v1.0.0, runtime error if not available\n\n   device.driverName == \"dra.example.com\" # any device from that driver",
+	"expression": "Expression is a CEL expression which evaluates a single device. It must evaluate to true when the device under consideration satisfies the desired criteria, and false when it does not. Any other result is an error and causes allocation of devices to abort.\n\nThe expression's input is an object named \"device\", which carries the following properties:\n - driver (string): the name of the driver which defines this device.\n - attributes (map[string]object): the device's attributes, grouped by prefix\n   (e.g. device.attributes[\"example.com\"] evaluates to an object with all\n   of the attributes which were prefixed by \"dra.example.com\".\n - capacity (map[string]object): the device's capacities, grouped by prefix.\n\nExample: Consider a device with driver=\"example.com\", which exposes two attributes named \"model\" and \"ext.example.com/family\" and which exposes one capacity named \"modules\". This input to this expression would have the following fields:\n\n    device.driver\n    device.attributes[\"example.com\"].model\n    device.attributes[\"ext.example.com\"].family\n    device.capacity[\"example.com\"].modules\n\nThe device.driver field can be used to check for a specific driver, either as a high-level precondition (i.e. you only want to consider devices from this driver) or as part of a multi-clause expression that is meant to consider devices from different drivers.\n\nThe value type of each attribute is defined by the device definition, and users who write these expressions must consult the documentation for their specific drivers. The value type of each capacity is Quantity.\n\nIf an unknown prefix is used as a lookup in either device.attributes or device.capacity, an empty map will be returned. Any reference to an unknown field will cause an evaluation error and allocation to abort.\n\nA robust expression should check for the existence of attributes before referencing them.\n\nFor ease of use, the cel.bind() function is enabled, and can be used to simplify expressions that access multiple attributes with the same domain. For example:\n\n    cel.bind(dra, device.attributes[\"dra.example.com\"], dra.someBool && dra.anotherBool)",
 }
 
 func (CELSelector) SwaggerDoc() map[string]string {
@@ -59,8 +59,8 @@ func (CELSelector) SwaggerDoc() map[string]string {
 }
 
 var map_ClaimConfiguration = map[string]string{
-	"":             "ClaimConfiguration is used for configuration parameters in ResourcClaimSpec.",
-	"requestNames": "The configuration applies to devices in these requests.\n\nIf empty, the configuration applies to all devices in the claim.",
+	"":         "ClaimConfiguration is used for configuration parameters in ResourcClaimSpec.",
+	"requests": "Requests lists the names of requests where the configuration applies. If empty, its applies to all requests.",
 }
 
 func (ClaimConfiguration) SwaggerDoc() map[string]string {
@@ -85,9 +85,9 @@ func (Configuration) SwaggerDoc() map[string]string {
 }
 
 var map_Constraint = map[string]string{
-	"":               "Besides the request name slice, constraint must have exactly one field set.",
-	"requestNames":   "The constraint applies to devices in these requests. A single entry is okay and used when that request is for multiple devices.\n\nIf empty, the constrain applies to all devices in the claim.",
-	"matchAttribute": "The devices must have this attribute and its value must be the same.\n\nFor example, if you specified \"dra.example.com/numa\" (a hypothetical example!), then only devices in the same NUMA node will be chosen.",
+	"":         "Besides the request names, constraint must have exactly one field set.",
+	"requests": "Requests is a list of the one or more requests in this claim which must co-satisfy this constraint. If a request is fulfilled by multiple devices, then all of the devices must satisfy the constraint. If this is not specified, this constraint applies to all requests in this claim.",
+	"device":   "Device defines the constraint for devices.",
 }
 
 func (Constraint) SwaggerDoc() map[string]string {
@@ -97,8 +97,8 @@ func (Constraint) SwaggerDoc() map[string]string {
 var map_Device = map[string]string{
 	"":           "Device represents one individual hardware instance that can be selected based on its attributes.",
 	"name":       "Name is unique identifier among all devices managed by the driver in the pool. It must be a DNS label.",
-	"attributes": "Attributes defines the set of attributes for this device. The name of each attribute must be unique in that set.\n\nThe maximum number of attributes and capacities is 32.",
-	"capacities": "Capacities defines the set of capacities for this device. The name of each capacity must be unique in that set.\n\nThe maximum number of attributes and capacities is 32.",
+	"attributes": "Attributes defines the set of attributes for this device. The name of each attribute must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
+	"capacities": "Capacities defines the set of capacities for this device. The name of each capacity must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
 }
 
 func (Device) SwaggerDoc() map[string]string {
@@ -107,7 +107,7 @@ func (Device) SwaggerDoc() map[string]string {
 
 var map_DeviceAttribute = map[string]string{
 	"":        "DeviceAttribute is a combination of an attribute name and its value. Exactly one value must be set.",
-	"name":    "Name is a unique identifier for this attribute, which will be referenced when selecting devices.\n\nAttributes are defined either by the owner of the specific driver (usually the vendor) or by some 3rd party (e.g. the Kubernetes project). Because attributes are sometimes compared across devices, a given name is expected to mean the same thing and have the same type on all devices.\n\nAttribute names must be either a DNS label (e.g. \"theName\") or a DNS subdomain followed by a slash (\"/\") followed by a DNS label (e.g. \"example.com/theName\"). Attributes whose name do not include the domain prefix are assumed to be part of the driver's domain. Attributes defined by 3rd parties must include the domain prefix.\n\nThe maximum length for the DNS subdomain is 63 characters (same as for driver names) and the maximum length of the DNS label identifier is 32.",
+	"name":    "Name is a unique identifier for this attribute, which will be referenced when selecting devices.\n\nAttributes are defined either by the owner of the specific driver (usually the vendor) or by some 3rd party (e.g. the Kubernetes project). Because attributes are sometimes compared across devices, a given name is expected to mean the same thing and have the same type on all devices.\n\nAttribute names must be either a C identifier (e.g. \"theName\") or a DNS subdomain followed by a slash (\"/\") followed by a C identifier (e.g. \"example.com/theName\"). Attributes whose name do not include the domain prefix are assumed to be part of the driver's domain. Attributes defined by 3rd parties must include the domain prefix.\n\nThe maximum length for the DNS subdomain is 63 characters (same as for driver names) and the maximum length of the C identifier is 32.",
 	"int":     "IntValue is a number.",
 	"bool":    "BoolValue is a true/false value.",
 	"string":  "StringValue is a string. Must not be longer than 64 characters.",
@@ -120,7 +120,7 @@ func (DeviceAttribute) SwaggerDoc() map[string]string {
 
 var map_DeviceCapacity = map[string]string{
 	"":         "DeviceCapacity is a combination of a capacity name and its value. Exactly one value must be set.",
-	"name":     "Name is a unique identifier for this capacity, which will be referenced when selecting devices.\n\nCapacities are defined either by the owner of the specific driver (usually the vendor) or by some 3rd party (e.g. the Kubernetes project). Because capacities are sometimes compared across devices, a given name is expected to mean the same thing and have the same type on all devices.\n\nCapacity names must be either a DNS label (e.g. \"theName\") or a DNS subdomain followed by a slash (\"/\") followed by a DNS label (e.g. \"example.com/theName\"). Capacities whose name do not include the domain prefix are assumed to be part of the driver's domain. Capacities defined by 3rd parties must include the domain prefix.\n\nThe maximum length for the DNS subdomain is 63 characters (same as for driver names) and the maximum length of the DNS label identifier is 32.",
+	"name":     "Name is a unique identifier for this capacity, which will be referenced when selecting devices.\n\nCapacities are defined either by the owner of the specific driver (usually the vendor) or by some 3rd party (e.g. the Kubernetes project). Because capacities are sometimes compared across devices, a given name is expected to mean the same thing and have the same type on all devices.\n\nCapacity names must be either a C identifier (e.g. \"theName\") or a DNS subdomain followed by a slash (\"/\") followed by a C identifier (e.g. \"example.com/theName\"). Capacities whose name do not include the domain prefix are assumed to be part of the driver's domain. Capacities defined by 3rd parties must include the domain prefix.\n\nThe maximum length for the DNS subdomain is 63 characters (same as for driver names) and the maximum length of the C identifier is 32.",
 	"quantity": "Quantity determines the size of the capacity.",
 }
 
@@ -129,9 +129,9 @@ func (DeviceCapacity) SwaggerDoc() map[string]string {
 }
 
 var map_DeviceClass = map[string]string{
-	"":         "DeviceClass is a vendor or admin-provided resource that contains device configuration and selectors. It can be referenced in the device requests of a claim to apply these presets. Cluster scoped.",
+	"":         "DeviceClass is a vendor or admin-provided resource that contains device configuration and selectors. It can be referenced in the device requests of a claim to apply these presets. Cluster scoped.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
 	"metadata": "Standard object metadata",
-	"spec":     "Spec defines what can be allocated and how to configure it.\n\nThis is mutable. Consumers have to be prepared for classes changing at any time, either because they get updated or replaced. Claim allocations are done once based on whatever was set in classes at the time of allocation.\n\nChanging the spec bumps up the generation number.",
+	"spec":     "Spec defines what can be allocated and how to configure it.\n\nThis is mutable. Consumers have to be prepared for classes changing at any time, either because they get updated or replaced. Claim allocations are done once based on whatever was set in classes at the time of allocation.\n\nChanging the spec increments the generation number.",
 }
 
 func (DeviceClass) SwaggerDoc() map[string]string {
@@ -158,13 +158,22 @@ func (DeviceClassSpec) SwaggerDoc() map[string]string {
 	return map_DeviceClassSpec
 }
 
+var map_DeviceConstraint = map[string]string{
+	"":               "DeviceConstraint defines one constraint for devices. Exactly one field must be set.",
+	"matchAttribute": "The devices must have this attribute and its value must be the same.\n\nFor example, if you specified \"dra.example.com/numa\" (a hypothetical example!), then only devices in the same NUMA node will be chosen. A device which does not have that attribute will not be chosen. All devices should use a value of the same type for this attribute because that is part of its specification, but if one device doesn't, then it also will not be chosen.",
+}
+
+func (DeviceConstraint) SwaggerDoc() map[string]string {
+	return map_DeviceConstraint
+}
+
 var map_DeviceRequest = map[string]string{
 	"":                "DeviceRequest is currently the only permitted alternative in RequestDetail.",
-	"deviceClassName": "By referencing a DeviceClass, a request inherits additional configuration parameters and selectors.\n\nA class is required. Which classes are available depends on the cluster.\n\nAdministrators may use this to restrict which devices may get requested by only installing classes with selectors for permitted devices. If users are free to request anything without restrictions, then an empty class called \"none\" can get created to permit `deviceClassName: none`.",
-	"selectors":       "Each selector must be satisfied by a device which is requested.",
-	"countMode":       "The count mode together with, for some modes, additional fields determines how many devices to allocate for the request.\n\nThe default if unset is exactly one device:\n    countMode: Exact\n    count: 1\n\n\"countMode: All\" asks for all devices matching the selectors. Allocation fails if not all of them are available, unless admin access is requested. Admin access is granted also for devices which are in use.\n\nMore modes may get added in the future.",
-	"count":           "Count is used only when the count mode is \"Exact\". Must be larger than zero.",
-	"adminAccess":     "AdminAccess indicates that this is a claim for administrative access to the device(s). Claims with AdminAccess are expected to be used for monitoring or other management services for a device.  They ignore all ordinary claims to the device with respect to access modes and any resource allocations. Ability to request this kind of access is controlled via ResourceQuota in the resource.k8s.io API.\n\nDefault is false.",
+	"deviceClassName": "DeviceClassName references a specific DeviceClass, which can define additional configuration and selectors to be inherited by this request.\n\nA class is required. Which classes are available depends on the cluster.\n\nAdministrators may use this to restrict which devices may get requested by only installing classes with selectors for permitted devices. If users are free to request anything without restrictions, then administrators can create an empty DeviceClass for users to reference.",
+	"selectors":       "Selectors define criteria which must be satisfied by a specific device in order for that device to be considered for this request. All selectors must be satisfied for a device to be considered.",
+	"countMode":       "CountMode and its related fields define how many devices are needed to satisfy this request. Supported values are:\n\n- All: This request is for all of the matching devices in a pool.\n  Allocation will fail if some devices are already allocated,\n  unless adminAccess is requested.\n\n- Exact: This request is for a specific number of devices. The exact\n  number is provided in the count field.\n\nIf countMode is not specified, the default countMode is Exact. If countMode is Exact and count is not specified, the default count is one. Any other requests must specify this field.\n\nMore modes may get added in the future. Clients must refuse to handle requests with unknown modes.",
+	"count":           "Count is used only when the count mode is \"Exact\". Must be greater than zero. If CountMode is Exact and this field is not specified, the default is one.",
+	"adminAccess":     "AdminAccess indicates that this is a claim for administrative access to the device(s). Claims with AdminAccess are expected to be used for monitoring or other management services for a device.  They ignore all ordinary claims to the device with respect to access modes and any resource allocations.\n\nDefault is false.",
 }
 
 func (DeviceRequest) SwaggerDoc() map[string]string {
@@ -173,7 +182,7 @@ func (DeviceRequest) SwaggerDoc() map[string]string {
 
 var map_OpaqueConfiguration = map[string]string{
 	"":           "OpaqueConfiguration contains configuration parameters for a driver in a format defined by the driver vendor.",
-	"driverName": "DriverName is used to determine which kubelet plugin needs to be passed these configuration parameters.\n\nAn admission webhook provided by the driver developer could use this to decide whether it needs to validate them.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver.",
+	"driver":     "Driver is used to determine which kubelet plugin needs to be passed these configuration parameters.\n\nAn admission policy provided by the driver developer could use this to decide whether it needs to validate them.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver.",
 	"parameters": "Parameters can contain arbitrary data. It is the responsibility of the driver developer to handle validation and versioning. Typically this includes self-identification and a version (\"kind\" + \"apiVersion\" for Kubernetes types), with conversion between different versions.",
 }
 
@@ -182,7 +191,7 @@ func (OpaqueConfiguration) SwaggerDoc() map[string]string {
 }
 
 var map_PodSchedulingContext = map[string]string{
-	"":         "PodSchedulingContext objects hold information that is needed to schedule a Pod with ResourceClaims that use \"WaitForFirstConsumer\" allocation mode.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
+	"":         "PodSchedulingContext objects hold information that is needed to schedule a Pod with ResourceClaims that use \"WaitForFirstConsumer\" allocation mode.\n\nThis is an alpha type and requires enabling the DRAControlPlaneController feature gate.",
 	"metadata": "Standard object metadata",
 	"spec":     "Spec describes where resources for the Pod are needed.",
 	"status":   "Status describes where resources for the Pod can be allocated.",
@@ -222,7 +231,7 @@ func (PodSchedulingContextStatus) SwaggerDoc() map[string]string {
 }
 
 var map_Request = map[string]string{
-	"":     "Request is a request for one of many resources required for a claim. This is typically a request for a single resource like a device, but can also ask for several identical devices. It might get extended to support asking for one of several different alternatives.",
+	"":     "Request is a request for one of many resources required for a claim. This is typically a request for a single resource like a device, but can also ask for several identical devices.",
 	"name": "The name can be used to reference this request in a pod.spec.containers[].resources.claims entry and in a constraint of the claim.\n\nMust be a DNS label.",
 }
 
@@ -231,11 +240,11 @@ func (Request) SwaggerDoc() map[string]string {
 }
 
 var map_RequestAllocationResult = map[string]string{
-	"":            "RequestAllocationResult contains the allocation result for one request.",
-	"requestName": "RequestName identifies the request in the claim which caused this device to be allocated. Multiple devices may have been allocated per request.",
-	"driverName":  "DriverName specifies the name of the DRA driver whose kubelet plugin should be invoked to process the allocation once the claim is needed on a node.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver.",
-	"poolName":    "This name together with the driver name and the device name field identify which device was allocated (`<driver name>/<pool name>/<device name>`).\n\nMust not be longer than 253 characters and may contain one or more DNS sub-domains separated by slashes.",
-	"deviceName":  "DeviceName references one device instance via its name in the driver's resource pool. It must be a DNS label.",
+	"":        "RequestAllocationResult contains the allocation result for one request.",
+	"request": "Request is the name of the request in the claim which caused this device to be allocated. Multiple devices may have been allocated per request.",
+	"driver":  "Driver specifies the name of the DRA driver whose kubelet plugin should be invoked to process the allocation once the claim is needed on a node.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver.",
+	"pool":    "This name together with the driver name and the device name field identify which device was allocated (`<driver name>/<pool name>/<device name>`).\n\nMust not be longer than 253 characters and may contain one or more DNS sub-domains separated by slashes.",
+	"device":  "Device references one device instance via its name in the driver's resource pool. It must be a DNS label.",
 }
 
 func (RequestAllocationResult) SwaggerDoc() map[string]string {
@@ -252,10 +261,10 @@ func (RequestDetail) SwaggerDoc() map[string]string {
 }
 
 var map_ResourceClaim = map[string]string{
-	"":         "ResourceClaim describes which resources (typically one or more devices) are needed by a claim consumer. Its status tracks whether the claim has been allocated and what the resulting attributes are.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
+	"":         "ResourceClaim describes a request for access to resources in the cluster, for use by workloads. For example, if a workload needs an accelerator device with specific properties, this is how that request is expressed. The status stanza tracks whether this claim has been satisfied and what specific resources have been allocated.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
 	"metadata": "Standard object metadata",
-	"spec":     "Spec defines what to allocated and how to configure it. The spec is immutable.",
-	"status":   "Status describes whether the claim is ready for use.",
+	"spec":     "Spec describes what is being requested and how to configure it. The spec is immutable.",
+	"status":   "Status describes whether the claim is ready to use and what has been allocated.",
 }
 
 func (ResourceClaim) SwaggerDoc() map[string]string {
@@ -295,11 +304,11 @@ func (ResourceClaimSchedulingStatus) SwaggerDoc() map[string]string {
 }
 
 var map_ResourceClaimSpec = map[string]string{
-	"":               "ResourceClaimSpec defines how a resource is to be allocated.",
-	"requests":       "Requests are individual requests for separate resources for the claim. An empty list is valid and means that the claim can always be allocated without needing anything. A class can be referenced to use the default requests from that class.",
-	"constraints":    "These constraints must be satisfied by the set of devices that get allocated for the claim.",
-	"config":         "This field holds configuration for multiple potential drivers which could satisfy requests in this claim. It is ignored while allocating the claim.",
-	"controllerName": "ControllerName defines the name of the DRA driver that is meant to handle allocation of this claim. If empty, allocation is handled by the scheduler while scheduling a pod.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver.\n\nThis is an alpha field and requires enabling the DRAControlPlaneController feature gate.",
+	"":            "ResourceClaimSpec defines how a resource is to be allocated.",
+	"requests":    "Requests represent individual requests for distinct resources which must all be satisfied. If empty, nothing needs to be allocated.",
+	"constraints": "These constraints must be satisfied by the set of devices that get allocated for the claim.",
+	"config":      "This field holds configuration for multiple potential drivers which could satisfy requests in this claim. It is ignored while allocating the claim.",
+	"controller":  "Controller is the name of the DRA driver that is meant to handle allocation of this claim. If empty, allocation is handled by the scheduler while scheduling a pod.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver.\n\nThis is an alpha field and requires enabling the DRAControlPlaneController feature gate.",
 }
 
 func (ResourceClaimSpec) SwaggerDoc() map[string]string {
@@ -318,7 +327,7 @@ func (ResourceClaimStatus) SwaggerDoc() map[string]string {
 }
 
 var map_ResourceClaimTemplate = map[string]string{
-	"":         "ResourceClaimTemplate is used to produce ResourceClaim objects.",
+	"":         "ResourceClaimTemplate is used to produce ResourceClaim objects.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
 	"metadata": "Standard object metadata",
 	"spec":     "Describes the ResourceClaim that is to be generated.\n\nThis field is immutable. A ResourceClaim will get created by the control plane for a Pod when needed and then not get updated anymore.",
 }
@@ -347,10 +356,21 @@ func (ResourceClaimTemplateSpec) SwaggerDoc() map[string]string {
 	return map_ResourceClaimTemplateSpec
 }
 
+var map_ResourcePool = map[string]string{
+	"":                   "ResourcePool describes the pool that ResourceSlices belong to.",
+	"name":               "Name is used to identify the pool. For node-local devices, this is often the node name, but this is not required.\n\nIt must not be longer than 253 characters and must consist of one or more DNS sub-domains separated by slashes.",
+	"generation":         "Generation gets incremented in all ResourceSlices of a pool whenever resource definitions change. A consumer must only use definitions from ResourceSlices with the highest generation number and ignore all others.",
+	"resourceSliceCount": "ResourceSliceCount is the total number of ResourceSlices in the pool at this generation number.\n\nConsumers can use this to check whether they have seen all ResourceSlices belonging to the same pool.",
+}
+
+func (ResourcePool) SwaggerDoc() map[string]string {
+	return map_ResourcePool
+}
+
 var map_ResourceSlice = map[string]string{
-	"":         "One or more slices represent a pool of devices managed by a given driver. How many slices the driver uses to publish that pool is driver-specific. Each device in a given pool must have a unique name.\n\nThe slice in which a device gets published may change over time. The unique identifier for a device is the tuple `<driver name>/<pool name>/<device name>`. Driver name and device name don't contain slashes, so it is okay to concatenate them like this in a string with a slash as separator. The pool name itself may contain additional slashes.\n\nWhenever a driver needs to update a pool, it bumps the pool generation number and updates all slices with that new number and any new device definitions. A consumer must only use device definitions from slices with the highest generation number and ignore all others.\n\nIf necessary, a consumer can check the number of total devices in a pool (included in each slice) to determine whether its view of a pool is complete.\n\nFor devices that are not local to a node, the node name is not set. Instead, the driver may use a node selector to specify where the devices are available.",
+	"":         "ResourceSlice represents one or more resources in a pool of similar resources, managed by a given driver. A pool may span more than one ResourceSlice, and exactly how many ResourceSlices comprise a pool is determined by the driver.\n\nAt the moment, the only resource type are devices with attributes and capacities. Each device in a given pool, regardless of how many ResourceSlices, must have a unique name. The ResourceSlice in which a device gets published may change over time. The unique identifier for a device is the tuple <driver name>, <pool name>, <device name>.\n\nWhenever a driver needs to update a pool, it increments the pool.Spec.Pool.Generation number and updates all ResourceSlices with that new number and new resource definitions. A consumer must only use ResourceSlices with the highest generation number and ignore all others.\n\nWhen allocating all resources in a pool matching certain criteria or when looking for the best solution among several different alternatives, a consumer should check the number of ResourceSlices in a pool (included in each ResourceSlice) to determine whether its view of a pool is complete and if not, should wait until the driver has completed updating the pool.\n\nFor resources that are not local to a node, the node name is not set. Instead, the driver may use a node selector to specify where the devices are available.\n\nThis is an alpha type and requires enabling the DynamicResourceAllocation feature gate.",
 	"metadata": "Standard object metadata",
-	"spec":     "Contains the information published by the driver.\n\nChanging the spec bumps up the generation number.",
+	"spec":     "Contains the information published by the driver.\n\nChanging the spec increments the generation number.",
 }
 
 func (ResourceSlice) SwaggerDoc() map[string]string {
@@ -358,9 +378,9 @@ func (ResourceSlice) SwaggerDoc() map[string]string {
 }
 
 var map_ResourceSliceList = map[string]string{
-	"":         "ResourceSliceList is a collection of slices.",
+	"":         "ResourceSliceList is a collection of ResourceSlices.",
 	"listMeta": "Standard list metadata",
-	"items":    "Items is the list of resource slices.",
+	"items":    "Items is the list of resource ResourceSlices.",
 }
 
 func (ResourceSliceList) SwaggerDoc() map[string]string {
@@ -368,14 +388,12 @@ func (ResourceSliceList) SwaggerDoc() map[string]string {
 }
 
 var map_ResourceSliceSpec = map[string]string{
-	"":               "ResourceSliceSpec contains the information published by the driver in one ResourceSlice.",
-	"driverName":     "DriverName identifies the DRA driver providing the capacity information. A field selector can be used to list only ResourceSlice objects with a certain driver name.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver.",
-	"poolName":       "PoolName is used to identify devices. For node-local devices, this is often the node name, but this is not required.\n\nIt must not be longer than 253 and must consist of one or more DNS sub-domains separated by slashes.",
-	"nodeName":       "NodeName identifies the node which provides the devices. A field selector can be used to list only ResourceSlice objects belonging to a certain node.\n\nThis field can be used to limit access from nodes to slices with the same node name. It also indicates to autoscalers that adding new nodes of the same type as some old node might also make new devices available.\n\nNodeName and NodeSelector are mutually exclusive. One of them must be set.",
-	"nodeSelector":   "Defines which nodes have access to the devices in the pool. If the node selector is empty, all nodes have access.\n\nNodeName and NodeSelector are mutually exclusive. One of them must be set.",
-	"poolGeneration": "The generation gets bumped in all slices of a pool whenever device definitions change. A consumer must only use device definitions from slices with the highest generation number and ignore all others.",
-	"poolSliceCount": "The total number of slices in the pool. Consumers can use this to check whether they have seen all slices.",
-	"devices":        "Devices lists all available devices in this pool.\n\nMust not have more than 128 entries.",
+	"":             "ResourceSliceSpec contains the information published by the driver in one ResourceSlice.",
+	"driver":       "Driver identifies the DRA driver providing the capacity information. A field selector can be used to list only ResourceSlice objects with a certain driver name.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver.",
+	"pool":         "Pool describes the pool that this ResourceSlice belongs to.",
+	"nodeName":     "NodeName identifies the node which provides the devices. A field selector can be used to list only ResourceSlice objects belonging to a certain node.\n\nThis field can be used to limit access from nodes to ResourceSlices with the same node name. It also indicates to autoscalers that adding new nodes of the same type as some old node might also make new devices available.\n\nExactly one of NodeName and NodeSelector must be set.",
+	"nodeSelector": "NodeSelector defines which nodes have access to the devices in the pool. If it is specified, but empty (has no terms), all nodes have access.\n\nExactly one of NodeName and NodeSelector must be set.",
+	"devices":      "Devices lists some or all of the devices in this pool.\n\nMust not have more than 128 entries.",
 }
 
 func (ResourceSliceSpec) SwaggerDoc() map[string]string {

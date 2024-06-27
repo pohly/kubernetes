@@ -143,7 +143,7 @@ func toSelectableFields(slice *resource.ResourceSlice) fields.Set {
 	// be adjusted.
 	fields := make(fields.Set, 3)
 	fields["nodeName"] = ptr.Deref(slice.Spec.NodeName, "")
-	fields["driverName"] = slice.Spec.DriverName
+	fields["driverName"] = slice.Spec.Driver
 
 	// Adds one field.
 	return generic.AddObjectMetaFieldsSet(fields, &slice.ObjectMeta, false)

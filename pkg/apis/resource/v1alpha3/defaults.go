@@ -27,9 +27,7 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 }
 
 func SetDefaults_DeviceRequest(obj *resourceapi.DeviceRequest) {
-	if obj.CountMode == "" {
-		obj.CountMode = resourceapi.CountModeExact
-	}
+	// CountMode default is set automatically.
 
 	if obj.CountMode == resourceapi.CountModeExact && obj.Count == nil {
 		obj.Count = ptr.To(int64(1))
