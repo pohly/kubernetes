@@ -14956,10 +14956,6 @@
     "io.k8s.api.resource.v1alpha3.AllocationConfiguration": {
       "description": "AllocationConfiguration gets embedded in an AllocationResult.",
       "properties": {
-        "admin": {
-          "description": "Admins is true if the source of the configuration was a class and thus not something that a normal user would have been able to set.",
-          "type": "boolean"
-        },
         "opaque": {
           "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.OpaqueConfiguration",
           "description": "Opaque provides driver-specific configuration parameters."
@@ -14971,9 +14967,14 @@
           },
           "type": "array",
           "x-kubernetes-list-type": "atomic"
+        },
+        "source": {
+          "description": "Source records whether the configuration comes from a class and thus is not something that a normal user would have been able to set or from a claim.",
+          "type": "string"
         }
       },
       "required": [
+        "source",
         "opaque"
       ],
       "type": "object"

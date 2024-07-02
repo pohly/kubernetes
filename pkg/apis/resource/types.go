@@ -732,9 +732,10 @@ type RequestAllocationResult struct {
 
 // AllocationConfiguration gets embedded in an AllocationResult.
 type AllocationConfiguration struct {
-	// Admins is true if the source of the configuration was a class and thus
-	// not something that a normal user would have been able to set.
-	Admin bool
+	// Source records whether the configuration comes from a class and thus
+	// is not something that a normal user would have been able to set
+	// or from a claim.
+	Source AllocationConfigSource
 
 	// Requests lists the names of requests where the configuration applies.
 	// If empty, its applies to all requests.
@@ -745,6 +746,14 @@ type AllocationConfiguration struct {
 
 	Configuration // inline
 }
+
+type AllocationConfigSource string
+
+// Valid [AllocationConfiguration.Source] values.
+const (
+	AllocationConfigSourceClass = "FromClass"
+	AllocationConfigSourceClaim = "FromClaim"
+)
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 

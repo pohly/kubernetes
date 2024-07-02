@@ -29,7 +29,7 @@ package v1alpha3
 // AUTO-GENERATED FUNCTIONS START HERE. DO NOT EDIT.
 var map_AllocationConfiguration = map[string]string{
 	"":         "AllocationConfiguration gets embedded in an AllocationResult.",
-	"admin":    "Admins is true if the source of the configuration was a class and thus not something that a normal user would have been able to set.",
+	"source":   "Source records whether the configuration comes from a class and thus is not something that a normal user would have been able to set or from a claim.",
 	"requests": "Requests lists the names of requests where the configuration applies. If empty, its applies to all requests.",
 }
 

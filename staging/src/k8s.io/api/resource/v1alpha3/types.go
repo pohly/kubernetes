@@ -738,9 +738,12 @@ type RequestAllocationResult struct {
 
 // AllocationConfiguration gets embedded in an AllocationResult.
 type AllocationConfiguration struct {
-	// Admins is true if the source of the configuration was a class and thus
-	// not something that a normal user would have been able to set.
-	Admin bool `json:"admin,omitempty" protobuf:"bytes,1,opt,name=admin"`
+	// Source records whether the configuration comes from a class and thus
+	// is not something that a normal user would have been able to set
+	// or from a claim.
+	//
+	// +required
+	Source AllocationConfigSource `json:"source" protobuf:"bytes,1,name=source"`
 
 	// Requests lists the names of requests where the configuration applies.
 	// If empty, its applies to all requests.
@@ -751,6 +754,14 @@ type AllocationConfiguration struct {
 
 	Configuration `json:",inline" protobuf:"bytes,3,name=configuration"`
 }
+
+type AllocationConfigSource string
+
+// Valid [AllocationConfiguration.Source] values.
+const (
+	AllocationConfigSourceClass = "FromClass"
+	AllocationConfigSourceClaim = "FromClaim"
+)
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.26

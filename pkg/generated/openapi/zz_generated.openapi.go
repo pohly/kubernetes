@@ -45348,10 +45348,11 @@ func schema_k8sio_api_resource_v1alpha3_AllocationConfiguration(ref common.Refer
 				Description: "AllocationConfiguration gets embedded in an AllocationResult.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
-					"admin": {
+					"source": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Admins is true if the source of the configuration was a class and thus not something that a normal user would have been able to set.",
-							Type:        []string{"boolean"},
+							Description: "Source records whether the configuration comes from a class and thus is not something that a normal user would have been able to set or from a claim.",
+							Default:     "",
+							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
@@ -45382,7 +45383,7 @@ func schema_k8sio_api_resource_v1alpha3_AllocationConfiguration(ref common.Refer
 						},
 					},
 				},
-				Required: []string{"opaque"},
+				Required: []string{"source", "opaque"},
 			},
 		},
 		Dependencies: []string{

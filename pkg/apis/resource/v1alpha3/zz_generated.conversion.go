@@ -415,7 +415,7 @@ func RegisterConversions(s *runtime.Scheme) error {
 }
 
 func autoConvert_v1alpha3_AllocationConfiguration_To_resource_AllocationConfiguration(in *v1alpha3.AllocationConfiguration, out *resource.AllocationConfiguration, s conversion.Scope) error {
-	out.Admin = in.Admin
+	out.Source = resource.AllocationConfigSource(in.Source)
 	out.Requests = *(*[]string)(unsafe.Pointer(&in.Requests))
 	if err := Convert_v1alpha3_Configuration_To_resource_Configuration(&in.Configuration, &out.Configuration, s); err != nil {
 		return err
@@ -429,7 +429,7 @@ func Convert_v1alpha3_AllocationConfiguration_To_resource_AllocationConfiguratio
 }
 
 func autoConvert_resource_AllocationConfiguration_To_v1alpha3_AllocationConfiguration(in *resource.AllocationConfiguration, out *v1alpha3.AllocationConfiguration, s conversion.Scope) error {
-	out.Admin = in.Admin
+	out.Source = v1alpha3.AllocationConfigSource(in.Source)
 	out.Requests = *(*[]string)(unsafe.Pointer(&in.Requests))
 	if err := Convert_resource_Configuration_To_v1alpha3_Configuration(&in.Configuration, &out.Configuration, s); err != nil {
 		return err

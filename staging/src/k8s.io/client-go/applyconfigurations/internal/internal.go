@@ -12133,9 +12133,6 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.resource.v1alpha3.AllocationConfiguration
   map:
     fields:
-    - name: admin
-      type:
-        scalar: boolean
     - name: opaque
       type:
         namedType: io.k8s.api.resource.v1alpha3.OpaqueConfiguration
@@ -12145,6 +12142,10 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             scalar: string
           elementRelationship: atomic
+    - name: source
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.resource.v1alpha3.AllocationResult
   map:
     fields:

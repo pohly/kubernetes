@@ -32,9 +32,12 @@ option go_package = "k8s.io/api/resource/v1alpha3";
 
 // AllocationConfiguration gets embedded in an AllocationResult.
 message AllocationConfiguration {
-  // Admins is true if the source of the configuration was a class and thus
-  // not something that a normal user would have been able to set.
-  optional bool admin = 1;
+  // Source records whether the configuration comes from a class and thus
+  // is not something that a normal user would have been able to set
+  // or from a claim.
+  //
+  // +required
+  optional string source = 1;
 
   // Requests lists the names of requests where the configuration applies.
   // If empty, its applies to all requests.

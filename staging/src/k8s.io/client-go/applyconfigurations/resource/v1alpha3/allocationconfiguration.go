@@ -18,11 +18,15 @@ limitations under the License.
 
 package v1alpha3
 
+import (
+	v1alpha3 "k8s.io/api/resource/v1alpha3"
+)
+
 // AllocationConfigurationApplyConfiguration represents a declarative configuration of the AllocationConfiguration type for use
 // with apply.
 type AllocationConfigurationApplyConfiguration struct {
-	Admin                           *bool    `json:"admin,omitempty"`
-	Requests                        []string `json:"requests,omitempty"`
+	Source                          *v1alpha3.AllocationConfigSource `json:"source,omitempty"`
+	Requests                        []string                         `json:"requests,omitempty"`
 	ConfigurationApplyConfiguration `json:",inline"`
 }
 
@@ -32,11 +36,11 @@ func AllocationConfiguration() *AllocationConfigurationApplyConfiguration {
 	return &AllocationConfigurationApplyConfiguration{}
 }
 
-// WithAdmin sets the Admin field in the declarative configuration to the given value
+// WithSource sets the Source field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Admin field is set to the value of the last call.
-func (b *AllocationConfigurationApplyConfiguration) WithAdmin(value bool) *AllocationConfigurationApplyConfiguration {
-	b.Admin = &value
+// If called multiple times, the Source field is set to the value of the last call.
+func (b *AllocationConfigurationApplyConfiguration) WithSource(value v1alpha3.AllocationConfigSource) *AllocationConfigurationApplyConfiguration {
+	b.Source = &value
 	return b
 }
 
