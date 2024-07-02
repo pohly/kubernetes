@@ -19,7 +19,6 @@ package v1alpha3
 import (
 	resourceapi "k8s.io/api/resource/v1alpha3"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/utils/ptr"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -29,7 +28,7 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 func SetDefaults_DeviceRequest(obj *resourceapi.DeviceRequest) {
 	// CountMode default is set automatically.
 
-	if obj.CountMode == resourceapi.CountModeExact && obj.Count == nil {
-		obj.Count = ptr.To(int64(1))
+	if obj.CountMode == resourceapi.CountModeExact && obj.Count == 0 {
+		obj.Count = 1
 	}
 }

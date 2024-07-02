@@ -446,7 +446,7 @@ func autoConvert_v1alpha3_AllocationResult_To_resource_AllocationResult(in *v1al
 	out.Results = *(*[]resource.RequestAllocationResult)(unsafe.Pointer(&in.Results))
 	out.Config = *(*[]resource.AllocationConfiguration)(unsafe.Pointer(&in.Config))
 	out.AvailableOnNodes = (*core.NodeSelector)(unsafe.Pointer(in.AvailableOnNodes))
-	out.Controller = (*string)(unsafe.Pointer(in.Controller))
+	out.Controller = in.Controller
 	return nil
 }
 
@@ -459,7 +459,7 @@ func autoConvert_resource_AllocationResult_To_v1alpha3_AllocationResult(in *reso
 	out.Results = *(*[]v1alpha3.RequestAllocationResult)(unsafe.Pointer(&in.Results))
 	out.Config = *(*[]v1alpha3.AllocationConfiguration)(unsafe.Pointer(&in.Config))
 	out.AvailableOnNodes = (*v1.NodeSelector)(unsafe.Pointer(in.AvailableOnNodes))
-	out.Controller = (*string)(unsafe.Pointer(in.Controller))
+	out.Controller = in.Controller
 	return nil
 }
 
@@ -727,7 +727,7 @@ func Convert_resource_DeviceClassSpec_To_v1alpha3_DeviceClassSpec(in *resource.D
 }
 
 func autoConvert_v1alpha3_DeviceConstraint_To_resource_DeviceConstraint(in *v1alpha3.DeviceConstraint, out *resource.DeviceConstraint, s conversion.Scope) error {
-	out.MatchAttribute = (*string)(unsafe.Pointer(in.MatchAttribute))
+	out.MatchAttribute = in.MatchAttribute
 	return nil
 }
 
@@ -737,7 +737,7 @@ func Convert_v1alpha3_DeviceConstraint_To_resource_DeviceConstraint(in *v1alpha3
 }
 
 func autoConvert_resource_DeviceConstraint_To_v1alpha3_DeviceConstraint(in *resource.DeviceConstraint, out *v1alpha3.DeviceConstraint, s conversion.Scope) error {
-	out.MatchAttribute = (*string)(unsafe.Pointer(in.MatchAttribute))
+	out.MatchAttribute = in.MatchAttribute
 	return nil
 }
 
@@ -750,8 +750,8 @@ func autoConvert_v1alpha3_DeviceRequest_To_resource_DeviceRequest(in *v1alpha3.D
 	out.DeviceClassName = in.DeviceClassName
 	out.Selectors = *(*[]resource.Selector)(unsafe.Pointer(&in.Selectors))
 	out.CountMode = resource.CountMode(in.CountMode)
-	out.Count = (*int64)(unsafe.Pointer(in.Count))
-	out.AdminAccess = (*bool)(unsafe.Pointer(in.AdminAccess))
+	out.Count = in.Count
+	out.AdminAccess = in.AdminAccess
 	return nil
 }
 
@@ -764,8 +764,8 @@ func autoConvert_resource_DeviceRequest_To_v1alpha3_DeviceRequest(in *resource.D
 	out.DeviceClassName = in.DeviceClassName
 	out.Selectors = *(*[]v1alpha3.Selector)(unsafe.Pointer(&in.Selectors))
 	out.CountMode = v1alpha3.CountMode(in.CountMode)
-	out.Count = (*int64)(unsafe.Pointer(in.Count))
-	out.AdminAccess = (*bool)(unsafe.Pointer(in.AdminAccess))
+	out.Count = in.Count
+	out.AdminAccess = in.AdminAccess
 	return nil
 }
 
@@ -1066,7 +1066,7 @@ func autoConvert_v1alpha3_ResourceClaimSpec_To_resource_ResourceClaimSpec(in *v1
 	out.Requests = *(*[]resource.Request)(unsafe.Pointer(&in.Requests))
 	out.Constraints = *(*[]resource.Constraint)(unsafe.Pointer(&in.Constraints))
 	out.Config = *(*[]resource.ClaimConfiguration)(unsafe.Pointer(&in.Config))
-	out.Controller = (*string)(unsafe.Pointer(in.Controller))
+	out.Controller = in.Controller
 	return nil
 }
 
@@ -1079,7 +1079,7 @@ func autoConvert_resource_ResourceClaimSpec_To_v1alpha3_ResourceClaimSpec(in *re
 	out.Requests = *(*[]v1alpha3.Request)(unsafe.Pointer(&in.Requests))
 	out.Constraints = *(*[]v1alpha3.Constraint)(unsafe.Pointer(&in.Constraints))
 	out.Config = *(*[]v1alpha3.ClaimConfiguration)(unsafe.Pointer(&in.Config))
-	out.Controller = (*string)(unsafe.Pointer(in.Controller))
+	out.Controller = in.Controller
 	return nil
 }
 
@@ -1263,7 +1263,7 @@ func autoConvert_v1alpha3_ResourceSliceSpec_To_resource_ResourceSliceSpec(in *v1
 	if err := Convert_v1alpha3_ResourcePool_To_resource_ResourcePool(&in.Pool, &out.Pool, s); err != nil {
 		return err
 	}
-	out.NodeName = (*string)(unsafe.Pointer(in.NodeName))
+	out.NodeName = in.NodeName
 	out.NodeSelector = (*core.NodeSelector)(unsafe.Pointer(in.NodeSelector))
 	out.Devices = *(*[]resource.Device)(unsafe.Pointer(&in.Devices))
 	return nil
@@ -1279,7 +1279,7 @@ func autoConvert_resource_ResourceSliceSpec_To_v1alpha3_ResourceSliceSpec(in *re
 	if err := Convert_resource_ResourcePool_To_v1alpha3_ResourcePool(&in.Pool, &out.Pool, s); err != nil {
 		return err
 	}
-	out.NodeName = (*string)(unsafe.Pointer(in.NodeName))
+	out.NodeName = in.NodeName
 	out.NodeSelector = (*v1.NodeSelector)(unsafe.Pointer(in.NodeSelector))
 	out.Devices = *(*[]v1alpha3.Device)(unsafe.Pointer(&in.Devices))
 	return nil

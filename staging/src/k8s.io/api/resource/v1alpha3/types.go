@@ -103,7 +103,7 @@ type ResourceSliceSpec struct {
 	// Exactly one of NodeName and NodeSelector must be set.
 	//
 	// +optional
-	NodeName *string `json:"nodeName,omitempty" protobuf:"bytes,3,opt,name=nodeName"`
+	NodeName string `json:"nodeName,omitempty" protobuf:"bytes,3,opt,name=nodeName"`
 
 	// NodeSelector defines which nodes have access to the devices in the pool.
 	// If it is specified, but empty (has no terms), all nodes have access.
@@ -349,7 +349,7 @@ type ResourceClaimSpec struct {
 	// feature gate.
 	//
 	// +optional
-	Controller *string `json:"controller,omitempty" protobuf:"bytes,4,opt,name=controller"`
+	Controller string `json:"controller,omitempty" protobuf:"bytes,4,opt,name=controller"`
 }
 
 // Request is a request for one of many resources required for a claim.
@@ -423,7 +423,7 @@ type DeviceRequest struct {
 	// If CountMode is Exact and this field is not specified, the default is one.
 	//
 	// +optional
-	Count *int64 `json:"count,omitempty" protobuf:"bytes,4,opt,name=count"`
+	Count int64 `json:"count,omitempty" protobuf:"bytes,4,opt,name=count"`
 
 	// AdminAccess indicates that this is a claim for administrative access
 	// to the device(s). Claims with AdminAccess are expected to be used for
@@ -434,7 +434,7 @@ type DeviceRequest struct {
 	// Default is false.
 	//
 	// +optional
-	AdminAccess *bool `json:"adminAccess,omitempty" protobuf:"bytes,5,opt,name=adminAccess"`
+	AdminAccess bool `json:"adminAccess,omitempty" protobuf:"bytes,5,opt,name=adminAccess"`
 }
 
 type CountMode string
@@ -537,7 +537,7 @@ type DeviceConstraint struct {
 	// chosen.
 	//
 	// +optional
-	MatchAttribute *string `json:"matchAttribute,omitempty" protobuf:"bytes,1,opt,name=matchAttribute"`
+	MatchAttribute string `json:"matchAttribute,omitempty" protobuf:"bytes,1,opt,name=matchAttribute"`
 }
 
 // ClaimConfiguration is used for configuration parameters in ResourcClaimSpec.
@@ -694,7 +694,7 @@ type AllocationResult struct {
 	// feature gate.
 	//
 	// +optional
-	Controller *string `json:"controller,omitempty" protobuf:"bytes,4,opt,name=controller"`
+	Controller string `json:"controller,omitempty" protobuf:"bytes,4,opt,name=controller"`
 }
 
 // AllocationResultsMaxSize represents the maximum number of

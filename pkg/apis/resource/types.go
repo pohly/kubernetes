@@ -100,7 +100,7 @@ type ResourceSliceSpec struct {
 	// Exactly one of NodeName and NodeSelector must be set.
 	//
 	// +optional
-	NodeName *string
+	NodeName string
 
 	// NodeSelector defines which nodes have access to the devices in the pool.
 	// If it is specified, but empty (has no terms), all nodes have access.
@@ -343,7 +343,7 @@ type ResourceClaimSpec struct {
 	// feature gate.
 	//
 	// +optional
-	Controller *string
+	Controller string
 }
 
 // Request is a request for one of many resources required for a claim.
@@ -417,7 +417,7 @@ type DeviceRequest struct {
 	// If CountMode is Exact and this field is not specified, the default is one.
 	//
 	// +optional
-	Count *int64
+	Count int64
 
 	// AdminAccess indicates that this is a claim for administrative access
 	// to the device(s). Claims with AdminAccess are expected to be used for
@@ -428,7 +428,7 @@ type DeviceRequest struct {
 	// Default is false.
 	//
 	// +optional
-	AdminAccess *bool
+	AdminAccess bool
 }
 
 type CountMode string
@@ -531,7 +531,7 @@ type DeviceConstraint struct {
 	// chosen.
 	//
 	// +optional
-	MatchAttribute *string
+	MatchAttribute string
 }
 
 // ClaimConfiguration is used for configuration parameters in ResourcClaimSpec.
@@ -688,7 +688,7 @@ type AllocationResult struct {
 	// feature gate.
 	//
 	// +optional
-	Controller *string
+	Controller string
 }
 
 // AllocationResultsMaxSize represents the maximum number of

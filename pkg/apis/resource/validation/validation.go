@@ -303,8 +303,8 @@ func ValidateResourceSlice(slice *resource.ResourceSlice) field.ErrorList {
 
 func validateResourceSliceSpec(spec *resource.ResourceSliceSpec, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
-	if spec.NodeName != nil {
-		allErrs = append(allErrs, validateNodeName(*spec.NodeName, field.NewPath("nodeName"))...)
+	if spec.NodeName != "" {
+		allErrs = append(allErrs, validateNodeName(spec.NodeName, field.NewPath("nodeName"))...)
 	}
 	allErrs = append(allErrs, validateDriverName(spec.Driver, field.NewPath("driverName"))...)
 	return allErrs
