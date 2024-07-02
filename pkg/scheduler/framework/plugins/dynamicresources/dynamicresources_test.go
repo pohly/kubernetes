@@ -50,17 +50,17 @@ import (
 var (
 	podKind = v1.SchemeGroupVersion.WithKind("Pod")
 
-	nodeName       = "worker"
-	controllerName = "some-driver"
-	driverName     = controllerName
-	podName        = "my-pod"
-	podUID         = "1234"
-	resourceName   = "my-resource"
-	resourceName2  = resourceName + "-2"
-	claimName      = podName + "-" + resourceName
-	claimName2     = podName + "-" + resourceName + "-2"
-	className      = "my-resource-class"
-	namespace      = "default"
+	nodeName      = "worker"
+	controller    = "some-driver"
+	driver        = controller
+	podName       = "my-pod"
+	podUID        = "1234"
+	resourceName  = "my-resource"
+	resourceName2 = resourceName + "-2"
+	claimName     = podName + "-" + resourceName
+	claimName2    = podName + "-" + resourceName + "-2"
+	className     = "my-resource-class"
+	namespace     = "default"
 
 	deviceClass = &resourceapi.DeviceClass{
 		ObjectMeta: metav1.ObjectMeta{
@@ -107,7 +107,7 @@ var (
 	workerNode      = &st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Node
 	workerNodeSlice = st.MakeResourceSlice(nodeName, "some-driver").Devices("instance-1").Obj()
 
-	claim = st.MakeResourceClaim(&controllerName).
+	claim = st.MakeResourceClaim(controller).
 		Name(claimName).
 		Namespace(namespace).
 		Request(className).
@@ -119,9 +119,9 @@ var (
 			Name(claimName2).
 			Obj()
 	allocationResult = &resourceapi.AllocationResult{
-		ControllerName: &controllerName,
+		Controller: controller,
 		Results: []resourceapi.RequestAllocationResult{{
-			Driver:  driverName,
+			Driver:  driver,
 			Pool:    nodeName,
 			Device:  "instance-1",
 			Request: "req-1",
@@ -143,12 +143,12 @@ var (
 			Obj()
 
 	allocatedClaimWithWrongTopology = st.FromResourceClaim(allocatedClaim).
-					Allocation(&resourceapi.AllocationResult{ControllerName: &controllerName, AvailableOnNodes: st.MakeNodeSelector().In("no-such-label", []string{"no-such-value"}).Obj()}).
+					Allocation(&resourceapi.AllocationResult{Controller: controller, AvailableOnNodes: st.MakeNodeSelector().In("no-such-label", []string{"no-such-value"}).Obj()}).
 					Obj()
 	allocatedClaimWithGoodTopology = st.FromResourceClaim(allocatedClaim).
-					Allocation(&resourceapi.AllocationResult{ControllerName: &controllerName, AvailableOnNodes: st.MakeNodeSelector().In("kubernetes.io/hostname", []string{nodeName}).Obj()}).
+					Allocation(&resourceapi.AllocationResult{Controller: controller, AvailableOnNodes: st.MakeNodeSelector().In("kubernetes.io/hostname", []string{nodeName}).Obj()}).
 					Obj()
-	otherClaim = st.MakeResourceClaim(&controllerName).
+	otherClaim = st.MakeResourceClaim(controller).
 			Name("not-my-claim").
 			Namespace(namespace).
 			Request(className).
@@ -186,7 +186,7 @@ func structuredClaim(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClai
 
 var brokenSelector = resourceapi.Selector{
 	CEL: &resourceapi.CELSelector{
-		Expression: `device.attributes["no-such-attribute"]`,
+		Expression: `device.attributes["dra.example.com"]["no-such-attribute"]`,
 	},
 }
 

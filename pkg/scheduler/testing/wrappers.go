@@ -900,7 +900,7 @@ func (p *PersistentVolumeWrapper) NodeAffinityIn(key string, vals []string) *Per
 type ResourceClaimWrapper struct{ resourceapi.ResourceClaim }
 
 // MakeResourceClaim creates a ResourceClaim wrapper.
-func MakeResourceClaim(controller *string) *ResourceClaimWrapper {
+func MakeResourceClaim(controller string) *ResourceClaimWrapper {
 	return &ResourceClaimWrapper{resourceapi.ResourceClaim{Spec: resourceapi.ResourceClaimSpec{Controller: controller}}}
 }
 
@@ -953,6 +953,8 @@ func (wrapper *ResourceClaimWrapper) Request(deviceClassName string) *ResourceCl
 			Name: fmt.Sprintf("req-%d", len(wrapper.Spec.Requests)+1),
 			RequestDetail: &resourceapi.RequestDetail{
 				Device: &resourceapi.DeviceRequest{
+					CountMode:       resourceapi.CountModeExact,
+					Count:           1,
 					DeviceClassName: deviceClassName,
 				},
 			},
@@ -971,10 +973,10 @@ func (wrapper *ResourceClaimWrapper) Allocation(allocation *resourceapi.Allocati
 // The only difference is that there is no controller name and the special finalizer
 // gets added.
 func (wrapper *ResourceClaimWrapper) Structured() *ResourceClaimWrapper {
-	wrapper.Spec.Controller = nil
+	wrapper.Spec.Controller = ""
 	if wrapper.ResourceClaim.Status.Allocation != nil {
 		wrapper.ResourceClaim.Finalizers = append(wrapper.ResourceClaim.Finalizers, resourceapi.Finalizer)
-		wrapper.ResourceClaim.Status.Allocation.ControllerName = nil
+		wrapper.ResourceClaim.Status.Allocation.Controller = ""
 	}
 	return wrapper
 }
@@ -1083,7 +1085,7 @@ type ResourceSliceWrapper struct {
 func MakeResourceSlice(nodeName, driverName string) *ResourceSliceWrapper {
 	wrapper := new(ResourceSliceWrapper)
 	wrapper.Name = nodeName + "-" + driverName
-	wrapper.Spec.NodeName = &nodeName
+	wrapper.Spec.NodeName = nodeName
 	wrapper.Spec.Pool.Name = nodeName
 	wrapper.Spec.Driver = driverName
 	return wrapper

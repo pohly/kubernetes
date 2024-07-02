@@ -988,13 +988,15 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 							),
 						}),
 						"Spec": gstruct.MatchAllFields(gstruct.Fields{
-							"DriverName":     gomega.Equal(driver.Name),
-							"PoolName":       gomega.Equal(nodeName),
-							"NodeName":       gomega.Equal(&nodeName),
-							"NodeSelector":   gomega.BeNil(),
-							"PoolGeneration": gstruct.Ignore(),
-							"PoolSliceCount": gomega.Equal(int64(1)),
-							"Devices":        gomega.Equal([]resourceapi.Device{{Name: "device-00"}}),
+							"Driver":       gomega.Equal(driver.Name),
+							"NodeName":     gomega.Equal(nodeName),
+							"NodeSelector": gomega.BeNil(),
+							"Pool": gstruct.MatchAllFields(gstruct.Fields{
+								"Name":               gomega.Equal(nodeName),
+								"Generation":         gstruct.Ignore(),
+								"ResourceSliceCount": gomega.Equal(int64(1)),
+							}),
+							"Devices": gomega.Equal([]resourceapi.Device{{Name: "device-00"}}),
 						}),
 					}),
 				)
@@ -1085,7 +1087,7 @@ func (b *builder) class() *resourceapi.DeviceClass {
 	case parameterModeStructured:
 		class.Spec.Selectors = []resourceapi.Selector{{
 			CEL: &resourceapi.CELSelector{
-				Expression: fmt.Sprintf(`device.driverName == "%s"`, b.driver.Name),
+				Expression: fmt.Sprintf(`device.driver == "%s"`, b.driver.Name),
 			},
 		}}
 	}

@@ -5,4 +5,4 @@ metadata:
 spec:
   selectors:
   - cel:
-      expression: device.driverName == "test-driver.cdi.k8s.io"
+      expression: device.driver == "test-driver.cdi.k8s.io"

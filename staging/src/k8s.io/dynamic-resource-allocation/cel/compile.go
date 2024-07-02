@@ -38,6 +38,8 @@ import (
 )
 
 const (
+	// TODO: should this be a "device" struct with typed fields?
+	// How can that be implemented? There is no cel.NewStructType.
 	driverVar     = "device.driver"
 	attributesVar = "device.attributes"
 	capacitiesVar = "device.capacities"
