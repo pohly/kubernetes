@@ -282,6 +282,7 @@ func (c *ExampleController) allocateOne(ctx context.Context, claim *resourceapi.
 		// driver just passes it through.
 		configs = append(configs,
 			resourceapi.AllocationConfiguration{
+				Source:        resourceapi.AllocationConfigSourceClaim,
 				Configuration: config.Configuration,
 			},
 		)
@@ -297,7 +298,7 @@ func (c *ExampleController) allocateOne(ctx context.Context, claim *resourceapi.
 			}
 			configs = append(configs,
 				resourceapi.AllocationConfiguration{
-					Admin:         true,
+					Source:        resourceapi.AllocationConfigSourceClass,
 					Configuration: config.Configuration,
 				},
 			)

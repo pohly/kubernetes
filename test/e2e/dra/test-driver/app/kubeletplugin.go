@@ -287,7 +287,7 @@ func (ex *ExamplePlugin) nodePrepareResource(ctx context.Context, claimReq *drap
 				len(config.Requests) > 0 && !slices.Contains(config.Requests, requestName) {
 				continue
 			}
-			if err := extractParameters(config.Opaque.Parameters, &env, config.Admin); err != nil {
+			if err := extractParameters(config.Opaque.Parameters, &env, config.Source == resourceapi.AllocationConfigSourceClass); err != nil {
 				return nil, fmt.Errorf("parameters in config #%d: %v", i, err)
 			}
 		}

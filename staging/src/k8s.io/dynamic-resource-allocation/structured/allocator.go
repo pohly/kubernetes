@@ -304,7 +304,7 @@ func (sharedAllocator *Allocator) Allocate(ctx context.Context, node *v1.Node) (
 			if class != nil {
 				for _, config := range class.Spec.Config {
 					allocationResult.Config = append(allocationResult.Config, resourceapi.AllocationConfiguration{
-						Admin:         true,
+						Source:        resourceapi.AllocationConfigSourceClass,
 						Requests:      nil, // All of them...
 						Configuration: config.Configuration,
 					})
@@ -313,7 +313,7 @@ func (sharedAllocator *Allocator) Allocate(ctx context.Context, node *v1.Node) (
 		}
 		for _, config := range claim.Spec.Config {
 			allocationResult.Config = append(allocationResult.Config, resourceapi.AllocationConfiguration{
-				Admin:         false,
+				Source:        resourceapi.AllocationConfigSourceClaim,
 				Requests:      config.Requests,
 				Configuration: config.Configuration,
 			})
