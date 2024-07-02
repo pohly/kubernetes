@@ -176,7 +176,7 @@ func (sharedAllocator *Allocator) Allocate(ctx context.Context, node *v1.Node) (
 				numDevices := request.Device.Count
 				if numDevices > math.MaxInt {
 					// Allowed by API validation, but doesn't make sense.
-					return nil, fmt.Errorf("claim %s, request %s: exact count %d is too large", klog.KObj(claim), request.Name, deviceRequest.DeviceClassName, numDevices)
+					return nil, fmt.Errorf("claim %s, request %s: exact count %d is too large", klog.KObj(claim), request.Name, numDevices)
 				}
 				requestData.numDevices = int(numDevices)
 			case resourceapi.CountModeAll:
@@ -201,7 +201,7 @@ func (sharedAllocator *Allocator) Allocate(ctx context.Context, node *v1.Node) (
 				requestData.numDevices = len(requestData.allDevices)
 				alloc.logger.V(5).Info("Request for 'all' devices", "claim", klog.KObj(claim), "request", request.Name, "numDevicesPerRequest", requestData.numDevices)
 			default:
-				return nil, fmt.Errorf("claim %s, request %s: unsupported amount type", klog.KObj(claim), request.Name)
+				return nil, fmt.Errorf("claim %s, request %s: unsupported count mode %s", klog.KObj(claim), request.Name, request.Device.CountMode)
 			}
 			alloc.requestData[requestIndices{claimIndex: claimIndex, requestIndex: requestIndex}] = requestData
 			numDevices += requestData.numDevices
@@ -210,7 +210,7 @@ func (sharedAllocator *Allocator) Allocate(ctx context.Context, node *v1.Node) (
 
 		// Check that we don't end up with too many results.
 		if numDevices > resourceapi.AllocationResultsMaxSize {
-			return nil, fmt.Errorf("claim %s: number of requested devices %d exceeds the claim limit of %d", numDevices, resourceapi.AllocationResultsMaxSize)
+			return nil, fmt.Errorf("claim %s: number of requested devices %d exceeds the claim limit of %d", klog.KObj(claim), numDevices, resourceapi.AllocationResultsMaxSize)
 		}
 
 		// If we don't, then we can pre-allocate the result slices for
@@ -545,6 +545,7 @@ func (alloc *allocator) allocateOne(r deviceIndices) (bool, error) {
 					return false, err
 				}
 				if !selectable {
+					alloc.logger.V(6).Info("Device not selectable", "device", deviceID)
 					continue
 				}
 
@@ -555,6 +556,7 @@ func (alloc *allocator) allocateOne(r deviceIndices) (bool, error) {
 				}
 				if !allocated {
 					// In use or constraint violated...
+					alloc.logger.V(6).Info("Device not usable", "device", deviceID)
 					continue
 				}
 				done, err := alloc.allocateOne(deviceIndices{claimIndex: r.claimIndex, requestIndex: r.requestIndex, deviceIndex: r.deviceIndex + 1})

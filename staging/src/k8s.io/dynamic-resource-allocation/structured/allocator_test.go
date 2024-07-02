@@ -18,1240 +18,353 @@ package structured
 
 import (
 	"errors"
-	"sync"
+	"flag"
+	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/onsi/gomega"
+	"github.com/onsi/gomega/types"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1alpha3"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
-	namedresourcesmodel "k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources/structured/namedresources"
-	"k8s.io/kubernetes/test/utils/ktesting"
-	"k8s.io/utils/ptr"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/klog/v2/ktesting"
+	"sigs.k8s.io/yaml"
 )
 
-func TestModel(t *testing.T) {
-	testcases := map[string]struct {
-		slices   resourceSliceLister
-		claims   assumeCacheLister
-		inFlight map[types.UID]resourceapi.ResourceClaimStatus
+func init() {
+	ktesting.DefaultConfig.AddFlags(flag.CommandLine)
+}
 
-		wantResources resources
-		wantErr       bool
+func TestAllocator(t *testing.T) {
+	driverA := "driver-a"
+	driverAClass := &resourceapi.DeviceClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: driverA,
+		},
+		Spec: resourceapi.DeviceClassSpec{
+			Selectors: []resourceapi.Selector{{
+				CEL: &resourceapi.CELSelector{
+					Expression: `device.driver == "driver-a"`,
+				},
+			}},
+		},
+	}
+	// device1 := "device-1"
+	// device2 := "device-2"
+	// driverVersion := "driverVersion"
+	// memory := "memory"
+	// oneGig := resource.NewQuantity(1024*1024, resource.BinarySI)
+	// numa := "numa"
+	// numa1 := ptr.To(int64(1))
+	// numa2 := ptr.To(int64(2))
+	node1 := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "worker-1",
+			Labels: map[string]string{
+				"region": "west",
+			},
+		},
+	}
+	// regionWest := v1.NodeSelector{
+	// 	NodeSelectorTerms: []v1.NodeSelectorTerm{{
+	// 		MatchExpressions: []v1.NodeSelectorRequirement{{
+	// 			Key:      "region",
+	// 			Operator: v1.NodeSelectorOpIn,
+	// 			Values:   []string{"west"},
+	// 		}},
+	// 	}},
+	// }
+	// TODO: use Go to define objects or YAML?
+	//
+	// Go is very verbose, but surfaces errors at compile time.
+	// YAML is more compact and supports global search/replace
+	// to produce new objects that are derived from others.
+	//
+	// node1Slice := &resourceapi.ResourceSlice{
+	// 	ObjectMeta: metav1.ObjectMeta{
+	// 		Name: "node1Slice",
+	// 	},
+	// 	Spec: resourceapi.ResourceSliceSpec{
+	// 		NodeName: node1.Name,
+	// 		Driver:   driverA,
+	// 		Pool: resourceapi.ResourcePool{
+	// 			Name:               node1.Name,
+	// 			ResourceSliceCount: 1,
+	// 		},
+	// 		Devices: []resourceapi.Device{
+	// 			{
+	// 				Name: device1,
+	// 				Attributes: []resourceapi.DeviceAttribute{
+	// 					{
+	// 						Name:         driverVersion,
+	// 						VersionValue: ptr.To("1.0.0"),
+	// 					},
+	// 					{
+	// 						Name:     numa,
+	// 						IntValue: numa1,
+	// 					},
+	// 				},
+	// 				Capacities: []resourceapi.DeviceCapacity{
+	// 					{
+	// 						Name:     memory,
+	// 						Quantity: oneGig,
+	// 					},
+	// 				},
+	// 			},
+	// 		},
+	// 	},
+	// }
+	node1slice := unmarshal[resourceapi.ResourceSlice](t, `
+metadata:
+  name: worker-1-slice
+spec:
+  nodeName: worker-1
+  driver: driver-a
+  pool:
+    name: worker-1
+    resourceSliceCount: 1
+  devices:
+  - name: device-1
+    attributes:
+    - name: driverVersion
+      version: 1.0.0
+    - name: numa
+      int: 1
+    capacities:
+    - name: memory
+      quantity: 1Gi # small
+  - name: device-2
+    attributes:
+    - name: driverVersion
+      version: 1.0.0
+    - name: numa
+      int: 1
+    capacities:
+    - name: memory
+      quantity: 2Gi # large
+`)
+	node2slice := replace(t, node1slice, "worker-1", "worker-2")
+	simpleClaim := unmarshal[resourceapi.ResourceClaim](t, `
+metadata:
+  name: claim
+spec:
+  requests:
+  - name: req-0
+    device:
+      countMode: Exact
+      count: 1
+      deviceClassName: driver-a
+`)
+
+	allocatedSimpleClaim := unmarshal[resourceapi.AllocationResult](t, `
+results:
+- request: req-0
+  driver: driver-a
+  pool: worker-1
+  device: device-1
+`)
+
+	twoDeviceClaim := unmarshal[resourceapi.ResourceClaim](t, `
+metadata:
+  name: claim
+spec:
+  requests:
+  - name: req-0
+    device:
+      countMode: Exact
+      count: 1
+      deviceClassName: driver-a
+      selectors:
+      - cel:
+          # small
+          expression: device.capacities["driver-a"].memory.compareTo(quantity("1Gi")) >= 0
+  - name: req-1
+    device:
+      countMode: Exact
+      count: 1
+      deviceClassName: driver-a
+      selectors:
+      - cel:
+          # large
+          expression: device.capacities["driver-a"].memory.compareTo(quantity("2Gi")) >= 0
+`)
+
+	allocatedTwoDeviceClaim := unmarshal[resourceapi.AllocationResult](t, `
+results:
+- request: req-0
+  driver: driver-a
+  pool: worker-1
+  device: device-1
+- request: req-1
+  driver: driver-a
+  pool: worker-1
+  device: device-2
+`)
+
+	testcases := map[string]struct {
+		claimsToAllocate []*resourceapi.ResourceClaim
+		allocatedClaims  []*resourceapi.ResourceClaim
+		classes          []*resourceapi.DeviceClass
+		slices           []*resourceapi.ResourceSlice
+		node             *v1.Node
+
+		expectResults []*resourceapi.AllocationResult
+		expectError   types.GomegaMatcher // can be used to check for no error or match specific error types
 	}{
 		"empty": {},
+		"simple": {
+			claimsToAllocate: objects(simpleClaim),
+			classes:          objects(driverAClass),
+			slices:           objects(node1slice, node2slice),
+			node:             node1,
 
-		"slice-list-error": {
-			slices: sliceError("slice list error"),
+			expectResults: objects(allocatedSimpleClaim),
+		},
+		"small-and-large": {
+			claimsToAllocate: objects(twoDeviceClaim),
+			classes:          objects(driverAClass),
+			slices:           objects(node1slice, node2slice),
+			node:             node1,
 
-			wantErr: true,
+			expectResults: objects(allocatedTwoDeviceClaim),
+		},
+		"small-and-large-backtrack": {
+			claimsToAllocate: objects(twoDeviceClaim),
+			classes:          objects(driverAClass),
+			// Reversing the order in which the devices are listed causes the "large" device to
+			// be allocated for the "small" request, leaving the "large" request unsatisfied.
+			// The initial decision needs to be undone before a solution is found.
+			slices: objects(func() *resourceapi.ResourceSlice {
+				slice := node1slice.DeepCopy()
+				slice.Spec.Devices[0], slice.Spec.Devices[1] = slice.Spec.Devices[1], slice.Spec.Devices[0]
+				return slice
+			}()),
+			node: node1,
+
+			expectResults: objects(allocatedTwoDeviceClaim),
 		},
 
-		"unknown-model": {
-			slices: sliceList{
-				&resourceapi.ResourceSlice{
-					NodeName:      "node",
-					DriverName:    "driver",
-					ResourceModel: resourceapi.ResourceModel{ /* empty! */ },
-				},
-			},
-
-			// Not an error. It is safe to ignore unknown resources until a claim requests them.
-			// The unknown model in that claim then triggers an error for that claim.
-			wantResources: resources{"node": map[string]ResourceModels{
-				"driver": {
-					NamedResources: namedresourcesmodel.Model{},
-				},
-			}},
-		},
-
-		"one-instance": {
-			slices: sliceList{
-				&resourceapi.ResourceSlice{
-					NodeName:   "node",
-					DriverName: "driver",
-					ResourceModel: resourceapi.ResourceModel{
-						NamedResources: &resourceapi.NamedResourcesResources{
-							Instances: []resourceapi.NamedResourcesInstance{{
-								Name: "one",
-								Attributes: []resourceapi.NamedResourcesAttribute{{
-									Name: "size",
-									NamedResourcesAttributeValue: resourceapi.NamedResourcesAttributeValue{
-										IntValue: ptr.To(int64(1)),
-									},
-								}},
-							}},
-						},
-					},
-				},
-			},
-
-			wantResources: resources{"node": map[string]ResourceModels{
-				"driver": {
-					NamedResources: namedresourcesmodel.Model{
-						Instances: []namedresourcesmodel.InstanceAllocation{
-							{
-								Instance: &resourceapi.NamedResourcesInstance{
-									Name: "one",
-									Attributes: []resourceapi.NamedResourcesAttribute{{
-										Name: "size",
-										NamedResourcesAttributeValue: resourceapi.NamedResourcesAttributeValue{
-											IntValue: ptr.To(int64(1)),
-										},
-									}},
-								},
-							},
-						},
-					},
-				},
-			}},
-		},
-
-		"two-instances": {
-			slices: sliceList{
-				&resourceapi.ResourceSlice{
-					NodeName:   "node",
-					DriverName: "driver",
-					ResourceModel: resourceapi.ResourceModel{
-						NamedResources: &resourceapi.NamedResourcesResources{
-							Instances: []resourceapi.NamedResourcesInstance{{Name: "one"}, {Name: "two"}},
-						},
-					},
-				},
-			},
-
-			wantResources: resources{"node": map[string]ResourceModels{
-				"driver": {
-					NamedResources: namedresourcesmodel.Model{
-						Instances: []namedresourcesmodel.InstanceAllocation{
-							{
-								Instance: &resourceapi.NamedResourcesInstance{Name: "one"},
-							},
-							{
-								Instance: &resourceapi.NamedResourcesInstance{Name: "two"},
-							},
-						},
-					},
-				},
-			}},
-		},
-
-		"two-nodes": {
-			slices: sliceList{
-				&resourceapi.ResourceSlice{
-					NodeName:   "node-a",
-					DriverName: "driver",
-					ResourceModel: resourceapi.ResourceModel{
-						NamedResources: &resourceapi.NamedResourcesResources{
-							Instances: []resourceapi.NamedResourcesInstance{{Name: "one"}, {Name: "two"}},
-						},
-					},
-				},
-				&resourceapi.ResourceSlice{
-					NodeName:   "node-b",
-					DriverName: "driver",
-					ResourceModel: resourceapi.ResourceModel{
-						NamedResources: &resourceapi.NamedResourcesResources{
-							Instances: []resourceapi.NamedResourcesInstance{{Name: "X"}, {Name: "Y"}},
-						},
-					},
-				},
-			},
-
-			wantResources: resources{
-				"node-a": map[string]ResourceModels{
-					"driver": {
-						NamedResources: namedresourcesmodel.Model{
-							Instances: []namedresourcesmodel.InstanceAllocation{
-								{
-									Instance: &resourceapi.NamedResourcesInstance{Name: "one"},
-								},
-								{
-									Instance: &resourceapi.NamedResourcesInstance{Name: "two"},
-								},
-							},
-						},
-					},
-				},
-				"node-b": map[string]ResourceModels{
-					"driver": {
-						NamedResources: namedresourcesmodel.Model{
-							Instances: []namedresourcesmodel.InstanceAllocation{
-								{
-									Instance: &resourceapi.NamedResourcesInstance{Name: "X"},
-								},
-								{
-									Instance: &resourceapi.NamedResourcesInstance{Name: "Y"},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-
-		"two-nodes-two-drivers": {
-			slices: sliceList{
-				&resourceapi.ResourceSlice{
-					NodeName:   "node-a",
-					DriverName: "driver-a",
-					ResourceModel: resourceapi.ResourceModel{
-						NamedResources: &resourceapi.NamedResourcesResources{
-							Instances: []resourceapi.NamedResourcesInstance{{Name: "one"}, {Name: "two"}},
-						},
-					},
-				},
-				&resourceapi.ResourceSlice{
-					NodeName:   "node-a",
-					DriverName: "driver-b",
-					ResourceModel: resourceapi.ResourceModel{
-						NamedResources: &resourceapi.NamedResourcesResources{
-							Instances: []resourceapi.NamedResourcesInstance{{Name: "one"}, {Name: "two"}},
-						},
-					},
-				},
-				&resourceapi.ResourceSlice{
-					NodeName:   "node-b",
-					DriverName: "driver-a",
-					ResourceModel: resourceapi.ResourceModel{
-						NamedResources: &resourceapi.NamedResourcesResources{
-							Instances: []resourceapi.NamedResourcesInstance{{Name: "X"}, {Name: "Y"}},
-						},
-					},
-				},
-				&resourceapi.ResourceSlice{
-					NodeName:   "node-b",
-					DriverName: "driver-b",
-					ResourceModel: resourceapi.ResourceModel{
-						NamedResources: &resourceapi.NamedResourcesResources{
-							Instances: []resourceapi.NamedResourcesInstance{{Name: "X"}, {Name: "Y"}},
-						},
-					},
-				},
-			},
-
-			wantResources: resources{
-				"node-a": map[string]ResourceModels{
-					"driver-a": {
-						NamedResources: namedresourcesmodel.Model{
-							Instances: []namedresourcesmodel.InstanceAllocation{
-								{
-									Instance: &resourceapi.NamedResourcesInstance{Name: "one"},
-								},
-								{
-									Instance: &resourceapi.NamedResourcesInstance{Name: "two"},
-								},
-							},
-						},
-					},
-					"driver-b": {
-						NamedResources: namedresourcesmodel.Model{
-							Instances: []namedresourcesmodel.InstanceAllocation{
-								{
-									Instance: &resourceapi.NamedResourcesInstance{Name: "one"},
-								},
-								{
-									Instance: &resourceapi.NamedResourcesInstance{Name: "two"},
-								},
-							},
-						},
-					},
-				},
-				"node-b": map[string]ResourceModels{
-					"driver-a": {
-						NamedResources: namedresourcesmodel.Model{
-							Instances: []namedresourcesmodel.InstanceAllocation{
-								{
-									Instance: &resourceapi.NamedResourcesInstance{Name: "X"},
-								},
-								{
-									Instance: &resourceapi.NamedResourcesInstance{Name: "Y"},
-								},
-							},
-						},
-					},
-					"driver-b": {
-						NamedResources: namedresourcesmodel.Model{
-							Instances: []namedresourcesmodel.InstanceAllocation{
-								{
-									Instance: &resourceapi.NamedResourcesInstance{Name: "X"},
-								},
-								{
-									Instance: &resourceapi.NamedResourcesInstance{Name: "Y"},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-
-		"in-use-simple": {
-			slices: sliceList{
-				&resourceapi.ResourceSlice{
-					NodeName:   "node-a",
-					DriverName: "driver-a",
-					ResourceModel: resourceapi.ResourceModel{
-						NamedResources: &resourceapi.NamedResourcesResources{
-							Instances: []resourceapi.NamedResourcesInstance{{Name: "one"}, {Name: "two"}},
-						},
-					},
-				},
-				&resourceapi.ResourceSlice{
-					NodeName:   "node-a",
-					DriverName: "driver-b",
-					ResourceModel: resourceapi.ResourceModel{
-						NamedResources: &resourceapi.NamedResourcesResources{
-							Instances: []resourceapi.NamedResourcesInstance{{Name: "one"}, {Name: "two"}},
-						},
-					},
-				},
-				&resourceapi.ResourceSlice{
-					NodeName:   "node-b",
-					DriverName: "driver-a",
-					ResourceModel: resourceapi.ResourceModel{
-						NamedResources: &resourceapi.NamedResourcesResources{
-							Instances: []resourceapi.NamedResourcesInstance{{Name: "X"}, {Name: "Y"}},
-						},
-					},
-				},
-				&resourceapi.ResourceSlice{
-					NodeName:   "node-b",
-					DriverName: "driver-b",
-					ResourceModel: resourceapi.ResourceModel{
-						NamedResources: &resourceapi.NamedResourcesResources{
-							Instances: []resourceapi.NamedResourcesInstance{{Name: "X"}, {Name: "Y"}},
-						},
-					},
-				},
-			},
-
-			claims: claimList{
-				&resourceapi.ResourceClaim{
-					/* not allocated */
-				},
-				&resourceapi.ResourceClaim{
-					Status: resourceapi.ResourceClaimStatus{
-						DriverName: "driver-a",
-						Allocation: &resourceapi.AllocationResult{
-							ResourceHandles: []resourceapi.ResourceHandle{{
-								// Claims not allocated via structured parameters can be ignored.
-							}},
-						},
-					},
-				},
-				&resourceapi.ResourceClaim{
-					Status: resourceapi.ResourceClaimStatus{
-						DriverName: "driver-a",
-						Allocation: &resourceapi.AllocationResult{
-							ResourceHandles: []resourceapi.ResourceHandle{{
-								DriverName: "driver-a",
-								StructuredData: &resourceapi.StructuredResourceHandle{
-									NodeName: "node-b",
-									// Unknown allocations can be ignored.
-									Results: []resourceapi.DriverAllocationResult{{
-										AllocationResultModel: resourceapi.AllocationResultModel{},
-									}},
-								},
-							}},
-						},
-					},
-				},
-				&resourceapi.ResourceClaim{
-					Status: resourceapi.ResourceClaimStatus{
-						DriverName: "driver-a",
-						Allocation: &resourceapi.AllocationResult{
-							ResourceHandles: []resourceapi.ResourceHandle{{
-								DriverName: "driver-a",
-								StructuredData: &resourceapi.StructuredResourceHandle{
-									NodeName: "node-a",
-									Results: []resourceapi.DriverAllocationResult{{
-										AllocationResultModel: resourceapi.AllocationResultModel{
-											NamedResources: &resourceapi.NamedResourcesAllocationResult{
-												Name: "two",
-											},
-										},
-									}},
-								},
-							}},
-						},
-					},
-				},
-			},
-
-			wantResources: resources{
-				"node-a": map[string]ResourceModels{
-					"driver-a": {
-						NamedResources: namedresourcesmodel.Model{
-							Instances: []namedresourcesmodel.InstanceAllocation{
-								{
-									Instance: &resourceapi.NamedResourcesInstance{Name: "one"},
-								},
-								{
-									Allocated: true,
-									Instance:  &resourceapi.NamedResourcesInstance{Name: "two"},
-								},
-							},
-						},
-					},
-					"driver-b": {
-						NamedResources: namedresourcesmodel.Model{
-							Instances: []namedresourcesmodel.InstanceAllocation{
-								{
-									Instance: &resourceapi.NamedResourcesInstance{Name: "one"},
-								},
-								{
-									Instance: &resourceapi.NamedResourcesInstance{Name: "two"},
-								},
-							},
-						},
-					},
-				},
-				"node-b": map[string]ResourceModels{
-					"driver-a": {
-						NamedResources: namedresourcesmodel.Model{
-							Instances: []namedresourcesmodel.InstanceAllocation{
-								{
-									Instance: &resourceapi.NamedResourcesInstance{Name: "X"},
-								},
-								{
-									Instance: &resourceapi.NamedResourcesInstance{Name: "Y"},
-								},
-							},
-						},
-					},
-					"driver-b": {
-						NamedResources: namedresourcesmodel.Model{
-							Instances: []namedresourcesmodel.InstanceAllocation{
-								{
-									Instance: &resourceapi.NamedResourcesInstance{Name: "X"},
-								},
-								{
-									Instance: &resourceapi.NamedResourcesInstance{Name: "Y"},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-
-		"in-use-meta-driver": {
-			slices: sliceList{
-				&resourceapi.ResourceSlice{
-					NodeName:   "node-a",
-					DriverName: "driver-a",
-					ResourceModel: resourceapi.ResourceModel{
-						NamedResources: &resourceapi.NamedResourcesResources{
-							Instances: []resourceapi.NamedResourcesInstance{{Name: "one"}, {Name: "two"}},
-						},
-					},
-				},
-				&resourceapi.ResourceSlice{
-					NodeName:   "node-a",
-					DriverName: "driver-b",
-					ResourceModel: resourceapi.ResourceModel{
-						NamedResources: &resourceapi.NamedResourcesResources{
-							Instances: []resourceapi.NamedResourcesInstance{{Name: "one"}, {Name: "two"}},
-						},
-					},
-				},
-				&resourceapi.ResourceSlice{
-					NodeName:   "node-b",
-					DriverName: "driver-a",
-					ResourceModel: resourceapi.ResourceModel{
-						NamedResources: &resourceapi.NamedResourcesResources{
-							Instances: []resourceapi.NamedResourcesInstance{{Name: "X"}, {Name: "Y"}},
-						},
-					},
-				},
-				&resourceapi.ResourceSlice{
-					NodeName:   "node-b",
-					DriverName: "driver-b",
-					ResourceModel: resourceapi.ResourceModel{
-						NamedResources: &resourceapi.NamedResourcesResources{
-							Instances: []resourceapi.NamedResourcesInstance{{Name: "X"}, {Name: "Y"}},
-						},
-					},
-				},
-			},
-
-			claims: claimList{
-				&resourceapi.ResourceClaim{
-					Status: resourceapi.ResourceClaimStatus{
-						DriverName: "meta-driver",
-						Allocation: &resourceapi.AllocationResult{
-							ResourceHandles: []resourceapi.ResourceHandle{{
-								DriverName: "driver-b",
-								StructuredData: &resourceapi.StructuredResourceHandle{
-									NodeName: "node-b",
-									Results: []resourceapi.DriverAllocationResult{{
-										AllocationResultModel: resourceapi.AllocationResultModel{
-											NamedResources: &resourceapi.NamedResourcesAllocationResult{
-												Name: "X",
-											},
-										},
-									}},
-								},
-							}},
-						},
-					},
-				},
-			},
-
-			wantResources: resources{
-				"node-a": map[string]ResourceModels{
-					"driver-a": {
-						NamedResources: namedresourcesmodel.Model{
-							Instances: []namedresourcesmodel.InstanceAllocation{
-								{
-									Instance: &resourceapi.NamedResourcesInstance{Name: "one"},
-								},
-								{
-									Instance: &resourceapi.NamedResourcesInstance{Name: "two"},
-								},
-							},
-						},
-					},
-					"driver-b": {
-						NamedResources: namedresourcesmodel.Model{
-							Instances: []namedresourcesmodel.InstanceAllocation{
-								{
-									Instance: &resourceapi.NamedResourcesInstance{Name: "one"},
-								},
-								{
-									Instance: &resourceapi.NamedResourcesInstance{Name: "two"},
-								},
-							},
-						},
-					},
-				},
-				"node-b": map[string]ResourceModels{
-					"driver-a": {
-						NamedResources: namedresourcesmodel.Model{
-							Instances: []namedresourcesmodel.InstanceAllocation{
-								{
-									Instance: &resourceapi.NamedResourcesInstance{Name: "X"},
-								},
-								{
-									Instance: &resourceapi.NamedResourcesInstance{Name: "Y"},
-								},
-							},
-						},
-					},
-					"driver-b": {
-						NamedResources: namedresourcesmodel.Model{
-							Instances: []namedresourcesmodel.InstanceAllocation{
-								{
-									Allocated: true,
-									Instance:  &resourceapi.NamedResourcesInstance{Name: "X"},
-								},
-								{
-									Instance: &resourceapi.NamedResourcesInstance{Name: "Y"},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-
-		"in-use-many-results": {
-			slices: sliceList{
-				&resourceapi.ResourceSlice{
-					NodeName:   "node-a",
-					DriverName: "driver-a",
-					ResourceModel: resourceapi.ResourceModel{
-						NamedResources: &resourceapi.NamedResourcesResources{
-							Instances: []resourceapi.NamedResourcesInstance{{Name: "one"}, {Name: "two"}},
-						},
-					},
-				},
-				&resourceapi.ResourceSlice{
-					NodeName:   "node-a",
-					DriverName: "driver-b",
-					ResourceModel: resourceapi.ResourceModel{
-						NamedResources: &resourceapi.NamedResourcesResources{
-							Instances: []resourceapi.NamedResourcesInstance{{Name: "one"}, {Name: "two"}},
-						},
-					},
-				},
-				&resourceapi.ResourceSlice{
-					NodeName:   "node-b",
-					DriverName: "driver-a",
-					ResourceModel: resourceapi.ResourceModel{
-						NamedResources: &resourceapi.NamedResourcesResources{
-							Instances: []resourceapi.NamedResourcesInstance{{Name: "X"}, {Name: "Y"}},
-						},
-					},
-				},
-				&resourceapi.ResourceSlice{
-					NodeName:   "node-b",
-					DriverName: "driver-b",
-					ResourceModel: resourceapi.ResourceModel{
-						NamedResources: &resourceapi.NamedResourcesResources{
-							Instances: []resourceapi.NamedResourcesInstance{{Name: "X"}, {Name: "Y"}},
-						},
-					},
-				},
-			},
-
-			claims: claimList{
-				&resourceapi.ResourceClaim{
-					Status: resourceapi.ResourceClaimStatus{
-						DriverName: "driver-a",
-						Allocation: &resourceapi.AllocationResult{
-							ResourceHandles: []resourceapi.ResourceHandle{{
-								DriverName: "driver-a",
-								StructuredData: &resourceapi.StructuredResourceHandle{
-									NodeName: "node-a",
-									Results: []resourceapi.DriverAllocationResult{
-										{
-											AllocationResultModel: resourceapi.AllocationResultModel{
-												NamedResources: &resourceapi.NamedResourcesAllocationResult{
-													Name: "one",
-												},
-											},
-										},
-										{
-											AllocationResultModel: resourceapi.AllocationResultModel{
-												NamedResources: &resourceapi.NamedResourcesAllocationResult{
-													Name: "two",
-												},
-											},
-										},
-									},
-								},
-							}},
-						},
-					},
-				},
-			},
-
-			wantResources: resources{
-				"node-a": map[string]ResourceModels{
-					"driver-a": {
-						NamedResources: namedresourcesmodel.Model{
-							Instances: []namedresourcesmodel.InstanceAllocation{
-								{
-									Allocated: true,
-									Instance:  &resourceapi.NamedResourcesInstance{Name: "one"},
-								},
-								{
-									Allocated: true,
-									Instance:  &resourceapi.NamedResourcesInstance{Name: "two"},
-								},
-							},
-						},
-					},
-					"driver-b": {
-						NamedResources: namedresourcesmodel.Model{
-							Instances: []namedresourcesmodel.InstanceAllocation{
-								{
-									Instance: &resourceapi.NamedResourcesInstance{Name: "one"},
-								},
-								{
-									Instance: &resourceapi.NamedResourcesInstance{Name: "two"},
-								},
-							},
-						},
-					},
-				},
-				"node-b": map[string]ResourceModels{
-					"driver-a": {
-						NamedResources: namedresourcesmodel.Model{
-							Instances: []namedresourcesmodel.InstanceAllocation{
-								{
-									Instance: &resourceapi.NamedResourcesInstance{Name: "X"},
-								},
-								{
-									Instance: &resourceapi.NamedResourcesInstance{Name: "Y"},
-								},
-							},
-						},
-					},
-					"driver-b": {
-						NamedResources: namedresourcesmodel.Model{
-							Instances: []namedresourcesmodel.InstanceAllocation{
-								{
-									Instance: &resourceapi.NamedResourcesInstance{Name: "X"},
-								},
-								{
-									Instance: &resourceapi.NamedResourcesInstance{Name: "Y"},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-
-		"in-use-many-handles": {
-			slices: sliceList{
-				&resourceapi.ResourceSlice{
-					NodeName:   "node-a",
-					DriverName: "driver-a",
-					ResourceModel: resourceapi.ResourceModel{
-						NamedResources: &resourceapi.NamedResourcesResources{
-							Instances: []resourceapi.NamedResourcesInstance{{Name: "one"}, {Name: "two"}},
-						},
-					},
-				},
-				&resourceapi.ResourceSlice{
-					NodeName:   "node-a",
-					DriverName: "driver-b",
-					ResourceModel: resourceapi.ResourceModel{
-						NamedResources: &resourceapi.NamedResourcesResources{
-							Instances: []resourceapi.NamedResourcesInstance{{Name: "one"}, {Name: "two"}},
-						},
-					},
-				},
-				&resourceapi.ResourceSlice{
-					NodeName:   "node-b",
-					DriverName: "driver-a",
-					ResourceModel: resourceapi.ResourceModel{
-						NamedResources: &resourceapi.NamedResourcesResources{
-							Instances: []resourceapi.NamedResourcesInstance{{Name: "X"}, {Name: "Y"}},
-						},
-					},
-				},
-				&resourceapi.ResourceSlice{
-					NodeName:   "node-b",
-					DriverName: "driver-b",
-					ResourceModel: resourceapi.ResourceModel{
-						NamedResources: &resourceapi.NamedResourcesResources{
-							Instances: []resourceapi.NamedResourcesInstance{{Name: "X"}, {Name: "Y"}},
-						},
-					},
-				},
-			},
-
-			claims: claimList{
-				&resourceapi.ResourceClaim{
-					Status: resourceapi.ResourceClaimStatus{
-						DriverName: "meta-driver",
-						Allocation: &resourceapi.AllocationResult{
-							ResourceHandles: []resourceapi.ResourceHandle{
-								{
-									DriverName: "driver-a",
-									StructuredData: &resourceapi.StructuredResourceHandle{
-										NodeName: "node-b",
-										Results: []resourceapi.DriverAllocationResult{{
-											AllocationResultModel: resourceapi.AllocationResultModel{
-												NamedResources: &resourceapi.NamedResourcesAllocationResult{
-													Name: "X",
-												},
-											},
-										}},
-									},
-								},
-								{
-									DriverName: "driver-b",
-									StructuredData: &resourceapi.StructuredResourceHandle{
-										NodeName: "node-b",
-										Results: []resourceapi.DriverAllocationResult{{
-											AllocationResultModel: resourceapi.AllocationResultModel{
-												NamedResources: &resourceapi.NamedResourcesAllocationResult{
-													Name: "X",
-												},
-											},
-										}},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-
-			wantResources: resources{
-				"node-a": map[string]ResourceModels{
-					"driver-a": {
-						NamedResources: namedresourcesmodel.Model{
-							Instances: []namedresourcesmodel.InstanceAllocation{
-								{
-									Instance: &resourceapi.NamedResourcesInstance{Name: "one"},
-								},
-								{
-									Instance: &resourceapi.NamedResourcesInstance{Name: "two"},
-								},
-							},
-						},
-					},
-					"driver-b": {
-						NamedResources: namedresourcesmodel.Model{
-							Instances: []namedresourcesmodel.InstanceAllocation{
-								{
-									Instance: &resourceapi.NamedResourcesInstance{Name: "one"},
-								},
-								{
-									Instance: &resourceapi.NamedResourcesInstance{Name: "two"},
-								},
-							},
-						},
-					},
-				},
-				"node-b": map[string]ResourceModels{
-					"driver-a": {
-						NamedResources: namedresourcesmodel.Model{
-							Instances: []namedresourcesmodel.InstanceAllocation{
-								{
-									Allocated: true,
-									Instance:  &resourceapi.NamedResourcesInstance{Name: "X"},
-								},
-								{
-									Instance: &resourceapi.NamedResourcesInstance{Name: "Y"},
-								},
-							},
-						},
-					},
-					"driver-b": {
-						NamedResources: namedresourcesmodel.Model{
-							Instances: []namedresourcesmodel.InstanceAllocation{
-								{
-									Allocated: true,
-									Instance:  &resourceapi.NamedResourcesInstance{Name: "X"},
-								},
-								{
-									Instance: &resourceapi.NamedResourcesInstance{Name: "Y"},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-
-		"orphaned-allocations": {
-			claims: claimList{
-				&resourceapi.ResourceClaim{
-					Status: resourceapi.ResourceClaimStatus{
-						DriverName: "meta-driver",
-						Allocation: &resourceapi.AllocationResult{
-							ResourceHandles: []resourceapi.ResourceHandle{
-								{
-									DriverName: "driver-a",
-									StructuredData: &resourceapi.StructuredResourceHandle{
-										NodeName: "node-b",
-										Results: []resourceapi.DriverAllocationResult{{
-											AllocationResultModel: resourceapi.AllocationResultModel{
-												NamedResources: &resourceapi.NamedResourcesAllocationResult{
-													Name: "X",
-												},
-											},
-										}},
-									},
-								},
-								{
-									DriverName: "driver-b",
-									StructuredData: &resourceapi.StructuredResourceHandle{
-										NodeName: "node-b",
-										Results: []resourceapi.DriverAllocationResult{{
-											AllocationResultModel: resourceapi.AllocationResultModel{
-												NamedResources: &resourceapi.NamedResourcesAllocationResult{
-													Name: "X",
-												},
-											},
-										}},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-
-			wantResources: resources{
-				"node-b": map[string]ResourceModels{},
-			},
-		},
-
-		"in-flight": {
-			slices: sliceList{
-				&resourceapi.ResourceSlice{
-					NodeName:   "node",
-					DriverName: "driver",
-					ResourceModel: resourceapi.ResourceModel{
-						NamedResources: &resourceapi.NamedResourcesResources{
-							Instances: []resourceapi.NamedResourcesInstance{{Name: "one"}},
-						},
-					},
-				},
-			},
-
-			claims: claimList{
-				&resourceapi.ResourceClaim{
-					ObjectMeta: metav1.ObjectMeta{
-						UID: "abc",
-					},
-					// Allocation not recorded yet.
-				},
-			},
-
-			inFlight: map[types.UID]resourceapi.ResourceClaimStatus{
-				"abc": {
-					DriverName: "driver",
-					Allocation: &resourceapi.AllocationResult{
-						ResourceHandles: []resourceapi.ResourceHandle{{
-							DriverName: "driver",
-							StructuredData: &resourceapi.StructuredResourceHandle{
-								NodeName: "node",
-								Results: []resourceapi.DriverAllocationResult{{
-									AllocationResultModel: resourceapi.AllocationResultModel{
-										NamedResources: &resourceapi.NamedResourcesAllocationResult{
-											Name: "one",
-										},
-									},
-								}},
-							},
-						}},
-					},
-				},
-			},
-
-			wantResources: resources{"node": map[string]ResourceModels{
-				"driver": {
-					NamedResources: namedresourcesmodel.Model{
-						Instances: []namedresourcesmodel.InstanceAllocation{
-							{
-								Allocated: true,
-								Instance:  &resourceapi.NamedResourcesInstance{Name: "one"},
-							},
-						},
-					},
-				},
-			}},
-		},
+		// TODO:
+		// - devices split across different slices
+		// - obsolete slices
+		// - allocating "all" devices while pool is incomplete
+		// - allocating a network-attached device, with and without class.SuitableNodes, with and without success
+		// - allocating with several different different drivers
+		// - allocating several claims, with and without constraints, with and without success
+		// - devices already allocated
+		// - count > 1
 	}
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			tCtx := ktesting.Init(t)
+			_, ctx := ktesting.NewTestContext(t)
+			g := gomega.NewWithT(t)
 
-			var inFlightAllocations sync.Map
-			for uid, claimStatus := range tc.inFlight {
-				inFlightAllocations.Store(uid, &resourceapi.ResourceClaim{Status: claimStatus})
+			// Listing objects is deterministic and returns them in the same
+			// order as in the test case. That makes the allocation result
+			// also deterministic.
+			var allocated, toAllocate claimLister
+			var classLister informerLister[resourceapi.DeviceClass]
+			var sliceLister informerLister[resourceapi.ResourceSlice]
+			for _, claim := range tc.claimsToAllocate {
+				toAllocate.claims = append(toAllocate.claims, claim.DeepCopy())
 			}
-
-			slices := tc.slices
-			if slices == nil {
-				slices = sliceList{}
+			for _, claim := range tc.allocatedClaims {
+				allocated.claims = append(allocated.claims, claim.DeepCopy())
 			}
-			claims := tc.claims
-			if claims == nil {
-				claims = claimList{}
+			for _, slice := range tc.slices {
+				sliceLister.objs = append(sliceLister.objs, slice.DeepCopy())
 			}
-			actualResources, actualErr := newResourceModel(tCtx.Logger(), slices, claims, &inFlightAllocations)
-
-			if actualErr != nil {
-				if !tc.wantErr {
-					tCtx.Fatalf("unexpected error: %v", actualErr)
-				}
-				return
-			}
-			if tc.wantErr {
-				tCtx.Fatalf("did not get expected error")
+			for _, class := range tc.classes {
+				classLister.objs = append(classLister.objs, class.DeepCopy())
 			}
 
-			expectResources := tc.wantResources
-			if expectResources == nil {
-				expectResources = resources{}
+			allocator, err := NewAllocator(ctx, toAllocate.claims, allocated, classLister, sliceLister)
+			g.Expect(err).ToNot(gomega.HaveOccurred())
+
+			results, err := allocator.Allocate(ctx, tc.node)
+			matchError := tc.expectError
+			if matchError == nil {
+				matchError = gomega.Not(gomega.HaveOccurred())
 			}
-			require.Equal(tCtx, expectResources, actualResources)
+			g.Expect(err).To(matchError)
+			g.Expect(results).To(gomega.HaveExactElements(tc.expectResults))
+
+			// Objects that the allocator had access to should not have been modified.
+			g.Expect(toAllocate.claims).To(gomega.HaveExactElements(tc.claimsToAllocate))
+			g.Expect(allocated.claims).To(gomega.HaveExactElements(tc.allocatedClaims))
+			g.Expect(sliceLister.objs).To(gomega.ConsistOf(tc.slices))
+			g.Expect(classLister.objs).To(gomega.ConsistOf(tc.classes))
 		})
 	}
 }
 
-type sliceList []*resourceapi.ResourceSlice
-
-func (l sliceList) List(selector labels.Selector) ([]*resourceapi.ResourceSlice, error) {
-	return l, nil
+type claimLister struct {
+	claims []*resourceapi.ResourceClaim
+	err    error
 }
 
-type sliceError string
-
-func (l sliceError) List(selector labels.Selector) ([]*resourceapi.ResourceSlice, error) {
-	return nil, errors.New(string(l))
+func (l claimLister) ListAllAllocated() ([]*resourceapi.ResourceClaim, error) {
+	return l.claims, l.err
 }
 
-type claimList []any
-
-func (l claimList) List(indexObj any) []any {
-	return l
+type informerLister[T any] struct {
+	objs []*T
+	err  error
 }
 
-func TestController(t *testing.T) {
-	driver1 := "driver-1"
-	class1 := &resourceapi.ResourceClass{
-		DriverName: driver1,
+func (l informerLister[T]) List(selector labels.Selector) (ret []*T, err error) {
+	if selector.String() != labels.Everything().String() {
+		return nil, errors.New("labels selector not implemented")
 	}
+	return l.objs, l.err
+}
 
-	classParametersEmpty := &resourceapi.ResourceClassParameters{}
-	classParametersAny := &resourceapi.ResourceClassParameters{
-		Filters: []resourceapi.ResourceFilter{{
-			DriverName: driver1,
-			ResourceFilterModel: resourceapi.ResourceFilterModel{
-				NamedResources: &resourceapi.NamedResourcesFilter{
-					Selector: "true",
-				},
-			},
-		}},
+func (l informerLister[T]) Get(name string) (*T, error) {
+	for _, obj := range l.objs {
+		accessor, err := meta.Accessor(obj)
+		if err != nil {
+			return nil, err
+		}
+		if accessor.GetName() == name {
+			return obj, nil
+		}
 	}
+	return nil, apierrors.NewNotFound(schema.GroupResource{}, "not found")
+}
 
-	claimParametersEmpty := &resourceapi.ResourceClaimParameters{}
-	claimParametersAny := &resourceapi.ResourceClaimParameters{
-		DriverRequests: []resourceapi.DriverRequests{{
-			DriverName: driver1,
-		}},
+func unmarshal[T any](t *testing.T, data string) *T {
+	t.Helper()
+
+	var obj T
+	err := yaml.UnmarshalStrict([]byte(data), &obj)
+	gomega.NewWithT(t).Expect(err).NotTo(gomega.HaveOccurred(), "parse YAML")
+	return &obj
+}
+
+func marshal[T any](t *testing.T, obj *T) string {
+	t.Helper()
+
+	data, err := yaml.Marshal(obj)
+	gomega.NewWithT(t).Expect(err).NotTo(gomega.HaveOccurred(), "create YAML")
+	return string(data)
+}
+
+func replace[T any](t *testing.T, obj *T, pairs ...string) *T {
+	t.Helper()
+
+	data := marshal(t, obj)
+	for i := 0; i < len(pairs); i += 2 {
+		data = strings.ReplaceAll(data, pairs[i], pairs[i+1])
 	}
-	claimParametersOne := &resourceapi.ResourceClaimParameters{
-		DriverRequests: []resourceapi.DriverRequests{{
-			DriverName: driver1,
-			Requests: []resourceapi.ResourceRequest{{
-				ResourceRequestModel: resourceapi.ResourceRequestModel{
-					NamedResources: &resourceapi.NamedResourcesRequest{
-						Selector: "true",
-					},
-				},
-			}},
-		}},
-	}
-	claimParametersBroken := &resourceapi.ResourceClaimParameters{
-		DriverRequests: []resourceapi.DriverRequests{{
-			DriverName: driver1,
-			Requests: []resourceapi.ResourceRequest{{
-				ResourceRequestModel: resourceapi.ResourceRequestModel{
-					NamedResources: &resourceapi.NamedResourcesRequest{
-						Selector: `attributes.bool["no-such-attribute"]`,
-					},
-				},
-			}},
-		}},
-	}
+	return unmarshal[T](t, data)
+}
 
-	instance1 := "instance-1"
-
-	node1 := "node-1"
-	node1Selector := &v1.NodeSelector{
-		NodeSelectorTerms: []v1.NodeSelectorTerm{{
-			MatchExpressions: []v1.NodeSelectorRequirement{{
-				Key:      "kubernetes.io/hostname",
-				Operator: v1.NodeSelectorOpIn,
-				Values:   []string{node1},
-			}},
-		}},
-	}
-	node1Resources := resources{node1: map[string]ResourceModels{
-		driver1: {
-			NamedResources: namedresourcesmodel.Model{
-				Instances: []namedresourcesmodel.InstanceAllocation{{
-					Instance: &resourceapi.NamedResourcesInstance{
-						Name: instance1,
-					},
-				}},
-			},
-		},
-	}}
-	node1Allocation := &resourceapi.AllocationResult{
-		AvailableOnNodes: node1Selector,
-	}
-
-	instance1Allocation := &resourceapi.AllocationResult{
-		AvailableOnNodes: node1Selector,
-		ResourceHandles: []resourceapi.ResourceHandle{{
-			DriverName: driver1,
-			StructuredData: &resourceapi.StructuredResourceHandle{
-				NodeName: node1,
-				Results: []resourceapi.DriverAllocationResult{{
-					AllocationResultModel: resourceapi.AllocationResultModel{
-						NamedResources: &resourceapi.NamedResourcesAllocationResult{
-							Name: instance1,
-						},
-					},
-				}},
-			},
-		}},
-	}
-
-	type nodeResult struct {
-		isSuitable  bool
-		suitableErr string
-
-		driverName  string
-		allocation  *resourceapi.AllocationResult
-		allocateErr string
-	}
-	type nodeResults map[string]nodeResult
-
-	testcases := map[string]struct {
-		resources       resources
-		class           *resourceapi.ResourceClass
-		classParameters *resourceapi.ResourceClassParameters
-		claimParameters *resourceapi.ResourceClaimParameters
-
-		expectCreateErr   bool
-		expectNodeResults nodeResults
-	}{
-		"empty": {
-			class:           class1,
-			classParameters: classParametersEmpty,
-			claimParameters: claimParametersEmpty,
-
-			expectNodeResults: nodeResults{
-				node1: {isSuitable: true, driverName: driver1, allocation: node1Allocation},
-			},
-		},
-
-		"any": {
-			class:           class1,
-			classParameters: classParametersEmpty,
-			claimParameters: claimParametersAny,
-
-			expectNodeResults: nodeResults{
-				node1: {isSuitable: true, driverName: driver1, allocation: node1Allocation},
-			},
-		},
-
-		"missing-model": {
-			class:           class1,
-			classParameters: classParametersEmpty,
-			claimParameters: &resourceapi.ResourceClaimParameters{
-				DriverRequests: []resourceapi.DriverRequests{{
-					Requests: []resourceapi.ResourceRequest{{ /* empty model */ }},
-				}},
-			},
-
-			expectCreateErr: true,
-		},
-
-		"no-resources": {
-			class:           class1,
-			classParameters: classParametersEmpty,
-			claimParameters: claimParametersOne,
-
-			expectNodeResults: nodeResults{
-				node1: {isSuitable: false, allocateErr: "allocating via named resources structured model: insufficient resources"},
-			},
-		},
-
-		"have-resources": {
-			resources:       node1Resources,
-			class:           class1,
-			classParameters: classParametersEmpty,
-			claimParameters: claimParametersOne,
-
-			expectNodeResults: nodeResults{
-				node1: {isSuitable: true, driverName: driver1, allocation: instance1Allocation},
-			},
-		},
-
-		"broken-cel": {
-			resources:       node1Resources,
-			class:           class1,
-			classParameters: classParametersEmpty,
-			claimParameters: claimParametersBroken,
-
-			expectNodeResults: nodeResults{
-				node1: {suitableErr: `checking node "node-1" and resources of driver "driver-1": evaluate request CEL expression: no such key: no-such-attribute`},
-			},
-		},
-
-		"class-filter": {
-			resources:       node1Resources,
-			class:           class1,
-			classParameters: classParametersAny,
-			claimParameters: claimParametersOne,
-
-			expectNodeResults: nodeResults{
-				node1: {isSuitable: true, driverName: driver1, allocation: instance1Allocation},
-			},
-		},
-
-		"vendor-parameters": {
-			resources: node1Resources,
-			class:     class1,
-			classParameters: func() *resourceapi.ResourceClassParameters {
-				parameters := classParametersAny.DeepCopy()
-				parameters.VendorParameters = []resourceapi.VendorParameters{{
-					DriverName: driver1,
-					Parameters: runtime.RawExtension{Raw: []byte("class-parameters")},
-				}}
-				return parameters
-			}(),
-
-			claimParameters: func() *resourceapi.ResourceClaimParameters {
-				parameters := claimParametersOne.DeepCopy()
-				parameters.DriverRequests[0].VendorParameters = runtime.RawExtension{Raw: []byte("claim-parameters")}
-				parameters.DriverRequests[0].Requests[0].VendorParameters = runtime.RawExtension{Raw: []byte("request-parameters")}
-				return parameters
-			}(),
-
-			expectNodeResults: nodeResults{
-				node1: {isSuitable: true, driverName: driver1,
-					allocation: func() *resourceapi.AllocationResult {
-						allocation := instance1Allocation.DeepCopy()
-						allocation.ResourceHandles[0].StructuredData.VendorClassParameters = runtime.RawExtension{Raw: []byte("class-parameters")}
-						allocation.ResourceHandles[0].StructuredData.VendorClaimParameters = runtime.RawExtension{Raw: []byte("claim-parameters")}
-						allocation.ResourceHandles[0].StructuredData.Results[0].VendorRequestParameters = runtime.RawExtension{Raw: []byte("request-parameters")}
-						return allocation
-					}(),
-				},
-			},
-		},
-	}
-
-	for name, tc := range testcases {
-		t.Run(name, func(t *testing.T) {
-			tCtx := ktesting.Init(t)
-
-			controller, err := newClaimController(tCtx.Logger(), tc.class, tc.classParameters, tc.claimParameters)
-			if err != nil {
-				if !tc.expectCreateErr {
-					tCtx.Fatalf("unexpected error: %v", err)
-				}
-				return
-			}
-			if tc.expectCreateErr {
-				tCtx.Fatalf("did not get expected error")
-			}
-
-			for nodeName, expect := range tc.expectNodeResults {
-				t.Run(nodeName, func(t *testing.T) {
-					tCtx := ktesting.Init(t)
-
-					isSuitable, err := controller.nodeIsSuitable(tCtx, nodeName, tc.resources)
-					if err != nil {
-						if expect.suitableErr == "" {
-							tCtx.Fatalf("unexpected nodeIsSuitable error: %v", err)
-						}
-						require.Equal(tCtx, expect.suitableErr, err.Error())
-						return
-					}
-					if expect.suitableErr != "" {
-						tCtx.Fatalf("did not get expected nodeIsSuitable error: %v", expect.suitableErr)
-					}
-					assert.Equal(tCtx, expect.isSuitable, isSuitable, "is suitable")
-
-					driverName, allocation, err := controller.allocate(tCtx, nodeName, tc.resources)
-					if err != nil {
-						if expect.allocateErr == "" {
-							tCtx.Fatalf("unexpected allocate error: %v", err)
-						}
-						require.Equal(tCtx, expect.allocateErr, err.Error())
-						return
-					}
-					if expect.allocateErr != "" {
-						tCtx.Fatalf("did not get expected allocate error: %v", expect.allocateErr)
-					}
-					assert.Equal(tCtx, expect.driverName, driverName, "driver name")
-					assert.Equal(tCtx, expect.allocation, allocation)
-				})
-			}
-		})
-	}
+func objects[T any](objs ...T) []T {
+	return objs
 }

@@ -40,7 +40,7 @@ func GatherPools(ctx context.Context, sliceLister resourcelisters.ResourceSliceL
 	// slices with the right node name and those with no node name.
 	slices, err := sliceLister.List(labels.Everything())
 	if err != nil {
-		return nil, fmt.Errorf("list resource slices: %w", node.Name, err)
+		return nil, fmt.Errorf("list resource slices: %w", err)
 	}
 	for _, slice := range slices {
 		switch {
