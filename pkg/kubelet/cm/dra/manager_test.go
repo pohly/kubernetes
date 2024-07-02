@@ -444,8 +444,19 @@ func TestPrepareResources(t *testing.T) {
 					},
 				},
 			},
-			claim:               genTestClaim(claimName, driverName, deviceName, podUID),
-			wantResourceSkipped: true,
+			claim:                  genTestClaim(claimName, driverName, deviceName, podUID),
+			expectedPrepareCalls:   1,
+			expectedClaimInfoState: genClaimInfoState(deviceName),
+			resp: &drapb.NodePrepareResourcesResponse{Claims: map[string]*drapb.NodePrepareResourceResponse{
+				string(claimUID): {
+					CDIDevices: []*drapb.Device{
+						{
+							RequestName: requestName,
+							CdiIds:      []string{deviceName},
+						},
+					},
+				},
+			}},
 		},
 		{
 			description:            "resource already prepared",

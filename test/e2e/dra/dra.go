@@ -164,7 +164,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			}
 		})
 
-		ginkgo.It("must skip NodePrepareResource if not used by any container", func(ctx context.Context) {
+		ginkgo.It("must call NodePrepareResources even if not used by any container", func(ctx context.Context) {
 			pod, template := b.podInline()
 			for i := range pod.Spec.Containers {
 				pod.Spec.Containers[i].Resources.Claims = nil
@@ -172,7 +172,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			b.create(ctx, pod, template)
 			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod), "start pod")
 			for host, plugin := range b.driver.Nodes {
-				gomega.Expect(plugin.GetPreparedResources()).Should(gomega.BeEmpty(), "not claims should be prepared on host %s while pod is running", host)
+				gomega.Expect(plugin.GetPreparedResources()).ShouldNot(gomega.BeEmpty(), "claims should be prepared on host %s while pod is running", host)
 			}
 		})
 	})
