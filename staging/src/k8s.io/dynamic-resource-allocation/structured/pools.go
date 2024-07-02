@@ -44,8 +44,8 @@ func GatherPools(ctx context.Context, sliceLister resourcelisters.ResourceSliceL
 	}
 	for _, slice := range slices {
 		switch {
-		case slice.Spec.NodeName != nil:
-			if *slice.Spec.NodeName == node.Name {
+		case slice.Spec.NodeName != "":
+			if slice.Spec.NodeName == node.Name {
 				addSlice(pools, slice)
 			}
 		case slice.Spec.NodeSelector != nil:

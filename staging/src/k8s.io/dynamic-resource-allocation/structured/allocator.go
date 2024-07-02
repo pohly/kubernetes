@@ -29,7 +29,6 @@ import (
 	resourcelisters "k8s.io/client-go/listers/resource/v1alpha3"
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/klog/v2"
-	"k8s.io/utils/ptr"
 )
 
 // ClaimLister returns a subset of the claims that a
@@ -174,7 +173,7 @@ func (sharedAllocator *Allocator) Allocate(ctx context.Context, node *v1.Node) (
 
 			switch request.Device.CountMode {
 			case resourceapi.CountModeExact:
-				numDevices := ptr.Deref(request.Device.Count, 1)
+				numDevices := request.Device.Count
 				if numDevices > math.MaxInt {
 					// Allowed by API validation, but doesn't make sense.
 					return nil, fmt.Errorf("claim %s, request %s: exact count %d is too large", klog.KObj(claim), request.Name, deviceRequest.DeviceClassName, numDevices)
@@ -229,16 +228,16 @@ func (sharedAllocator *Allocator) Allocate(ctx context.Context, node *v1.Node) (
 				return nil, fmt.Errorf("claim %s, constraint #%d: unsupported constraint type", klog.KObj(claim), i)
 			}
 			switch {
-			case constraint.Device.MatchAttribute != nil:
+			case constraint.Device.MatchAttribute != "":
 				logger := alloc.logger
 				if alloc.logger.V(5).Enabled() {
 					logger = klog.LoggerWithName(logger, "matchAttributeConstraint")
-					logger = klog.LoggerWithValues(logger, "matchAttribute", *constraint.Device.MatchAttribute)
+					logger = klog.LoggerWithValues(logger, "matchAttribute", constraint.Device.MatchAttribute)
 				}
 				m := &matchAttributeConstraint{
 					logger:        logger,
 					requestNames:  sets.New(constraint.Requests...),
-					attributeName: *constraint.Device.MatchAttribute,
+					attributeName: constraint.Device.MatchAttribute,
 				}
 				constraints = append(constraints, m)
 			default:
@@ -504,7 +503,7 @@ func (alloc *allocator) allocateOne(r deviceIndices) (bool, error) {
 
 	request := &alloc.claimsToAllocate[r.claimIndex].Spec.Requests[r.requestIndex]
 	doAllDevices := request.Device.CountMode == resourceapi.CountModeAll
-	alloc.logger.V(5).Info("Allocating one device", "currentClaim", r.claimIndex, "totalClaims", len(alloc.claimsToAllocate), "currentRequest", r.requestIndex, "totalRequestsPerClaim", len(claim.Spec.Requests), "currentDevice", r.deviceIndex, "devicesPerRequest", requestData.numDevices, "allDevices", doAllDevices, "adminAccess", ptr.Deref(request.Device.AdminAccess, false))
+	alloc.logger.V(5).Info("Allocating one device", "currentClaim", r.claimIndex, "totalClaims", len(alloc.claimsToAllocate), "currentRequest", r.requestIndex, "totalRequestsPerClaim", len(claim.Spec.Requests), "currentDevice", r.deviceIndex, "devicesPerRequest", requestData.numDevices, "allDevices", doAllDevices, "adminAccess", request.Device.AdminAccess)
 
 	if doAllDevices {
 		// For "all" devices we already know which ones we need. We
@@ -535,7 +534,7 @@ func (alloc *allocator) allocateOne(r deviceIndices) (bool, error) {
 				deviceID := DeviceID{Driver: pool.Driver, Pool: pool.Pool, Device: slice.Spec.Devices[deviceIndex].Name}
 
 				// Checking for "in use" is cheap and thus gets done first.
-				if !ptr.Deref(request.Device.AdminAccess, false) && alloc.allocated[deviceID] {
+				if !request.Device.AdminAccess && alloc.allocated[deviceID] {
 					alloc.logger.V(6).Info("Device in use", "device", deviceID)
 					continue
 				}
@@ -660,7 +659,7 @@ func (alloc *allocator) selectorsMatch(r requestIndices, device *resourceapi.Dev
 func (alloc *allocator) allocateDevice(r deviceIndices, device *resourceapi.Device, deviceID DeviceID, must bool) (bool, func(), error) {
 	claim := alloc.claimsToAllocate[r.claimIndex]
 	request := &claim.Spec.Requests[r.requestIndex]
-	adminAccess := ptr.Deref(request.Device.AdminAccess, false)
+	adminAccess := request.Device.AdminAccess
 	if !adminAccess && alloc.allocated[deviceID] {
 		alloc.logger.V(6).Info("Device in use", "device", deviceID)
 		return false, nil, nil

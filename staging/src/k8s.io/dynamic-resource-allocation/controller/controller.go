@@ -43,7 +43,6 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
-	"k8s.io/utils/ptr"
 )
 
 // Controller watches ResourceClaims and triggers allocation and deallocation
@@ -568,7 +567,7 @@ func (ctrl *controller) allocateClaims(ctx context.Context, claims []*ClaimAlloc
 		logger.V(5).Info("successfully allocated", "claim", klog.KObj(claimAllocation.Claim))
 		claim := claimAllocation.Claim.DeepCopy()
 		claim.Status.Allocation = claimAllocation.Allocation
-		claim.Status.Allocation.Controller = &ctrl.name
+		claim.Status.Allocation.Controller = ctrl.name
 		if selectedUser != nil && ctrl.setReservedFor {
 			claim.Status.ReservedFor = append(claim.Status.ReservedFor, *selectedUser)
 		}
@@ -608,7 +607,7 @@ func (ctrl *controller) checkPodClaim(ctx context.Context, pod *v1.Pod, podClaim
 		// need to be done for the claim either.
 		return nil, nil
 	}
-	if ptr.Deref(claim.Spec.Controller, "") != ctrl.name {
+	if claim.Spec.Controller != ctrl.name {
 		return nil, nil
 	}
 

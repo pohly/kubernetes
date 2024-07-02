@@ -434,7 +434,7 @@ func (pl *dynamicResources) isSchedulableAfterClaimChange(logger klog.Logger, po
 
 	if originalClaim != nil &&
 		originalClaim.Status.Allocation != nil &&
-		ptr.Deref(originalClaim.Status.Allocation.Controller, "") == "" &&
+		originalClaim.Status.Allocation.Controller == "" &&
 		modifiedClaim.Status.Allocation == nil {
 		// A claim with structured parameters was deallocated. This might have made
 		// resources available for other pods.
@@ -702,7 +702,7 @@ func (pl *dynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 		}
 
 		if claim.Status.Allocation != nil {
-			s.informationsForClaim[index].structuredParameters = ptr.Deref(claim.Status.Allocation.Controller, "") == ""
+			s.informationsForClaim[index].structuredParameters = claim.Status.Allocation.Controller == ""
 			if claim.Status.Allocation.AvailableOnNodes != nil {
 				nodeSelector, err := nodeaffinity.NewNodeSelector(claim.Status.Allocation.AvailableOnNodes)
 				if err != nil {
@@ -711,7 +711,7 @@ func (pl *dynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 				s.informationsForClaim[index].availableOnNodes = map[string]*nodeaffinity.NodeSelector{"": nodeSelector}
 			}
 		} else {
-			structuredParameters := ptr.Deref(claim.Spec.Controller, "") == ""
+			structuredParameters := claim.Spec.Controller == ""
 			s.informationsForClaim[index].structuredParameters = structuredParameters
 			if structuredParameters {
 				allocateClaims = append(allocateClaims, claim)

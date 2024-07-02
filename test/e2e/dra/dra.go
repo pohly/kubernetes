@@ -824,9 +824,9 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 
 			// Attempt to create claim and claim template with admin access. Must fail.
 			claim := b.externalClaim()
-			claim.Spec.Requests[0].RequestDetail.Device.AdminAccess = ptr.To(true)
+			claim.Spec.Requests[0].RequestDetail.Device.AdminAccess = true
 			_, claimTemplate := b.podInline()
-			claimTemplate.Spec.Spec.Requests[0].RequestDetail.Device.AdminAccess = ptr.To(true)
+			claimTemplate.Spec.Spec.Requests[0].RequestDetail.Device.AdminAccess = true
 			matchVAPError := gomega.MatchError(gomega.ContainSubstring("admin access to devices not enabled" /* in namespace " + b.f.Namespace.Name */))
 			_, err := b.f.ClientSet.ResourceV1alpha3().ResourceClaims(b.f.Namespace.Name).Create(ctx, claim, metav1.CreateOptions{})
 			gomega.Expect(err).To(matchVAPError)
@@ -1163,7 +1163,7 @@ func (b *builder) claimSpec() resourceapi.ResourceClaimSpec {
 	}
 
 	if b.driver.parameterMode == parameterModeClassicDRA {
-		spec.Controller = &b.driver.Name
+		spec.Controller = b.driver.Name
 	}
 
 	return spec

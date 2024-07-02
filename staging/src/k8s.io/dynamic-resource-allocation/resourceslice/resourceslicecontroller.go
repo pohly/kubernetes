@@ -310,9 +310,9 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 	// Retrieve node object to get UID?
 	// The result gets cached and is expected to not change while
 	// the controller runs.
-	var nodeName *string
+	var nodeName string
 	if c.owner.APIVersion == "v1" && c.owner.Kind == "Node" {
-		nodeName = &c.owner.Name
+		nodeName = c.owner.Name
 		if c.owner.UID == "" {
 			node, err := c.kubeClient.CoreV1().Nodes().Get(ctx, c.owner.Name, metav1.GetOptions{})
 			if err != nil {

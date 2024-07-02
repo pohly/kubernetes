@@ -46,7 +46,6 @@ import (
 	"k8s.io/klog/v2"
 	draplugin "k8s.io/kubernetes/pkg/kubelet/cm/dra/plugin"
 	admissionapi "k8s.io/pod-security-admission/api"
-	"k8s.io/utils/ptr"
 
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -646,7 +645,7 @@ func createTestObjects(ctx context.Context, clientSet kubernetes.Interface, node
 			Config: []resourceapi.AllocationConfiguration{{
 				Configuration: resourceapi.Configuration{
 					Opaque: &resourceapi.OpaqueConfiguration{
-						Driver: driverName,
+						Driver:     driverName,
 						Parameters: runtime.RawExtension{Raw: []byte(`{"EnvVars":{"DRA_PARAM1":"PARAM1_VALUE"}}`)},
 					},
 				},
@@ -665,10 +664,10 @@ func createTestResourceSlice(ctx context.Context, clientSet kubernetes.Interface
 			Name: nodeName,
 		},
 		Spec: resourceapi.ResourceSliceSpec{
-			NodeName:   ptr.To(nodeName),
-			Driver: driverName,
+			NodeName: nodeName,
+			Driver:   driverName,
 			Pool: resourceapi.ResourcePool{
-				Name:   nodeName,
+				Name: nodeName,
 			},
 		},
 	}
