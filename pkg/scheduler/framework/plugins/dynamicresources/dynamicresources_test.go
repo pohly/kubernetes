@@ -309,7 +309,11 @@ func TestPlugin(t *testing.T) {
 
 		prepare prepare
 		want    want
-		disable bool
+
+		// Feature gates. False is chosen so that the uncommon case
+		// doesn't need to be set.
+		disableDRA        bool
+		disableClassicDRA bool
 	}{
 		"empty": {
 			pod: st.MakePod().Name("foo").Namespace("default").Obj(),
@@ -916,7 +920,7 @@ func TestPlugin(t *testing.T) {
 			pod:    podWithClaimName,
 			claims: []*resourceapi.ResourceClaim{inUseClaim},
 		},
-		"disable": {
+		"DRA-disabled": {
 			pod:    podWithClaimName,
 			claims: []*resourceapi.ResourceClaim{inUseClaim},
 			want: want{
@@ -924,7 +928,7 @@ func TestPlugin(t *testing.T) {
 					status: framework.NewStatus(framework.Skip),
 				},
 			},
-			disable: true,
+			disableDRA: true,
 		},
 	}
 
@@ -937,8 +941,11 @@ func TestPlugin(t *testing.T) {
 			if nodes == nil {
 				nodes = []*v1.Node{workerNode}
 			}
-			testCtx := setup(t, nodes, tc.claims, tc.classes, tc.schedulings, tc.objs)
-			testCtx.p.enabled = !tc.disable
+			features := feature.Features{
+				EnableDynamicResourceAllocation: !tc.disableDRA,
+				EnableDRAControlPlaneController: !tc.disableClassicDRA,
+			}
+			testCtx := setup(t, nodes, tc.claims, tc.classes, tc.schedulings, tc.objs, features)
 			initialObjects := testCtx.listAll(t)
 
 			status := testCtx.p.PreEnqueue(testCtx.ctx, tc.pod)
@@ -1131,6 +1138,9 @@ func (tc *testContext) listAll(t *testing.T) (objects []metav1.Object) {
 }
 
 func (tc *testContext) listAssumedClaims() []metav1.Object {
+	if tc.p.claimAssumeCache == nil {
+		return nil
+	}
 	var assumedClaims []metav1.Object
 	for _, obj := range tc.p.claimAssumeCache.List(nil) {
 		claim := obj.(*resourceapi.ResourceClaim)
@@ -1214,7 +1224,7 @@ func update(t *testing.T, objects []metav1.Object, updates change) []metav1.Obje
 	return updated
 }
 
-func setup(t *testing.T, nodes []*v1.Node, claims []*resourceapi.ResourceClaim, classes []*resourceapi.DeviceClass, schedulings []*resourceapi.PodSchedulingContext, objs []apiruntime.Object) (result *testContext) {
+func setup(t *testing.T, nodes []*v1.Node, claims []*resourceapi.ResourceClaim, classes []*resourceapi.DeviceClass, schedulings []*resourceapi.PodSchedulingContext, objs []apiruntime.Object, features feature.Features) (result *testContext) {
 	t.Helper()
 
 	tc := &testContext{}
@@ -1237,7 +1247,7 @@ func setup(t *testing.T, nodes []*v1.Node, claims []*resourceapi.ResourceClaim, 
 		t.Fatal(err)
 	}
 
-	pl, err := New(tCtx, nil, fh, feature.Features{EnableDynamicResourceAllocation: true})
+	pl, err := New(tCtx, nil, fh, features)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1431,7 +1441,10 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
 			logger, tCtx := ktesting.NewTestContext(t)
-			testCtx := setup(t, nil, tc.claims, nil, nil, nil)
+			features := feature.Features{
+				EnableDynamicResourceAllocation: true,
+			}
+			testCtx := setup(t, nil, tc.claims, nil, nil, nil, features)
 			oldObj := tc.oldObj
 			newObj := tc.newObj
 			if claim, ok := tc.newObj.(*resourceapi.ResourceClaim); ok {
@@ -1599,7 +1612,11 @@ func Test_isSchedulableAfterPodSchedulingContextChange(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			logger, _ := ktesting.NewTestContext(t)
-			testCtx := setup(t, nil, tc.claims, nil, tc.schedulings, nil)
+			features := feature.Features{
+				EnableDynamicResourceAllocation: true,
+				EnableDRAControlPlaneController: true,
+			}
+			testCtx := setup(t, nil, tc.claims, nil, tc.schedulings, nil, features)
 			actualHint, err := testCtx.p.isSchedulableAfterPodSchedulingContextChange(logger, tc.pod, tc.oldObj, tc.newObj)
 			if tc.expectedErr {
 				require.Error(t, err)
