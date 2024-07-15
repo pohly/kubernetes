@@ -52,6 +52,7 @@ const (
 	req0    = "req-0"
 	req1    = "req-1"
 	claim0  = "claim-0"
+	claim1  = "claim-1"
 	slice1  = "slice-1"
 	slice2  = "slice-2"
 	device1 = "device-1"
@@ -342,7 +343,7 @@ func TestAllocator(t *testing.T) {
 				deviceAllocationResult(req1, driverA, pool1, device2),
 			)},
 		},
-		"small-and-large-backtrack": {
+		"small-and-large-backtrack-requests": {
 			claimsToAllocate: objects(claimWithRequests(
 				claim0,
 				nil,
@@ -373,6 +374,41 @@ func TestAllocator(t *testing.T) {
 				deviceAllocationResult(req0, driverA, pool1, device1),
 				deviceAllocationResult(req1, driverA, pool1, device2),
 			)},
+		},
+		"small-and-large-backtrack-claims": {
+			claimsToAllocate: objects(
+				claimWithRequests(
+					claim0,
+					nil,
+					request(req0, classA, 1, resourceapi.DeviceSelector{
+						CEL: &resourceapi.CELDeviceSelector{
+							Expression: fmt.Sprintf(`device.capacity["%s"].memory.compareTo(quantity("1Gi")) >= 0`, driverA),
+						}})),
+				claimWithRequests(
+					claim1,
+					nil,
+					request(req1, classA, 1, resourceapi.DeviceSelector{
+						CEL: &resourceapi.CELDeviceSelector{
+							Expression: fmt.Sprintf(`device.capacity["%s"].memory.compareTo(quantity("2Gi")) >= 0`, driverA),
+						}}),
+				)),
+			classes: objects(class(classA, driverA)),
+			// Reversing the order in which the devices are listed causes the "large" device to
+			// be allocated for the "small" request, leaving the "large" request unsatisfied.
+			// The initial decision needs to be undone before a solution is found.
+			slices: objects(slice(slice1, node1, pool1, driverA, 1, 1, nil, []resourceapi.Device{
+				device(device2, map[resourceapi.QualifiedName]resource.Quantity{
+					"memory": resource.MustParse("2Gi"),
+				}, nil),
+				device(device1, map[resourceapi.QualifiedName]resource.Quantity{
+					"memory": resource.MustParse("1Gi"),
+				}, nil),
+			})),
+			node: node(node1, region1),
+
+			expectResults: []any{allocationResults(deviceAllocationResult(req0, driverA, pool1, device1)),
+				allocationResults(deviceAllocationResult(req1, driverA, pool1, device2)),
+			},
 		},
 		"devices-split-across-different-slices": {
 			claimsToAllocate: objects(claimWithRequests(claim0, nil, resourceapi.DeviceRequest{
