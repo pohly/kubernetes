@@ -65,6 +65,10 @@ const (
 )
 
 func init() {
+	// Bump up the default verbosity for testing. Allocate uses very
+	// high thresholds because it is used in the scheduler's per-node
+	// filter operation.
+	ktesting.DefaultConfig = ktesting.NewConfig(ktesting.Verbosity(7))
 	ktesting.DefaultConfig.AddFlags(flag.CommandLine)
 }
 

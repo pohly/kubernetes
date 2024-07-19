@@ -94,9 +94,9 @@ func (a *Allocator) ClaimsToAllocate() []*resourceapi.ResourceClaim {
 // Allocate is thread-safe. If the caller wants to get the node name included
 // in log output, it can use contextual logging and add the node as an
 // additional value. A name can also be useful because log messages do not
-// have a common prefix. V(4) is used for one-time log entries, V(5) for important
-// progress reports, and V(6) for detailed debug output.
-func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) ([]*resourceapi.AllocationResult, error) {
+// have a common prefix. V(5) is used for one-time log entries, V(6) for important
+// progress reports, and V(7) for detailed debug output.
+func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []*resourceapi.AllocationResult, finalErr error) {
 	alloc := &allocator{
 		Allocator:            a,
 		ctx:                  ctx, // all methods share the same a and thus ctx
@@ -107,6 +107,8 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) ([]*resourceapi
 		allocated:            make(map[DeviceID]bool),
 		result:               make([]*resourceapi.AllocationResult, len(a.claimsToAllocate)),
 	}
+	alloc.logger.V(5).Info("Starting allocation", "numClaims", len(alloc.claimsToAllocate))
+	defer alloc.logger.V(5).Info("Done with allocation", "success", len(finalResult) == len(alloc.claimsToAllocate), "err", finalErr)
 
 	// First determine all eligible pools.
 	pools, err := GatherPools(ctx, alloc.sliceLister, node)
@@ -114,10 +116,10 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) ([]*resourceapi
 		return nil, fmt.Errorf("gather pool information: %w", err)
 	}
 	alloc.pools = pools
-	if loggerV := alloc.logger.V(6); loggerV.Enabled() {
+	if loggerV := alloc.logger.V(7); loggerV.Enabled() {
 		loggerV.Info("Gathered pool information", "numPools", len(pools), "pools", pools)
 	} else {
-		alloc.logger.V(4).Info("Gathered pool information", "numPools", len(pools))
+		alloc.logger.V(5).Info("Gathered pool information", "numPools", len(pools))
 	}
 
 	// We allocate one claim after the other and for each claim, all of
@@ -199,7 +201,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) ([]*resourceapi
 					}
 				}
 				requestData.numDevices = len(requestData.allDevices)
-				alloc.logger.V(5).Info("Request for 'all' devices", "claim", klog.KObj(claim), "request", request.Name, "numDevicesPerRequest", requestData.numDevices)
+				alloc.logger.V(6).Info("Request for 'all' devices", "claim", klog.KObj(claim), "request", request.Name, "numDevicesPerRequest", requestData.numDevices)
 			default:
 				return nil, fmt.Errorf("claim %s, request %s: unsupported count mode %s", klog.KObj(claim), request.Name, request.AllocationMode)
 			}
@@ -229,7 +231,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) ([]*resourceapi
 			switch {
 			case constraint.MatchAttribute != nil:
 				logger := alloc.logger
-				if loggerV := alloc.logger.V(5); loggerV.Enabled() {
+				if loggerV := alloc.logger.V(6); loggerV.Enabled() {
 					logger = klog.LoggerWithName(logger, "matchAttributeConstraint")
 					logger = klog.LoggerWithValues(logger, "matchAttribute", *constraint.MatchAttribute)
 				}
@@ -410,14 +412,14 @@ type matchAttributeConstraint struct {
 func (m *matchAttributeConstraint) add(requestName string, device *resourceapi.BasicDevice, deviceID DeviceID) bool {
 	if m.requestNames.Len() > 0 && !m.requestNames.Has(requestName) {
 		// Device not affected by constraint.
-		m.logger.V(6).Info("Constraint does not apply to request", "request", requestName)
+		m.logger.V(7).Info("Constraint does not apply to request", "request", requestName)
 		return true
 	}
 
 	attribute := lookupAttribute(device, deviceID, m.attributeName)
 	if attribute == nil {
 		// Doesn't have the attribute.
-		m.logger.V(6).Info("Constraint not satisfied, attribute not set")
+		m.logger.V(7).Info("Constraint not satisfied, attribute not set")
 		return false
 	}
 
@@ -425,24 +427,24 @@ func (m *matchAttributeConstraint) add(requestName string, device *resourceapi.B
 		// The first device can always get picked.
 		m.attribute = attribute
 		m.numDevices = 1
-		m.logger.V(6).Info("First in set")
+		m.logger.V(7).Info("First in set")
 		return true
 	}
 
 	switch {
 	case attribute.StringValue != nil:
 		if m.attribute.StringValue == nil || *attribute.StringValue != *m.attribute.StringValue {
-			m.logger.V(6).Info("String values different")
+			m.logger.V(7).Info("String values different")
 			return false
 		}
 	case attribute.IntValue != nil:
 		if m.attribute.IntValue == nil || *attribute.IntValue != *m.attribute.IntValue {
-			m.logger.V(6).Info("Int values different")
+			m.logger.V(7).Info("Int values different")
 			return false
 		}
 	case attribute.BoolValue != nil:
 		if m.attribute.BoolValue == nil || *attribute.BoolValue != *m.attribute.BoolValue {
-			m.logger.V(6).Info("Bool values different")
+			m.logger.V(7).Info("Bool values different")
 			return false
 		}
 	case attribute.VersionValue != nil:
@@ -450,17 +452,17 @@ func (m *matchAttributeConstraint) add(requestName string, device *resourceapi.B
 		// minimal form (in particular, no leading zeros). Therefore a
 		// strict "exact equal" check can do a string comparison.
 		if m.attribute.VersionValue == nil || *attribute.VersionValue != *m.attribute.VersionValue {
-			m.logger.V(6).Info("Version values different")
+			m.logger.V(7).Info("Version values different")
 			return false
 		}
 	default:
 		// Unknown value type, cannot match.
-		m.logger.V(6).Info("Match attribute type unknown")
+		m.logger.V(7).Info("Match attribute type unknown")
 		return false
 	}
 
 	m.numDevices++
-	m.logger.V(6).Info("Constraint satisfied by device", "device", deviceID, "numDevices", m.numDevices)
+	m.logger.V(7).Info("Constraint satisfied by device", "device", deviceID, "numDevices", m.numDevices)
 	return true
 }
 
@@ -471,7 +473,7 @@ func (m *matchAttributeConstraint) remove(requestName string, device *resourceap
 	}
 
 	m.numDevices--
-	m.logger.V(6).Info("Device removed from constraint set", "device", deviceID, "numDevices", m.numDevices)
+	m.logger.V(7).Info("Device removed from constraint set", "device", deviceID, "numDevices", m.numDevices)
 }
 
 func lookupAttribute(device *resourceapi.BasicDevice, deviceID DeviceID, attributeName resourceapi.FullyQualifiedName) *resourceapi.DeviceAttribute {
@@ -507,7 +509,7 @@ func (alloc *allocator) allocateOne(r deviceIndices) (bool, error) {
 		// Done! If we were doing scoring, we would compare the current allocation result
 		// against the previous one, keep the best, and continue. Without scoring, we stop
 		// and use the first solution.
-		alloc.logger.V(4).Info("Allocation result found")
+		alloc.logger.V(6).Info("Allocation result found")
 		return true, nil
 	}
 
@@ -526,7 +528,7 @@ func (alloc *allocator) allocateOne(r deviceIndices) (bool, error) {
 
 	request := &alloc.claimsToAllocate[r.claimIndex].Spec.Devices.Requests[r.requestIndex]
 	doAllDevices := request.AllocationMode == resourceapi.DeviceAllocationModeAll
-	alloc.logger.V(5).Info("Allocating one device", "currentClaim", r.claimIndex, "totalClaims", len(alloc.claimsToAllocate), "currentRequest", r.requestIndex, "totalRequestsPerClaim", len(claim.Spec.Devices.Requests), "currentDevice", r.deviceIndex, "devicesPerRequest", requestData.numDevices, "allDevices", doAllDevices, "adminAccess", request.AdminAccess)
+	alloc.logger.V(6).Info("Allocating one device", "currentClaim", r.claimIndex, "totalClaims", len(alloc.claimsToAllocate), "currentRequest", r.requestIndex, "totalRequestsPerClaim", len(claim.Spec.Devices.Requests), "currentDevice", r.deviceIndex, "devicesPerRequest", requestData.numDevices, "allDevices", doAllDevices, "adminAccess", request.AdminAccess)
 
 	if doAllDevices {
 		// For "all" devices we already know which ones we need. We
@@ -558,7 +560,7 @@ func (alloc *allocator) allocateOne(r deviceIndices) (bool, error) {
 
 				// Checking for "in use" is cheap and thus gets done first.
 				if !request.AdminAccess && alloc.allocated[deviceID] {
-					alloc.logger.V(6).Info("Device in use", "device", deviceID)
+					alloc.logger.V(7).Info("Device in use", "device", deviceID)
 					continue
 				}
 
@@ -568,7 +570,7 @@ func (alloc *allocator) allocateOne(r deviceIndices) (bool, error) {
 					return false, err
 				}
 				if !selectable {
-					alloc.logger.V(6).Info("Device not selectable", "device", deviceID)
+					alloc.logger.V(7).Info("Device not selectable", "device", deviceID)
 					continue
 				}
 
@@ -579,7 +581,7 @@ func (alloc *allocator) allocateOne(r deviceIndices) (bool, error) {
 				}
 				if !allocated {
 					// In use or constraint violated...
-					alloc.logger.V(6).Info("Device not usable", "device", deviceID)
+					alloc.logger.V(7).Info("Device not usable", "device", deviceID)
 					continue
 				}
 				done, err := alloc.allocateOne(deviceIndices{claimIndex: r.claimIndex, requestIndex: r.requestIndex, deviceIndex: r.deviceIndex + 1})
@@ -665,9 +667,9 @@ func (alloc *allocator) selectorsMatch(r requestIndices, device *resourceapi.Bas
 
 		matches, err := expr.DeviceMatches(alloc.ctx, cel.Device{Driver: deviceID.Driver, Attributes: device.Attributes, Capacity: device.Capacity})
 		if class != nil {
-			alloc.logger.V(6).Info("CEL result", "device", deviceID, "class", klog.KObj(class), "selector", i, "expression", selector.CEL.Expression, "matches", matches, "err", err)
+			alloc.logger.V(7).Info("CEL result", "device", deviceID, "class", klog.KObj(class), "selector", i, "expression", selector.CEL.Expression, "matches", matches, "err", err)
 		} else {
-			alloc.logger.V(6).Info("CEL result", "device", deviceID, "claim", klog.KObj(alloc.claimsToAllocate[r.claimIndex]), "selector", i, "expression", selector.CEL.Expression, "matches", matches, "err", err)
+			alloc.logger.V(7).Info("CEL result", "device", deviceID, "claim", klog.KObj(alloc.claimsToAllocate[r.claimIndex]), "selector", i, "expression", selector.CEL.Expression, "matches", matches, "err", err)
 		}
 
 		if err != nil {
@@ -698,7 +700,7 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device *resourceapi.Basi
 	request := &claim.Spec.Devices.Requests[r.requestIndex]
 	adminAccess := request.AdminAccess
 	if !adminAccess && alloc.allocated[deviceID] {
-		alloc.logger.V(6).Info("Device in use", "device", deviceID)
+		alloc.logger.V(7).Info("Device in use", "device", deviceID)
 		return false, nil, nil
 	}
 
@@ -722,7 +724,7 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device *resourceapi.Basi
 
 	// All constraints satisfied. Mark as in use (unless we do admin access)
 	// and record the result.
-	alloc.logger.V(6).Info("Device allocated", "device", deviceID)
+	alloc.logger.V(7).Info("Device allocated", "device", deviceID)
 	if !adminAccess {
 		alloc.allocated[deviceID] = true
 	}
@@ -744,7 +746,7 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device *resourceapi.Basi
 		}
 		// Truncate, but keep the underlying slice.
 		alloc.result[r.claimIndex].Devices.Results = alloc.result[r.claimIndex].Devices.Results[:previousNumResults]
-		alloc.logger.V(6).Info("Device deallocated", "device", deviceID)
+		alloc.logger.V(7).Info("Device deallocated", "device", deviceID)
 	}, nil
 }
 

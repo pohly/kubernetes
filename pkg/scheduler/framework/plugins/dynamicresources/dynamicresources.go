@@ -932,9 +932,6 @@ func (pl *dynamicResources) Filter(ctx context.Context, cs *framework.CycleState
 			allocCtx = klog.NewContext(allocCtx, klog.LoggerWithValues(logger, "node", klog.KObj(node)))
 		}
 
-		// TODO: is emitting log output at V(4) okay in Filter? That is what the
-		// allocator does for one-time output.
-
 		a, err := state.allocator.Allocate(allocCtx, node)
 		if err != nil {
 			// This should only fail if there is something wrong with the claim or class.
