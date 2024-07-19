@@ -1197,19 +1197,19 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			mustCreate := func(clientSet kubernetes.Interface, clientName string, slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
 				ginkgo.GinkgoHelper()
 				slice, err := clientSet.ResourceV1alpha3().ResourceSlices().Create(ctx, slice, metav1.CreateOptions{})
-				gomega.Expect(err).ToNot(gomega.HaveOccurred(), fmt.Sprintf("CREATE: %s + %s", clientName, slice.Name))
+				framework.ExpectNoError(err, fmt.Sprintf("CREATE: %s + %s", clientName, slice.Name))
 				return slice
 			}
 			mustUpdate := func(clientSet kubernetes.Interface, clientName string, slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
 				ginkgo.GinkgoHelper()
 				slice, err := clientSet.ResourceV1alpha3().ResourceSlices().Update(ctx, slice, metav1.UpdateOptions{})
-				gomega.Expect(err).ToNot(gomega.HaveOccurred(), fmt.Sprintf("UPDATE: %s + %s", clientName, slice.Name))
+				framework.ExpectNoError(err, fmt.Sprintf("UPDATE: %s + %s", clientName, slice.Name))
 				return slice
 			}
 			mustDelete := func(clientSet kubernetes.Interface, clientName string, slice *resourceapi.ResourceSlice) {
 				ginkgo.GinkgoHelper()
 				err := clientSet.ResourceV1alpha3().ResourceSlices().Delete(ctx, slice.Name, metav1.DeleteOptions{})
-				gomega.Expect(err).ToNot(gomega.HaveOccurred(), fmt.Sprintf("DELETE: %s + %s", clientName, slice.Name))
+				framework.ExpectNoError(err, fmt.Sprintf("DELETE: %s + %s", clientName, slice.Name))
 			}
 			mustCreateAndDelete := func(clientSet kubernetes.Interface, clientName string, slice *resourceapi.ResourceSlice) {
 				ginkgo.GinkgoHelper()
