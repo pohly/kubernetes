@@ -18,7 +18,8 @@ package auth
 
 import (
 	"context"
-	"embed"
+	_ "embed"
+	"fmt"
 	"strings"
 
 	g "github.com/onsi/ginkgo/v2"
@@ -29,23 +30,26 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/client-go/kubernetes"
+	cgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	"k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/ptr"
 )
 
+// Embed manifests that we leave as yaml to make it clear to users how to these permissions are created.
+// These will match future docs.
 var (
-	//go:embed e2edata
-	e2eData embed.FS
+	//go:embed e2edata/per_node_validatingadmissionpolicy.yaml
+	perNodeCheckValidatingAdmissionPolicy string
+
+	//go:embed e2edata/per_node_validatingadmissionpolicybinding.yaml
+	perNodeCheckValidatingAdmissionPolicyBinding string
 )
 
 var _ = SIGDescribe("ValidatingAdmissionPolicy", framework.WithFeatureGate(features.ServiceAccountTokenNodeBindingValidation), func() {
@@ -53,16 +57,10 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy", framework.WithFeatureGate(featu
 	f := framework.NewDefaultFramework("node-authn")
 	f.NamespacePodSecurityLevel = admissionapi.LevelRestricted
 
-	g.It("can restrict access by-node", func() {
-		// Read manifests that we leave as yaml to make it clear to users how to these permissions are created.
-		// These will match future docs.
-		perNodeCheckValidatingAdmissionPolicy, err := e2eData.ReadFile("e2edata/per_node_validatingadmissionpolicy.yaml")
-		framework.ExpectNoError(err)
-		perNodeCheckValidatingAdmissionPolicyBinding, err := e2eData.ReadFile("e2edata/per_node_validatingadmissionpolicybinding.yaml")
-		framework.ExpectNoError(err)
-		admission := strings.ReplaceAll(string(perNodeCheckValidatingAdmissionPolicy), "e2e-ns", f.Namespace.Name)
+	g.It("can restrict access by-node", func(ctx context.Context) {
+		admission := strings.ReplaceAll(perNodeCheckValidatingAdmissionPolicy, "e2e-ns", f.Namespace.Name)
 		admissionToCreate := readValidatingAdmissionPolicyV1OrDie([]byte(admission))
-		admissionBinding := strings.ReplaceAll(string(perNodeCheckValidatingAdmissionPolicyBinding), "e2e-ns", f.Namespace.Name)
+		admissionBinding := strings.ReplaceAll(perNodeCheckValidatingAdmissionPolicyBinding, "e2e-ns", f.Namespace.Name)
 		admissionBindingToCreate := readValidatingAdmissionPolicyBindingV1OrDie([]byte(admissionBinding))
 
 		saTokenRoleBinding := &rbacv1.RoleBinding{
@@ -109,23 +107,21 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy", framework.WithFeatureGate(featu
 			Status: v1.PodStatus{},
 		})
 
-		ctx := context.Background()
-
 		// cleanup the ValidatingAdmissionPolicy.
-		defer func() {
-			_ = f.ClientSet.AdmissionregistrationV1().ValidatingAdmissionPolicies().Delete(context.Background(), admissionToCreate.Name, metav1.DeleteOptions{})
-			_ = f.ClientSet.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Delete(context.Background(), admissionBindingToCreate.Name, metav1.DeleteOptions{})
-		}()
 
-		_, err = f.ClientSet.AdmissionregistrationV1().ValidatingAdmissionPolicies().Create(context.Background(), admissionToCreate, metav1.CreateOptions{})
+		var err error
+		_, err = f.ClientSet.AdmissionregistrationV1().ValidatingAdmissionPolicies().Create(ctx, admissionToCreate, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
-		_, err = f.ClientSet.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Create(context.Background(), admissionBindingToCreate, metav1.CreateOptions{})
+		g.DeferCleanup(f.ClientSet.AdmissionregistrationV1().ValidatingAdmissionPolicies().Delete, admissionToCreate.Name, metav1.DeleteOptions{})
+
+		_, err = f.ClientSet.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Create(ctx, admissionBindingToCreate, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
+		g.DeferCleanup(f.ClientSet.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Delete, admissionBindingToCreate.Name, metav1.DeleteOptions{})
 
 		// create permissions that will allow unrestricted access to mutate configmaps in this namespace.
 		// We limited these permissions in the step above.
 		// This means the admission policy must fail closed or permissions will be too broad.
-		_, err = f.ClientSet.RbacV1().RoleBindings(f.Namespace.Name).Create(context.Background(), saTokenRoleBinding, metav1.CreateOptions{})
+		_, err = f.ClientSet.RbacV1().RoleBindings(f.Namespace.Name).Create(ctx, saTokenRoleBinding, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
 		// run an actual pod to prove that the token is injected, not just creatable via the API
@@ -138,16 +134,17 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy", framework.WithFeatureGate(featu
 		framework.ExpectNoError(err)
 
 		// get the actual projected token from the pod.
-		nodeScopedSAToken, err := utils.ExecInPodWithResult(
-			ctx,
-			f.ClientSet.CoreV1(),
-			f.ClientConfig(),
-			actualPod.Namespace,
-			actualPod.Name,
-			"sleeper",
-			[]string{"cat", "/var/run/secrets/kubernetes.io/serviceaccount/token"},
-		)
+		nodeScopedSAToken, stderr, err := e2epod.ExecWithOptionsContext(ctx, f, e2epod.ExecOptions{
+			Command:            []string{"cat", "/var/run/secrets/kubernetes.io/serviceaccount/token"},
+			Namespace:          actualPod.Namespace,
+			PodName:            actualPod.Name,
+			ContainerName:      actualPod.Spec.Containers[0].Name,
+			CaptureStdout:      true,
+			CaptureStderr:      true,
+			PreserveWhitespace: true,
+		})
 		framework.ExpectNoError(err)
+		o.Expect(stderr).To(o.BeEmpty(), "stderr from cat")
 
 		// make a kubeconfig with the token and confirm the kube-apiserver has the expected claims
 		nodeScopedClientConfig := rest.AnonymousClientConfig(f.ClientConfig())
@@ -173,12 +170,13 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy", framework.WithFeatureGate(featu
 				Name:      "unlikely-node",
 			},
 		}
+		disallowedMessage := fmt.Sprintf("this user running on node '%s' may not modify ConfigMap '%s' because the name does not match the node name", actualPod.Spec.NodeName, disallowedConfigMap.Name)
 
 		actualAllowedConfigMap, err := nodeScopedClient.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, allowedConfigMap, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		_, err = nodeScopedClient.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, disallowedConfigMap, metav1.CreateOptions{})
 		o.Expect(err).To(o.HaveOccurred())
-		o.Expect(err.Error()).To(o.ContainSubstring("this user may only modify configmaps that belong to the node the pod is running on"))
+		o.Expect(err.Error()).To(o.ContainSubstring(disallowedMessage))
 
 		// now create so we can see the update cases
 		actualDisallowedConfigMap, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, disallowedConfigMap, metav1.CreateOptions{})
@@ -188,7 +186,7 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy", framework.WithFeatureGate(featu
 		framework.ExpectNoError(err)
 		_, err = nodeScopedClient.CoreV1().ConfigMaps(f.Namespace.Name).Update(ctx, actualDisallowedConfigMap, metav1.UpdateOptions{})
 		o.Expect(err).To(o.HaveOccurred())
-		o.Expect(err.Error()).To(o.ContainSubstring("this user may only modify configmaps that belong to the node the pod is running on"))
+		o.Expect(err.Error()).To(o.ContainSubstring(disallowedMessage))
 
 		// ensure that if the node claim is missing from the restricted service-account user, we reject the request
 		impersonatingConfig := rest.CopyConfig(f.ClientConfig())
@@ -206,26 +204,18 @@ var _ = SIGDescribe("ValidatingAdmissionPolicy", framework.WithFeatureGate(featu
 		impersonatingClient, err := kubernetes.NewForConfig(impersonatingConfig)
 		framework.ExpectNoError(err)
 
+		noNodeAssociationMessage := "no node association found for user, this user must run in a pod on a node and ServiceAccountTokenPodNodeInfo must be enabled"
 		_, err = impersonatingClient.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, actualDisallowedConfigMap, metav1.CreateOptions{})
 		o.Expect(err).To(o.HaveOccurred())
-		o.Expect(err.Error()).To(o.ContainSubstring("this user must have a \"authentication.kubernetes.io/node-name\" claim"))
+		o.Expect(err.Error()).To(o.ContainSubstring(noNodeAssociationMessage))
 		_, err = impersonatingClient.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, actualAllowedConfigMap, metav1.CreateOptions{})
 		o.Expect(err).To(o.HaveOccurred())
-		o.Expect(err.Error()).To(o.ContainSubstring("this user must have a \"authentication.kubernetes.io/node-name\" claim"))
+		o.Expect(err.Error()).To(o.ContainSubstring(noNodeAssociationMessage))
 	})
 })
 
-var (
-	readScheme = runtime.NewScheme()
-	readCodecs = serializer.NewCodecFactory(readScheme)
-)
-
-func init() {
-	utilruntime.Must(admissionregistrationv1.AddToScheme(readScheme))
-}
-
 func readValidatingAdmissionPolicyV1OrDie(objBytes []byte) *admissionregistrationv1.ValidatingAdmissionPolicy {
-	requiredObj, err := runtime.Decode(readCodecs.UniversalDecoder(admissionregistrationv1.SchemeGroupVersion), objBytes)
+	requiredObj, err := runtime.Decode(cgoscheme.Codecs.UniversalDecoder(admissionregistrationv1.SchemeGroupVersion), objBytes)
 	if err != nil {
 		panic(err)
 	}
@@ -233,7 +223,7 @@ func readValidatingAdmissionPolicyV1OrDie(objBytes []byte) *admissionregistratio
 }
 
 func readValidatingAdmissionPolicyBindingV1OrDie(objBytes []byte) *admissionregistrationv1.ValidatingAdmissionPolicyBinding {
-	requiredObj, err := runtime.Decode(readCodecs.UniversalDecoder(admissionregistrationv1.SchemeGroupVersion), objBytes)
+	requiredObj, err := runtime.Decode(cgoscheme.Codecs.UniversalDecoder(admissionregistrationv1.SchemeGroupVersion), objBytes)
 	if err != nil {
 		panic(err)
 	}

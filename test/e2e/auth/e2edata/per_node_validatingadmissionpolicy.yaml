@@ -8,17 +8,22 @@ spec:
     resourceRules:
       - apiGroups:   [""]
         apiVersions: ["v1"]
-        # notice you cannot restrict DELETEs.  Your per-node actor should not have deletion powers.
-        # it probably shouldn't have create powers either, but we can control that
-        operations:  ["CREATE", "UPDATE"]
+        operations:  ["CREATE", "UPDATE", "DELETE"]
         resources:   ["configmaps"]
+  matchConditions:
+  - name: isRestrictedUser
+    # e2e-ns gets replaced with the tests's namespace when running the E2E test.
+    expression: >-
+      request.userInfo.username == "system:serviceaccount:e2e-ns:default"
   variables:
-    - name: hasNodeName
-      expression: ('authentication.kubernetes.io/node-name' in request.userInfo.extra)
-    - name: isPartitionedServiceAccount
-      expression: request.userInfo.username == "system:serviceaccount:e2e-ns:default"
+  - name: userNodeName
+    expression: >-
+      request.userInfo.extra[?'authentication.kubernetes.io/node-name'][0].orValue('')
   validations:
-    - expression: "(!variables.isPartitionedServiceAccount) || (variables.isPartitionedServiceAccount && variables.hasNodeName)"
-      message: "this user must have a \"authentication.kubernetes.io/node-name\" claim"
-    - expression: "(!variables.isPartitionedServiceAccount) || (!variables.hasNodeName) || (object.metadata.name == request.userInfo.extra[\"authentication.kubernetes.io/node-name\"][0])"
-      message: "this user may only modify configmaps that belong to the node the pod is running on"
+  - expression: variables.userNodeName != ""
+    message: >-
+      no node association found for user, this user must run in a pod on a node and ServiceAccountTokenPodNodeInfo must be enabled
+  - expression: variables.userNodeName == request.name
+    messageExpression: >-
+      "this user running on node '"+variables.userNodeName+"' may not modify ConfigMap '" + request.name +
+      "' because the name does not match the node name"
