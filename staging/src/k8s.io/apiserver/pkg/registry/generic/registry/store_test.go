@@ -62,6 +62,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2/ktesting"
 )
 
 var scheme = runtime.NewScheme()
@@ -2417,6 +2418,7 @@ func TestStoreWatch(t *testing.T) {
 }
 
 func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheEnabled bool) (factory.DestroyFunc, *Store) {
+	_, ctx := ktesting.NewTestContext(t)
 	podPrefix := "/pods"
 	server, sc := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 	strategy := &testRESTStrategy{scheme, names.SimpleNameGenerator, true, false, true}
@@ -2435,6 +2437,7 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 	}
 	if hasCacheEnabled {
 		config := cacherstorage.Config{
+			Ctx:            ctx,
 			Storage:        s,
 			Versioner:      storage.APIObjectVersioner{},
 			GroupResource:  schema.GroupResource{Resource: "pods"},
