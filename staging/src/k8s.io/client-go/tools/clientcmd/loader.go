@@ -128,15 +128,16 @@ type ClientConfigLoadingRules struct {
 	// In case of missing files, it warns the user about the missing files.
 	WarnIfAllMissing bool
 
-	// Warner is the warning log callback to use in case of missing files.
+	// Warner is the warning log callback to use in case of missing files
 	Warner WarningHandler
 }
 
-// WarningHandler allows to set the logging function to use
+// WarningHandler allows to set the logging function to use.
 type WarningHandler func(error)
 
 func (handler WarningHandler) Warn(err error) {
 	if handler == nil {
+		//nolint:logcheck // Historic API, cannot be made context-aware.
 		klog.V(1).Info(err)
 	} else {
 		handler(err)
@@ -399,6 +400,7 @@ func LoadFromFile(filename string) (*clientcmdapi.Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	//nolint:logcheck // Not worth adding a new public API for a single log call.
 	klog.V(6).Infoln("Config loaded from file: ", filename)
 
 	// set LocationOfOrigin on every Cluster, User, and Context
