@@ -392,7 +392,7 @@ func (ec *Controller) enqueueResourceClaim(logger klog.Logger, obj interface{}, 
 }
 
 func (ec *Controller) Run(ctx context.Context, workers int) {
-	defer runtime.HandleCrash()
+	defer runtime.HandleCrashWithContext(ctx)
 	defer ec.queue.ShutDown()
 
 	logger := klog.FromContext(ctx)
@@ -400,12 +400,12 @@ func (ec *Controller) Run(ctx context.Context, workers int) {
 	defer logger.Info("Shutting down resource claim controller")
 
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
-	eventBroadcaster.StartLogging(klog.Infof)
+	eventBroadcaster.StartStructuredLogging(0)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: ec.kubeClient.CoreV1().Events("")})
 	ec.recorder = eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "resource_claim"})
 	defer eventBroadcaster.Shutdown()
 
-	if !cache.WaitForNamedCacheSync("resource_claim", ctx.Done(), ec.podSynced, ec.podSchedulingSynced, ec.claimsSynced, ec.templatesSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, ec.podSynced, ec.podSchedulingSynced, ec.claimsSynced, ec.templatesSynced) {
 		return
 	}
 
@@ -434,7 +434,7 @@ func (ec *Controller) processNextWorkItem(ctx context.Context) bool {
 		return true
 	}
 
-	runtime.HandleError(fmt.Errorf("%v failed with: %v", key, err))
+	runtime.HandleErrorWithContext(ctx, err, "Syncing failed", "key", key)
 	ec.queue.AddRateLimited(key)
 
 	return true

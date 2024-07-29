@@ -144,7 +144,7 @@ func (sched *Scheduler) updatePodInSchedulingQueue(oldObj, newObj interface{}) {
 
 	isAssumed, err := sched.Cache.IsAssumedPod(newPod)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("failed to check whether pod %s/%s is assumed: %v", newPod.Namespace, newPod.Name, err))
+		utilruntime.HandleError(fmt.Errorf("failed to check whether pod %s/%s is assumed: %v", newPod.Namespace, newPod.Name, err)) //nolint:logcheck // Should not be reached.
 	}
 	if isAssumed {
 		return
@@ -167,11 +167,11 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(obj interface{}) {
 		var ok bool
 		pod, ok = t.Obj.(*v1.Pod)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("unable to convert object %T to *v1.Pod in %T", obj, sched))
+			utilruntime.HandleError(fmt.Errorf("unable to convert object %T to *v1.Pod in %T", obj, sched)) //nolint:logcheck // Should not be reached.
 			return
 		}
 	default:
-		utilruntime.HandleError(fmt.Errorf("unable to handle object in %T: %T", sched, obj))
+		utilruntime.HandleError(fmt.Errorf("unable to handle object in %T: %T", sched, obj)) //nolint:logcheck // Should not be reached.
 		return
 	}
 
@@ -348,10 +348,10 @@ func addAllEventHandlers(
 						// it's assigned or not. Attempting to cleanup anyways.
 						return true
 					}
-					utilruntime.HandleError(fmt.Errorf("unable to convert object %T to *v1.Pod in %T", obj, sched))
+					utilruntime.HandleError(fmt.Errorf("unable to convert object %T to *v1.Pod in %T", obj, sched)) //nolint:logcheck // Should not be reached.
 					return false
 				default:
-					utilruntime.HandleError(fmt.Errorf("unable to handle object in %T: %T", sched, obj))
+					utilruntime.HandleError(fmt.Errorf("unable to handle object in %T: %T", sched, obj)) //nolint:logcheck // Should not be reached.
 					return false
 				}
 			},
@@ -379,10 +379,10 @@ func addAllEventHandlers(
 						// it's assigned or not.
 						return responsibleForPod(pod, sched.Profiles)
 					}
-					utilruntime.HandleError(fmt.Errorf("unable to convert object %T to *v1.Pod in %T", obj, sched))
+					utilruntime.HandleError(fmt.Errorf("unable to convert object %T to *v1.Pod in %T", obj, sched)) //nolint:logcheck // Should not be reached.
 					return false
 				default:
-					utilruntime.HandleError(fmt.Errorf("unable to handle object in %T: %T", sched, obj))
+					utilruntime.HandleError(fmt.Errorf("unable to handle object in %T: %T", sched, obj)) //nolint:logcheck // Should not be reached.
 					return false
 				}
 			},

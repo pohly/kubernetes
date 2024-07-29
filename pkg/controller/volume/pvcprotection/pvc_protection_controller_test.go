@@ -17,7 +17,6 @@ limitations under the License.
 package pvcprotection
 
 import (
-	"context"
 	"errors"
 	"reflect"
 	"testing"
@@ -512,7 +511,7 @@ func TestPVCProtectionController(t *testing.T) {
 		podInformer := informers.Core().V1().Pods()
 
 		// Create the controller
-		logger, _ := ktesting.NewTestContext(t)
+		logger, ctx := ktesting.NewTestContext(t)
 		ctrl, err := NewPVCProtectionController(logger, pvcInformer, podInformer, client)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -561,8 +560,7 @@ func TestPVCProtectionController(t *testing.T) {
 			}
 			if ctrl.queue.Len() > 0 {
 				logger.V(5).Info("Non-empty queue, processing one", "test", test.name, "queueLength", ctrl.queue.Len())
-				ctx := context.TODO()
-				ctrl.processNextWorkItem()
+				ctrl.processNextWorkItem(ctx)
 				for ctrl.pvcProcessingStore.namespaceQueue.Len() != 0 {
 					ctrl.processPVCsByNamespace(ctx)
 				}

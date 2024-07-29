@@ -160,7 +160,7 @@ func NewPVCProtectionController(logger klog.Logger, pvcInformer coreinformers.Pe
 
 // Run runs the controller goroutines.
 func (c *Controller) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 	defer c.queue.ShutDown()
 	defer c.pvcProcessingStore.namespaceQueue.ShutDown()
 
@@ -168,7 +168,7 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 	logger.Info("Starting PVC protection controller")
 	defer logger.Info("Shutting down PVC protection controller")
 
-	if !cache.WaitForNamedCacheSync("PVC protection", ctx.Done(), c.pvcListerSynced, c.podListerSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.pvcListerSynced, c.podListerSynced) {
 		return
 	}
 
@@ -182,7 +182,7 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 
 // Main worker batch-pulls PVC items off informer's work queue and populates namespace queue and namespace-PVCs map
 func (c *Controller) runMainWorker(ctx context.Context) {
-	for c.processNextWorkItem() {
+	for c.processNextWorkItem(ctx) {
 	}
 }
 
@@ -192,7 +192,7 @@ func (c *Controller) runProcessNamespaceWorker(ctx context.Context) {
 	}
 }
 
-func (c *Controller) processNextWorkItem() bool {
+func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 	pvcKey, quit := c.queue.Get()
 	if quit {
 		return false
@@ -200,7 +200,7 @@ func (c *Controller) processNextWorkItem() bool {
 
 	pvcNamespace, pvcName, err := cache.SplitMetaNamespaceKey(pvcKey)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("error parsing PVC key %q: %w", pvcKey, err))
+		utilruntime.HandleErrorWithContext(ctx, err, "Error parsing PVC key", "key", pvcKey)
 		return true
 	}
 
@@ -421,12 +421,12 @@ func podIsShutDown(pod *v1.Pod) bool {
 func (c *Controller) pvcAddedUpdated(logger klog.Logger, obj interface{}) {
 	pvc, ok := obj.(*v1.PersistentVolumeClaim)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("PVC informer returned non-PVC object: %#v", obj))
+		utilruntime.HandleErrorWithContext(klog.NewContext(context.Background(), logger), nil, "PVC informer returned non-PVC object", "obj", klog.Format(obj))
 		return
 	}
 	key, err := cache.MetaNamespaceKeyFunc(pvc)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("couldn't get key for Persistent Volume Claim %#v: %v", pvc, err))
+		utilruntime.HandleErrorWithContext(klog.NewContext(context.Background(), logger), err, "Couldn't get key for Persistent Volume Claim", "obj", klog.Format(pvc))
 		return
 	}
 	logger.V(4).Info("Got event on PVC", "pvc", klog.KObj(pvc))
@@ -460,12 +460,12 @@ func (*Controller) parsePod(obj interface{}) *v1.Pod {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj)) //nolint:logcheck // Not reached, all objects have a key.
 			return nil
 		}
 		pod, ok = tombstone.Obj.(*v1.Pod)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a Pod %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a Pod %#v", obj)) //nolint:logcheck // Not reached, all objects have a key.
 			return nil
 		}
 	}
