@@ -21,10 +21,12 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -35,6 +37,8 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+	"github.com/onsi/gomega/format"
 )
 
 const (
@@ -493,5 +497,67 @@ var _ = SIGDescribe("NoExecuteTaintManager Multiple Pods", framework.WithSerial(
 				evicted++
 			}
 		}
+	})
+})
+
+var _ = SIGDescribe("Node.Spec.Taints SSA", framework.WithSerial(), func() {
+	f := framework.NewDefaultFramework("taint-client-a")
+	f.SkipNamespaceCreation = true
+
+	ginkgo.It("replaces all taints", func(ctx context.Context) {
+		// Pick one node.
+		nodes, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+		framework.ExpectNoError(err)
+		if len(nodes.Items) == 0 {
+			ginkgo.Skip("need at least one node")
+		}
+		node := &nodes.Items[0]
+
+		// Always restore the old taints after the test.
+		oldTaints := node.Spec.Taints
+		ginkgo.DeferCleanup(func(ctx context.Context) {
+			for {
+				node.Spec.Taints = oldTaints
+				_, err := f.ClientSet.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{})
+				if apierrors.IsConflict(err) {
+					// Try again with fresh copy.
+					node, err = f.ClientSet.CoreV1().Nodes().Get(ctx, node.Name, metav1.GetOptions{})
+					framework.ExpectNoError(err)
+					continue
+				}
+				framework.ExpectNoError(err, "restore node taints")
+				break
+			}
+		})
+
+		taintsToAC := func(taints []v1.Taint) []*corev1ac.TaintApplyConfiguration {
+			taintsAC := make([]*corev1ac.TaintApplyConfiguration, len(taints))
+			for i, taint := range taints {
+				taintsAC[i] = &corev1ac.TaintApplyConfiguration{
+					Key:       &taint.Key,
+					Value:     &taint.Value,
+					Effect:    &taint.Effect,
+					TimeAdded: taint.TimeAdded,
+				}
+			}
+			return taintsAC
+		}
+
+		// Set some taint with client A.
+		updatedTaints := append(oldTaints, v1.Taint{Key: "tainted-by-client-a", Effect: v1.TaintEffectNoSchedule})
+		nodeAC := corev1ac.Node(node.Name).WithSpec(corev1ac.NodeSpec().WithTaints(taintsToAC(updatedTaints)...))
+		node, err = f.ClientSet.CoreV1().Nodes().Apply(ctx, nodeAC, metav1.ApplyOptions{Force: true, FieldManager: "test-client-A"})
+		framework.ExpectNoError(err, "add first taint")
+		framework.Logf("Added tainted-by-client-a:\n%s", format.Object(node, 1))
+
+		// Remove the taint from client A and add another one.
+		updatedTaints = append(oldTaints, v1.Taint{Key: "tainted-by-client-b", Effect: v1.TaintEffectNoSchedule})
+		nodeAC = corev1ac.Node(node.Name).WithSpec(corev1ac.NodeSpec().WithTaints(taintsToAC(updatedTaints)...))
+		node, err = f.ClientSet.CoreV1().Nodes().Apply(ctx, nodeAC, metav1.ApplyOptions{Force: true, FieldManager: "test-client-B"})
+		framework.ExpectNoError(err, "replace with second taint")
+		framework.Logf("Removed tainted-by-client-a and added tainted-by-client-b:\n%s", format.Object(node, 1))
+
+		// listType=atomic means that our update replaced the list.
+		gomega.Expect(node.Spec.Taints).To(gomega.Equal(updatedTaints))
 	})
 })
