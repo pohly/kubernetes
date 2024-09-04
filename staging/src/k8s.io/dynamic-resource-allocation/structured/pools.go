@@ -22,9 +22,8 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1alpha3"
-	"k8s.io/apimachinery/pkg/labels"
-	resourcelisters "k8s.io/client-go/listers/resource/v1alpha3"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
+	"k8s.io/dynamic-resource-allocation/api"
 )
 
 // GatherPools collects information about all resource pools which provide
@@ -32,16 +31,9 @@ import (
 //
 // Out-dated slices are silently ignored. Pools may be incomplete, which is
 // recorded in the result.
-func GatherPools(ctx context.Context, sliceLister resourcelisters.ResourceSliceLister, node *v1.Node) ([]*Pool, error) {
+func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node *v1.Node) ([]*Pool, error) {
 	pools := make(map[PoolID]*Pool)
 
-	// TODO (future): use a custom lister interface and implement it with
-	// and indexer on the node name field. Then here we can ask for only
-	// slices with the right node name and those with no node name.
-	slices, err := sliceLister.List(labels.Everything())
-	if err != nil {
-		return nil, fmt.Errorf("list resource slices: %w", err)
-	}
 	for _, slice := range slices {
 		switch {
 		case slice.Spec.NodeName != "":
@@ -81,14 +73,17 @@ func GatherPools(ctx context.Context, sliceLister resourcelisters.ResourceSliceL
 	return result, nil
 }
 
-func addSlice(pools map[PoolID]*Pool, slice *resourceapi.ResourceSlice) {
+func addSlice(pools map[PoolID]*Pool, s *resourceapi.ResourceSlice) {
+	var slice api.ResourceSlice
+	api.Convert_v1alpha3_ResourceSlice_To_api_ResourceSlice(s, &slice, nil)
+
 	id := PoolID{Driver: slice.Spec.Driver, Pool: slice.Spec.Pool.Name}
 	pool := pools[id]
 	if pool == nil {
 		// New pool.
 		pool = &Pool{
 			PoolID: id,
-			Slices: []*resourceapi.ResourceSlice{slice},
+			Slices: []*api.ResourceSlice{&slice},
 		}
 		pools[id] = pool
 		return
@@ -101,31 +96,39 @@ func addSlice(pools map[PoolID]*Pool, slice *resourceapi.ResourceSlice) {
 
 	if slice.Spec.Pool.Generation > pool.Slices[0].Spec.Pool.Generation {
 		// Newer, replaces all old slices.
-		pool.Slices = []*resourceapi.ResourceSlice{slice}
+		pool.Slices = []*api.ResourceSlice{&slice}
 	}
 
 	// Add to pool.
-	pool.Slices = append(pool.Slices, slice)
+	pool.Slices = append(pool.Slices, &slice)
 }
 
 type Pool struct {
 	PoolID
 	IsIncomplete bool
-	Slices       []*resourceapi.ResourceSlice
+	Slices       []*api.ResourceSlice
 }
 
 type PoolID struct {
-	Driver, Pool string
+	Driver, Pool api.UniqueString
 }
 
 func (p PoolID) String() string {
-	return p.Driver + "/" + p.Pool
+	return p.Driver.String() + "/" + p.Pool.String()
 }
 
 type DeviceID struct {
-	Driver, Pool, Device string
+	Driver, Pool, Device api.UniqueString
 }
 
 func (d DeviceID) String() string {
-	return d.Driver + "/" + d.Pool + "/" + d.Device
+	return d.Driver.String() + "/" + d.Pool.String() + "/" + d.Device.String()
+}
+
+func MakeDeviceID(driver, pool, device string) DeviceID {
+	return DeviceID{
+		Driver: api.MakeUniqueString(driver),
+		Pool:   api.MakeUniqueString(pool),
+		Device: api.MakeUniqueString(device),
+	}
 }
