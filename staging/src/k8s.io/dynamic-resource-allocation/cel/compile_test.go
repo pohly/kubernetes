@@ -20,9 +20,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	resourceapi "k8s.io/api/resource/v1alpha3"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apiserver/pkg/cel/environment"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
 )
@@ -194,7 +197,10 @@ device.attributes["dra.example.com"]["version"].isGreaterThan(semver("0.0.1"))
 				}
 				return
 			}
-			match, err := result.DeviceMatches(ctx, Device{Attributes: scenario.attributes, Capacity: scenario.capacity, Driver: scenario.driver})
+			in := resourceapi.BasicDevice{Attributes: scenario.attributes, Capacity: scenario.capacity}
+			var out draapi.BasicDevice
+			require.NoError(t, draapi.Convert_v1alpha3_BasicDevice_To_api_BasicDevice(&in, &out, nil), "convert test data")
+			match, err := result.DeviceMatches(ctx, Device{Attributes: out.Attributes, Capacity: out.Capacity, Driver: scenario.driver})
 			if err != nil {
 				if scenario.expectMatchError == "" {
 					t.Fatalf("unexpected evaluation error: %v", err)

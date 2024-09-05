@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1alpha3"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/dynamic-resource-allocation/api"
 )
@@ -31,25 +30,21 @@ import (
 //
 // Out-dated slices are silently ignored. Pools may be incomplete, which is
 // recorded in the result.
-func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node *v1.Node) ([]*Pool, error) {
+func GatherPools(ctx context.Context, slices []*api.ResourceSlice, node *v1.Node) ([]*Pool, error) {
 	pools := make(map[PoolID]*Pool)
-	nodeName := ""
+	var nodeName api.UniqueString
 	if node != nil {
-		nodeName = node.Name
+		nodeName = api.MakeUniqueString(node.Name)
 	}
 
 	for _, slice := range slices {
 		switch {
-		case slice.Spec.NodeName != "":
+		case slice.Spec.NodeName != api.NullUniqueString:
 			if slice.Spec.NodeName == nodeName {
-				if err := addSlice(pools, slice); err != nil {
-					return nil, fmt.Errorf("add node slice %s: %w", slice.Name, err)
-				}
+				addSlice(pools, slice)
 			}
 		case slice.Spec.AllNodes:
-			if err := addSlice(pools, slice); err != nil {
-				return nil, fmt.Errorf("add cluster slice %s: %w", slice.Name, err)
-			}
+			addSlice(pools, slice)
 		case slice.Spec.NodeSelector != nil:
 			// TODO: move conversion into api.
 			selector, err := nodeaffinity.NewNodeSelector(slice.Spec.NodeSelector)
@@ -57,9 +52,7 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 				return nil, fmt.Errorf("node selector in resource slice %s: %w", slice.Name, err)
 			}
 			if selector.Match(node) {
-				if err := addSlice(pools, slice); err != nil {
-					return nil, fmt.Errorf("add matching slice %s: %w", slice.Name, err)
-				}
+				addSlice(pools, slice)
 			}
 		default:
 			// Nothing known was set. This must be some future, unknown extension,
@@ -84,37 +77,31 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 	return result, nil
 }
 
-func addSlice(pools map[PoolID]*Pool, s *resourceapi.ResourceSlice) error {
-	var slice api.ResourceSlice
-	if err := api.Convert_v1alpha3_ResourceSlice_To_api_ResourceSlice(s, &slice, nil); err != nil {
-		return fmt.Errorf("convert ResourceSlice: %w", err)
-	}
-
+func addSlice(pools map[PoolID]*Pool, slice *api.ResourceSlice) {
 	id := PoolID{Driver: slice.Spec.Driver, Pool: slice.Spec.Pool.Name}
 	pool := pools[id]
 	if pool == nil {
 		// New pool.
 		pool = &Pool{
 			PoolID: id,
-			Slices: []*api.ResourceSlice{&slice},
+			Slices: []*api.ResourceSlice{slice},
 		}
 		pools[id] = pool
-		return nil
+		return
 	}
 
 	if slice.Spec.Pool.Generation < pool.Slices[0].Spec.Pool.Generation {
 		// Out-dated.
-		return nil
+		return
 	}
 
 	if slice.Spec.Pool.Generation > pool.Slices[0].Spec.Pool.Generation {
 		// Newer, replaces all old slices.
-		pool.Slices = []*api.ResourceSlice{&slice}
+		pool.Slices = []*api.ResourceSlice{slice}
 	}
 
 	// Add to pool.
-	pool.Slices = append(pool.Slices, &slice)
-	return nil
+	pool.Slices = append(pool.Slices, slice)
 }
 
 type Pool struct {

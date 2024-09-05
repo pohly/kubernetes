@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/util/workqueue"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
@@ -308,7 +309,6 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 	informerFactory := informers.NewSharedInformerFactory(tCtx.Client(), 0)
 	claimInformer := informerFactory.Resource().V1alpha3().ResourceClaims().Informer()
 	classLister := informerFactory.Resource().V1alpha3().DeviceClasses().Lister()
-	sliceLister := informerFactory.Resource().V1alpha3().ResourceSlices().Lister()
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 	claimCache := assumecache.NewAssumeCache(tCtx.Logger(), claimInformer, "ResourceClaim", "", nil)
 	informerFactory.Start(tCtx.Done())
@@ -320,7 +320,6 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 	expectSyncedInformers := map[reflect.Type]bool{
 		reflect.TypeOf(&resourceapi.DeviceClass{}):   true,
 		reflect.TypeOf(&resourceapi.ResourceClaim{}): true,
-		reflect.TypeOf(&resourceapi.ResourceSlice{}): true,
 		reflect.TypeOf(&v1.Node{}):                   true,
 	}
 	require.Equal(tCtx, expectSyncedInformers, syncedInformers, "synced informers")
@@ -329,8 +328,14 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 	// The set of nodes is assumed to be fixed at this point.
 	nodes, err := nodeLister.List(labels.Everything())
 	tCtx.ExpectNoError(err, "list nodes")
-	slices, err := sliceLister.List(labels.Everything())
+	slices, err := tCtx.Client().ResourceV1alpha3().ResourceSlices().List(tCtx, metav1.ListOptions{})
 	tCtx.ExpectNoError(err, "list slices")
+	slicesUnique := make([]*draapi.ResourceSlice, len(slices.Items))
+	for i := range slices.Items {
+		var slice draapi.ResourceSlice
+		tCtx.ExpectNoError(draapi.Convert_v1alpha3_ResourceSlice_To_api_ResourceSlice(&slices.Items[i], &slice, nil), "convert slice")
+		slicesUnique[i] = &slice
+	}
 
 	// Allocate one claim at a time, picking nodes randomly. Each
 	// allocation is stored immediately, using the claim cache to avoid
@@ -354,7 +359,7 @@ claims:
 			}
 		}
 
-		allocator, err := structured.NewAllocator(tCtx, []*resourceapi.ResourceClaim{claim}, allocatedDevices, classLister, slices, celCache)
+		allocator, err := structured.NewAllocator(tCtx, []*resourceapi.ResourceClaim{claim}, allocatedDevices, classLister, slicesUnique, celCache)
 		tCtx.ExpectNoError(err, "create allocator")
 
 		rand.Shuffle(len(nodes), func(i, j int) {

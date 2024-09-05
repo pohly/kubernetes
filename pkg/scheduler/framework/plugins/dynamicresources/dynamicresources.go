@@ -41,6 +41,7 @@ import (
 	resourcelisters "k8s.io/client-go/listers/resource/v1alpha3"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/klog/v2"
@@ -278,7 +279,7 @@ type dynamicResources struct {
 	clientset                  kubernetes.Interface
 	classLister                resourcelisters.DeviceClassLister
 	podSchedulingContextLister resourcelisters.PodSchedulingContextLister // nil if and only if DRAControlPlaneController is disabled
-	sliceLister                resourcelisters.ResourceSliceLister
+	sliceLister                draapi.ResourceSliceLister
 	celCache                   *structured.CELCache
 	allocatedDevices           *allocatedDevices
 
@@ -353,7 +354,7 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 		fh:               fh,
 		clientset:        fh.ClientSet(),
 		classLister:      fh.SharedInformerFactory().Resource().V1alpha3().DeviceClasses().Lister(),
-		sliceLister:      fh.SharedInformerFactory().Resource().V1alpha3().ResourceSlices().Lister(),
+		sliceLister:      draapi.NewResourceSliceLister(draapi.NewInformerForResourceSlice(fh.SharedInformerFactory()).GetIndexer()),
 		claimAssumeCache: fh.ResourceClaimCache(),
 
 		// This is a LRU cache for compiled CEL expressions. The most
@@ -551,7 +552,7 @@ func (pl *dynamicResources) isSchedulableAfterPodChange(logger klog.Logger, pod 
 //
 // The delete claim event will not invoke it, so newObj will never be nil.
 func (pl *dynamicResources) isSchedulableAfterResourceSliceChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
-	_, modifiedSlice, err := schedutil.As[*resourceapi.ResourceSlice](oldObj, newObj)
+	_, modifiedSlice, err := schedutil.As[*draapi.ResourceSlice](oldObj, newObj)
 	if err != nil {
 		// Shouldn't happen.
 		return framework.Queue, fmt.Errorf("unexpected object in isSchedulableAfterResourceSliceChange: %w", err)

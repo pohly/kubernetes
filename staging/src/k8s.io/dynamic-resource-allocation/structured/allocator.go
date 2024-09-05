@@ -44,7 +44,7 @@ type Allocator struct {
 	claimsToAllocate []*resourceapi.ResourceClaim
 	allocatedDevices sets.Set[DeviceID]
 	classLister      resourcelisters.DeviceClassLister
-	slices           []*resourceapi.ResourceSlice
+	slices           []*api.ResourceSlice
 	celCache         *CELCache
 	celMutex         keymutex.KeyMutex
 }
@@ -58,7 +58,7 @@ func NewAllocator(ctx context.Context,
 	claimsToAllocate []*resourceapi.ResourceClaim,
 	allocatedDevices sets.Set[DeviceID],
 	classLister resourcelisters.DeviceClassLister,
-	slices []*resourceapi.ResourceSlice,
+	slices []*api.ResourceSlice,
 	celCache *CELCache,
 ) (*Allocator, error) {
 	return &Allocator{
@@ -704,13 +704,7 @@ func (alloc *allocator) selectorsMatch(r requestIndices, device *api.BasicDevice
 			return false, fmt.Errorf("claim %s: selector #%d: CEL compile error: %w", klog.KObj(alloc.claimsToAllocate[r.claimIndex]), i, expr.Error)
 		}
 
-		// If this conversion turns out to be expensive, the CEL package could be converted
-		// to use unique strings.
-		var d resourceapi.BasicDevice
-		if err := api.Convert_api_BasicDevice_To_v1alpha3_BasicDevice(device, &d, nil); err != nil {
-			return false, fmt.Errorf("convert BasicDevice: %w", err)
-		}
-		matches, err := expr.DeviceMatches(alloc.ctx, cel.Device{Driver: deviceID.Driver.String(), Attributes: d.Attributes, Capacity: d.Capacity})
+		matches, err := expr.DeviceMatches(alloc.ctx, cel.Device{Driver: deviceID.Driver.String(), Attributes: device.Attributes, Capacity: device.Capacity})
 		if class != nil {
 			alloc.logger.V(7).Info("CEL result", "device", deviceID, "class", klog.KObj(class), "selector", i, "expression", selector.CEL.Expression, "matches", matches, "err", err)
 		} else {
