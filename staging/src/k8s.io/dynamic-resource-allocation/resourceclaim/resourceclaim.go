@@ -49,8 +49,9 @@ var (
 //     input is invalid or the API got extended and the library and the client
 //     using it need to be updated) or the claim hasn't been created yet.
 //
-//     The error includes pod and pod claim name and the unexpected field and
-//     is derived from one of the pre-defined errors in this package.
+//     The error does *not* pod and pod claim name because the caller can add that
+//     if (and only if) desired. If there is an unexpected field, that is
+//     included, which is the less common error.
 //
 //   - A nil string pointer and no error when the ResourceClaim intentionally
 //     didn't get created and the PodResourceClaim can be ignored.
@@ -70,9 +71,11 @@ func Name(pod *v1.Pod, podClaim *v1.PodResourceClaim) (name *string, mustCheckOw
 				return status.ResourceClaimName, true, nil
 			}
 		}
-		return nil, false, fmt.Errorf(`pod "%s/%s": %w`, pod.Namespace, pod.Name, ErrClaimNotFound)
+		// The scheduler will run into this a lot when checking whether
+		// a pod can be scheduled. It is important to not allocate memory here.
+		return nil, false, ErrClaimNotFound
 	default:
-		return nil, false, fmt.Errorf(`pod "%s/%s", spec.resourceClaim %q: %w`, pod.Namespace, pod.Name, podClaim.Name, ErrAPIUnsupported)
+		return nil, false, fmt.Errorf("spec.resourceClaim %q: %w", podClaim.Name, ErrAPIUnsupported)
 	}
 }
 

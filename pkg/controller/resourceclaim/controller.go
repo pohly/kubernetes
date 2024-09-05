@@ -241,7 +241,7 @@ func (ec *Controller) enqueuePod(logger klog.Logger, obj interface{}, deleted bo
 				// Either the claim was not created (nothing to do here) or
 				// the API changed. The later will also get reported elsewhere,
 				// so here it's just a debug message.
-				logger.V(6).Info("Nothing to do for claim during pod change", "err", err, "reason", reason)
+				logger.V(6).Info("Nothing to do for claim during pod change", "pod", klog.KObj(pod), "err", err, "reason", reason)
 			case claimName != nil:
 				key := claimKeyPrefix + pod.Namespace + "/" + *claimName
 				logger.V(6).Info("Process claim", "pod", klog.KObj(pod), "key", key, "reason", reason)
