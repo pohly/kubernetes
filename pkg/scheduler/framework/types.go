@@ -129,7 +129,7 @@ const (
 	StorageClass          GVK = "storage.k8s.io/StorageClass"
 	PodSchedulingContext  GVK = "PodSchedulingContext"
 	ResourceClaim         GVK = "ResourceClaim"
-	ResourceSlice         GVK = "ResourceSlice"
+	ResourceSlice         GVK = "ResourceSlice" // Hints use the ResourceSlice type from k8s.io/dynamic-resource-allocation/api.
 	DeviceClass           GVK = "DeviceClass"
 
 	// WildCard is a special GVK to match all resources.

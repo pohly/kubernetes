@@ -44,7 +44,7 @@ type Allocator struct {
 	claimsToAllocate []*resourceapi.ResourceClaim
 	allocatedDevices sets.Set[DeviceID]
 	classLister      resourcelisters.DeviceClassLister
-	slices           []*resourceapi.ResourceSlice
+	slices           []*api.ResourceSlice
 	celCache         *CELCache
 	celMutex         keymutex.KeyMutex
 }
@@ -58,7 +58,7 @@ func NewAllocator(ctx context.Context,
 	claimsToAllocate []*resourceapi.ResourceClaim,
 	allocatedDevices []DeviceID,
 	classLister resourcelisters.DeviceClassLister,
-	slices []*resourceapi.ResourceSlice,
+	slices []*api.ResourceSlice,
 	celCache *CELCache,
 ) (*Allocator, error) {
 	return &Allocator{

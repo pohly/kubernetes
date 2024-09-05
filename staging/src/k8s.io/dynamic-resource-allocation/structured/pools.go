@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1alpha3"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/dynamic-resource-allocation/api"
 )
@@ -31,7 +30,7 @@ import (
 //
 // Out-dated slices are silently ignored. Pools may be incomplete, which is
 // recorded in the result.
-func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node *v1.Node) ([]*Pool, error) {
+func GatherPools(ctx context.Context, slices []*api.ResourceSlice, node *v1.Node) ([]*Pool, error) {
 	pools := make(map[PoolID]*Pool)
 
 	for _, slice := range slices {
@@ -73,17 +72,14 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 	return result, nil
 }
 
-func addSlice(pools map[PoolID]*Pool, s *resourceapi.ResourceSlice) {
-	var slice api.ResourceSlice
-	api.Convert_v1alpha3_ResourceSlice_To_api_ResourceSlice(s, &slice, nil)
-
+func addSlice(pools map[PoolID]*Pool, slice *api.ResourceSlice) {
 	id := PoolID{Driver: slice.Spec.Driver, Pool: slice.Spec.Pool.Name}
 	pool := pools[id]
 	if pool == nil {
 		// New pool.
 		pool = &Pool{
 			PoolID: id,
-			Slices: []*api.ResourceSlice{&slice},
+			Slices: []*api.ResourceSlice{slice},
 		}
 		pools[id] = pool
 		return
@@ -96,11 +92,11 @@ func addSlice(pools map[PoolID]*Pool, s *resourceapi.ResourceSlice) {
 
 	if slice.Spec.Pool.Generation > pool.Slices[0].Spec.Pool.Generation {
 		// Newer, replaces all old slices.
-		pool.Slices = []*api.ResourceSlice{&slice}
+		pool.Slices = []*api.ResourceSlice{slice}
 	}
 
 	// Add to pool.
-	pool.Slices = append(pool.Slices, &slice)
+	pool.Slices = append(pool.Slices, slice)
 }
 
 type Pool struct {

@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	corev1nodeaffinity "k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
+	drapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/backend/queue"
@@ -540,7 +541,7 @@ func addAllEventHandlers(
 			}
 		case framework.DeviceClass:
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				if handlerRegistration, err = informerFactory.Resource().V1alpha3().DeviceClasses().Informer().AddEventHandler(
+				if handlerRegistration, err = drapi.NewInformerForResourceSlice(informerFactory).AddEventHandler(
 					buildEvtResHandler(at, framework.DeviceClass, "DeviceClass"),
 				); err != nil {
 					return err

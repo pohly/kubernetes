@@ -26,6 +26,19 @@ func (us UniqueString) String() string {
 	return unique.Handle[string](us).Value()
 }
 
+func (us *UniqueString) DeepCopyInto(out *UniqueString) {
+	*out = *us
+}
+
+func (us *UniqueString) DeepCopy() *UniqueString {
+	if us == nil {
+		return nil
+	}
+
+	out := *us
+	return &out
+}
+
 func MakeUniqueString(str string) UniqueString {
 	return UniqueString(unique.Make(str))
 }
