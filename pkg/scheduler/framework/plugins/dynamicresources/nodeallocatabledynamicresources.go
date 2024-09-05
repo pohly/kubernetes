@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	resourcehelper "k8s.io/component-helpers/resource"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -105,15 +106,17 @@ func (pl *DynamicResources) calculateAndCheckNodeAllocatableResources(ctx contex
 
 // getDeviceFromManager retrieves a specific Device object from the DRA manager's cache and
 // looks for the device matching the given poolName and deviceName.
-func getDeviceFromManager(draManager fwk.SharedDRAManager, poolName, deviceName string) (*resourceapi.Device, error) {
+func getDeviceFromManager(draManager fwk.SharedDRAManager, poolName, deviceName string) (*draapi.Device, error) {
 	slices, err := draManager.ResourceSlices().ListWithDeviceTaintRules()
 	if err != nil {
 		return nil, fmt.Errorf("listing resource slices: %w", err)
 	}
+	uniquePoolName := draapi.MakeUniqueString(poolName)
+	uniqueDeviceName := draapi.MakeUniqueString(deviceName)
 	for _, slice := range slices {
-		if slice.Spec.Pool.Name == poolName {
+		if slice.Spec.Pool.Name == uniquePoolName {
 			for i := range slice.Spec.Devices {
-				if slice.Spec.Devices[i].Name == deviceName {
+				if slice.Spec.Devices[i].Name == uniqueDeviceName {
 					return &slice.Spec.Devices[i], nil
 				}
 			}

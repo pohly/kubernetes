@@ -34,6 +34,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -53,7 +54,7 @@ var (
 type mockDRAManager struct {
 	fwk.SharedDRAManager
 	claims         []*resourceapi.ResourceClaim
-	resourceSlices []*resourceapi.ResourceSlice
+	resourceSlices []*draapi.ResourceSlice
 }
 
 func (m *mockDRAManager) ResourceClaims() fwk.ResourceClaimTracker {
@@ -103,7 +104,7 @@ func (m *mockDRAManager) ResourceSlices() fwk.ResourceSliceLister {
 	return m
 }
 
-func (m *mockDRAManager) ListWithDeviceTaintRules() ([]*resourceapi.ResourceSlice, error) {
+func (m *mockDRAManager) ListWithDeviceTaintRules() ([]*draapi.ResourceSlice, error) {
 	return m.resourceSlices, nil
 }
 
@@ -589,9 +590,17 @@ func TestBuildNodeAllocatableDRAInfo(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			resourceSlices := make([]*draapi.ResourceSlice, len(tt.resourceSlices))
+			for i := range tt.resourceSlices {
+				var slice draapi.ResourceSlice
+				if err := draapi.Convert_v1_ResourceSlice_To_api_ResourceSlice(tt.resourceSlices[i], &slice, nil); err != nil {
+					t.Fatalf("convert slice: %v", err)
+				}
+				resourceSlices[i] = &slice
+			}
 			draManager := &mockDRAManager{
 				claims:         tt.claims,
-				resourceSlices: tt.resourceSlices,
+				resourceSlices: resourceSlices,
 			}
 
 			pl := &DynamicResources{

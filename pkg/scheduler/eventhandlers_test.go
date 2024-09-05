@@ -45,6 +45,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
@@ -327,7 +328,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 				reflect.TypeOf(&v1.Node{}):                   true,
 				reflect.TypeOf(&v1.Namespace{}):              true,
 				reflect.TypeOf(&resourceapi.ResourceClaim{}): true,
-				reflect.TypeOf(&resourceapi.ResourceSlice{}): true,
+				reflect.TypeOf(&draapi.ResourceSlice{}):      true,
 				reflect.TypeOf(&resourceapi.DeviceClass{}):   true,
 			},
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
@@ -346,7 +347,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 				reflect.TypeOf(&v1.Node{}):                   true,
 				reflect.TypeOf(&v1.Namespace{}):              true,
 				reflect.TypeOf(&resourceapi.ResourceClaim{}): true,
-				reflect.TypeOf(&resourceapi.ResourceSlice{}): true,
+				reflect.TypeOf(&draapi.ResourceSlice{}):      true,
 				reflect.TypeOf(&resourceapi.DeviceClass{}):   true,
 			},
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
@@ -366,7 +367,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 				reflect.TypeOf(&v1.Node{}):                         true,
 				reflect.TypeOf(&v1.Namespace{}):                    true,
 				reflect.TypeOf(&resourceapi.ResourceClaim{}):       true,
-				reflect.TypeOf(&resourceapi.ResourceSlice{}):       true,
+				reflect.TypeOf(&draapi.ResourceSlice{}):            true,
 				reflect.TypeOf(&resourcebetaapi.DeviceTaintRule{}): true,
 				reflect.TypeOf(&resourceapi.DeviceClass{}):         true,
 			},
@@ -396,7 +397,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 				reflect.TypeOf(&v1.Node{}):                   true,
 				reflect.TypeOf(&v1.Namespace{}):              true,
 				reflect.TypeOf(&resourceapi.ResourceClaim{}): true,
-				reflect.TypeOf(&resourceapi.ResourceSlice{}): true,
+				reflect.TypeOf(&draapi.ResourceSlice{}):      true,
 				reflect.TypeOf(&schedulingapi.PodGroup{}):    true,
 			},
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
@@ -496,10 +497,12 @@ func TestAddAllEventHandlers(t *testing.T) {
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 				resourceClaimInformer := informerFactory.Resource().V1().ResourceClaims().Informer()
 				resourceClaimCache = assumecache.NewAssumeCache(logger, resourceClaimInformer, "ResourceClaim", "", nil)
+				sliceInformer := draapi.NewInformerForResourceSlice(informerFactory)
 				var err error
 				opts := resourceslicetracker.Options{
 					EnableDeviceTaintRules: utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules),
-					SliceInformer:          informerFactory.Resource().V1().ResourceSlices(),
+					SliceLister:            draapi.NewResourceSliceLister(sliceInformer.GetIndexer()),
+					SliceInformer:          sliceInformer,
 				}
 				if opts.EnableDeviceTaintRules {
 					opts.TaintInformer = informerFactory.Resource().V1beta2().DeviceTaintRules()
