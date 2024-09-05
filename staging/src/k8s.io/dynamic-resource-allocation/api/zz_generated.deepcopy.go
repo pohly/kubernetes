@@ -197,6 +197,7 @@ func (in *ResourceSliceSpec) DeepCopyInto(out *ResourceSliceSpec) {
 	*out = *in
 	in.Driver.DeepCopyInto(&out.Driver)
 	in.Pool.DeepCopyInto(&out.Pool)
+	in.NodeName.DeepCopyInto(&out.NodeName)
 	if in.NodeSelector != nil {
 		in, out := &in.NodeSelector, &out.NodeSelector
 		*out = new(v1.NodeSelector)

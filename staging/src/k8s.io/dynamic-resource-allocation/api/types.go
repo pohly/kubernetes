@@ -33,7 +33,7 @@ type ResourceSlice struct {
 type ResourceSliceSpec struct {
 	Driver       UniqueString
 	Pool         ResourcePool
-	NodeName     string
+	NodeName     UniqueString
 	NodeSelector *v1.NodeSelector
 	AllNodes     bool
 	Devices      []Device

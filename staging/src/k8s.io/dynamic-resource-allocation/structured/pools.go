@@ -32,16 +32,21 @@ import (
 // recorded in the result.
 func GatherPools(ctx context.Context, slices []*api.ResourceSlice, node *v1.Node) ([]*Pool, error) {
 	pools := make(map[PoolID]*Pool)
+	var nodeName api.UniqueString
+	if node != nil {
+		nodeName = api.MakeUniqueString(node.Name)
+	}
 
 	for _, slice := range slices {
 		switch {
-		case slice.Spec.NodeName != "":
-			if slice.Spec.NodeName == node.Name {
+		case slice.Spec.NodeName != api.NullUniqueString:
+			if slice.Spec.NodeName == nodeName {
 				addSlice(pools, slice)
 			}
 		case slice.Spec.AllNodes:
 			addSlice(pools, slice)
 		case slice.Spec.NodeSelector != nil:
+			// TODO: move conversion into api.
 			selector, err := nodeaffinity.NewNodeSelector(slice.Spec.NodeSelector)
 			if err != nil {
 				return nil, fmt.Errorf("node selector in resource slice %s: %w", slice.Name, err)

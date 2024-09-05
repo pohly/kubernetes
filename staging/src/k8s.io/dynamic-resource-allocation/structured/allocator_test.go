@@ -223,6 +223,8 @@ func slice(name string, nodeSelection any, pool, driver string, devices ...api.D
 		}
 		slice.Spec.AllNodes = true
 	case string:
+		slice.Spec.NodeName = api.MakeUniqueString(nodeSelection)
+	case api.UniqueString:
 		slice.Spec.NodeName = nodeSelection
 	default:
 		panic(fmt.Sprintf("unexpected nodeSelection type %T: %+v", nodeSelection, nodeSelection))

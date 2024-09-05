@@ -20,6 +20,8 @@ import (
 	"unique"
 )
 
+var NullUniqueString UniqueString
+
 type UniqueString unique.Handle[string]
 
 func (us UniqueString) String() string {
