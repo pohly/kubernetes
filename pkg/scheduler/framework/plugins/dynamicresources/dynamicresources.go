@@ -384,6 +384,9 @@ func (pl *dynamicResources) EventsToRegister(_ context.Context) ([]framework.Clu
 	events := []framework.ClusterEventWithHint{
 		// Allocation is tracked in ResourceClaims, so any changes may make the pods schedulable.
 		{Event: framework.ClusterEvent{Resource: framework.ResourceClaim, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterClaimChange},
+		// Adding the ResourceClaim name to the pod status makes pods waiting for their ResourceClaim schedulable.
+		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Update}, QueueingHintFn: pl.isSchedulableAfterPodChange},
+
 		// A resource might depend on node labels for topology filtering.
 		// A new or updated node may make pods schedulable.
 		//
@@ -447,7 +450,10 @@ func (pl *dynamicResources) isSchedulableAfterClaimChange(logger klog.Logger, po
 		// This is not an unexpected error: we know that
 		// foreachPodResourceClaim only returns errors for "not
 		// schedulable".
-		logger.V(6).Info("pod is not schedulable after resource claim change", "pod", klog.KObj(pod), "claim", klog.KObj(modifiedClaim), "reason", err.Error())
+		if loggerV := logger.V(6); loggerV.Enabled() {
+			owner := metav1.GetControllerOf(modifiedClaim)
+			loggerV.Info("pod is not schedulable after resource claim change", "pod", klog.KObj(pod), "claim", klog.KObj(modifiedClaim), "claimOwner", owner, "reason", err.Error())
+		}
 		return framework.QueueSkip, nil
 	}
 
@@ -490,6 +496,33 @@ func (pl *dynamicResources) isSchedulableAfterClaimChange(logger klog.Logger, po
 	}
 
 	logger.V(4).Info("status of claim for pod got updated", "pod", klog.KObj(pod), "claim", klog.KObj(modifiedClaim))
+	return framework.Queue, nil
+}
+
+// isSchedulableAfterPodChange is invoked for update pod events reported by
+// an informer. It checks whether that change adds the ResourceClaim(s) that the
+// pod has been waiting for.
+func (pl *dynamicResources) isSchedulableAfterPodChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+	_, modifiedPod, err := schedutil.As[*v1.Pod](nil, newObj)
+	if err != nil {
+		// Shouldn't happen.
+		return framework.Queue, fmt.Errorf("unexpected object in isSchedulableAfterClaimChange: %w", err)
+	}
+
+	if pod.UID != modifiedPod.UID {
+		logger.V(7).Info("pod is not schedulable after change in other pod", "pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod))
+		return framework.QueueSkip, nil
+	}
+
+	if err := pl.foreachPodResourceClaim(modifiedPod, nil); err != nil {
+		// This is not an unexpected error: we know that
+		// foreachPodResourceClaim only returns errors for "not
+		// schedulable".
+		logger.Info("pod is not schedulable after being updated", "pod", klog.KObj(pod))
+		return framework.QueueSkip, nil
+	}
+
+	logger.V(4).Info("pod got updated and is schedulable", "pod", klog.KObj(pod))
 	return framework.Queue, nil
 }
 
