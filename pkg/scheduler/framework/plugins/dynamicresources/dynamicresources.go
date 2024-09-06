@@ -714,6 +714,10 @@ func (pl *dynamicResources) podResourceClaims(pod *v1.Pod) ([]*resourceapi.Resou
 
 // foreachPodResourceClaim checks that each ResourceClaim for the pod exists.
 // It calls an optional handler for those claims that it finds.
+//
+// If that handler is nil, foreachPodResourceClaim only verifies that
+// it knows the names of all claims. It does not check that it actually
+// have a copy of them in the cache.
 func (pl *dynamicResources) foreachPodResourceClaim(pod *v1.Pod, cb func(podResourceName string, claim *resourceapi.ResourceClaim)) error {
 	for _, resource := range pod.Spec.ResourceClaims {
 		claimName, mustCheckOwner, err := resourceclaim.Name(pod, &resource)
@@ -726,6 +730,12 @@ func (pl *dynamicResources) foreachPodResourceClaim(pod *v1.Pod, cb func(podReso
 		if claimName == nil {
 			continue
 		}
+
+		// Avoid more detailed checks?
+		if cb == nil {
+			return nil
+		}
+
 		obj, err := pl.claimAssumeCache.Get(pod.Namespace + "/" + *claimName)
 		if err != nil {
 			return err
@@ -745,9 +755,7 @@ func (pl *dynamicResources) foreachPodResourceClaim(pod *v1.Pod, cb func(podReso
 				return err
 			}
 		}
-		if cb != nil {
-			cb(resource.Name, claim)
-		}
+		cb(resource.Name, claim)
 	}
 	return nil
 }
