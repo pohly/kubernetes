@@ -347,6 +347,41 @@ func SinceInSeconds(start time.Time) float64 {
 	return time.Since(start).Seconds()
 }
 
+// UnschedulableReason creates a GaugeMetric with plugin and profile as labels.
+// Note that each call needs to allocate memory. Use an [UnschedulableReasonsCache]
+// to avoid that.
 func UnschedulableReason(plugin string, profile string) metrics.GaugeMetric {
 	return unschedulableReasons.With(metrics.Labels{"plugin": plugin, "profile": profile})
+}
+
+// UnschedulableReasonsCache caches GaugeMetric instances, which avoids repeatedly
+// allocating memory in [UnschedulableReason].
+//
+// This is intentionally not thread-safe and meant to be used in a context
+// where some other lock already protects the cache! The null UnschedulableReasonsCache
+// is directly usable.
+type UnschedulableReasonsCache struct {
+	cache map[string]map[string]metrics.GaugeMetric
+}
+
+// Get is a wrapper around [UnschedulableReason] which caches and reuses the result.
+func (c *UnschedulableReasonsCache) Get(plugin string, profile string) metrics.GaugeMetric {
+	// Fast path: simply look it up.
+	gm := c.cache[profile][plugin]
+	if gm != nil {
+		return gm
+	}
+
+	// Slow path: create label set, create GaugeMetric, store it.
+	mapByPlugin := c.cache[profile]
+	if mapByPlugin == nil {
+		mapByPlugin = make(map[string]metrics.GaugeMetric, 10)
+		if c.cache == nil {
+			c.cache = make(map[string]map[string]metrics.GaugeMetric, 1)
+		}
+		c.cache[profile] = mapByPlugin
+	}
+	gm = unschedulableReasons.With(metrics.Labels{"plugin": plugin, "profile": profile})
+	mapByPlugin[plugin] = gm
+	return gm
 }
