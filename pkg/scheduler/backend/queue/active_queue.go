@@ -125,6 +125,8 @@ type activeQueue struct {
 	isSchedulingQueueHintEnabled bool
 
 	metricsRecorder metrics.MetricAsyncRecorder
+	// unschedulableReasonsCache avoids repeated calls to UnschedulableReasons.
+	unschedulableReasonsCache metrics.UnschedulableReasonsCache
 }
 
 func newActiveQueue(queue *heap.Heap[*framework.QueuedPodInfo], isSchedulingQueueHintEnabled bool, metricRecorder metrics.MetricAsyncRecorder) *activeQueue {
@@ -225,7 +227,7 @@ func (aq *activeQueue) unlockedPop(logger klog.Logger) (*framework.QueuedPodInfo
 
 	// Update metrics and reset the set of unschedulable plugins for the next attempt.
 	for plugin := range pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins) {
-		metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Dec()
+		aq.unschedulableReasonsCache.Get(plugin, pInfo.Pod.Spec.SchedulerName).Dec()
 	}
 	pInfo.UnschedulablePlugins.Clear()
 	pInfo.PendingPlugins.Clear()

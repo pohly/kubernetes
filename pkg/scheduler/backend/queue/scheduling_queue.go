@@ -193,6 +193,9 @@ type PriorityQueue struct {
 
 	// isSchedulingQueueHintEnabled indicates whether the feature gate for the scheduling queue is enabled.
 	isSchedulingQueueHintEnabled bool
+
+	// unschedulableReasonsCache avoids repeated calls to UnschedulableReasons.
+	unschedulableReasonsCache metrics.UnschedulableReasonsCache
 }
 
 // QueueingHintFunction is the wrapper of QueueingHintFn that has PluginName.
@@ -517,7 +520,7 @@ func (p *PriorityQueue) runPreEnqueuePlugins(ctx context.Context, pInfo *framewo
 			continue
 		}
 		pInfo.UnschedulablePlugins.Insert(pl.Name())
-		metrics.UnschedulableReason(pl.Name(), pod.Spec.SchedulerName).Inc()
+		p.unschedulableReasonsCache.Get(pl.Name(), pod.Spec.SchedulerName).Inc()
 		if s.Code() == framework.Error {
 			logger.Error(s.AsError(), "Unexpected error running PreEnqueue plugin", "pod", klog.KObj(pod), "plugin", pl.Name())
 		} else {
@@ -700,7 +703,7 @@ func (p *PriorityQueue) addUnschedulableWithoutQueueingHint(logger klog.Logger, 
 	// If a move request has been received, move it to the BackoffQ, otherwise move
 	// it to unschedulablePods.
 	for plugin := range rejectorPlugins {
-		metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Inc()
+		p.unschedulableReasonsCache.Get(plugin, pInfo.Pod.Spec.SchedulerName).Inc()
 	}
 	if p.moveRequestCycle >= podSchedulingCycle || len(rejectorPlugins) == 0 {
 		// Two cases to move a Pod to the active/backoff queue:
@@ -756,7 +759,7 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(logger klog.Logger, pInfo *
 	// it to unschedulablePods.
 	rejectorPlugins := pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins)
 	for plugin := range rejectorPlugins {
-		metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Inc()
+		p.unschedulableReasonsCache.Get(plugin, pInfo.Pod.Spec.SchedulerName).Inc()
 	}
 
 	// We check whether this Pod may change its scheduling result by any of events that happened during scheduling.
