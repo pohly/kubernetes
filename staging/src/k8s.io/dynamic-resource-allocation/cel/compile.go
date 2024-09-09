@@ -18,20 +18,14 @@ package cel
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"reflect"
-	"strings"
 	"sync"
 
-	"github.com/blang/semver/v4"
 	"github.com/google/cel-go/cel"
-	"github.com/google/cel-go/common/types"
-	"github.com/google/cel-go/common/types/ref"
-	"github.com/google/cel-go/common/types/traits"
 	"github.com/google/cel-go/ext"
+	"github.com/google/cel-go/interpreter"
 
-	resourceapi "k8s.io/api/resource/v1alpha3"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/version"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
@@ -42,10 +36,7 @@ import (
 )
 
 const (
-	deviceVar     = "device"
-	driverVar     = "driver"
-	attributesVar = "attributes"
-	capacityVar   = "capacity"
+	deviceVar = "device"
 )
 
 var (
@@ -67,18 +58,37 @@ type CompilationResult struct {
 	Expression  string
 	OutputType  *cel.Type
 	Environment *cel.Env
-
-	emptyMapVal ref.Val
 }
 
 // Device defines the input values for a CEL selector expression.
+//
+// Several different helper types are typedefs for this struct which
+// implement access to the content in CEL.
 type Device struct {
 	// Driver gets used as domain for any attribute which does not already
 	// have a domain prefix. If set, then it is also made available as a
 	// string attribute.
 	Driver     string
-	Attributes map[draapi.QualifiedName]draapi.DeviceAttribute
-	Capacity   map[draapi.QualifiedName]resource.Quantity
+	Attributes map[string]map[string]draapi.DeviceAttribute
+	Capacity   map[string]map[string]resource.Quantity
+}
+
+// rootResolver implements [interpreter.Activation] for the Eval root.
+type rootResolver Device
+
+var _ interpreter.Activation = &rootResolver{}
+
+func (r *rootResolver) ResolveName(name string) (any, bool) {
+	switch name {
+	case deviceVar:
+		return (*device)(r), true
+	default:
+		return nil, false
+	}
+}
+
+func (r *rootResolver) Parent() interpreter.Activation {
+	return nil
 }
 
 type compiler struct {
@@ -133,68 +143,13 @@ func (c compiler) CompileCELExpression(expression string, envType environment.Ty
 		Expression:  expression,
 		OutputType:  ast.OutputType(),
 		Environment: env,
-		emptyMapVal: env.CELTypeAdapter().NativeToValue(map[string]any{}),
-	}
-}
-
-// getAttributeValue returns the native representation of the one value that
-// should be stored in the attribute, otherwise an error. An error is
-// also returned when there is no supported value.
-func getAttributeValue(attr draapi.DeviceAttribute) (any, error) {
-	switch {
-	case attr.IntValue != nil:
-		return *attr.IntValue, nil
-	case attr.BoolValue != nil:
-		return *attr.BoolValue, nil
-	case attr.StringValue != nil:
-		return *attr.StringValue, nil
-	case attr.VersionValue != nil:
-		v, err := semver.Parse(*attr.VersionValue)
-		if err != nil {
-			return nil, fmt.Errorf("parse semantic version: %w", err)
-		}
-		return apiservercel.Semver{Version: v}, nil
-	default:
-		return nil, errors.New("unsupported attribute value")
 	}
 }
 
 var boolType = reflect.TypeOf(true)
 
-func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (bool, error) {
-	// TODO (future): avoid building these maps and instead use a proxy
-	// which wraps the underlying maps and directly looks up values.
-	attributes := make(map[string]any)
-	for name, attr := range input.Attributes {
-		value, err := getAttributeValue(attr)
-		if err != nil {
-			return false, fmt.Errorf("attribute %s: %w", name, err)
-		}
-		domain, id := parseQualifiedName(name, input.Driver)
-		if attributes[domain] == nil {
-			attributes[domain] = make(map[string]any)
-		}
-		attributes[domain].(map[string]any)[id] = value
-	}
-
-	capacity := make(map[string]any)
-	for name, quantity := range input.Capacity {
-		domain, id := parseQualifiedName(name, input.Driver)
-		if capacity[domain] == nil {
-			capacity[domain] = make(map[string]apiservercel.Quantity)
-		}
-		capacity[domain].(map[string]apiservercel.Quantity)[id] = apiservercel.Quantity{Quantity: &quantity}
-	}
-
-	variables := map[string]any{
-		deviceVar: map[string]any{
-			driverVar:     input.Driver,
-			attributesVar: newStringInterfaceMapWithDefault(c.Environment.CELTypeAdapter(), attributes, c.emptyMapVal),
-			capacityVar:   newStringInterfaceMapWithDefault(c.Environment.CELTypeAdapter(), capacity, c.emptyMapVal),
-		},
-	}
-
-	result, _, err := c.Program.ContextEval(ctx, variables)
+func (c CompilationResult) DeviceMatches(ctx context.Context, input *Device) (bool, error) {
+	result, _, err := c.Program.ContextEval(ctx, (*rootResolver)(input))
 	if err != nil {
 		return false, err
 	}
@@ -211,21 +166,6 @@ func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (boo
 
 func mustBuildEnv() *environment.EnvSet {
 	envset := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), false /* strictCost */)
-	field := func(name string, declType *apiservercel.DeclType, required bool) *apiservercel.DeclField {
-		return apiservercel.NewDeclField(name, declType, required, nil, nil)
-	}
-	fields := func(fields ...*apiservercel.DeclField) map[string]*apiservercel.DeclField {
-		result := make(map[string]*apiservercel.DeclField, len(fields))
-		for _, f := range fields {
-			result[f.Name] = f
-		}
-		return result
-	}
-	deviceType := apiservercel.NewObjectType("kubernetes.DRADevice", fields(
-		field(driverVar, apiservercel.StringType, true),
-		field(attributesVar, apiservercel.NewMapType(apiservercel.StringType, apiservercel.NewMapType(apiservercel.StringType, apiservercel.AnyType, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice), resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice), true),
-		field(capacityVar, apiservercel.NewMapType(apiservercel.StringType, apiservercel.NewMapType(apiservercel.StringType, apiservercel.QuantityDeclType, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice), resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice), true),
-	))
 
 	versioned := []environment.VersionedOptions{
 		{
@@ -258,40 +198,4 @@ func mustBuildEnv() *environment.EnvSet {
 		panic(fmt.Errorf("internal error building CEL environment: %w", err))
 	}
 	return envset
-}
-
-// parseQualifiedName splits into domain and identified, using the default domain
-// if the name does not contain one.
-func parseQualifiedName(name draapi.QualifiedName, defaultDomain string) (string, string) {
-	sep := strings.Index(string(name), "/")
-	if sep == -1 {
-		return defaultDomain, string(name)
-	}
-	return string(name[0:sep]), string(name[sep+1:])
-}
-
-// newStringInterfaceMapWithDefault is like
-// https://pkg.go.dev/github.com/google/cel-go@v0.20.1/common/types#NewStringInterfaceMap,
-// except that looking up an unknown key returns a default value.
-func newStringInterfaceMapWithDefault(adapter types.Adapter, value map[string]any, defaultValue ref.Val) traits.Mapper {
-	return mapper{
-		Mapper:       types.NewStringInterfaceMap(adapter, value),
-		defaultValue: defaultValue,
-	}
-}
-
-type mapper struct {
-	traits.Mapper
-	defaultValue ref.Val
-}
-
-// Find wraps the mapper's Find so that a default empty map is returned when
-// the lookup did not find the entry.
-func (m mapper) Find(key ref.Val) (ref.Val, bool) {
-	value, found := m.Mapper.Find(key)
-	if found {
-		return value, true
-	}
-
-	return m.defaultValue, true
 }

@@ -199,8 +199,8 @@ device.attributes["dra.example.com"]["version"].isGreaterThan(semver("0.0.1"))
 			}
 			in := resourceapi.BasicDevice{Attributes: scenario.attributes, Capacity: scenario.capacity}
 			var out draapi.BasicDevice
-			require.NoError(t, draapi.Convert_v1alpha3_BasicDevice_To_api_BasicDevice(&in, &out, nil), "convert test data")
-			match, err := result.DeviceMatches(ctx, Device{Attributes: out.Attributes, Capacity: out.Capacity, Driver: scenario.driver})
+			require.NoError(t, draapi.ConvertBasicDevice(&in, &out, scenario.driver))
+			match, err := result.DeviceMatches(ctx, &Device{Attributes: out.Attributes, Capacity: out.Capacity, Driver: scenario.driver})
 			if err != nil {
 				if scenario.expectMatchError == "" {
 					t.Fatalf("unexpected evaluation error: %v", err)

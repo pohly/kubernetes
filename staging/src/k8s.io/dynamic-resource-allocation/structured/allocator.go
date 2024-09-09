@@ -511,24 +511,12 @@ func (m *matchAttributeConstraint) remove(requestName string, device *api.BasicD
 }
 
 func lookupAttribute(device *api.BasicDevice, deviceID DeviceID, attributeName api.FullyQualifiedName) *api.DeviceAttribute {
-	// Fully-qualified match?
-	if attr, ok := device.Attributes[api.QualifiedName(attributeName)]; ok {
-		return &attr
-	}
 	index := strings.Index(string(attributeName), "/")
 	if index < 0 {
 		// Should not happen for a valid fully qualified name.
 		return nil
 	}
-
-	if string(attributeName[0:index]) != deviceID.Driver.String() {
-		// Not an attribute of the driver and not found above,
-		// so it is not available.
-		return nil
-	}
-
-	// Domain matches the driver, so let's check just the ID.
-	if attr, ok := device.Attributes[api.QualifiedName(attributeName[index+1:])]; ok {
+	if attr, ok := device.Attributes[string(attributeName[:index])][string(attributeName[index+1:])]; ok {
 		return &attr
 	}
 
@@ -704,7 +692,7 @@ func (alloc *allocator) selectorsMatch(r requestIndices, device *api.BasicDevice
 			return false, fmt.Errorf("claim %s: selector #%d: CEL compile error: %w", klog.KObj(alloc.claimsToAllocate[r.claimIndex]), i, expr.Error)
 		}
 
-		matches, err := expr.DeviceMatches(alloc.ctx, cel.Device{Driver: deviceID.Driver.String(), Attributes: device.Attributes, Capacity: device.Capacity})
+		matches, err := expr.DeviceMatches(alloc.ctx, &cel.Device{Driver: deviceID.Driver.String(), Attributes: device.Attributes, Capacity: device.Capacity})
 		if class != nil {
 			alloc.logger.V(7).Info("CEL result", "device", deviceID, "class", klog.KObj(class), "selector", i, "expression", selector.CEL.Expression, "matches", matches, "err", err)
 		} else {

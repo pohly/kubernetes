@@ -32,16 +32,36 @@ func (in *BasicDevice) DeepCopyInto(out *BasicDevice) {
 	*out = *in
 	if in.Attributes != nil {
 		in, out := &in.Attributes, &out.Attributes
-		*out = make(map[QualifiedName]DeviceAttribute, len(*in))
+		*out = make(map[string]map[string]DeviceAttribute, len(*in))
 		for key, val := range *in {
-			(*out)[key] = *val.DeepCopy()
+			var outVal map[string]DeviceAttribute
+			if val == nil {
+				(*out)[key] = nil
+			} else {
+				in, out := &val, &outVal
+				*out = make(map[string]DeviceAttribute, len(*in))
+				for key, val := range *in {
+					(*out)[key] = *val.DeepCopy()
+				}
+			}
+			(*out)[key] = outVal
 		}
 	}
 	if in.Capacity != nil {
 		in, out := &in.Capacity, &out.Capacity
-		*out = make(map[QualifiedName]resource.Quantity, len(*in))
+		*out = make(map[string]map[string]resource.Quantity, len(*in))
 		for key, val := range *in {
-			(*out)[key] = val.DeepCopy()
+			var outVal map[string]resource.Quantity
+			if val == nil {
+				(*out)[key] = nil
+			} else {
+				in, out := &val, &outVal
+				*out = make(map[string]resource.Quantity, len(*in))
+				for key, val := range *in {
+					(*out)[key] = val.DeepCopy()
+				}
+			}
+			(*out)[key] = outVal
 		}
 	}
 	return

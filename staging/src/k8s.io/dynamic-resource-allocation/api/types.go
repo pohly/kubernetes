@@ -49,9 +49,10 @@ type Device struct {
 	Basic *BasicDevice
 }
 
+// +k8s:conversion-gen=false
 type BasicDevice struct {
-	Attributes map[QualifiedName]DeviceAttribute
-	Capacity   map[QualifiedName]resource.Quantity
+	Attributes map[string]map[string]DeviceAttribute
+	Capacity   map[string]map[string]resource.Quantity
 }
 
 type QualifiedName string
