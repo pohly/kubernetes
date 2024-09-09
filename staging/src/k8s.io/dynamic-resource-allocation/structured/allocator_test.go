@@ -185,13 +185,18 @@ func claimWithDeviceConfig(name, request, class, driver, attribute string) *reso
 }
 
 // generate a Device object with the given name, capacity and attributes.
-func device(name string, capacity map[api.QualifiedName]resource.Quantity, attributes map[api.QualifiedName]api.DeviceAttribute) api.Device {
+func device(driverName, name string, capacity map[resourceapi.QualifiedName]resource.Quantity, attributes map[resourceapi.QualifiedName]resourceapi.DeviceAttribute) api.Device {
+	in := resourceapi.BasicDevice{
+		Attributes: attributes,
+		Capacity:   capacity,
+	}
+	var out api.BasicDevice
+	if err := api.Convert_BasicDevice(&in, &out, driverName); err != nil {
+		panic(err)
+	}
 	return api.Device{
-		Name: api.MakeUniqueString(name),
-		Basic: &api.BasicDevice{
-			Attributes: attributes,
-			Capacity:   capacity,
-		},
+		Name:  api.MakeUniqueString(name),
+		Basic: &out,
 	}
 }
 
@@ -343,7 +348,7 @@ func objects[T any](objs ...T) []T {
 
 // generate a ResourceSlice object with the given parameters and one device "device-1"
 func sliceWithOneDevice(name string, nodeSelection any, pool, driver string) *api.ResourceSlice {
-	return slice(name, nodeSelection, pool, driver, device(device1, nil, nil))
+	return slice(name, nodeSelection, pool, driver, device(driver, device1, nil, nil))
 }
 
 func TestAllocator(t *testing.T) {
@@ -405,10 +410,10 @@ func TestAllocator(t *testing.T) {
 			)),
 			classes: objects(class(classA, driverA)),
 			slices: objects(slice(slice1, node1, pool1, driverA,
-				device(device1, map[api.QualifiedName]resource.Quantity{
+				device(driverA, device1, map[resourceapi.QualifiedName]resource.Quantity{
 					"memory": resource.MustParse("1Gi"),
 				}, nil),
-				device(device2, map[api.QualifiedName]resource.Quantity{
+				device(driverA, device2, map[resourceapi.QualifiedName]resource.Quantity{
 					"memory": resource.MustParse("2Gi"),
 				}, nil),
 			)),
@@ -438,10 +443,10 @@ func TestAllocator(t *testing.T) {
 			// be allocated for the "small" request, leaving the "large" request unsatisfied.
 			// The initial decision needs to be undone before a solution is found.
 			slices: objects(slice(slice1, node1, pool1, driverA,
-				device(device2, map[api.QualifiedName]resource.Quantity{
+				device(driverA, device2, map[resourceapi.QualifiedName]resource.Quantity{
 					"memory": resource.MustParse("2Gi"),
 				}, nil),
-				device(device1, map[api.QualifiedName]resource.Quantity{
+				device(driverA, device1, map[resourceapi.QualifiedName]resource.Quantity{
 					"memory": resource.MustParse("1Gi"),
 				}, nil),
 			)),
@@ -475,10 +480,10 @@ func TestAllocator(t *testing.T) {
 			// be allocated for the "small" request, leaving the "large" request unsatisfied.
 			// The initial decision needs to be undone before a solution is found.
 			slices: objects(slice(slice1, node1, pool1, driverA,
-				device(device2, map[api.QualifiedName]resource.Quantity{
+				device(driverA, device2, map[resourceapi.QualifiedName]resource.Quantity{
 					"memory": resource.MustParse("2Gi"),
 				}, nil),
-				device(device1, map[api.QualifiedName]resource.Quantity{
+				device(driverA, device1, map[resourceapi.QualifiedName]resource.Quantity{
 					"memory": resource.MustParse("1Gi"),
 				}, nil),
 			)),
@@ -688,8 +693,8 @@ func TestAllocator(t *testing.T) {
 			classes:          objects(class(classA, driverA), class(classB, driverB)),
 			slices: objects(
 				slice(slice1, node1, pool1, driverA,
-					device(device1, nil, nil),
-					device(device2, nil, nil),
+					device(driverA, device1, nil, nil),
+					device(driverA, device2, nil, nil),
 				),
 				sliceWithOneDevice(slice1, node1, pool1, driverB),
 			),
@@ -745,13 +750,13 @@ func TestAllocator(t *testing.T) {
 			),
 			classes: objects(class(classA, driverA)),
 			slices: objects(slice(slice1, node1, pool1, driverA,
-				device(device1, nil, map[api.QualifiedName]api.DeviceAttribute{
+				device(driverA, device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
 					"driverVersion":   {VersionValue: ptr.To("1.0.0")},
 					"numa":            {IntValue: ptr.To(int64(1))},
 					"stringAttribute": {StringValue: ptr.To("stringAttributeValue")},
 					"boolAttribute":   {BoolValue: ptr.To(true)},
 				}),
-				device(device2, nil, map[api.QualifiedName]api.DeviceAttribute{
+				device(driverA, device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
 					"driverVersion":   {VersionValue: ptr.To("1.0.0")},
 					"numa":            {IntValue: ptr.To(int64(1))},
 					"stringAttribute": {StringValue: ptr.To("stringAttributeValue")},
@@ -784,10 +789,10 @@ func TestAllocator(t *testing.T) {
 			),
 			classes: objects(class(classA, driverA), class(classB, driverB)),
 			slices: objects(slice(slice1, node1, pool1, driverA,
-				device(device1, nil, map[api.QualifiedName]api.DeviceAttribute{
+				device(driverA, device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
 					"numa": {IntValue: ptr.To(int64(1))},
 				}),
-				device(device2, nil, map[api.QualifiedName]api.DeviceAttribute{
+				device(driverA, device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
 					"numa": {IntValue: ptr.To(int64(2))},
 				}),
 			)),
@@ -803,10 +808,10 @@ func TestAllocator(t *testing.T) {
 			),
 			classes: objects(class(classA, driverA), class(classB, driverB)),
 			slices: objects(slice(slice1, node1, pool1, driverA,
-				device(device1, nil, map[api.QualifiedName]api.DeviceAttribute{
+				device(driverA, device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
 					"driverVersion": {VersionValue: ptr.To("1.0.0")},
 				}),
-				device(device2, nil, map[api.QualifiedName]api.DeviceAttribute{
+				device(driverA, device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
 					"driverVersion": {VersionValue: ptr.To("2.0.0")},
 				}),
 			)),
@@ -822,10 +827,10 @@ func TestAllocator(t *testing.T) {
 			),
 			classes: objects(class(classA, driverA), class(classB, driverB)),
 			slices: objects(slice(slice1, node1, pool1, driverA,
-				device(device1, nil, map[api.QualifiedName]api.DeviceAttribute{
+				device(driverA, device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
 					"stringAttribute": {StringValue: ptr.To("stringAttributeValue")},
 				}),
-				device(device2, nil, map[api.QualifiedName]api.DeviceAttribute{
+				device(driverA, device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
 					"stringAttribute": {StringValue: ptr.To("stringAttributeValue2")},
 				}),
 			)),
@@ -841,10 +846,10 @@ func TestAllocator(t *testing.T) {
 			),
 			classes: objects(class(classA, driverA), class(classB, driverB)),
 			slices: objects(slice(slice1, node1, pool1, driverA,
-				device(device1, nil, map[api.QualifiedName]api.DeviceAttribute{
+				device(driverA, device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
 					"boolAttribute": {BoolValue: ptr.To(true)},
 				}),
-				device(device2, nil, map[api.QualifiedName]api.DeviceAttribute{
+				device(driverA, device2, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
 					"boolAttribute": {BoolValue: ptr.To(false)},
 				}),
 			)),
