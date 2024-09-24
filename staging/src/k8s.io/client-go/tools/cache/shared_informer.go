@@ -163,11 +163,6 @@ type SharedInformer interface {
 	//
 	// TODO: logcheck:context // AddEventHandlerWithConfig should be used instead of AddEventHandlerWithResyncPeriod in code which supports contextual logging.
 	AddEventHandlerWithResyncPeriod(handler ResourceEventHandler, resyncPeriod time.Duration) (ResourceEventHandlerRegistration, error)
-	// AddEventHandler is a variant of AddEventHandler and AddEventHandlerWithResyncPeriod
-	// where additional optional parameters are passed in a struct. If no resync period
-	// is specified there, AddEventHandlerWithConfig behaves like AddEventHandler.
-	// The context is used for contextual logging.
-	AddEventHandlerWithConfig(ctx context.Context, handler ResourceEventHandler, config HandlerConfig) (ResourceEventHandlerRegistration, error)
 	// RemoveEventHandler removes a formerly added event handler given by
 	// its registration handle.
 	// This function is guaranteed to be idempotent, and thread-safe.
@@ -181,9 +176,6 @@ type SharedInformer interface {
 	//
 	// TODO: logcheck:context // RunWithContext should be used instead of Run in code which uses contextual logging.
 	Run(stopCh <-chan struct{})
-	// RunWithContext starts and runs the shared informer, returning after it stops.
-	// The informer will be stopped when the context is canceled.
-	RunWithContext(ctx context.Context)
 	// HasSynced returns true if the shared informer's store has been
 	// informed by at least one full LIST of the authoritative state
 	// of the informer's object collection.  This is unrelated to "resync".
@@ -214,10 +206,6 @@ type SharedInformer interface {
 	// TODO: logcheck:context // SetWatchErrorHandlerWithContext should be used instead of SetWatchErrorHandler in code which supports contextual logging.
 	SetWatchErrorHandler(handler WatchErrorHandler) error
 
-	// SetWatchErrorHandlerWithContext is a variant of SetWatchErrorHandler where
-	// the handler is passed an additional context parameter.
-	SetWatchErrorHandlerWithContext(handler WatchErrorHandlerWithContext) error
-
 	// The TransformFunc is called for each object which is about to be stored.
 	//
 	// This function is intended for you to take the opportunity to
@@ -235,6 +223,30 @@ type SharedInformer interface {
 	IsStopped() bool
 }
 
+// SharedInformerContextExt defines additional methods for better context support.
+type SharedInformerContextExt interface {
+	// AddEventHandler is a variant of AddEventHandler and AddEventHandlerWithResyncPeriod
+	// where additional optional parameters are passed in a struct. If no resync period
+	// is specified there, AddEventHandlerWithConfig behaves like AddEventHandler.
+	// The context is used for contextual logging.
+	AddEventHandlerWithContext(ctx context.Context, handler ResourceEventHandler, config HandlerOptions) (ResourceEventHandlerRegistration, error)
+
+	// RunWithContext starts and runs the shared informer, returning after it stops.
+	// The informer will be stopped when the context is canceled.
+	RunWithContext(ctx context.Context)
+
+	// SetWatchErrorHandlerWithContext is a variant of SetWatchErrorHandler where
+	// the handler is passed an additional context parameter.
+	SetWatchErrorHandlerWithContext(handler WatchErrorHandlerWithContext) error
+}
+
+// SharedInformerWithContext extends [SharedInformer] with alternative methods
+// that support context better.
+type SharedInformerWithContext interface {
+	SharedInformer
+	SharedInformerContextExt
+}
+
 // Opaque interface representing the registration of ResourceEventHandler for
 // a SharedInformer. Must be supplied back to the same SharedInformer's
 // `RemoveEventHandler` to unregister the handlers.
@@ -249,7 +261,7 @@ type ResourceEventHandlerRegistration interface {
 
 // Optional configuration options for [SharedInformer.AddEventHandlerWithConfig].
 // May be left empty.
-type HandlerConfig struct {
+type HandlerOptions struct {
 	// ResyncPeriod requests a certain resync period from an informer. Zero
 	// means the handler does not care about resyncs. Not all informers do
 	// resyncs, even if requested. See
@@ -265,15 +277,33 @@ type SharedIndexInformer interface {
 	GetIndexer() Indexer
 }
 
+// SharedIndexInformerWithContext extends [SharedIndexInformer] with alternative methods
+// that support context better.
+type SharedIndexInformerWithContext interface {
+	SharedIndexInformer
+	SharedInformerContextExt
+}
+
 // NewSharedInformer creates a new instance for the ListerWatcher. See NewSharedIndexInformerWithOptions for full details.
 func NewSharedInformer(lw ListerWatcher, exampleObject runtime.Object, defaultEventHandlerResyncPeriod time.Duration) SharedInformer {
-	return NewSharedIndexInformer(lw, exampleObject, defaultEventHandlerResyncPeriod, Indexers{})
+	return NewSharedInformerWithContext(lw, exampleObject, defaultEventHandlerResyncPeriod)
+}
+
+// NewSharedInformerWithContext creates a new instance for the ListerWatcher. See NewSharedIndexInformerWithOptions for full details.
+func NewSharedInformerWithContext(lw ListerWatcher, exampleObject runtime.Object, defaultEventHandlerResyncPeriod time.Duration) SharedInformerWithContext {
+	return NewSharedIndexInformerWithContext(lw, exampleObject, defaultEventHandlerResyncPeriod, Indexers{})
 }
 
 // NewSharedIndexInformer creates a new instance for the ListerWatcher and specified Indexers. See
 // NewSharedIndexInformerWithOptions for full details.
 func NewSharedIndexInformer(lw ListerWatcher, exampleObject runtime.Object, defaultEventHandlerResyncPeriod time.Duration, indexers Indexers) SharedIndexInformer {
-	return NewSharedIndexInformerWithOptions(
+	return NewSharedIndexInformerWithContext(lw, exampleObject, defaultEventHandlerResyncPeriod, indexers)
+}
+
+// NewSharedIndexInformerWithContext creates a new instance for the ListerWatcher and specified Indexers. See
+// NewSharedIndexInformerWithOptions for full details.
+func NewSharedIndexInformerWithContext(lw ListerWatcher, exampleObject runtime.Object, defaultEventHandlerResyncPeriod time.Duration, indexers Indexers) SharedIndexInformerWithContext {
+	return NewSharedIndexInformerWithOptionsAndContext(
 		lw,
 		exampleObject,
 		SharedIndexInformerOptions{
@@ -295,6 +325,16 @@ func NewSharedIndexInformer(lw ListerWatcher, exampleObject runtime.Object, defa
 // options.ResyncPeriod given here and (b) the constant
 // `minimumResyncPeriod` defined in this file.
 func NewSharedIndexInformerWithOptions(lw ListerWatcher, exampleObject runtime.Object, options SharedIndexInformerOptions) SharedIndexInformer {
+	return newSharedInformer(lw, exampleObject, options)
+}
+
+// NewSharedIndexInformerWithContext creates a new instance for the ListerWatcher.
+// See [NewSharedIndexInformerWithOptions] for details.
+func NewSharedIndexInformerWithOptionsAndContext(lw ListerWatcher, exampleObject runtime.Object, options SharedIndexInformerOptions) SharedIndexInformerWithContext {
+	return newSharedInformer(lw, exampleObject, options)
+}
+
+func newSharedInformer(lw ListerWatcher, exampleObject runtime.Object, options SharedIndexInformerOptions) *sharedIndexInformer {
 	realClock := &clock.RealClock{}
 
 	return &sharedIndexInformer{
@@ -622,7 +662,7 @@ func (s *sharedIndexInformer) GetController() Controller {
 }
 
 func (s *sharedIndexInformer) AddEventHandler(handler ResourceEventHandler) (ResourceEventHandlerRegistration, error) {
-	return s.AddEventHandlerWithConfig(context.Background(), handler, HandlerConfig{ResyncPeriod: s.defaultEventHandlerResyncPeriod})
+	return s.AddEventHandlerWithContext(context.Background(), handler, HandlerOptions{ResyncPeriod: s.defaultEventHandlerResyncPeriod})
 }
 
 func determineResyncPeriod(logger klog.Logger, desired, check time.Duration) time.Duration {
@@ -643,10 +683,10 @@ func determineResyncPeriod(logger klog.Logger, desired, check time.Duration) tim
 const minimumResyncPeriod = 1 * time.Second
 
 func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler ResourceEventHandler, resyncPeriod time.Duration) (ResourceEventHandlerRegistration, error) {
-	return s.AddEventHandlerWithConfig(context.Background(), handler, HandlerConfig{ResyncPeriod: resyncPeriod})
+	return s.AddEventHandlerWithContext(context.Background(), handler, HandlerOptions{ResyncPeriod: resyncPeriod})
 }
 
-func (s *sharedIndexInformer) AddEventHandlerWithConfig(ctx context.Context, handler ResourceEventHandler, config HandlerConfig) (ResourceEventHandlerRegistration, error) {
+func (s *sharedIndexInformer) AddEventHandlerWithContext(ctx context.Context, handler ResourceEventHandler, config HandlerOptions) (ResourceEventHandlerRegistration, error) {
 	s.startedLock.Lock()
 	defer s.startedLock.Unlock()
 

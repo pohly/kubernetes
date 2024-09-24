@@ -152,7 +152,7 @@ func NewController(
 
 	metrics.RegisterMetrics()
 
-	if _, err := podInformer.Informer().AddEventHandlerWithConfig(ctx, cache.ResourceEventHandlerFuncs{
+	if _, err := podInformer.Informer().(cache.SharedInformerWithContext).AddEventHandlerWithContext(ctx, cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			ec.enqueuePod(logger, obj, false)
 		},
@@ -162,10 +162,10 @@ func NewController(
 		DeleteFunc: func(obj interface{}) {
 			ec.enqueuePod(logger, obj, true)
 		},
-	}, cache.HandlerConfig{}); err != nil {
+	}, cache.HandlerOptions{}); err != nil {
 		return nil, err
 	}
-	if _, err := claimInformer.Informer().AddEventHandlerWithConfig(ctx, cache.ResourceEventHandlerFuncs{
+	if _, err := claimInformer.Informer().(cache.SharedInformerWithContext).AddEventHandlerWithContext(ctx, cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			logger.V(6).Info("new claim", "claimDump", obj)
 			ec.enqueueResourceClaim(logger, obj, false)
@@ -178,7 +178,7 @@ func NewController(
 			logger.V(6).Info("deleted claim", "claimDump", obj)
 			ec.enqueueResourceClaim(logger, obj, true)
 		},
-	}, cache.HandlerConfig{}); err != nil {
+	}, cache.HandlerOptions{}); err != nil {
 		return nil, err
 	}
 	if err := ec.podIndexer.AddIndexers(cache.Indexers{podResourceClaimIndex: podResourceClaimIndexFunc}); err != nil {
