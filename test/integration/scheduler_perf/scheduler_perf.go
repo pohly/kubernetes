@@ -807,6 +807,13 @@ func (co churnOp) patchParams(w *workload) (realOp, error) {
 	return &co, nil
 }
 
+type SchedulingStage string
+
+const (
+	Scheduled SchedulingStage = "Scheduled"
+	Attempted SchedulingStage = "Attempted"
+)
+
 // barrierOp defines an op that can be used to wait until all scheduled pods of
 // one or many namespaces have been bound to nodes. This is useful when pods
 // were scheduled with SkipWaitToCompletion set to true.
@@ -816,9 +823,20 @@ type barrierOp struct {
 	// Namespaces to block on. Empty array or not specifying this field signifies
 	// that the barrier should block on all namespaces.
 	Namespaces []string
+	// Labels used to filter the pods to block on.
+	// If empty, it won't filter the labels.
+	// Optional.
+	LabelSelector map[string]string
+	// Determines what stage of pods scheduling the barrier should wait for.
+	// If empty, it is interpreted as "Scheduled".
+	// Optional
+	StageRequirement SchedulingStage
 }
 
 func (bo *barrierOp) isValid(allowParameterization bool) error {
+	if bo.StageRequirement != "" && bo.StageRequirement != Scheduled && bo.StageRequirement != Attempted {
+		return fmt.Errorf("invalid StageRequirement %s", bo.StageRequirement)
+	}
 	return nil
 }
 
@@ -827,6 +845,9 @@ func (*barrierOp) collectsMetrics() bool {
 }
 
 func (bo barrierOp) patchParams(w *workload) (realOp, error) {
+	if bo.StageRequirement == "" {
+		bo.StageRequirement = Scheduled
+	}
 	return &bo, nil
 }
 
@@ -871,6 +892,10 @@ type startCollectingMetricsOp struct {
 	Name string
 	// Namespaces for which the scheduling throughput metric is calculated.
 	Namespaces []string
+	// Labels used to filter the pods for which the scheduling throughput metric is collected.
+	// If empty, it will collect the metric for all pods in the selected namespaces.
+	// Optional.
+	LabelSelector map[string]string
 }
 
 func (scm *startCollectingMetricsOp) isValid(_ bool) error {
@@ -1227,12 +1252,12 @@ func checkEmptyInFlightEvents() error {
 	return nil
 }
 
-func startCollectingMetrics(tCtx ktesting.TContext, collectorWG *sync.WaitGroup, podInformer coreinformers.PodInformer, mcc *metricsCollectorConfig, throughputErrorMargin float64, opIndex int, name string, namespaces []string) (ktesting.TContext, []testDataCollector) {
+func startCollectingMetrics(tCtx ktesting.TContext, collectorWG *sync.WaitGroup, podInformer coreinformers.PodInformer, mcc *metricsCollectorConfig, throughputErrorMargin float64, opIndex int, name string, namespaces []string, labelSelector map[string]string) (ktesting.TContext, []testDataCollector) {
 	collectorCtx := ktesting.WithCancel(tCtx)
 	workloadName := tCtx.Name()
 	// The first part is the same for each workload, therefore we can strip it.
 	workloadName = workloadName[strings.Index(name, "/")+1:]
-	collectors := getTestDataCollectors(podInformer, fmt.Sprintf("%s/%s", workloadName, name), namespaces, mcc, throughputErrorMargin)
+	collectors := getTestDataCollectors(podInformer, fmt.Sprintf("%s/%s", workloadName, name), namespaces, labelSelector, mcc, throughputErrorMargin)
 	for _, collector := range collectors {
 		// Need loop-local variable for function below.
 		collector := collector
@@ -1373,7 +1398,7 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 				if collectorCtx != nil {
 					tCtx.Fatalf("op %d: Metrics collection is overlapping. Probably second collector was started before stopping a previous one", opIndex)
 				}
-				collectorCtx, collectors = startCollectingMetrics(tCtx, &collectorWG, podInformer, tc.MetricsCollectorConfig, throughputErrorMargin, opIndex, namespace, []string{namespace})
+				collectorCtx, collectors = startCollectingMetrics(tCtx, &collectorWG, podInformer, tc.MetricsCollectorConfig, throughputErrorMargin, opIndex, namespace, []string{namespace}, nil)
 				defer collectorCtx.Cancel("cleaning up")
 			}
 			if err := createPodsRapidly(tCtx, namespace, concreteOp); err != nil {
@@ -1389,7 +1414,7 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 					tCtx.Fatalf("op %d: %v", opIndex, err)
 				}
 			default:
-				if err := waitUntilPodsScheduledInNamespace(tCtx, podInformer, namespace, concreteOp.Count); err != nil {
+				if err := waitUntilPodsScheduledInNamespace(tCtx, podInformer, nil, namespace, concreteOp.Count); err != nil {
 					tCtx.Fatalf("op %d: error in waiting for pods to get scheduled: %v", opIndex, err)
 				}
 			}
@@ -1561,16 +1586,26 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 					tCtx.Fatalf("op %d: unknown namespace %s", opIndex, namespace)
 				}
 			}
-			if err := waitUntilPodsScheduled(tCtx, podInformer, concreteOp.Namespaces, numPodsScheduledPerNamespace); err != nil {
-				tCtx.Fatalf("op %d: %v", opIndex, err)
-			}
-			// At the end of the barrier, we can be sure that there are no pods
-			// pending scheduling in the namespaces that we just blocked on.
-			if len(concreteOp.Namespaces) == 0 {
-				numPodsScheduledPerNamespace = make(map[string]int)
-			} else {
-				for _, namespace := range concreteOp.Namespaces {
-					delete(numPodsScheduledPerNamespace, namespace)
+			switch concreteOp.StageRequirement {
+			case Attempted:
+				if err := waitUntilPodsAttempted(tCtx, podInformer, concreteOp.LabelSelector, concreteOp.Namespaces, numPodsScheduledPerNamespace); err != nil {
+					tCtx.Fatalf("op %d: %v", opIndex, err)
+				}
+			case Scheduled:
+				// Default should be treated like "Scheduled", so handling both in the same way.
+				fallthrough
+			default:
+				if err := waitUntilPodsScheduled(tCtx, podInformer, concreteOp.LabelSelector, concreteOp.Namespaces, numPodsScheduledPerNamespace); err != nil {
+					tCtx.Fatalf("op %d: %v", opIndex, err)
+				}
+				// At the end of the barrier, we can be sure that there are no pods
+				// pending scheduling in the namespaces that we just blocked on.
+				if len(concreteOp.Namespaces) == 0 {
+					numPodsScheduledPerNamespace = make(map[string]int)
+				} else {
+					for _, namespace := range concreteOp.Namespaces {
+						delete(numPodsScheduledPerNamespace, namespace)
+					}
 				}
 			}
 
@@ -1584,7 +1619,7 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 			if collectorCtx != nil {
 				tCtx.Fatalf("op %d: Metrics collection is overlapping. Probably second collector was started before stopping a previous one", opIndex)
 			}
-			collectorCtx, collectors = startCollectingMetrics(tCtx, &collectorWG, podInformer, tc.MetricsCollectorConfig, throughputErrorMargin, opIndex, concreteOp.Name, concreteOp.Namespaces)
+			collectorCtx, collectors = startCollectingMetrics(tCtx, &collectorWG, podInformer, tc.MetricsCollectorConfig, throughputErrorMargin, opIndex, concreteOp.Name, concreteOp.Namespaces, concreteOp.LabelSelector)
 			defer collectorCtx.Cancel("cleaning up")
 
 		case *stopCollectingMetricsOp:
@@ -1633,12 +1668,12 @@ type testDataCollector interface {
 	collect() []DataItem
 }
 
-func getTestDataCollectors(podInformer coreinformers.PodInformer, name string, namespaces []string, mcc *metricsCollectorConfig, throughputErrorMargin float64) []testDataCollector {
+func getTestDataCollectors(podInformer coreinformers.PodInformer, name string, namespaces []string, labelSelector map[string]string, mcc *metricsCollectorConfig, throughputErrorMargin float64) []testDataCollector {
 	if mcc == nil {
 		mcc = &defaultMetricsCollectorConfig
 	}
 	return []testDataCollector{
-		newThroughputCollector(podInformer, map[string]string{"Name": name}, namespaces, throughputErrorMargin),
+		newThroughputCollector(podInformer, map[string]string{"Name": name}, labelSelector, namespaces, throughputErrorMargin),
 		newMetricsCollector(mcc, map[string]string{"Name": name}),
 	}
 }
@@ -1832,7 +1867,7 @@ func createPodsSteadily(tCtx ktesting.TContext, namespace string, podInformer co
 // waitUntilPodsScheduledInNamespace blocks until all pods in the given
 // namespace are scheduled. Times out after 10 minutes because even at the
 // lowest observed QPS of ~10 pods/sec, a 5000-node test should complete.
-func waitUntilPodsScheduledInNamespace(tCtx ktesting.TContext, podInformer coreinformers.PodInformer, namespace string, wantCount int) error {
+func waitUntilPodsScheduledInNamespace(tCtx ktesting.TContext, podInformer coreinformers.PodInformer, labelSelector map[string]string, namespace string, wantCount int) error {
 	var pendingPod *v1.Pod
 
 	err := wait.PollUntilContextTimeout(tCtx, 1*time.Second, 10*time.Minute, true, func(ctx context.Context) (bool, error) {
@@ -1841,7 +1876,7 @@ func waitUntilPodsScheduledInNamespace(tCtx ktesting.TContext, podInformer corei
 			return true, ctx.Err()
 		default:
 		}
-		scheduled, unscheduled, err := getScheduledPods(podInformer, namespace)
+		scheduled, attempted, unattempted, err := getScheduledPods(podInformer, labelSelector, namespace)
 		if err != nil {
 			return false, err
 		}
@@ -1850,8 +1885,10 @@ func waitUntilPodsScheduledInNamespace(tCtx ktesting.TContext, podInformer corei
 			return true, nil
 		}
 		tCtx.Logf("namespace: %s, pods: want %d, got %d", namespace, wantCount, len(scheduled))
-		if len(unscheduled) > 0 {
-			pendingPod = unscheduled[0]
+		if len(attempted) > 0 {
+			pendingPod = attempted[0]
+		} else if len(unattempted) > 0 {
+			pendingPod = unattempted[0]
 		} else {
 			pendingPod = nil
 		}
@@ -1859,14 +1896,49 @@ func waitUntilPodsScheduledInNamespace(tCtx ktesting.TContext, podInformer corei
 	})
 
 	if err != nil && pendingPod != nil {
-		err = fmt.Errorf("at least pod %s is not scheduled: %v", klog.KObj(pendingPod), err)
+		err = fmt.Errorf("at least pod %s is not scheduled: %w", klog.KObj(pendingPod), err)
+	}
+	return err
+}
+
+// waitUntilPodsAttemptedInNamespace blocks until all pods in the given
+// namespace at least once went through a schedyling cycle.
+// Times out after 10 minutes similarly to waitUntilPodsScheduledInNamespace.
+func waitUntilPodsAttemptedInNamespace(tCtx ktesting.TContext, podInformer coreinformers.PodInformer, labelSelector map[string]string, namespace string, wantCount int) error {
+	var pendingPod *v1.Pod
+
+	err := wait.PollUntilContextTimeout(tCtx, 1*time.Second, 10*time.Minute, true, func(ctx context.Context) (bool, error) {
+		select {
+		case <-ctx.Done():
+			return true, ctx.Err()
+		default:
+		}
+		scheduled, attempted, unattempted, err := getScheduledPods(podInformer, labelSelector, namespace)
+		if err != nil {
+			return false, err
+		}
+		if len(scheduled)+len(attempted) >= wantCount {
+			tCtx.Logf("all pods attempted to be scheduled")
+			return true, nil
+		}
+		tCtx.Logf("namespace: %s, attempted pods: want %d, got %d", namespace, wantCount, len(scheduled)+len(attempted))
+		if len(unattempted) > 0 {
+			pendingPod = unattempted[0]
+		} else {
+			pendingPod = nil
+		}
+		return false, nil
+	})
+
+	if err != nil && pendingPod != nil {
+		err = fmt.Errorf("at least pod %s is not attempted: %w", klog.KObj(pendingPod), err)
 	}
 	return err
 }
 
 // waitUntilPodsScheduled blocks until the all pods in the given namespaces are
 // scheduled.
-func waitUntilPodsScheduled(tCtx ktesting.TContext, podInformer coreinformers.PodInformer, namespaces []string, numPodsScheduledPerNamespace map[string]int) error {
+func waitUntilPodsScheduled(tCtx ktesting.TContext, podInformer coreinformers.PodInformer, labelSelector map[string]string, namespaces []string, numPodsScheduledPerNamespace map[string]int) error {
 	// If unspecified, default to all known namespaces.
 	if len(namespaces) == 0 {
 		for namespace := range numPodsScheduledPerNamespace {
@@ -1883,7 +1955,33 @@ func waitUntilPodsScheduled(tCtx ktesting.TContext, podInformer coreinformers.Po
 		if !ok {
 			return fmt.Errorf("unknown namespace %s", namespace)
 		}
-		if err := waitUntilPodsScheduledInNamespace(tCtx, podInformer, namespace, wantCount); err != nil {
+		if err := waitUntilPodsScheduledInNamespace(tCtx, podInformer, labelSelector, namespace, wantCount); err != nil {
+			return fmt.Errorf("error waiting for pods in namespace %q: %w", namespace, err)
+		}
+	}
+	return nil
+}
+
+// waitUntilPodsAttempted blocks until the all pods in the given namespaces are
+// attempted (at least once went through a schedyling cycle).
+func waitUntilPodsAttempted(tCtx ktesting.TContext, podInformer coreinformers.PodInformer, labelSelector map[string]string, namespaces []string, numPodsScheduledPerNamespace map[string]int) error {
+	// If unspecified, default to all known namespaces.
+	if len(namespaces) == 0 {
+		for namespace := range numPodsScheduledPerNamespace {
+			namespaces = append(namespaces, namespace)
+		}
+	}
+	for _, namespace := range namespaces {
+		select {
+		case <-tCtx.Done():
+			return context.Cause(tCtx)
+		default:
+		}
+		wantCount, ok := numPodsScheduledPerNamespace[namespace]
+		if !ok {
+			return fmt.Errorf("unknown namespace %s", namespace)
+		}
+		if err := waitUntilPodsAttemptedInNamespace(tCtx, podInformer, labelSelector, namespace, wantCount); err != nil {
 			return fmt.Errorf("error waiting for pods in namespace %q: %w", namespace, err)
 		}
 	}

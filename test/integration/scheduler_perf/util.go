@@ -148,28 +148,42 @@ func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfig
 	return informerFactory, tCtx
 }
 
-// Returns the list of scheduled and unscheduled pods in the specified namespaces.
+func isAttempted(pod *v1.Pod) bool {
+	for _, cond := range pod.Status.Conditions {
+		if cond.Type == v1.PodScheduled {
+			return true
+		}
+	}
+	return false
+}
+
+// getScheduledPods returns the list of scheduled, attempted but unschedulable
+// and unattempted pods in the specified namespaces.
+// Label selector can be used to filter the pods.
 // Note that no namespaces specified matches all namespaces.
-func getScheduledPods(podInformer coreinformers.PodInformer, namespaces ...string) ([]*v1.Pod, []*v1.Pod, error) {
+func getScheduledPods(podInformer coreinformers.PodInformer, labelSelector map[string]string, namespaces ...string) ([]*v1.Pod, []*v1.Pod, []*v1.Pod, error) {
 	pods, err := podInformer.Lister().List(labels.Everything())
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	s := sets.New(namespaces...)
 	scheduled := make([]*v1.Pod, 0, len(pods))
-	unscheduled := make([]*v1.Pod, 0, len(pods))
+	attempted := make([]*v1.Pod, 0, len(pods))
+	unattempted := make([]*v1.Pod, 0, len(pods))
 	for i := range pods {
 		pod := pods[i]
-		if len(s) == 0 || s.Has(pod.Namespace) {
+		if (len(s) == 0 || s.Has(pod.Namespace)) && labelsMatch(pod.Labels, labelSelector) {
 			if len(pod.Spec.NodeName) > 0 {
 				scheduled = append(scheduled, pod)
+			} else if isAttempted(pod) {
+				attempted = append(attempted, pod)
 			} else {
-				unscheduled = append(unscheduled, pod)
+				unattempted = append(unattempted, pod)
 			}
 		}
 	}
-	return scheduled, unscheduled, nil
+	return scheduled, attempted, unattempted, nil
 }
 
 // DataItem is the data point.
@@ -405,7 +419,8 @@ func collectHistogramVec(metric string, labels map[string]string, lvMap map[stri
 type throughputCollector struct {
 	podInformer           coreinformers.PodInformer
 	schedulingThroughputs []float64
-	labels                map[string]string
+	labelSelector         map[string]string
+	resultLabels          map[string]string
 	namespaces            sets.Set[string]
 	errorMargin           float64
 
@@ -413,12 +428,13 @@ type throughputCollector struct {
 	start    time.Time
 }
 
-func newThroughputCollector(podInformer coreinformers.PodInformer, labels map[string]string, namespaces []string, errorMargin float64) *throughputCollector {
+func newThroughputCollector(podInformer coreinformers.PodInformer, resultLabels map[string]string, labelSelector map[string]string, namespaces []string, errorMargin float64) *throughputCollector {
 	return &throughputCollector{
-		podInformer: podInformer,
-		labels:      labels,
-		namespaces:  sets.New(namespaces...),
-		errorMargin: errorMargin,
+		podInformer:   podInformer,
+		labelSelector: labelSelector,
+		resultLabels:  resultLabels,
+		namespaces:    sets.New(namespaces...),
+		errorMargin:   errorMargin,
 	}
 }
 
@@ -451,7 +467,7 @@ func (tc *throughputCollector) run(tCtx ktesting.TContext) {
 			return
 		}
 
-		if !tc.namespaces.Has(newPod.Namespace) {
+		if !tc.namespaces.Has(newPod.Namespace) || !labelsMatch(newPod.Labels, tc.labelSelector) {
 			return
 		}
 
@@ -577,7 +593,7 @@ func (tc *throughputCollector) run(tCtx ktesting.TContext) {
 
 func (tc *throughputCollector) collect() []DataItem {
 	throughputSummary := DataItem{
-		Labels:   tc.labels,
+		Labels:   tc.resultLabels,
 		progress: tc.progress,
 		start:    tc.start,
 	}
