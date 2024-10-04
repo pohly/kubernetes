@@ -176,7 +176,7 @@ func (h *peerProxyHandler) WrapHandler(handler http.Handler) http.Handler {
 		// TODO: maintain locally serviceable GVRs somewhere so that we dont have to
 		// consult the storageversion-informed map for those
 		if len(serviceableByResp.peerEndpoints) == 0 {
-			klog.Errorf(fmt.Sprintf("GVR %v is not served by anything in this cluster", gvr))
+			klog.Error(fmt.Sprintf("GVR %v is not served by anything in this cluster", gvr))
 			handler.ServeHTTP(w, r)
 			return
 		}
@@ -251,7 +251,7 @@ func (h *peerProxyHandler) proxyRequestToDestinationAPIServer(req *http.Request,
 	newReq.Header.Add(PeerProxiedHeader, "true")
 	defer cancelFn()
 
-	proxyRoundTripper := transport.NewAuthProxyRoundTripper(user.GetName(), user.GetGroups(), user.GetExtra(), h.proxyTransport)
+	proxyRoundTripper := transport.NewAuthProxyRoundTripper(user.GetName(), user.GetUID(), user.GetGroups(), user.GetExtra(), h.proxyTransport)
 
 	delegate := &epmetrics.ResponseWriterDelegator{ResponseWriter: rw}
 	w := responsewriter.WrapForHTTP1Or2(delegate)

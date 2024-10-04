@@ -28,13 +28,19 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"path"
 	"reflect"
+	"regexp"
+	goruntime "runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
@@ -54,6 +60,7 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
@@ -553,6 +560,7 @@ func TestURLTemplate(t *testing.T) {
 }
 
 func TestTransformResponse(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	invalid := []byte("aaaaa")
 	uri, _ := url.Parse("http://localhost")
 	testCases := []struct {
@@ -601,7 +609,7 @@ func TestTransformResponse(t *testing.T) {
 		if test.Response.Body == nil {
 			test.Response.Body = io.NopCloser(bytes.NewReader([]byte{}))
 		}
-		result := r.transformResponse(test.Response, &http.Request{})
+		result := r.transformResponse(ctx, test.Response, &http.Request{})
 		response, created, err := result.body, result.statusCode == http.StatusCreated, result.err
 		hasErr := err != nil
 		if hasErr != test.Error {
@@ -652,6 +660,7 @@ func (r *renegotiator) StreamDecoder(contentType string, params map[string]strin
 }
 
 func TestTransformResponseNegotiate(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	invalid := []byte("aaaaa")
 	uri, _ := url.Parse("http://localhost")
 	testCases := []struct {
@@ -765,7 +774,7 @@ func TestTransformResponseNegotiate(t *testing.T) {
 		if test.Response.Body == nil {
 			test.Response.Body = io.NopCloser(bytes.NewReader([]byte{}))
 		}
-		result := r.transformResponse(test.Response, &http.Request{})
+		result := r.transformResponse(ctx, test.Response, &http.Request{})
 		_, err := result.body, result.err
 		hasErr := err != nil
 		if hasErr != test.Error {
@@ -890,6 +899,7 @@ func TestTransformUnstructuredError(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run("", func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
 			r := &Request{
 				c: &RESTClient{
 					content: defaultContentConfig(),
@@ -897,7 +907,7 @@ func TestTransformUnstructuredError(t *testing.T) {
 				resourceName: testCase.Name,
 				resource:     testCase.Resource,
 			}
-			result := r.transformResponse(testCase.Res, testCase.Req)
+			result := r.transformResponse(ctx, testCase.Res, testCase.Req)
 			err := result.err
 			if !testCase.ErrFn(err) {
 				t.Fatalf("unexpected error: %v", err)
@@ -977,7 +987,7 @@ func TestRequestWatch(t *testing.T) {
 			Err:              true,
 		},
 		{
-			name: "server returns forbidden",
+			name: "server returns forbidden with json content",
 			Request: &Request{
 				c: &RESTClient{
 					content: defaultContentConfig(),
@@ -986,41 +996,27 @@ func TestRequestWatch(t *testing.T) {
 			},
 			serverReturns: []responseErr{
 				{response: &http.Response{
+					Header:     http.Header{"Content-Type": []string{"application/json"}},
 					StatusCode: http.StatusForbidden,
-					Body:       io.NopCloser(bytes.NewReader([]byte{})),
+					Body: io.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &metav1.Status{
+						Status:  metav1.StatusFailure,
+						Message: "secrets is forbidden",
+						Reason:  metav1.StatusReasonForbidden,
+						Code:    http.StatusForbidden,
+					})))),
 				}, err: nil},
 			},
 			attemptsExpected: 1,
-			Expect: []watch.Event{
-				{
-					Type: watch.Error,
-					Object: &metav1.Status{
-						Status:  "Failure",
-						Code:    500,
-						Reason:  "InternalError",
-						Message: `an error on the server ("unable to decode an event from the watch stream: test error") has prevented the request from succeeding`,
-						Details: &metav1.StatusDetails{
-							Causes: []metav1.StatusCause{
-								{
-									Type:    "UnexpectedServerResponse",
-									Message: "unable to decode an event from the watch stream: test error",
-								},
-								{
-									Type:    "ClientWatchDecoding",
-									Message: "unable to decode an event from the watch stream: test error",
-								},
-							},
-						},
-					},
-				},
-			},
-			Err: true,
+			Err:              true,
 			ErrFn: func(err error) bool {
+				if err.Error() != "secrets is forbidden" {
+					return false
+				}
 				return apierrors.IsForbidden(err)
 			},
 		},
 		{
-			name: "server returns forbidden",
+			name: "server returns forbidden without content",
 			Request: &Request{
 				c: &RESTClient{
 					content: defaultContentConfig(),
@@ -1493,6 +1489,7 @@ func TestDoRequestNewWay(t *testing.T) {
 
 // This test assumes that the client implementation backs off exponentially, for an individual request.
 func TestBackoffLifecycle(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	count := 0
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		count++
@@ -1521,17 +1518,33 @@ func TestBackoffLifecycle(t *testing.T) {
 		)}
 
 	for _, sec := range seconds {
-		thisBackoff := request.backoff.CalculateBackoff(request.URL())
+		thisBackoff := request.backoff.CalculateBackoffWithContext(ctx, request.URL())
 		t.Logf("Current backoff %v", thisBackoff)
 		if thisBackoff != time.Duration(sec)*time.Second {
 			t.Errorf("Backoff is %v instead of %v", thisBackoff, sec)
 		}
-		now := clock.Now()
-		request.DoRaw(context.Background())
-		elapsed := clock.Since(now)
-		if clock.Since(now) != thisBackoff {
-			t.Errorf("CalculatedBackoff not honored by clock: Expected time of %v, but got %v ", thisBackoff, elapsed)
+
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			// This is allowed to fail ("the server was unable to return a response in the time allotted, but may still be processing the request").
+			_, _ = request.DoRaw(ctx)
+		}()
+
+		// Poll until DoRaw is sleeping.
+		for {
+			if clock.HasWaiters() {
+				break
+			}
+			time.Sleep(time.Millisecond)
 		}
+
+		// Fast-forward the fake clock to ensure that DoRaw returns.
+		// This will block and eventually time out if the backoff
+		// is more that thisBackoff. We cannot test anymore that the
+		// backoff isn't less than thisBackoff.
+		clock.Step(thisBackoff)
+		<-done
 	}
 }
 
@@ -1539,14 +1552,14 @@ type testBackoffManager struct {
 	sleeps []time.Duration
 }
 
-func (b *testBackoffManager) UpdateBackoff(actualUrl *url.URL, err error, responseCode int) {
+func (b *testBackoffManager) UpdateBackoffWithContext(ctx context.Context, actualURL *url.URL, err error, responseCode int) {
 }
 
-func (b *testBackoffManager) CalculateBackoff(actualUrl *url.URL) time.Duration {
+func (b *testBackoffManager) CalculateBackoffWithContext(ctx context.Context, actualURL *url.URL) time.Duration {
 	return time.Duration(0)
 }
 
-func (b *testBackoffManager) Sleep(d time.Duration) {
+func (b *testBackoffManager) SleepWithContext(ctx context.Context, d time.Duration) {
 	b.sleeps = append(b.sleeps, d)
 }
 
@@ -1572,7 +1585,7 @@ func TestCheckRetryClosesBody(t *testing.T) {
 	expectedSleeps := []time.Duration{0, time.Second, time.Second, time.Second, time.Second}
 
 	c := testRESTClient(t, testServer)
-	c.createBackoffMgr = func() BackoffManager { return backoff }
+	c.createBackoffMgr = func() BackoffManagerWithContext { return backoff }
 	_, err := c.Verb("POST").
 		Prefix("foo", "bar").
 		Suffix("baz").
@@ -2345,7 +2358,7 @@ func TestTruncateBody(t *testing.T) {
 	l := flag.Lookup("v").Value.(flag.Getter).Get().(klog.Level)
 	for _, test := range tests {
 		flag.Set("v", test.level)
-		got := truncateBody(test.body)
+		got := truncateBody(klog.Background(), test.body)
 		if got != test.want {
 			t.Errorf("truncateBody(%v) = %v, want %v", test.body, got, test.want)
 		}
@@ -2438,6 +2451,7 @@ func TestRequestPreflightCheck(t *testing.T) {
 }
 
 func TestThrottledLogger(t *testing.T) {
+	logger := klog.Background()
 	now := time.Now()
 	oldClock := globalThrottledLogger.clock
 	defer func() {
@@ -2452,7 +2466,7 @@ func TestThrottledLogger(t *testing.T) {
 		wg.Add(10)
 		for j := 0; j < 10; j++ {
 			go func() {
-				if _, ok := globalThrottledLogger.attemptToLog(); ok {
+				if _, ok := globalThrottledLogger.attemptToLog(logger); ok {
 					logMessages++
 				}
 				wg.Done()
@@ -3001,7 +3015,6 @@ const retryTestKey retryTestKeyType = iota
 // metric calls are invoked appropriately in right order.
 type withRateLimiterBackoffManagerAndMetrics struct {
 	flowcontrol.RateLimiter
-	*NoBackoff
 	metrics.ResultMetric
 	calculateBackoffSeq int64
 	calculateBackoffFn  func(i int64) time.Duration
@@ -3017,7 +3030,7 @@ func (lb *withRateLimiterBackoffManagerAndMetrics) Wait(ctx context.Context) err
 	return nil
 }
 
-func (lb *withRateLimiterBackoffManagerAndMetrics) CalculateBackoff(actualUrl *url.URL) time.Duration {
+func (lb *withRateLimiterBackoffManagerAndMetrics) CalculateBackoffWithContext(ctx context.Context, actualURL *url.URL) time.Duration {
 	lb.invokeOrderGot = append(lb.invokeOrderGot, "BackoffManager.CalculateBackoff")
 
 	waitFor := lb.calculateBackoffFn(lb.calculateBackoffSeq)
@@ -3025,11 +3038,11 @@ func (lb *withRateLimiterBackoffManagerAndMetrics) CalculateBackoff(actualUrl *u
 	return waitFor
 }
 
-func (lb *withRateLimiterBackoffManagerAndMetrics) UpdateBackoff(actualUrl *url.URL, err error, responseCode int) {
+func (lb *withRateLimiterBackoffManagerAndMetrics) UpdateBackoffWithContext(ctx context.Context, actualURL *url.URL, err error, responseCode int) {
 	lb.invokeOrderGot = append(lb.invokeOrderGot, "BackoffManager.UpdateBackoff")
 }
 
-func (lb *withRateLimiterBackoffManagerAndMetrics) Sleep(d time.Duration) {
+func (lb *withRateLimiterBackoffManagerAndMetrics) SleepWithContext(ctx context.Context, d time.Duration) {
 	lb.invokeOrderGot = append(lb.invokeOrderGot, "BackoffManager.Sleep")
 	lb.sleepsGot = append(lb.sleepsGot, d.String())
 }
@@ -3210,7 +3223,6 @@ func testRetryWithRateLimiterBackoffAndMetrics(t *testing.T, key string, doFunc 
 		t.Run(test.name, func(t *testing.T) {
 			interceptor := &withRateLimiterBackoffManagerAndMetrics{
 				RateLimiter:        flowcontrol.NewFakeAlwaysRateLimiter(),
-				NoBackoff:          &NoBackoff{},
 				calculateBackoffFn: test.calculateBackoffFn,
 			}
 
@@ -4063,5 +4075,116 @@ func TestRequestConcurrencyWithRetry(t *testing.T) {
 	expected := concurrency * (req.maxRetries + 1)
 	if atomic.LoadInt32(&attempts) != int32(expected) {
 		t.Errorf("Expected attempts: %d, but got: %d", expected, attempts)
+	}
+}
+
+func TestRequestLogging(t *testing.T) {
+	testcases := map[string]struct {
+		v              int
+		body           any
+		response       *http.Response
+		expectedOutput string
+	}{
+		"no-output": {
+			v:    7,
+			body: []byte("ping"),
+			response: &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader("pong")),
+			},
+		},
+		"output": {
+			v:    8,
+			body: []byte("ping"),
+			response: &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader("pong")),
+			},
+			expectedOutput: `<location>] "Request Body" logger="TestLogger" body="ping"
+<location>] "Response Body" logger="TestLogger" body="pong"
+`,
+		},
+		"io-reader": {
+			v:    8,
+			body: strings.NewReader("ping"),
+			response: &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader("pong")),
+			},
+			// Cannot log the request body!
+			expectedOutput: `<location>] "Response Body" logger="TestLogger" body="pong"
+`,
+		},
+		"truncate": {
+			v:    8,
+			body: []byte(strings.Repeat("a", 2000)),
+			response: &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader("pong")),
+			},
+			expectedOutput: fmt.Sprintf(`<location>] "Request Body" logger="TestLogger" body="%s [truncated 976 chars]"
+<location>] "Response Body" logger="TestLogger" body="pong"
+`, strings.Repeat("a", 1024)),
+		},
+		"warnings": {
+			v:    8,
+			body: []byte("ping"),
+			response: &http.Response{
+				StatusCode: http.StatusOK,
+				Header: http.Header{
+					"Warning": []string{
+						`299 request-test "warning 1"`,
+						`299 request-test-2 "warning 2"`,
+						`300 request-test-3 "ignore code 300"`,
+					},
+				},
+				Body: io.NopCloser(strings.NewReader("pong")),
+			},
+			expectedOutput: `<location>] "Request Body" logger="TestLogger" body="ping"
+<location>] "Response Body" logger="TestLogger" body="pong"
+<location>] "Warning" logger="TestLogger" message="warning 1"
+<location>] "Warning" logger="TestLogger" message="warning 2"
+`,
+		},
+	}
+
+	for name, tc := range testcases {
+		//nolint:logcheck // Intentionally testing with plain klog here.
+		t.Run(name, func(t *testing.T) {
+			state := klog.CaptureState()
+			defer state.Restore()
+
+			var buffer bytes.Buffer
+			klog.SetOutput(&buffer)
+			klog.LogToStderr(false)
+			var fs flag.FlagSet
+			klog.InitFlags(&fs)
+			require.NoError(t, fs.Set("v", fmt.Sprintf("%d", tc.v)), "set verbosity")
+			require.NoError(t, fs.Set("one_output", "true"), "set one_output")
+
+			client := clientForFunc(func(req *http.Request) (*http.Response, error) {
+				return tc.response, nil
+			})
+
+			req := NewRequestWithClient(nil, "", defaultContentConfig(), client).
+				Body(tc.body)
+
+			logger := klog.Background()
+			logger = klog.LoggerWithName(logger, "TestLogger")
+			ctx := klog.NewContext(context.Background(), logger)
+
+			_, file, line, _ := goruntime.Caller(0)
+			result := req.Do(ctx)
+			require.NoError(t, result.Error(), "request.Do")
+
+			// Compare log output:
+			// - strip date/time/pid from each line (fixed length header)
+			// - replace <location> with the actual call location
+			state.Restore()
+			expectedOutput := strings.ReplaceAll(tc.expectedOutput, "<location>", fmt.Sprintf("%s:%d", path.Base(file), line+1))
+			actualOutput := buffer.String()
+			actualOutput = regexp.MustCompile(`(?m)^.{30}`).ReplaceAllString(actualOutput, "")
+			assert.Equal(t, expectedOutput, actualOutput)
+		})
 	}
 }

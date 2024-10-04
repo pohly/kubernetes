@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -369,6 +370,24 @@ func Test_podSchedulingPropertiesChange(t *testing.T) {
 			newPod: st.MakePod().Annotation("foo", "bar").Obj(),
 			oldPod: st.MakePod().Annotation("foo", "bar2").Obj(),
 			want:   []ClusterEvent{assignedPodOtherUpdate},
+		},
+		{
+			name:   "scheduling gate is eliminated",
+			newPod: st.MakePod().SchedulingGates([]string{}).Obj(),
+			oldPod: st.MakePod().SchedulingGates([]string{"foo"}).Obj(),
+			want:   []ClusterEvent{PodSchedulingGateEliminatedChange},
+		},
+		{
+			name:   "scheduling gate is removed, but not completely eliminated",
+			newPod: st.MakePod().SchedulingGates([]string{"foo"}).Obj(),
+			oldPod: st.MakePod().SchedulingGates([]string{"foo", "bar"}).Obj(),
+			want:   []ClusterEvent{assignedPodOtherUpdate},
+		},
+		{
+			name:   "pod's tolerations are updated",
+			newPod: st.MakePod().Toleration("key").Toleration("key2").Obj(),
+			oldPod: st.MakePod().Toleration("key").Obj(),
+			want:   []ClusterEvent{PodTolerationChange},
 		},
 	}
 	for _, tt := range tests {
