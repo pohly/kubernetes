@@ -231,7 +231,7 @@ type DeviceCapacity struct {
 	// capacity (= share a single device between different consumers).
 }
 
-// Limit for the sum of the number of entries in both ResourceSlices.
+// Limit for the sum of the number of entries in both attributes and capacity.
 const ResourceSliceMaxAttributesAndCapacitiesPerDevice = 32
 
 // QualifiedName is the name of a device attribute or capacity.
