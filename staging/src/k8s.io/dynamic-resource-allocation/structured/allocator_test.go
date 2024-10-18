@@ -412,8 +412,46 @@ func TestAllocator(t *testing.T) {
 			)),
 			node: node(node1, region1),
 
-			// TODO: support allocating composite devices
-			expectResults: nil,
+			// TODO: a lot more test cases for partitionable devices (mixins, partitions, etc.)
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+			)},
+		},
+		"mixin": {
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				nil,
+				request(req0, classA, 1, resourceapi.DeviceSelector{
+					CEL: &resourceapi.CELDeviceSelector{
+						Expression: fmt.Sprintf(`device.capacity["%s"].memory.compareTo(quantity("1Gi")) >= 0`, driverA),
+					}}),
+			)),
+			classes: objects(class(classA, driverA)),
+			slices: objects(slice(slice1, node1, pool1, driverA,
+				func() resourceapi.Device {
+					device := compositeDevice(device1, nil, nil)
+					device.Composite.Includes = []resourceapi.DeviceMixinRef{{Name: "1Gi-mixin"}}
+					return device
+				}(),
+				func() resourceapi.DeviceMixin {
+					mixin := resourceapi.DeviceMixin{
+						Name: "1Gi-mixin",
+						Composite: &resourceapi.CompositeDeviceMixin{
+							Capacity: map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+								"memory": {Value: resource.MustParse("1Gi")},
+							},
+						},
+					}
+					return mixin
+				}(),
+			)),
+			node: node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+			)},
 		},
 		"other-node": {
 			claimsToAllocate: objects(claim(claim0, req0, classA)),

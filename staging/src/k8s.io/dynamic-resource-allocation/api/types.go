@@ -44,8 +44,14 @@ type ResourcePool struct {
 	ResourceSliceCount int64
 }
 type Device struct {
-	Name      UniqueString
-	Basic     *BasicDevice
+	Name UniqueString
+
+	// Instead of distinguishing between basic and composite devices,
+	// both types of devices get mapped to a CompositeDevice. This
+	// works because they are mutually exclusive and BasicDevice
+	// is a subset of CompositeDevice.
+	//
+	// This can be nil for some future, currently unknown device type.
 	Composite *CompositeDevice
 }
 
@@ -55,7 +61,7 @@ type BasicDevice struct {
 }
 
 type CompositeDevice struct {
-	Includes             []DeviceMixinRef
+	Includes             []DeviceMixinRef // Conversion already resolves this, can be ignored during allocation.
 	ConsumesCapacityFrom []DeviceRef
 	Attributes           map[QualifiedName]DeviceAttribute
 	Capacity             map[QualifiedName]DeviceCapacity
