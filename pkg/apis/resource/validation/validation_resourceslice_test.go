@@ -85,11 +85,11 @@ func TestValidateResourceSlice(t *testing.T) {
 		wantFailures field.ErrorList
 	}{
 		"good": {
-			slice: testResourceSlice(goodName, goodName, driverName, resourceapi.ResourceSliceMaxDevices),
+			slice: testResourceSlice(goodName, goodName, driverName, resourceapi.ResourceSliceMaxDevicesAndMixins),
 		},
 		"too-large": {
-			wantFailures: field.ErrorList{field.TooLongMaxLength(field.NewPath("spec", "devices"), resourceapi.ResourceSliceMaxDevices+1, resourceapi.ResourceSliceMaxDevices)},
-			slice:        testResourceSlice(goodName, goodName, goodName, resourceapi.ResourceSliceMaxDevices+1),
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec"), resourceapi.ResourceSliceMaxDevicesAndMixins+1, "the total number of devices and mixins must not exceed 128")},
+			slice:        testResourceSlice(goodName, goodName, goodName, resourceapi.ResourceSliceMaxDevicesAndMixins+1),
 		},
 		"missing-name": {
 			wantFailures: field.ErrorList{field.Required(field.NewPath("metadata", "name"), "name or generateName is required")},

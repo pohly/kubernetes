@@ -35,6 +35,7 @@ type ResourceSliceSpec struct {
 	NodeSelector *v1.NodeSelector
 	AllNodes     bool
 	Devices      []Device
+	DeviceMixins []DeviceMixin
 }
 
 type ResourcePool struct {
@@ -43,13 +44,29 @@ type ResourcePool struct {
 	ResourceSliceCount int64
 }
 type Device struct {
-	Name  UniqueString
-	Basic *BasicDevice
+	Name      UniqueString
+	Basic     *BasicDevice
+	Composite *CompositeDevice
 }
 
 type BasicDevice struct {
 	Attributes map[QualifiedName]DeviceAttribute
 	Capacity   map[QualifiedName]DeviceCapacity
+}
+
+type CompositeDevice struct {
+	Includes             []DeviceMixinRef
+	ConsumesCapacityFrom []DeviceRef
+	Attributes           map[QualifiedName]DeviceAttribute
+	Capacity             map[QualifiedName]DeviceCapacity
+}
+
+type DeviceMixinRef struct {
+	Name string
+}
+
+type DeviceRef struct {
+	Name string
 }
 
 type QualifiedName string
@@ -65,4 +82,14 @@ type DeviceAttribute struct {
 
 type DeviceCapacity struct {
 	Quantity resource.Quantity
+}
+
+type DeviceMixin struct {
+	Name      string
+	Composite *CompositeDeviceMixin
+}
+
+type CompositeDeviceMixin struct {
+	Attributes map[QualifiedName]DeviceAttribute
+	Capacity   map[QualifiedName]DeviceCapacity
 }
