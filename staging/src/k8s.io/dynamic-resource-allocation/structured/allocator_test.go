@@ -410,8 +410,11 @@ func TestAllocator(t *testing.T) {
 			)),
 			node: node(node1, region1),
 
-			// TODO: support allocating composite devices
-			expectResults: nil,
+			// TODO: a lot more test cases for partitionable devices (mixins, partitions, etc.)
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+			)},
 		},
 		"other-node": {
 			claimsToAllocate: objects(claim(claim0, req0, classA)),

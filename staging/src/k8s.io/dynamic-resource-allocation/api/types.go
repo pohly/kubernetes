@@ -44,9 +44,13 @@ type ResourcePool struct {
 	ResourceSliceCount int64
 }
 type Device struct {
-	Name      UniqueString
-	Basic     *BasicDevice
-	Composite *CompositeDevice
+	Name UniqueString
+
+	// Instead of distinguishing between basic and composite devices,
+	// both types of devices get mapped to a CompositeDevice. This
+	// works because they are mutually exclusive and BasicDevice
+	// is a subset of CompositeDevice.
+	Composite CompositeDevice
 }
 
 type BasicDevice struct {
