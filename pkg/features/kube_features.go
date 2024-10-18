@@ -206,6 +206,16 @@ const (
 	// is to move it into a separate KEP.
 	DRAAdminAccess featuregate.Feature = "DRAAdminAccess"
 
+	// owner: @klueska
+	// kep: http://kep.k8s.io/4815
+	//
+	// Enables support for dynamically partitioning devices based on what
+	// which parts of them were allocated during scheduling.
+	//
+	// Additionally, it provides primitives to represent both full devices
+	// and their partitions in a more compact way ("mixins").
+	DRAPartitionableDevices featuregate.Feature = "DRAPartitionableDevices"
+
 	// owner: @pohly
 	// kep: http://kep.k8s.io/4381
 	//
