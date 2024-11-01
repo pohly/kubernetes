@@ -57,11 +57,19 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
+	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 	utiltesting "k8s.io/kubernetes/test/utils/ktesting"
 )
+
+func init() {
+	// Some of the tests call framework code which expects these metrics to be initialized.
+	// Those tests panic without this.
+	metrics.InitMetrics()
+}
 
 func TestSchedulerCreation(t *testing.T) {
 	invalidRegistry := map[string]frameworkruntime.PluginFactory{
@@ -867,7 +875,7 @@ func Test_UnionedGVKs(t *testing.T) {
 			name:    "plugins with default profile (No feature gate enabled)",
 			plugins: schedulerapi.PluginSet{Enabled: defaults.PluginsV1.MultiPoint.Enabled},
 			want: map[framework.EventResource]framework.ActionType{
-				framework.Pod:                   framework.Add | framework.UpdatePodLabel | framework.Delete,
+				framework.Pod:                   framework.Add | framework.UpdatePodLabel | framework.Delete | framework.UpdatePodGeneratedResourceClaim,
 				framework.Node:                  framework.Add | framework.UpdateNodeAllocatable | framework.UpdateNodeLabel | framework.UpdateNodeTaint | framework.Delete,
 				framework.CSINode:               framework.All - framework.Delete,
 				framework.CSIDriver:             framework.Update,
@@ -876,13 +884,16 @@ func Test_UnionedGVKs(t *testing.T) {
 				framework.PersistentVolumeClaim: framework.All - framework.Delete,
 				framework.StorageClass:          framework.All - framework.Delete,
 				framework.VolumeAttachment:      framework.Delete,
+				framework.DeviceClass:           framework.All - framework.Delete,
+				framework.ResourceClaim:         framework.All - framework.Delete,
+				framework.ResourceSlice:         framework.All - framework.Delete,
 			},
 		},
 		{
 			name:    "plugins with default profile (InPlacePodVerticalScaling: enabled)",
 			plugins: schedulerapi.PluginSet{Enabled: defaults.PluginsV1.MultiPoint.Enabled},
 			want: map[framework.EventResource]framework.ActionType{
-				framework.Pod:                   framework.Add | framework.UpdatePodLabel | framework.UpdatePodScaleDown | framework.Delete,
+				framework.Pod:                   framework.Add | framework.UpdatePodLabel | framework.UpdatePodScaleDown | framework.Delete | framework.UpdatePodGeneratedResourceClaim,
 				framework.Node:                  framework.Add | framework.UpdateNodeAllocatable | framework.UpdateNodeLabel | framework.UpdateNodeTaint | framework.Delete,
 				framework.CSINode:               framework.All - framework.Delete,
 				framework.CSIDriver:             framework.Update,
@@ -891,6 +902,9 @@ func Test_UnionedGVKs(t *testing.T) {
 				framework.PersistentVolumeClaim: framework.All - framework.Delete,
 				framework.StorageClass:          framework.All - framework.Delete,
 				framework.VolumeAttachment:      framework.Delete,
+				framework.DeviceClass:           framework.All - framework.Delete,
+				framework.ResourceClaim:         framework.All - framework.Delete,
+				framework.ResourceSlice:         framework.All - framework.Delete,
 			},
 			enableInPlacePodVerticalScaling: true,
 		},
@@ -898,7 +912,7 @@ func Test_UnionedGVKs(t *testing.T) {
 			name:    "plugins with default profile (queueingHint/InPlacePodVerticalScaling: enabled)",
 			plugins: schedulerapi.PluginSet{Enabled: defaults.PluginsV1.MultiPoint.Enabled},
 			want: map[framework.EventResource]framework.ActionType{
-				framework.Pod:                   framework.Add | framework.UpdatePodLabel | framework.UpdatePodScaleDown | framework.UpdatePodTolerations | framework.UpdatePodSchedulingGatesEliminated | framework.Delete,
+				framework.Pod:                   framework.Add | framework.UpdatePodLabel | framework.UpdatePodScaleDown | framework.UpdatePodTolerations | framework.UpdatePodSchedulingGatesEliminated | framework.Delete | framework.UpdatePodGeneratedResourceClaim,
 				framework.Node:                  framework.Add | framework.UpdateNodeAllocatable | framework.UpdateNodeLabel | framework.UpdateNodeTaint | framework.Delete,
 				framework.CSINode:               framework.All - framework.Delete,
 				framework.CSIDriver:             framework.Update,
@@ -907,6 +921,9 @@ func Test_UnionedGVKs(t *testing.T) {
 				framework.PersistentVolumeClaim: framework.All - framework.Delete,
 				framework.StorageClass:          framework.All - framework.Delete,
 				framework.VolumeAttachment:      framework.Delete,
+				framework.DeviceClass:           framework.All - framework.Delete,
+				framework.ResourceClaim:         framework.All - framework.Delete,
+				framework.ResourceSlice:         framework.All - framework.Delete,
 			},
 			enableInPlacePodVerticalScaling: true,
 			enableSchedulerQueueingHints:    true,
@@ -955,9 +972,12 @@ func Test_UnionedGVKs(t *testing.T) {
 }
 
 func newFramework(ctx context.Context, r frameworkruntime.Registry, profile schedulerapi.KubeSchedulerProfile) (framework.Framework, error) {
+	informerFactory := informers.NewSharedInformerFactory(fake.NewClientset(), 0)
+	claimAssumeCache := assumecache.NewAssumeCache(klog.FromContext(ctx), informerFactory.Resource().V1alpha3().ResourceClaims().Informer(), "resource claim", "", nil)
 	return frameworkruntime.NewFramework(ctx, r, &profile,
+		frameworkruntime.WithResourceClaimCache(claimAssumeCache),
 		frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(nil, nil)),
-		frameworkruntime.WithInformerFactory(informers.NewSharedInformerFactory(fake.NewClientset(), 0)),
+		frameworkruntime.WithInformerFactory(informerFactory),
 	)
 }
 

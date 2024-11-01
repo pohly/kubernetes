@@ -254,7 +254,7 @@ leaderElection:
 			},
 		},
 		{
-			name: "component configuration v1",
+			name: "component configuration` v1",
 			flags: []string{
 				"--config", pluginConfigFilev1,
 				"--kubeconfig", configKubeconfig,
@@ -262,6 +262,9 @@ leaderElection:
 			wantPlugins: map[string]*config.Plugins{
 				"default-scheduler": func() *config.Plugins {
 					plugins := defaults.ExpandedPluginsV1.DeepCopy()
+					plugins.PreEnqueue.Enabled = []config.Plugin{
+						{Name: "SchedulingGates"},
+					}
 					plugins.Filter.Enabled = []config.Plugin{
 						{Name: "NodeResourcesFit"},
 						{Name: "NodePorts"},
@@ -269,6 +272,9 @@ leaderElection:
 					plugins.PreFilter.Enabled = []config.Plugin{
 						{Name: "NodeResourcesFit"},
 						{Name: "NodePorts"},
+					}
+					plugins.PostFilter.Enabled = []config.Plugin{
+						{Name: "DefaultPreemption"},
 					}
 					plugins.PreScore.Enabled = []config.Plugin{
 						{Name: "VolumeBinding"},
@@ -279,6 +285,12 @@ leaderElection:
 					plugins.Score.Enabled = []config.Plugin{
 						{Name: "InterPodAffinity", Weight: 1},
 						{Name: "TaintToleration", Weight: 1},
+					}
+					plugins.Reserve.Enabled = []config.Plugin{
+						{Name: "VolumeBinding"},
+					}
+					plugins.PreBind.Enabled = []config.Plugin{
+						{Name: "VolumeBinding"},
 					}
 					return plugins
 				}(),
