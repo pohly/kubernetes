@@ -40,6 +40,7 @@ import (
 	"k8s.io/component-base/featuregate"
 	"k8s.io/controller-manager/controller"
 	csitrans "k8s.io/csi-translation-lib"
+	drainformers "k8s.io/dynamic-resource-allocation/informers"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	pkgcontroller "k8s.io/kubernetes/pkg/controller"
 	endpointcontroller "k8s.io/kubernetes/pkg/controller/endpoint"
@@ -410,8 +411,9 @@ func startResourceClaimController(ctx context.Context, controllerContext Control
 		utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess),
 		controllerContext.ClientBuilder.ClientOrDie("resource-claim-controller"),
 		controllerContext.InformerFactory.Core().V1().Pods(),
-		controllerContext.InformerFactory.Resource().V1beta1().ResourceClaims(),
-		controllerContext.InformerFactory.Resource().V1beta1().ResourceClaimTemplates())
+		drainformers.ResourceClaims(ctx, controllerContext.InformerFactory),
+		drainformers.ResourceClaimTemplates(ctx, controllerContext.InformerFactory),
+	)
 	if err != nil {
 		return nil, true, fmt.Errorf("failed to start resource claim controller: %v", err)
 	}

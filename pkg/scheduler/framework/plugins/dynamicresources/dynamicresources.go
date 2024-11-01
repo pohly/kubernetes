@@ -39,6 +39,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/dynamic-resource-allocation/cel"
+	drainformers "k8s.io/dynamic-resource-allocation/informers"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/klog/v2"
@@ -186,8 +187,8 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 
 		fh:               fh,
 		clientset:        fh.ClientSet(),
-		classLister:      fh.SharedInformerFactory().Resource().V1beta1().DeviceClasses().Lister(),
-		sliceLister:      fh.SharedInformerFactory().Resource().V1beta1().ResourceSlices().Lister(),
+		classLister:      drainformers.DeviceClassInformers(ctx, fh.SharedInformerFactory()).Lister(),
+		sliceLister:      drainformers.ResourceSlices(ctx, fh.SharedInformerFactory()).Lister(),
 		claimAssumeCache: fh.ResourceClaimCache(),
 
 		// This is a LRU cache for compiled CEL expressions. The most

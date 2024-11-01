@@ -35,6 +35,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	versionedinformers "k8s.io/client-go/informers"
 	resourceinformers "k8s.io/client-go/informers/resource/v1beta1"
+	drainformers "k8s.io/dynamic-resource-allocation/informers"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	"k8s.io/kubernetes/pkg/features"
@@ -99,7 +100,7 @@ func (config Config) New(ctx context.Context, serverID string) (authorizer.Autho
 		case authzconfig.AuthorizerType(modes.ModeNode):
 			var slices resourceinformers.ResourceSliceInformer
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				slices = config.VersionedInformerFactory.Resource().V1beta1().ResourceSlices()
+				slices = drainformers.ResourceSlices(ctx, config.VersionedInformerFactory)
 			}
 			node.RegisterMetrics()
 			graph := node.NewGraph()

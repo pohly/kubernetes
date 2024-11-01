@@ -33,6 +33,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+	drainformers "k8s.io/dynamic-resource-allocation/informers"
 	"k8s.io/klog/v2"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	"k8s.io/kubernetes/pkg/features"
@@ -297,7 +298,7 @@ func New(ctx context.Context,
 
 	var resourceClaimCache *assumecache.AssumeCache
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-		resourceClaimInformer := informerFactory.Resource().V1beta1().ResourceClaims().Informer()
+		resourceClaimInformer := drainformers.ResourceClaims(ctx, informerFactory).Informer()
 		resourceClaimCache = assumecache.NewAssumeCache(logger, resourceClaimInformer, "ResourceClaim", "", nil)
 	}
 

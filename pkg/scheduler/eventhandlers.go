@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	corev1nodeaffinity "k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
+	drainformers "k8s.io/dynamic-resource-allocation/informers"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/backend/queue"
@@ -525,28 +526,31 @@ func addAllEventHandlers(
 			handlers = append(handlers, handlerRegistration)
 		case framework.ResourceClaim:
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				handlerRegistration = resourceClaimCache.AddEventHandler(
+				_ = resourceClaimCache.AddEventHandler(
 					buildEvtResHandler(at, framework.ResourceClaim),
 				)
-				handlers = append(handlers, handlerRegistration)
+				// No need to wait and might not sync if API group is disabled.
+				// handlers = append(handlers, handlerRegistration)
 			}
 		case framework.ResourceSlice:
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				if handlerRegistration, err = informerFactory.Resource().V1beta1().ResourceSlices().Informer().AddEventHandler(
+				if _, err = drainformers.ResourceSlices(context.TODO(), informerFactory).Informer().AddEventHandler(
 					buildEvtResHandler(at, framework.ResourceSlice),
 				); err != nil {
 					return err
 				}
-				handlers = append(handlers, handlerRegistration)
+				// No need to wait and might not sync if API group is disabled.
+				// handlers = append(handlers, handlerRegistration)
 			}
 		case framework.DeviceClass:
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				if handlerRegistration, err = informerFactory.Resource().V1beta1().DeviceClasses().Informer().AddEventHandler(
+				if _, err = drainformers.DeviceClassInformers(context.TODO(), informerFactory).Informer().AddEventHandler(
 					buildEvtResHandler(at, framework.DeviceClass),
 				); err != nil {
 					return err
 				}
-				handlers = append(handlers, handlerRegistration)
+				// No need to wait and might not sync if API group is disabled.
+				// handlers = append(handlers, handlerRegistration)
 			}
 		case framework.StorageClass:
 			if handlerRegistration, err = informerFactory.Storage().V1().StorageClasses().Informer().AddEventHandler(
