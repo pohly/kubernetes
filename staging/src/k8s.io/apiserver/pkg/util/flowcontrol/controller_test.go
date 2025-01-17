@@ -404,9 +404,11 @@ func TestAPFControllerWithGracefulShutdown(t *testing.T) {
 		t.Fatalf("WaitForCacheSync did not successfully complete, resources=%#v", names)
 	}
 
-	if err := controller.Start(ctx); err != nil {
-		t.Fatalf("error starting controller: %v", err)
-	}
+	go func() {
+		if err := controller.Run(ctx); err != nil {
+			t.Errorf("error starting controller: %v", err)
+		}
+	}()
 
 	// ensure that the controller has run its first loop.
 	err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {

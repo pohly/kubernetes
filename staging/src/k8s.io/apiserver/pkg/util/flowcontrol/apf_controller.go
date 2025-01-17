@@ -369,7 +369,10 @@ func newTestableController(config TestableConfig) *configController {
 	return cfgCtlr
 }
 
-func (cfgCtlr *configController) Start(ctx context.Context) error {
+func (cfgCtlr *configController) Run(ctx context.Context) error {
+	var wg sync.WaitGroup
+	defer wg.Wait()
+
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting API Priority and Fairness config controller")
 	if ok := cache.WaitForCacheSync(ctx.Done(), cfgCtlr.plInformerSynced, cfgCtlr.fsInformerSynced); !ok {
@@ -377,17 +380,24 @@ func (cfgCtlr *configController) Start(ctx context.Context) error {
 	}
 
 	logger.Info("Running API Priority and Fairness config worker")
-	go wait.UntilWithContext(ctx, cfgCtlr.runWorker, time.Second)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		wait.UntilWithContext(ctx, cfgCtlr.runWorker, time.Second)
+	}()
 
 	logger.Info("Running API Priority and Fairness periodic rebalancing process")
-	go wait.UntilWithContext(ctx, cfgCtlr.updateBorrowing, borrowingAdjustmentPeriod)
-
+	wg.Add(1)
 	go func() {
-		<-ctx.Done()
-		// Let the config worker stop when we are done
-		logger.Info("Shutting down API Priority and Fairness config worker")
-		cfgCtlr.configQueue.ShutDown()
+		defer wg.Done()
+		wait.UntilWithContext(ctx, cfgCtlr.updateBorrowing, borrowingAdjustmentPeriod)
 	}()
+
+	<-ctx.Done()
+
+	// Let the config worker stop when we are done
+	logger.Info("Shutting down API Priority and Fairness config worker")
+	cfgCtlr.configQueue.ShutDown()
 
 	return nil
 }

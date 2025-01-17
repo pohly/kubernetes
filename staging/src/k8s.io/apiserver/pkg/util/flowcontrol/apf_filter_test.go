@@ -126,9 +126,11 @@ func TestQueueWaitTimeLatencyTracker(t *testing.T) {
 		t.Fatalf("WaitForCacheSync did not successfully complete, resources=%#v", names)
 	}
 
-	if err := controller.Start(ctx); err != nil {
-		t.Fatalf("error starting controller: %v", err)
-	}
+	go func() {
+		if err := controller.Run(ctx); err != nil {
+			t.Errorf("error running controller: %v", err)
+		}
+	}()
 
 	// ensure that the controller has run its first loop.
 	err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {

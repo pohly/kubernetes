@@ -146,9 +146,11 @@ func (ft *fightTest) createController(invert bool, i int) {
 	})
 	ft.ctlrs[invert][i] = ctlr
 	informerFactory.Start(ft.ctx.Done())
-	if err := ctlr.Start(ft.ctx); err != nil {
-		ft.t.Fatalf("error starting controller: %v", err)
-	}
+	go func() {
+		if err := ctlr.Start(ft.ctx); err != nil {
+			ft.t.Errorf("error starting controller: %v", err)
+		}
+	}()
 }
 
 func (ft *fightTest) evaluate(tBeforeCreate, tAfterCreate time.Time) {

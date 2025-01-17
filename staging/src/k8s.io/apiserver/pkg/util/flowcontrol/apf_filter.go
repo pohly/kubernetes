@@ -67,10 +67,10 @@ type Interface interface {
 		execFn func(),
 	)
 
-	// Start waits for informer sync, forks goroutines that monitor config
+	// Run waits for informer sync, forks goroutines that monitor config
 	// objects from the main apiservers and causes any needed changes to local
-	// behavior, and then returns without blocking when the controller is running.
-	Start(ctx context.Context) error
+	// behavior, and then runs the controller.
+	Run(ctx context.Context) error
 
 	// Install installs debugging endpoints to the web-server.
 	Install(c *mux.PathRecorderMux)
