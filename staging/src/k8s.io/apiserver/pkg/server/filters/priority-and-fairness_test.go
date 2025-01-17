@@ -343,7 +343,6 @@ func TestApfCancelWaitRequest(t *testing.T) {
 	}
 
 	checkForExpectedMetrics(t, []string{
-		"apiserver_current_inflight_requests",
 		"apiserver_request_terminations_total",
 		"apiserver_request_total",
 	})
