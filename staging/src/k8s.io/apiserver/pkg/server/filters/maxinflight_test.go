@@ -116,7 +116,7 @@ func TestMaxInFlightNonMutating(t *testing.T) {
 	for i := 0; i < AllowedNonMutatingInflightRequestsNo; i++ {
 		// These should hang waiting on block...
 		go func() {
-			if err := expectHTTPGet(server.URL+"/api/v1/namespaces/default/wait?watch=true", http.StatusOK); err != nil {
+			if err := expectHTTPGet(ctx, server.URL+"/api/v1/namespaces/default/wait?watch=true", http.StatusOK); err != nil {
 				t.Error(err)
 			}
 			responses.Done()
@@ -124,7 +124,7 @@ func TestMaxInFlightNonMutating(t *testing.T) {
 	}
 
 	// Check that sever is not saturated by not-accounted calls
-	if err := expectHTTPGet(server.URL+"/dontwait", http.StatusOK); err != nil {
+	if err := expectHTTPGet(ctx, server.URL+"/dontwait", http.StatusOK); err != nil {
 		t.Error(err)
 	}
 
@@ -132,7 +132,7 @@ func TestMaxInFlightNonMutating(t *testing.T) {
 	for i := 0; i < AllowedNonMutatingInflightRequestsNo; i++ {
 		// These should hang waiting on block...
 		go func() {
-			if err := expectHTTPGet(server.URL, http.StatusOK); err != nil {
+			if err := expectHTTPGet(ctx, server.URL, http.StatusOK); err != nil {
 				t.Error(err)
 			}
 			responses.Done()
@@ -147,17 +147,17 @@ func TestMaxInFlightNonMutating(t *testing.T) {
 
 	// Do this multiple times to show that rate limit rejected requests don't block.
 	for i := 0; i < 2; i++ {
-		if err := expectHTTPGet(server.URL, http.StatusTooManyRequests); err != nil {
+		if err := expectHTTPGet(ctx, server.URL, http.StatusTooManyRequests); err != nil {
 			t.Error(err)
 		}
 	}
 	// Validate that non-accounted URLs still work.  use a path regex match
-	if err := expectHTTPGet(server.URL+"/api/v1/watch/namespaces/default/dontwait", http.StatusOK); err != nil {
+	if err := expectHTTPGet(ctx, server.URL+"/api/v1/watch/namespaces/default/dontwait", http.StatusOK); err != nil {
 		t.Error(err)
 	}
 
 	// We should allow a single mutating request.
-	if err := expectHTTPPost(server.URL+"/dontwait", http.StatusOK); err != nil {
+	if err := expectHTTPPost(ctx, server.URL+"/dontwait", http.StatusOK); err != nil {
 		t.Error(err)
 	}
 
@@ -167,7 +167,7 @@ func TestMaxInFlightNonMutating(t *testing.T) {
 	// Show that we recover from being blocked up.
 	// Too avoid flakyness we need to wait until at least one of the requests really finishes.
 	responses.Wait()
-	if err := expectHTTPGet(server.URL, http.StatusOK); err != nil {
+	if err := expectHTTPGet(ctx, server.URL, http.StatusOK); err != nil {
 		t.Error(err)
 	}
 }
@@ -200,7 +200,7 @@ func TestMaxInFlightMutating(t *testing.T) {
 	for i := 0; i < AllowedMutatingInflightRequestsNo; i++ {
 		// These should hang waiting on block...
 		go func() {
-			if err := expectHTTPPost(server.URL+"/foo/bar", http.StatusOK); err != nil {
+			if err := expectHTTPPost(ctx, server.URL+"/foo/bar", http.StatusOK); err != nil {
 				t.Error(err)
 			}
 			responses.Done()
@@ -216,12 +216,12 @@ func TestMaxInFlightMutating(t *testing.T) {
 
 	// Do this multiple times to show that rate limit rejected requests don't block.
 	for i := 0; i < 2; i++ {
-		if err := expectHTTPPost(server.URL+"/foo/bar/", http.StatusTooManyRequests); err != nil {
+		if err := expectHTTPPost(ctx, server.URL+"/foo/bar/", http.StatusTooManyRequests); err != nil {
 			t.Error(err)
 		}
 	}
 	// Validate that non-mutating URLs still work.  use a path regex match
-	if err := expectHTTPGet(server.URL+"/dontwait", http.StatusOK); err != nil {
+	if err := expectHTTPGet(ctx, server.URL+"/dontwait", http.StatusOK); err != nil {
 		t.Error(err)
 	}
 
@@ -231,14 +231,18 @@ func TestMaxInFlightMutating(t *testing.T) {
 	// Show that we recover from being blocked up.
 	// Too avoid flakyness we need to wait until at least one of the requests really finishes.
 	responses.Wait()
-	if err := expectHTTPPost(server.URL+"/foo/bar", http.StatusOK); err != nil {
+	if err := expectHTTPPost(ctx, server.URL+"/foo/bar", http.StatusOK); err != nil {
 		t.Error(err)
 	}
 }
 
 // We use GET as a sample non-mutating request.
-func expectHTTPGet(url string, code int) error {
-	r, err := http.Get(url)
+func expectHTTPGet(ctx context.Context, url string, code int) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return fmt.Errorf("unexpected error creating request: %v", err)
+	}
+	r, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("unexpected error: %v", err)
 	}
@@ -249,8 +253,8 @@ func expectHTTPGet(url string, code int) error {
 }
 
 // We use POST as a sample mutating request.
-func expectHTTPPost(url string, code int, groups ...string) error {
-	req, err := http.NewRequest(http.MethodPost, url, strings.NewReader("foo bar"))
+func expectHTTPPost(ctx context.Context, url string, code int, groups ...string) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, strings.NewReader("foo bar"))
 	if err != nil {
 		return err
 	}
@@ -296,7 +300,7 @@ func TestMaxInFlightSkipsMasters(t *testing.T) {
 	for i := 0; i < AllowedMutatingInflightRequestsNo; i++ {
 		// These should hang waiting on block...
 		go func() {
-			if err := expectHTTPPost(server.URL+"/foo/bar", http.StatusOK); err != nil {
+			if err := expectHTTPPost(ctx, server.URL+"/foo/bar", http.StatusOK); err != nil {
 				t.Error(err)
 			}
 			responses.Done()
@@ -312,7 +316,7 @@ func TestMaxInFlightSkipsMasters(t *testing.T) {
 
 	// Do this multiple times to show that rate limit rejected requests don't block.
 	for i := 0; i < 2; i++ {
-		if err := expectHTTPPost(server.URL+"/dontwait", http.StatusOK, user.SystemPrivilegedGroup); err != nil {
+		if err := expectHTTPPost(ctx, server.URL+"/dontwait", http.StatusOK, user.SystemPrivilegedGroup); err != nil {
 			t.Error(err)
 		}
 	}

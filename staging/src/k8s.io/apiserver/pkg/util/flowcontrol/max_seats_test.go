@@ -116,6 +116,7 @@ func Test_GetMaxSeats(t *testing.T) {
 				ExecSeatsGaugeVec:      metrics.PriorityLevelExecutionSeatsGaugeVec,
 				QueueSetFactory:        fqs.NewQueueSetFactory(clk),
 			})
+			defer c.Done()
 
 			testPriorityLevel := &flowcontrolv1.PriorityLevelConfiguration{
 				ObjectMeta: metav1.ObjectMeta{

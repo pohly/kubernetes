@@ -117,6 +117,8 @@ func TestQueueWaitTimeLatencyTracker(t *testing.T) {
 	})
 
 	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	informerFactory.Start(ctx.Done())
 	status := informerFactory.WaitForCacheSync(ctx.Done())

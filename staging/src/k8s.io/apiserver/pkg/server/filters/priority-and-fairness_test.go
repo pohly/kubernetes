@@ -22,12 +22,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
 	"reflect"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"go.uber.org/goleak"
 
 	flowcontrol "k8s.io/api/flowcontrol/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -60,7 +61,7 @@ import (
 
 func TestMain(m *testing.M) {
 	klog.InitFlags(nil)
-	os.Exit(m.Run())
+	goleak.VerifyTestMain(m)
 }
 
 type mockDecision int
@@ -203,10 +204,12 @@ func TestApfSkipLongRunningRequest(t *testing.T) {
 	defer server.Close()
 
 	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	StartPriorityAndFairnessWatermarkMaintenance(ctx.Done())
 
 	// send a watch request to test skipping long running request
-	if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/foos/foo/proxy", server.URL), http.StatusOK); err != nil {
+	if err := expectHTTPGet(ctx, fmt.Sprintf("%s/api/v1/foos/foo/proxy", server.URL), http.StatusOK); err != nil {
 		// request should not be rejected
 		t.Error(err)
 	}
@@ -217,9 +220,11 @@ func TestApfRejectRequest(t *testing.T) {
 	defer server.Close()
 
 	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	StartPriorityAndFairnessWatermarkMaintenance(ctx.Done())
 
-	if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces/default", server.URL), http.StatusTooManyRequests); err != nil {
+	if err := expectHTTPGet(ctx, fmt.Sprintf("%s/api/v1/namespaces/default", server.URL), http.StatusTooManyRequests); err != nil {
 		t.Error(err)
 	}
 
@@ -234,9 +239,11 @@ func TestApfExemptRequest(t *testing.T) {
 	defer server.Close()
 
 	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	StartPriorityAndFairnessWatermarkMaintenance(ctx.Done())
 
-	if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces/default", server.URL), http.StatusOK); err != nil {
+	if err := expectHTTPGet(ctx, fmt.Sprintf("%s/api/v1/namespaces/default", server.URL), http.StatusOK); err != nil {
 		t.Error(err)
 	}
 
@@ -251,9 +258,11 @@ func TestApfExecuteRequest(t *testing.T) {
 	defer server.Close()
 
 	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	StartPriorityAndFairnessWatermarkMaintenance(ctx.Done())
 
-	if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces/default", server.URL), http.StatusOK); err != nil {
+	if err := expectHTTPGet(ctx, fmt.Sprintf("%s/api/v1/namespaces/default", server.URL), http.StatusOK); err != nil {
 		t.Error(err)
 	}
 
@@ -313,6 +322,8 @@ func TestApfExecuteMultipleRequests(t *testing.T) {
 	defer server.Close()
 
 	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	StartPriorityAndFairnessWatermarkMaintenance(ctx.Done())
 
 	var wg sync.WaitGroup
@@ -320,7 +331,7 @@ func TestApfExecuteMultipleRequests(t *testing.T) {
 	for i := 0; i < concurrentRequests; i++ {
 		go func() {
 			defer wg.Done()
-			if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces/default", server.URL), http.StatusOK); err != nil {
+			if err := expectHTTPGet(ctx, fmt.Sprintf("%s/api/v1/namespaces/default", server.URL), http.StatusOK); err != nil {
 				t.Error(err)
 			}
 		}()
@@ -335,10 +346,13 @@ func TestApfExecuteMultipleRequests(t *testing.T) {
 }
 
 func TestApfCancelWaitRequest(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	server := newApfServerWithSingleRequest(t, decisionCancelWait)
 	defer server.Close()
 
-	if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces/default", server.URL), http.StatusTooManyRequests); err != nil {
+	if err := expectHTTPGet(ctx, fmt.Sprintf("%s/api/v1/namespaces/default", server.URL), http.StatusTooManyRequests); err != nil {
 		t.Error(err)
 	}
 
@@ -418,6 +432,9 @@ func (f *fakeWatchApfFilter) wait() error {
 }
 
 func TestApfExecuteWatchRequestsWithInitializationSignal(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	signalsLock := sync.Mutex{}
 	signals := []utilflowcontrol.InitializationSignal{}
 	sendSignals := func() {
@@ -472,7 +489,7 @@ func TestApfExecuteWatchRequestsWithInitializationSignal(t *testing.T) {
 	for i := 0; i < concurrentRequests; i++ {
 		go func() {
 			defer wg.Done()
-			if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces/default/pods?watch=true", server.URL), http.StatusOK); err != nil {
+			if err := expectHTTPGet(ctx, fmt.Sprintf("%s/api/v1/namespaces/default/pods?watch=true", server.URL), http.StatusOK); err != nil {
 				t.Error(err)
 			}
 		}()
@@ -486,7 +503,7 @@ func TestApfExecuteWatchRequestsWithInitializationSignal(t *testing.T) {
 	for i := 0; i < concurrentRequests; i++ {
 		go func() {
 			defer wg.Done()
-			if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces/default/pods?watch=true", server.URL), http.StatusOK); err != nil {
+			if err := expectHTTPGet(ctx, fmt.Sprintf("%s/api/v1/namespaces/default/pods?watch=true", server.URL), http.StatusOK); err != nil {
 				t.Error(err)
 			}
 		}()
@@ -497,6 +514,9 @@ func TestApfExecuteWatchRequestsWithInitializationSignal(t *testing.T) {
 }
 
 func TestApfRejectWatchRequestsWithInitializationSignal(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	fakeFilter := newFakeWatchApfFilter(0)
 
 	onExecuteFunc := func() {
@@ -507,12 +527,15 @@ func TestApfRejectWatchRequestsWithInitializationSignal(t *testing.T) {
 	server := newApfServerWithFilter(t, fakeFilter, time.Minute/4, onExecuteFunc, postExecuteFunc)
 	defer server.Close()
 
-	if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces/default/pods?watch=true", server.URL), http.StatusTooManyRequests); err != nil {
+	if err := expectHTTPGet(ctx, fmt.Sprintf("%s/api/v1/namespaces/default/pods?watch=true", server.URL), http.StatusTooManyRequests); err != nil {
 		t.Error(err)
 	}
 }
 
 func TestApfWatchPanic(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	epmetrics.Register()
 	fcmetrics.Register()
 
@@ -535,7 +558,7 @@ func TestApfWatchPanic(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(handler))
 	defer server.Close()
 
-	if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces/default/pods?watch=true", server.URL), http.StatusOK); err != nil {
+	if err := expectHTTPGet(ctx, fmt.Sprintf("%s/api/v1/namespaces/default/pods?watch=true", server.URL), http.StatusOK); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 }
@@ -570,6 +593,9 @@ func TestApfWatchHandlePanic(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
 			apfHandler := newApfHandlerWithFilter(t, test.filter, time.Minute/4, onExecuteFunc, postExecuteFunc)
 			handler := func(w http.ResponseWriter, r *http.Request) {
 				defer func() {
@@ -582,7 +608,7 @@ func TestApfWatchHandlePanic(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(handler))
 			defer server.Close()
 
-			if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces/default/pods?watch=true", server.URL), http.StatusOK); err != nil {
+			if err := expectHTTPGet(ctx, fmt.Sprintf("%s/api/v1/namespaces/default/pods?watch=true", server.URL), http.StatusOK); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
 		})
@@ -596,6 +622,9 @@ func TestApfWatchHandlePanic(t *testing.T) {
 // Even though in production we are not using httptest.Server, this logic is shared
 // across these two.
 func TestContextClosesOnRequestProcessed(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	epmetrics.Register()
 	fcmetrics.Register()
 	wg := sync.WaitGroup{}
@@ -611,7 +640,7 @@ func TestContextClosesOnRequestProcessed(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(handler))
 	defer server.Close()
 
-	if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces/default/pods?watch=true", server.URL), http.StatusOK); err != nil {
+	if err := expectHTTPGet(ctx, fmt.Sprintf("%s/api/v1/namespaces/default/pods?watch=true", server.URL), http.StatusOK); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
@@ -691,6 +720,8 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 
 		apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, 0)
 		_, ctx := ktesting.NewTestContext(t)
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
 		controller, err := startAPFController(t, ctx, apfConfiguration, serverConcurrency, plName, plConcurrency)
 		if err != nil {
 			t.Fatalf("Failed to start the controller: %v", err)
@@ -760,6 +791,8 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 
 		apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, 0)
 		_, ctx := ktesting.NewTestContext(t)
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
 		controller, err := startAPFController(t, ctx, apfConfiguration, serverConcurrency, plName, plConcurrency)
 		if err != nil {
 			t.Fatalf("Failed to start the controller: %v", err)
@@ -825,6 +858,8 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 
 		apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, 0)
 		_, ctx := ktesting.NewTestContext(t)
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
 		controller, err := startAPFController(t, ctx, apfConfiguration, serverConcurrency, plName, plConcurrency)
 		if err != nil {
 			t.Fatalf("Failed to start the controller: %v", err)
@@ -896,6 +931,8 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 
 		apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, 0)
 		_, ctx := ktesting.NewTestContext(t)
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
 		controller, err := startAPFController(t, ctx, apfConfiguration, serverConcurrency, plName, plConcurrency)
 		if err != nil {
 			t.Fatalf("Failed to start the controller: %v", err)
@@ -968,6 +1005,8 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 
 		apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, queueLength)
 		_, ctx := ktesting.NewTestContext(t)
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
 		controller, err := startAPFController(t, ctx, apfConfiguration, serverConcurrency, plName, plConcurrency)
 		if err != nil {
 			t.Fatalf("Failed to start the controller: %v", err)

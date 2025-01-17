@@ -33,6 +33,7 @@ import (
 	"time"
 
 	"golang.org/x/net/http2"
+	"k8s.io/klog/v2/ktesting"
 )
 
 func TestProbabilisticGoawayDecider(t *testing.T) {
@@ -379,6 +380,10 @@ func TestClientReceivedGOAWAY(t *testing.T) {
 
 // TestGOAWAYHTTP1Requests tests GOAWAY filter will not affect HTTP1.1 requests.
 func TestGOAWAYHTTP1Requests(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	s := httptest.NewUnstartedServer(WithProbabilisticGoaway(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("hello"))
@@ -405,7 +410,11 @@ func TestGOAWAYHTTP1Requests(t *testing.T) {
 		},
 	}
 
-	resp, err := client.Get(s.URL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, s.URL, nil)
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		t.Fatalf("failed to request the server, err: %v", err)
 	}

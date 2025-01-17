@@ -271,7 +271,9 @@ func (stats *seatDemandStats) update(obs fq.IntegratorResults) {
 	stats.smoothed = math.Max(envelope, seatDemandSmoothingCoefficient*stats.smoothed+(1-seatDemandSmoothingCoefficient)*envelope)
 }
 
-// NewTestableController is extra flexible to facilitate testing
+// NewTestableController is extra flexible to facilitate testing.
+//
+// Callers must call Start or Done. Not doing so leaks goroutines.
 func newTestableController(config TestableConfig) *configController {
 	cfgCtlr := &configController{
 		name:                   config.Name,
@@ -290,6 +292,7 @@ func newTestableController(config TestableConfig) *configController {
 	klog.V(2).Infof("NewTestableController %q with serverConcurrencyLimit=%d, name=%s, asFieldManager=%q", cfgCtlr.name, cfgCtlr.serverConcurrencyLimit, cfgCtlr.name, cfgCtlr.asFieldManager)
 	// Start with longish delay because conflicts will be between
 	// different processes, so take some time to go away.
+	// Beware, this spawns a goroutine.
 	cfgCtlr.configQueue = workqueue.NewTypedRateLimitingQueueWithConfig(
 		workqueue.NewTypedItemExponentialFailureRateLimiter[int](200*time.Millisecond, 8*time.Hour),
 		workqueue.TypedRateLimitingQueueConfig[int]{Name: "priority_and_fairness_config_queue"},
@@ -387,6 +390,10 @@ func (cfgCtlr *configController) Start(ctx context.Context) error {
 	}()
 
 	return nil
+}
+
+func (cfgCtlr *configController) Done() {
+	cfgCtlr.configQueue.ShutDown()
 }
 
 func (cfgCtlr *configController) updateBorrowing(_ context.Context) {

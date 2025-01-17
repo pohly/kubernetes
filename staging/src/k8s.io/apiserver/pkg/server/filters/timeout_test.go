@@ -45,6 +45,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/endpoints/responsewriter"
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 )
 
 type recorder struct {
@@ -77,6 +78,10 @@ func newHandler(responseCh <-chan string, panicCh <-chan interface{}, writeErrCh
 }
 
 func TestTimeout(t *testing.T) {
+	_, testCtx := ktesting.NewTestContext(t)
+	testCtx, cancelTest := context.WithCancel(testCtx)
+	defer cancelTest()
+
 	origReallyCrash := runtime.ReallyCrash
 	runtime.ReallyCrash = false
 	defer func() {
@@ -114,7 +119,11 @@ func TestTimeout(t *testing.T) {
 	// No timeouts
 	ctx = context.Background()
 	sendResponse <- resp
-	res, err := http.Get(ts.URL)
+	req, err := http.NewRequestWithContext(testCtx, http.MethodGet, ts.URL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +145,11 @@ func TestTimeout(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	timeout <- time.Time{}
-	res, err = http.Get(ts.URL)
+	req, err = http.NewRequestWithContext(testCtx, http.MethodGet, ts.URL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err = http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -164,7 +177,11 @@ func TestTimeout(t *testing.T) {
 
 	// Panics
 	doPanic <- "inner handler panics"
-	res, err = http.Get(ts.URL)
+	req, err = http.NewRequestWithContext(testCtx, http.MethodGet, ts.URL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err = http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -184,7 +201,11 @@ func TestTimeout(t *testing.T) {
 	// Panics with http.ErrAbortHandler
 	ctx = context.Background()
 	doPanic <- http.ErrAbortHandler
-	res, err = http.Get(ts.URL)
+	req, err = http.NewRequestWithContext(testCtx, http.MethodGet, ts.URL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err = http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}

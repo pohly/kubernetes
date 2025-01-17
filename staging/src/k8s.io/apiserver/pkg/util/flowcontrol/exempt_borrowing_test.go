@@ -61,6 +61,7 @@ func TestUpdateBorrowing(t *testing.T) {
 		QueueSetFactory:        fqs.NewQueueSetFactory(clk),
 	}
 	ctlr := newTestableController(config)
+	defer ctlr.Done()
 	_ = ctlr.lockAndDigestConfigObjects(plcs, fses)
 	if ctlr.nominalCLSum != serverCL {
 		t.Fatalf("Unexpected rounding: nominalCLSum=%d", ctlr.nominalCLSum)
