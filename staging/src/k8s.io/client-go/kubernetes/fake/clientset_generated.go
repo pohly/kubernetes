@@ -163,9 +163,10 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 		if watchActcion, ok := action.(testing.WatchActionImpl); ok {
 			opts = watchActcion.ListOptions
 		}
+		logger := action.GetLogger()
 		gvr := action.GetResource()
 		ns := action.GetNamespace()
-		watch, err := o.Watch(gvr, ns, opts)
+		watch, err := o.Watch(logger, gvr, ns, opts)
 		if err != nil {
 			return false, nil, err
 		}
@@ -216,9 +217,10 @@ func NewClientset(objects ...runtime.Object) *Clientset {
 		if watchActcion, ok := action.(testing.WatchActionImpl); ok {
 			opts = watchActcion.ListOptions
 		}
+		logger := action.GetLogger()
 		gvr := action.GetResource()
 		ns := action.GetNamespace()
-		watch, err := o.Watch(gvr, ns, opts)
+		watch, err := o.Watch(logger, gvr, ns, opts)
 		if err != nil {
 			return false, nil, err
 		}

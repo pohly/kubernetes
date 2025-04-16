@@ -22,6 +22,7 @@ import (
 	reflect "reflect"
 	sync "sync"
 	time "time"
+	"context"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -49,6 +50,8 @@ import (
 	storagemigration "k8s.io/client-go/informers/storagemigration"
 	kubernetes "k8s.io/client-go/kubernetes"
 	cache "k8s.io/client-go/tools/cache"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/klog/v2"
 )
 
 // SharedInformerOption defines the functional option type for SharedInformerFactory.
@@ -141,6 +144,10 @@ func NewSharedInformerFactoryWithOptions(client kubernetes.Interface, defaultRes
 }
 
 func (f *sharedInformerFactory) Start(stopCh <-chan struct{}) {
+	f.StartWithContext(wait.ContextForChannel(stopCh))
+}
+
+func (f *sharedInformerFactory) StartWithContext(ctx context.Context) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
@@ -157,7 +164,14 @@ func (f *sharedInformerFactory) Start(stopCh <-chan struct{}) {
 			informer := informer
 			go func() {
 				defer f.wg.Done()
-				informer.Run(stopCh)
+
+				// Some code logs the type (e.g. reflector.go), but not all.
+				// With contextual logging we get it injected consistently
+				// into all log entries.
+				logger := klog.FromContext(ctx)
+				logger = klog.LoggerWithValues(logger, "type", informerType.String())
+				ctx := klog.NewContext(ctx, logger)
+				informer.RunWithContext(ctx)
 			}()
 			f.startedInformers[informerType] = true
 		}
@@ -249,6 +263,11 @@ type SharedInformerFactory interface {
 	// which run until the stop channel gets closed.
 	// Warning: Start does not block. When run in a go-routine, it will race with a later WaitForCacheSync.
 	Start(stopCh <-chan struct{})
+
+	// Start initializes all requested informers. They are handled in goroutines
+	// which run until the stop channel gets closed.
+	// Warning: Start does not block. When run in a go-routine, it will race with a later WaitForCacheSync.
+	StartWithContext(ctx context.Context)
 
 	// Shutdown marks a factory as shutting down. At that point no new
 	// informers can be started anymore and Start will return without

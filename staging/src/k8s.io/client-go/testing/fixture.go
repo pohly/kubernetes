@@ -19,11 +19,12 @@ package testing
 import (
 	"fmt"
 	"reflect"
-	"sigs.k8s.io/structured-merge-diff/v4/typed"
-	"sigs.k8s.io/yaml"
 	"sort"
 	"strings"
 	"sync"
+
+	"sigs.k8s.io/structured-merge-diff/v4/typed"
+	"sigs.k8s.io/yaml"
 
 	jsonpatch "gopkg.in/evanphx/json-patch.v4"
 
@@ -40,6 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/watch"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/klog/v2"
 )
 
 // ObjectTracker keeps track of objects. It is intended to be used to
@@ -76,7 +78,7 @@ type ObjectTracker interface {
 
 	// Watch watches objects from the tracker. Watch returns a channel
 	// which will push added / modified / deleted object.
-	Watch(gvr schema.GroupVersionResource, ns string, opts ...metav1.ListOptions) (watch.Interface, error)
+	Watch(logger klog.Logger, gvr schema.GroupVersionResource, ns string, opts ...metav1.ListOptions) (watch.Interface, error)
 }
 
 // ObjectScheme abstracts the implementation of common operations on objects.
@@ -353,7 +355,7 @@ func (t *tracker) List(gvr schema.GroupVersionResource, gvk schema.GroupVersionK
 	return list.DeepCopyObject(), nil
 }
 
-func (t *tracker) Watch(gvr schema.GroupVersionResource, ns string, opts ...metav1.ListOptions) (watch.Interface, error) {
+func (t *tracker) Watch(logger klog.Logger, gvr schema.GroupVersionResource, ns string, opts ...metav1.ListOptions) (watch.Interface, error) {
 	_, err := assertOptionalSingleArgument(opts)
 	if err != nil {
 		return nil, err
@@ -362,7 +364,7 @@ func (t *tracker) Watch(gvr schema.GroupVersionResource, ns string, opts ...meta
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	fakewatcher := watch.NewRaceFreeFake()
+	fakewatcher := watch.NewRaceFreeFakeWithLogger(logger)
 
 	if _, exists := t.watchers[gvr]; !exists {
 		t.watchers[gvr] = make(map[string][]*watch.RaceFreeFakeWatcher)

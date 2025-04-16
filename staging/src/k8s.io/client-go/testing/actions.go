@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog/v2"
 )
 
 // All NewRoot... functions return non-namespaced actions, and are equivalent to
@@ -475,13 +476,13 @@ func ExtractFromListOptions(opts interface{}) (labelSelector labels.Selector, fi
 	return labelSelector, fieldSelector, resourceVersion
 }
 
-func NewWatchAction(resource schema.GroupVersionResource, namespace string, opts interface{}) WatchActionImpl {
+func NewWatchAction(logger klog.Logger, resource schema.GroupVersionResource, namespace string, opts interface{}) WatchActionImpl {
 	listOpts, _ := opts.(metav1.ListOptions)
-	return NewWatchActionWithOptions(resource, namespace, listOpts)
+	return NewWatchActionWithOptions(logger, resource, namespace, listOpts)
 }
 
-func NewWatchActionWithOptions(resource schema.GroupVersionResource, namespace string, opts metav1.ListOptions) WatchActionImpl {
-	action := WatchActionImpl{}
+func NewWatchActionWithOptions(logger klog.Logger, resource schema.GroupVersionResource, namespace string, opts metav1.ListOptions) WatchActionImpl {
+	action := WatchActionImpl{ActionImpl: ActionImpl{Logger: &logger}}
 	action.Verb = "watch"
 	action.Resource = resource
 	action.Namespace = namespace
@@ -517,6 +518,7 @@ type WatchRestrictions struct {
 }
 
 type Action interface {
+	GetLogger() klog.Logger
 	GetNamespace() string
 	GetVerb() string
 	GetResource() schema.GroupVersionResource
@@ -586,10 +588,18 @@ type ProxyGetAction interface {
 }
 
 type ActionImpl struct {
+	Logger      *klog.Logger
 	Namespace   string
 	Verb        string
 	Resource    schema.GroupVersionResource
 	Subresource string
+}
+
+func (a ActionImpl) GetLogger() klog.Logger {
+	if a.Logger != nil {
+		return *a.Logger
+	}
+	return klog.Background()
 }
 
 func (a ActionImpl) GetNamespace() string {

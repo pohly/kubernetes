@@ -18,11 +18,13 @@ package cache
 
 import (
 	"fmt"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
-	utiltrace "k8s.io/utils/trace"
 	"sync"
 	"time"
+
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
+	utiltrace "k8s.io/utils/trace"
 )
 
 // RealFIFO is a Queue in which every notification from the Reflector is passed
@@ -31,8 +33,9 @@ import (
 // 1. delivers notifications for items that have been deleted
 // 2. delivers multiple notifications per item instead of simply the most recent value
 type RealFIFO struct {
-	lock sync.RWMutex
-	cond sync.Cond
+	logger klog.Logger
+	lock   sync.RWMutex
+	cond   sync.Cond
 
 	items []Delta
 
@@ -149,7 +152,10 @@ func (f *RealFIFO) Add(obj interface{}) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
-	f.populated = true
+	if !f.populated {
+		f.logger.Info("RealFIFO populated via Add", "objType", fmt.Sprintf("%T", obj))
+		f.populated = true
+	}
 	retErr := f.addToItems_locked(Added, false, obj)
 
 	return retErr
@@ -160,7 +166,10 @@ func (f *RealFIFO) Update(obj interface{}) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
-	f.populated = true
+	if !f.populated {
+		f.logger.Info("RealFIFO populated via Update", "objType", fmt.Sprintf("%T", obj))
+		f.populated = true
+	}
 	retErr := f.addToItems_locked(Updated, false, obj)
 
 	return retErr
@@ -173,7 +182,10 @@ func (f *RealFIFO) Delete(obj interface{}) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
-	f.populated = true
+	if !f.populated {
+		f.logger.Info("RealFIFO populated via Delete", "objType", fmt.Sprintf("%T", obj))
+		f.populated = true
+	}
 	retErr := f.addToItems_locked(Deleted, false, obj)
 
 	return retErr
@@ -334,6 +346,11 @@ func (f *RealFIFO) Replace(newItems []interface{}, resourceVersion string) error
 	}
 
 	if !f.populated {
+		if len(newItems) > 0 {
+			f.logger.Info("RealFIFO populated via Replace", "resourceVersion", resourceVersion, "objType", fmt.Sprintf("%T", newItems[0]))
+		} else {
+			f.logger.Info("RealFIFO populated via Replace with no items", "resourceVersion", resourceVersion)
+		}
 		f.populated = true
 		f.initialPopulationCount = len(f.items)
 	}
