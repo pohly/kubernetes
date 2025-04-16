@@ -241,11 +241,20 @@ func (f *RaceFreeFakeWatcher) ResultChan() <-chan Event {
 	return f.result
 }
 
+func logObj(obj runtime.Object) any {
+	if obj, ok := obj.(klog.KMetadata); ok {
+		return klog.KObj(obj)
+	}
+	// Fallback, should not be necessary.
+	return obj.GetObjectKind()
+}
+
 // Add sends an add event.
 func (f *RaceFreeFakeWatcher) Add(obj runtime.Object) {
 	f.Lock()
 	defer f.Unlock()
 	if !f.Stopped {
+		f.logger.V(4).Info("Add to watch", "obj", logObj(obj))
 		select {
 		case f.result <- Event{Added, obj}:
 			return
@@ -260,6 +269,7 @@ func (f *RaceFreeFakeWatcher) Modify(obj runtime.Object) {
 	f.Lock()
 	defer f.Unlock()
 	if !f.Stopped {
+		f.logger.V(4).Info("Update to watch", "obj", logObj(obj))
 		select {
 		case f.result <- Event{Modified, obj}:
 			return
@@ -274,6 +284,7 @@ func (f *RaceFreeFakeWatcher) Delete(lastValue runtime.Object) {
 	f.Lock()
 	defer f.Unlock()
 	if !f.Stopped {
+		f.logger.V(4).Info("Delete to watch", "obj", logObj(lastValue))
 		select {
 		case f.result <- Event{Deleted, lastValue}:
 			return
@@ -288,6 +299,7 @@ func (f *RaceFreeFakeWatcher) Error(errValue runtime.Object) {
 	f.Lock()
 	defer f.Unlock()
 	if !f.Stopped {
+		f.logger.V(4).Info("Error to watch", "obj", logObj(errValue))
 		select {
 		case f.result <- Event{Error, errValue}:
 			return
@@ -302,6 +314,7 @@ func (f *RaceFreeFakeWatcher) Action(action EventType, obj runtime.Object) {
 	f.Lock()
 	defer f.Unlock()
 	if !f.Stopped {
+		f.logger.V(4).Info("Action to watch", "action", action, "obj", logObj(obj))
 		select {
 		case f.result <- Event{action, obj}:
 			return
