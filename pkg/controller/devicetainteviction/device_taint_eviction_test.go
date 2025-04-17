@@ -1343,7 +1343,8 @@ func TestEviction(t *testing.T) {
 	} {
 		tCtx.Run(name, func(tCtx ktesting.TContext) {
 			tCtx.Parallel()
-			fakeClientset := fake.NewSimpleClientset(tt.initialObjects...)
+			initialObjects := append(tt.initialObjects[:], fake.LoggerObject(tCtx.Logger()))
+			fakeClientset := fake.NewSimpleClientset(initialObjects...)
 			tCtx = ktesting.WithClients(tCtx, nil, nil, fakeClientset, nil, nil)
 
 			var mutex sync.Mutex

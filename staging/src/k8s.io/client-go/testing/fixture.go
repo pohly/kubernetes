@@ -287,6 +287,7 @@ func (o objectTrackerReact) Patch(action PatchActionImpl) (runtime.Object, error
 }
 
 type tracker struct {
+	logger  klog.Logger
 	scheme  ObjectScheme
 	decoder runtime.Decoder
 	lock    sync.RWMutex
@@ -304,7 +305,12 @@ var _ ObjectTracker = &tracker{}
 // NewObjectTracker returns an ObjectTracker that can be used to keep track
 // of objects for the fake clientset. Mostly useful for unit tests.
 func NewObjectTracker(scheme ObjectScheme, decoder runtime.Decoder) ObjectTracker {
+	return NewObjectTrackerWithLogger(klog.Background(), scheme, decoder)
+}
+
+func NewObjectTrackerWithLogger(logger klog.Logger, scheme ObjectScheme, decoder runtime.Decoder) ObjectTracker {
 	return &tracker{
+		logger:   logger,
 		scheme:   scheme,
 		decoder:  decoder,
 		objects:  make(map[schema.GroupVersionResource]map[types.NamespacedName]runtime.Object),
@@ -370,6 +376,7 @@ func (t *tracker) Watch(logger klog.Logger, gvr schema.GroupVersionResource, ns 
 		t.watchers[gvr] = make(map[string][]*watch.RaceFreeFakeWatcher)
 	}
 	t.watchers[gvr][ns] = append(t.watchers[gvr][ns], fakewatcher)
+	logger.V(5).Info("Added new watch", "gvr", gvr, "namespace", ns)
 	return fakewatcher, nil
 }
 
@@ -578,8 +585,9 @@ func (t *tracker) add(gvr schema.GroupVersionResource, obj runtime.Object, ns st
 	}
 
 	t.objects[gvr][namespacedName] = obj
-
-	for _, w := range t.getWatches(gvr, ns) {
+	watches := t.getWatches(gvr, ns)
+	t.logger.V(5).Info("Object stored in tracker", "gvr", gvr, "obj", klog.KObj(newMeta), "numWatches", len(watches))
+	for _, w := range watches {
 		// To avoid the object from being accidentally modified by watcher
 		w.Add(obj.DeepCopyObject())
 	}
@@ -642,9 +650,9 @@ var _ ObjectTracker = &managedFieldObjectTracker{}
 
 // NewFieldManagedObjectTracker returns an ObjectTracker that can be used to keep track
 // of objects and managed fields for the fake clientset. Mostly useful for unit tests.
-func NewFieldManagedObjectTracker(scheme *runtime.Scheme, decoder runtime.Decoder, typeConverter managedfields.TypeConverter) ObjectTracker {
+func NewFieldManagedObjectTracker(logger klog.Logger, scheme *runtime.Scheme, decoder runtime.Decoder, typeConverter managedfields.TypeConverter) ObjectTracker {
 	return &managedFieldObjectTracker{
-		ObjectTracker:   NewObjectTracker(scheme, decoder),
+		ObjectTracker:   NewObjectTrackerWithLogger(logger, scheme, decoder),
 		scheme:          scheme,
 		objectConverter: scheme,
 		mapper:          testrestmapper.TestOnlyStaticRESTMapper(scheme),

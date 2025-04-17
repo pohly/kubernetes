@@ -24,12 +24,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/klog/v2"
 )
 
 // Fake implements client.Interface. Meant to be embedded into a struct to get
 // a default implementation. This makes faking out just the method you want to
 // test easier.
 type Fake struct {
+	klog.Logger
 	sync.RWMutex
 	actions []Action // these may be castable to other types, but "Action" is the minimum
 
