@@ -17,8 +17,12 @@ limitations under the License.
 package logrotation
 
 import (
+	"context"
 	"os"
+	"path"
 	"path/filepath"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -234,5 +238,100 @@ func TestLogrotationWrite(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestTornwrites sets up kube-log-runner of a byte stream with log rotation,
+// then writes chunks of data. Log rotation must not split those chunks.
+func TestTornWrites(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	logFileName := "test.log"
+	output, err := Open(path.Join(tmpDir, logFileName), 0, 1024, 0)
+	if err != nil {
+		t.Fatalf("unexpected error opening test output file: %v", err)
+	}
+
+	// We must write through a real pipe. Doing it in-memory would
+	// reliably preserve chunk boundaries.
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("unexpected error creating a pipe: %v", err)
+	}
+
+	// Output redirection happens in the background.
+	var wg sync.WaitGroup
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		cancel()
+		wg.Wait()
+	}()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		// We don't know the size of the buffer that exec.Command is using when
+		// reading the command's output. Let's make it large.
+		buffer := make([]byte, 10*1024)
+		for ctx.Err() == nil {
+			read, err := r.Read(buffer)
+			if err != nil {
+				t.Errorf("unexpected error reading from pipe: %v", err)
+				cancel()
+				break
+			}
+			if read <= 0 {
+				continue
+			}
+			if _, err := output.Write(buffer[0:read]); err != nil {
+				t.Errorf("unexpected error writing to test output file: %v", err)
+				cancel()
+				break
+			}
+		}
+	}()
+
+	// In the foreground, we write several chunks, then check the resulting files.
+	// The size of each written chunk is intentionally not aligned with buffer
+	// sizes above.
+	header := "START:\n"
+	continuation := "   log continuation\n"
+	logData := []byte(header + strings.Repeat(continuation, 3000/len(continuation)))
+	numFiles := 0
+	recordsPerCheck := 5
+	for i := 0; i < 100; i++ {
+		for e := 0; e < recordsPerCheck; e++ {
+			_, err := w.Write(logData)
+			if err != nil {
+				t.Fatalf("unexpected error writing to pipe: %v", err)
+			}
+		}
+
+		// Pause writing to check resulting files.
+		entries, err := os.ReadDir(tmpDir)
+		if err != nil {
+			t.Fatalf("unexpected error reading temp directory: %v", err)
+		}
+
+		for _, entry := range entries {
+			if entry.Name() == logFileName {
+				continue
+			}
+			// We don't need to read the content. Any file which is not
+			// aligned with the log data chunk size must contain an
+			// incomplete log record.
+			info, err := entry.Info()
+			if err != nil {
+				t.Fatalf("unexpected error getting file infos: %v", err)
+			}
+			if mod := info.Size() % int64(len(logData)); mod != 0 {
+				t.Fatalf("after writing %d log records, file %s contains an incomplete log record (total length %d module log record length %d = %d)", i*recordsPerCheck, entry.Name(), info.Size(), len(logData), mod)
+			}
+			numFiles++
+		}
+	}
+
+	if numFiles == 0 {
+		t.Error("should have seen backup log files, got none")
 	}
 }
