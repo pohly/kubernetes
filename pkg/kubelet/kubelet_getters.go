@@ -120,8 +120,9 @@ func (kl *Kubelet) ListPodsFromDisk() ([]types.UID, error) {
 // user namespaces.
 func (kl *Kubelet) HandlerSupportsUserNamespaces(rtHandler string) (bool, error) {
 	rtHandlers := kl.runtimeState.runtimeHandlers()
-	if rtHandlers == nil {
-		return false, fmt.Errorf("runtime handlers are not set")
+	if len(rtHandlers) == 0 {
+		// The slice is empty if the runtime is old and doesn't support this message.
+		return false, nil
 	}
 	for _, h := range rtHandlers {
 		if h.Name == rtHandler {
@@ -277,11 +278,6 @@ func (kl *Kubelet) GetPodByCgroupfs(cgroupfs string) (*v1.Pod, bool) {
 		return kl.podManager.GetPodByUID(podUID)
 	}
 	return nil, false
-}
-
-// GetHostname Returns the hostname as the kubelet sees it.
-func (kl *Kubelet) GetHostname() string {
-	return kl.hostname
 }
 
 // getRuntime returns the current Runtime implementation in use by the kubelet.

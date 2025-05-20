@@ -307,7 +307,7 @@ func newTestKubeletWithImageList(
 	volumeStatsAggPeriod := time.Second * 10
 	kubelet.resourceAnalyzer = serverstats.NewResourceAnalyzer(kubelet, volumeStatsAggPeriod, kubelet.recorder)
 
-	fakeHostStatsProvider := stats.NewFakeHostStatsProvider()
+	fakeHostStatsProvider := stats.NewFakeHostStatsProvider(&containertest.FakeOS{})
 
 	kubelet.StatsProvider = stats.NewCadvisorStatsProvider(
 		kubelet.cadvisor,
@@ -3553,7 +3553,6 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 	kubeDep := &Dependencies{
 		Auth:                 nil,
 		CAdvisorInterface:    cadvisor,
-		Cloud:                nil,
 		ContainerManager:     cm.NewStubContainerManager(),
 		KubeClient:           nil, // standalone mode
 		HeartbeatClient:      nil,
@@ -3577,7 +3576,6 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 		kubeDep,
 		crOptions,
 		"hostname",
-		false,
 		"hostname",
 		[]net.IP{},
 		"",

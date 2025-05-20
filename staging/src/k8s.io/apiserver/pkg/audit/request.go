@@ -40,7 +40,7 @@ const (
 	userAgentTruncateSuffix = "...TRUNCATED"
 )
 
-func LogRequestMetadata(ctx context.Context, req *http.Request, requestReceivedTimestamp time.Time, level auditinternal.Level, attribs authorizer.Attributes) {
+func LogRequestMetadata(ctx context.Context, req *http.Request, requestReceivedTimestamp time.Time, attribs authorizer.Attributes) {
 	ac := AuditContextFrom(ctx)
 	if !ac.Enabled() {
 		return
@@ -51,7 +51,6 @@ func LogRequestMetadata(ctx context.Context, req *http.Request, requestReceivedT
 		ev.Verb = attribs.GetVerb()
 		ev.RequestURI = req.URL.RequestURI()
 		ev.UserAgent = maybeTruncateUserAgent(req)
-		ev.Level = level
 
 		ips := utilnet.SourceIPs(req)
 		ev.SourceIPs = make([]string, len(ips))
@@ -172,11 +171,13 @@ func LogRequestPatch(ctx context.Context, patch []byte) {
 // will be converted to the given gv.
 func LogResponseObject(ctx context.Context, obj runtime.Object, gv schema.GroupVersion, s runtime.NegotiatedSerializer) {
 	ac := AuditContextFrom(WithAuditContext(ctx))
+	status, _ := obj.(*metav1.Status)
 	if ac.GetEventLevel().Less(auditinternal.LevelMetadata) {
 		return
+	} else if ac.GetEventLevel().Less(auditinternal.LevelRequestResponse) {
+		ac.LogResponseObject(status, nil)
+		return
 	}
-
-	status, _ := obj.(*metav1.Status)
 
 	if shouldOmitManagedFields(ac) {
 		copy, ok, err := copyWithoutManagedFields(obj)

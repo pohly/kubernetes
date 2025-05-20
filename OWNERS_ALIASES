@@ -280,6 +280,7 @@ aliases:
   # - khenidak
   # - mrhohn
   sig-network-reviewers:
+    - adrianmoisey
     - aojea
     - aroradaman
     - bowei
@@ -442,6 +443,7 @@ aliases:
   sig-cloud-provider-api-reviewers:
     - elmiko
     - cheftako
+    - joelspeed
     - dims
   # sig-cluster-lifecycle-api-reviewers:
   #   -
