@@ -54,6 +54,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	kubeschedulerscheme "k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/integration/util"
 	"k8s.io/kubernetes/test/utils/format"
@@ -200,6 +201,7 @@ func TestDRA(t *testing.T) {
 			features: map[featuregate.Feature]bool{features.DynamicResourceAllocation: true},
 			f: func(tCtx ktesting.TContext) {
 				tCtx.Run("AdminAccess", func(tCtx ktesting.TContext) { testAdminAccess(tCtx, false) })
+				tCtx.Run("DeviceBindingConditions", func(tCtx ktesting.TContext) { testDeviceBindingConditions(tCtx, false) })
 				tCtx.Run("PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, false) })
 				tCtx.Run("Pod", func(tCtx ktesting.TContext) { testPod(tCtx, true) })
 				tCtx.Run("PublishResourceSlices", func(tCtx ktesting.TContext) {
@@ -240,14 +242,16 @@ func TestDRA(t *testing.T) {
 				// Additional DRA feature gates go here,
 				// in alphabetical order,
 				// as needed by tests for them.
-				features.DRAAdminAccess:          true,
-				features.DRADeviceTaints:         true,
-				features.DRAPartitionableDevices: true,
-				features.DRAPrioritizedList:      true,
+				features.DRAAdminAccess:             true,
+				features.DRADeviceBindingConditions: true,
+				features.DRADeviceTaints:            true,
+				features.DRAPartitionableDevices:    true,
+				features.DRAPrioritizedList:         true,
 			},
 			f: func(tCtx ktesting.TContext) {
 				tCtx.Run("AdminAccess", func(tCtx ktesting.TContext) { testAdminAccess(tCtx, true) })
 				tCtx.Run("Convert", testConvert)
+				tCtx.Run("DeviceBindingConditions", func(tCtx ktesting.TContext) { testDeviceBindingConditions(tCtx, true) })
 				tCtx.Run("PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, true) })
 				tCtx.Run("PublishResourceSlices", func(tCtx ktesting.TContext) { testPublishResourceSlices(tCtx) })
 				tCtx.Run("MaxResourceSlice", testMaxResourceSlice)
@@ -504,6 +508,112 @@ func testAdminAccess(tCtx ktesting.TContext, adminAccessEnabled bool) {
 			tCtx.Fatal("should drop AdminAccess in ResourceClaim")
 		}
 	}
+}
+
+// testDeviceBindingConditions checks scheduling with a mixture of devices where one (listed first)
+// depends on binding conditions and the second one doesn't. The first pod should get the
+// device without binding conditions because using it is simpler. The second pod then gets
+// the device with binding conditions. The test cases in scheduler_perf cover "successful binding"
+// and "permanently failing binding". Here we fail once and check that the scheduler retries.
+//
+// TODO: update the test when "prefer devices without binding conditions" is implemented.
+func testDeviceBindingConditions(tCtx ktesting.TContext, enabled bool) {
+	tCtx.Parallel()
+	namespace := createTestNamespace(tCtx, nil)
+	class, driverName := createTestClass(tCtx, namespace)
+
+	nodeName := "worker-0"
+	bindingCondition := "attached"
+	failureCondition := "failed"
+	slice := &resourceapi.ResourceSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: namespace + "-",
+		},
+		Spec: resourceapi.ResourceSliceSpec{
+			NodeName: nodeName,
+			Pool: resourceapi.ResourcePool{
+				Name:               nodeName,
+				ResourceSliceCount: 1,
+			},
+			Driver: driverName,
+			Devices: []resourceapi.Device{
+				{
+					Name: "with-binding",
+					Basic: &resourceapi.BasicDevice{
+						BindingConditions:        []string{bindingCondition},
+						BindingFailureConditions: []string{failureCondition},
+					},
+				},
+				// {
+				// 	Name:  "without-binding",
+				// 	Basic: &resourceapi.BasicDevice{},
+				// },
+			},
+		},
+	}
+	slice, err := tCtx.Client().ResourceV1beta1().ResourceSlices().Create(tCtx, slice, metav1.CreateOptions{})
+	tCtx.ExpectNoError(err, "create slice")
+
+	haveBindingConditionFields := len(slice.Spec.Devices[0].Basic.BindingConditions) > 0 || len(slice.Spec.Devices[0].Basic.BindingFailureConditions) > 0
+	if !enabled {
+		if haveBindingConditionFields {
+			tCtx.Fatalf("Expected device binding condition fields to get dropped, got instead:\n%s", format.Object(slice, 1))
+		}
+		return
+	}
+	if !haveBindingConditionFields {
+		tCtx.Fatalf("Expected device binding condition fields to be stored, got instead:\n%s", format.Object(slice, 1))
+	}
+
+	startScheduler(tCtx)
+
+	// Schedule first pod and wait for the scheduler to reach the binding phase, which marks the claim as allocated.
+	start := time.Now()
+	claim := createClaim(tCtx, namespace, "-a", class, claim)
+	pod := createPod(tCtx, namespace, "-a", claim, podWithClaimName)
+	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *resourceapi.ResourceClaim {
+		c, err := tCtx.Client().ResourceV1beta1().ResourceClaims(namespace).Get(tCtx, claim.Name, metav1.GetOptions{})
+		tCtx.ExpectNoError(err)
+		claim = c
+		return claim
+	}).Should(gomega.HaveField("Status.Allocation", gomega.Not(gomega.BeNil())), "Claim should have been allocated.")
+	end := time.Now()
+	gomega.NewWithT(tCtx).Expect(claim).To(gomega.HaveField("Status.Allocation", gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+		"Devices": gomega.Equal(resourceapi.DeviceAllocationResult{
+			Results: []resourceapi.DeviceRequestAllocationResult{{
+				Request:                  claim.Spec.Devices.Requests[0].Name,
+				Driver:                   driverName,
+				Pool:                     nodeName,
+				Device:                   "with-binding",
+				BindingConditions:        []string{bindingCondition},
+				BindingFailureConditions: []string{failureCondition},
+			}}}),
+		// NodeSelector intentionally not checked - that's covered elsewhere.
+		"AllocationTimestamp": gomega.HaveField("Time", gomega.And(
+			gomega.BeTemporally(">=", start.Truncate(time.Second) /* may get rounded down during round-tripping */),
+			gomega.BeTemporally("<=", end),
+		)),
+	}))), "first allocated claim")
+
+	// Allow the scheduler to proceed.
+	claim.Status.Devices = []resourceapi.AllocatedDeviceStatus{{
+		Driver: driverName,
+		Pool:   nodeName,
+		Device: "with-binding",
+		Conditions: []metav1.Condition{{
+			Type:               bindingCondition,
+			Status:             metav1.ConditionTrue,
+			ObservedGeneration: claim.Generation,
+			LastTransitionTime: metav1.Now(),
+			Reason:             "Testing",
+			Message:            "The test has seen the allocation.",
+		}},
+	}}
+	claim, err = tCtx.Client().ResourceV1beta1().ResourceClaims(namespace).UpdateStatus(tCtx, claim, metav1.UpdateOptions{})
+	tCtx.ExpectNoError(err, "add binding condition")
+
+	err = e2epod.WaitForPodScheduled(tCtx, tCtx.Client(), namespace, pod.Name)
+	tCtx.ExpectNoError(err, "first pod scheduled")
 }
 
 func testPrioritizedList(tCtx ktesting.TContext, enabled bool) {
