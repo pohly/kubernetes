@@ -58,8 +58,6 @@ message AllocatedDeviceStatus {
   // +required
   optional string device = 3;
 
-  // +default=""
-  // +optional
   optional string shareUID = 7;
 
   // Conditions contains the latest observation of the device's state.

@@ -1481,9 +1481,7 @@ type AllocatedDeviceStatus struct {
 	// +required
 	Device string
 
-	// +default=""
-	// +optional
-	ShareUID *string
+	ShareUID string
 
 	// Conditions contains the latest observation of the device's state.
 	// If the device has been configured according to the class and claim

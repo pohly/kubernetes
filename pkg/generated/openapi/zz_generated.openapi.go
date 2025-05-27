@@ -46928,7 +46928,7 @@ func schema_k8sio_api_resource_v1alpha3_AllocatedDeviceStatus(ref common.Referen
 						},
 					},
 				},
-				Required: []string{"driver", "pool", "device"},
+				Required: []string{"driver", "pool", "device", "shareUID"},
 			},
 		},
 		Dependencies: []string{
@@ -49020,7 +49020,7 @@ func schema_k8sio_api_resource_v1beta1_AllocatedDeviceStatus(ref common.Referenc
 						},
 					},
 				},
-				Required: []string{"driver", "pool", "device"},
+				Required: []string{"driver", "pool", "device", "shareUID"},
 			},
 		},
 		Dependencies: []string{
@@ -50949,7 +50949,7 @@ func schema_k8sio_api_resource_v1beta2_AllocatedDeviceStatus(ref common.Referenc
 						},
 					},
 				},
-				Required: []string{"driver", "pool", "device"},
+				Required: []string{"driver", "pool", "device", "shareUID"},
 			},
 		},
 		Dependencies: []string{

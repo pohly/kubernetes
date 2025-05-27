@@ -540,10 +540,9 @@ func testResourceClaimDeviceStatus(tCtx ktesting.TContext, enabled bool) {
 	tCtx.ExpectNoError(err, "create ResourceClaim")
 
 	deviceStatus := []resourceapi.AllocatedDeviceStatus{{
-		Driver:   "one",
-		Pool:     "global",
-		Device:   "my-device",
-		ShareUID: ptr.To(""), // Not required, but comes back like this because of defaulting, so we need to set it for require.Equal below.
+		Driver: "one",
+		Pool:   "global",
+		Device: "my-device",
 		Data: &runtime.RawExtension{
 			Raw: []byte(`{"kind": "foo", "apiVersion": "dra.example.com/v1"}`),
 		},
@@ -618,10 +617,9 @@ func testResourceClaimDeviceStatus(tCtx ktesting.TContext, enabled bool) {
 		WithDevice("another-device").
 		WithNetworkData(resourceapiac.NetworkDeviceData().WithInterfaceName("net-2"))
 	deviceStatus = append(deviceStatus, resourceapi.AllocatedDeviceStatus{
-		Driver:   "two",
-		Pool:     "global",
-		Device:   "another-device",
-		ShareUID: ptr.To(""),
+		Driver: "two",
+		Pool:   "global",
+		Device: "another-device",
 		NetworkData: &resourceapi.NetworkDeviceData{
 			InterfaceName: "net-2",
 		},
@@ -641,10 +639,9 @@ func testResourceClaimDeviceStatus(tCtx ktesting.TContext, enabled bool) {
 		WithDevice("my-device").
 		WithNetworkData(resourceapiac.NetworkDeviceData().WithInterfaceName("net-3"))
 	deviceStatus = append(deviceStatus, resourceapi.AllocatedDeviceStatus{
-		Driver:   "three",
-		Pool:     "global",
-		Device:   "my-device",
-		ShareUID: ptr.To(""),
+		Driver: "three",
+		Pool:   "global",
+		Device: "my-device",
 		NetworkData: &resourceapi.NetworkDeviceData{
 			InterfaceName: "net-3",
 		},
