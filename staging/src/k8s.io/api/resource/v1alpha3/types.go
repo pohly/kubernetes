@@ -1503,6 +1503,7 @@ type AllocatedDeviceStatus struct {
 	// +required
 	Device string `json:"device" protobuf:"bytes,3,rep,name=device"`
 
+	// +default=""
 	// +optional
 	ShareUID *string `json:"shareUID" protobuf:"bytes,7,rep,name=shareUID"`
 

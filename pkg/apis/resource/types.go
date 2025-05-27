@@ -1481,6 +1481,7 @@ type AllocatedDeviceStatus struct {
 	// +required
 	Device string
 
+	// +default=""
 	// +optional
 	ShareUID *string
 

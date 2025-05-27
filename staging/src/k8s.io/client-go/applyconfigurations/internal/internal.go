@@ -12526,6 +12526,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: shareUID
       type:
         scalar: string
+      default: ""
 - name: io.k8s.api.resource.v1alpha3.AllocationResult
   map:
     fields:
@@ -13154,6 +13155,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: shareUID
       type:
         scalar: string
+      default: ""
 - name: io.k8s.api.resource.v1beta1.AllocationResult
   map:
     fields:
@@ -13740,6 +13742,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: shareUID
       type:
         scalar: string
+      default: ""
 - name: io.k8s.api.resource.v1beta2.AllocationResult
   map:
     fields:
