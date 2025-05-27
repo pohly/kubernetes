@@ -46886,6 +46886,12 @@ func schema_k8sio_api_resource_v1alpha3_AllocatedDeviceStatus(ref common.Referen
 							Format:      "",
 						},
 					},
+					"shareUID": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
+						},
+					},
 					"conditions": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
@@ -48560,6 +48566,7 @@ func schema_k8sio_api_resource_v1alpha3_ResourceClaimStatus(ref common.Reference
 									"driver",
 									"device",
 									"pool",
+									"shareUID",
 								},
 								"x-kubernetes-list-type": "map",
 							},
@@ -48968,6 +48975,12 @@ func schema_k8sio_api_resource_v1beta1_AllocatedDeviceStatus(ref common.Referenc
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
+						},
+					},
+					"shareUID": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
 						},
 					},
 					"conditions": {
@@ -50481,6 +50494,7 @@ func schema_k8sio_api_resource_v1beta1_ResourceClaimStatus(ref common.ReferenceC
 									"driver",
 									"device",
 									"pool",
+									"shareUID",
 								},
 								"x-kubernetes-list-type": "map",
 							},
@@ -50889,6 +50903,12 @@ func schema_k8sio_api_resource_v1beta2_AllocatedDeviceStatus(ref common.Referenc
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
+						},
+					},
+					"shareUID": {
+						SchemaProps: spec.SchemaProps{
+							Type:   []string{"string"},
+							Format: "",
 						},
 					},
 					"conditions": {
@@ -52403,6 +52423,7 @@ func schema_k8sio_api_resource_v1beta2_ResourceClaimStatus(ref common.ReferenceC
 									"driver",
 									"device",
 									"pool",
+									"shareUID",
 								},
 								"x-kubernetes-list-type": "map",
 							},

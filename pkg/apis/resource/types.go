@@ -1138,6 +1138,7 @@ type ResourceClaimStatus struct {
 	// +listMapKey=driver
 	// +listMapKey=device
 	// +listMapKey=pool
+	// +listMapKey=shareUID
 	// +featureGate=DRAResourceClaimDeviceStatus
 	Devices []AllocatedDeviceStatus
 }
@@ -1479,6 +1480,9 @@ type AllocatedDeviceStatus struct {
 	//
 	// +required
 	Device string
+
+	// +optional
+	ShareUID *string
 
 	// Conditions contains the latest observation of the device's state.
 	// If the device has been configured according to the class and claim

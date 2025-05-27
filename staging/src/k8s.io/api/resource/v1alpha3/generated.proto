@@ -58,6 +58,9 @@ message AllocatedDeviceStatus {
   // +required
   optional string device = 3;
 
+  // +optional
+  optional string shareUID = 7;
+
   // Conditions contains the latest observation of the device's state.
   // If the device has been configured according to the class and claim
   // config references, the `Ready` condition should be True.
@@ -1158,6 +1161,7 @@ message ResourceClaimStatus {
   // +listMapKey=driver
   // +listMapKey=device
   // +listMapKey=pool
+  // +listMapKey=shareUID
   // +featureGate=DRAResourceClaimDeviceStatus
   repeated AllocatedDeviceStatus devices = 4;
 }

@@ -448,6 +448,7 @@ func autoConvert_v1beta2_AllocatedDeviceStatus_To_resource_AllocatedDeviceStatus
 	out.Driver = in.Driver
 	out.Pool = in.Pool
 	out.Device = in.Device
+	out.ShareUID = (*string)(unsafe.Pointer(in.ShareUID))
 	out.Conditions = *(*[]v1.Condition)(unsafe.Pointer(&in.Conditions))
 	out.Data = (*runtime.RawExtension)(unsafe.Pointer(in.Data))
 	out.NetworkData = (*resource.NetworkDeviceData)(unsafe.Pointer(in.NetworkData))
@@ -463,6 +464,7 @@ func autoConvert_resource_AllocatedDeviceStatus_To_v1beta2_AllocatedDeviceStatus
 	out.Driver = in.Driver
 	out.Pool = in.Pool
 	out.Device = in.Device
+	out.ShareUID = (*string)(unsafe.Pointer(in.ShareUID))
 	out.Conditions = *(*[]v1.Condition)(unsafe.Pointer(&in.Conditions))
 	out.Data = (*runtime.RawExtension)(unsafe.Pointer(in.Data))
 	out.NetworkData = (*resourcev1beta2.NetworkDeviceData)(unsafe.Pointer(in.NetworkData))
