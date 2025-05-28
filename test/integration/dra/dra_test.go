@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path"
 	"regexp"
 	"sort"
 	"strings"
@@ -34,6 +35,7 @@ import (
 	"github.com/onsi/gomega/gstruct"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	clientv3 "go.etcd.io/etcd/client/v3"
 
 	v1 "k8s.io/api/core/v1"
 	resourcealphaapi "k8s.io/api/resource/v1alpha3"
@@ -58,6 +60,7 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/integration/util"
+	"k8s.io/kubernetes/test/utils/format"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
@@ -212,6 +215,7 @@ func TestDRA(t *testing.T) {
 				tCtx.Run("PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, true) })
 				tCtx.Run("PublishResourceSlices", func(tCtx ktesting.TContext) { testPublishResourceSlices(tCtx) })
 				tCtx.Run("ResourceClaimDeviceStatus", func(tCtx ktesting.TContext) { testResourceClaimDeviceStatus(tCtx, true) })
+				tCtx.Run("DeviceStatusWithConsumableCapacity", testResourceClaimDeviceStatusWithConsumableCapacity)
 				tCtx.Run("MaxResourceSlice", testMaxResourceSlice)
 			},
 		},
@@ -243,11 +247,32 @@ func TestDRA(t *testing.T) {
 			server := kubeapiservertesting.StartTestServerOrDie(t, apiServerOptions, apiServerFlags, etcdOptions)
 			tCtx.Cleanup(server.TearDownFn)
 			tCtx = ktesting.WithRESTConfig(tCtx, server.ClientConfig)
+			tCtx = ktesting.WithValue(tCtx, etcdKey, etcd{client: server.EtcdClient, storagePrefix: server.EtcdStoragePrefix})
 
 			tc.f(tCtx)
 		})
 	}
 }
+
+func getEtcd(tCtx ktesting.TContext) etcd {
+	return tCtx.Value(etcdKey).(etcd)
+}
+
+type etcd struct {
+	client        *clientv3.Client
+	storagePrefix string
+}
+
+func (e etcd) put(tCtx ktesting.TContext, resource, namespace, name, data string) {
+	tCtx.Helper()
+	key := path.Join("/", e.storagePrefix, resource, namespace, name)
+	_, err := e.client.Put(tCtx, key, data)
+	tCtx.ExpectNoError(err, fmt.Sprintf("etcd PUT %s", key))
+}
+
+type etcdKeyType struct{}
+
+var etcdKey etcdKeyType
 
 func startScheduler(tCtx ktesting.TContext) {
 	// Run scheduler with default configuration.
@@ -682,6 +707,265 @@ func testResourceClaimDeviceStatus(tCtx ktesting.TContext, enabled bool) {
 		FieldManager: "manager-2",
 	})
 	tCtx.ExpectNoError(err, "remove device status three")
+	require.Equal(tCtx, deviceStatus, claim.Status.Devices, "after removing device status three")
+}
+
+// testResourceClaimDeviceStatusWithConsumableCapacity checks the upgrade path of adding SharedUID to
+// the keys of the devices +listType=map.
+func testResourceClaimDeviceStatusWithConsumableCapacity(tCtx ktesting.TContext) {
+	namespace := createTestNamespace(tCtx, nil)
+	claimName := "test-claim"
+	etcd := getEtcd(tCtx)
+
+	// Store a ResourceClaim as it would have been stored by Kubernetes 1.32,
+	// with three keys instead of four.
+	data := `{
+              "kind": "ResourceClaim",
+              "apiVersion": "resource.k8s.io/v1beta1",
+              "metadata": {
+                 "name": "test-claim",
+                 "namespace": "test-namespace",
+                 "uid": "90715e47-024e-45eb-88fb-1cc0313e7d39",
+                 "resourceVersion": "75",
+                 "creationTimestamp": "2025-05-27T14:08:37Z",
+                 "managedFields": [
+                    {
+                       "manager": "manager-1",
+                       "operation": "Apply",
+                       "apiVersion": "resource.k8s.io/v1beta1",
+                       "time": "2025-05-27T14:08:37Z",
+                       "fieldsType": "FieldsV1",
+                       "fieldsV1": {
+                          "f:status": {
+                             "f:devices": {
+                                "k:{\"device\":\"another-device\",\"driver\":\"two\",\"pool\":\"global\"}": {
+                                   ".": {},
+                                   "f:device": {},
+                                   "f:driver": {},
+                                   "f:networkData": {
+                                      "f:interfaceName": {}
+                                   },
+                                   "f:pool": {}
+                                }
+                             }
+                          }
+                       },
+                       "subresource": "status"
+                    },
+                    {
+                       "manager": "manager-2",
+                       "operation": "Apply",
+                       "apiVersion": "resource.k8s.io/v1beta1",
+                       "time": "2025-05-27T14:08:37Z",
+                       "fieldsType": "FieldsV1",
+                       "fieldsV1": {
+                          "f:status": {
+                             "f:devices": {
+                                "k:{\"device\":\"my-device\",\"driver\":\"three\",\"pool\":\"global\"}": {
+                                   ".": {},
+                                   "f:device": {},
+                                   "f:driver": {},
+                                   "f:networkData": {
+                                      "f:interfaceName": {}
+                                   },
+                                   "f:pool": {}
+                                }
+                             }
+                          }
+                       },
+                       "subresource": "status"
+                    },
+                    {
+                       "manager": "dra.test",
+                       "operation": "Update",
+                       "apiVersion": "resource.k8s.io/v1beta1",
+                       "time": "2025-05-27T14:08:37Z",
+                       "fieldsType": "FieldsV1",
+                       "fieldsV1": {
+                          "f:spec": {
+                             "f:devices": {
+                                "f:requests": {}
+                             }
+                          }
+                       }
+                    },
+                    {
+                       "manager": "dra.test",
+                       "operation": "Update",
+                       "apiVersion": "resource.k8s.io/v1beta1",
+                       "time": "2025-05-27T14:08:37Z",
+                       "fieldsType": "FieldsV1",
+                       "fieldsV1": {
+                          "f:status": {
+                             "f:allocation": {
+                                ".": {},
+                                "f:devices": {
+                                   ".": {},
+                                   "f:results": {}
+                                }
+                             },
+                             "f:devices": {
+                                ".": {},
+                                "k:{\"device\":\"my-device\",\"driver\":\"one\",\"pool\":\"global\"}": {
+                                   ".": {},
+                                   "f:conditions": {},
+                                   "f:device": {},
+                                   "f:driver": {},
+                                   "f:networkData": {
+                                      ".": {},
+                                      "f:hardwareAddress": {},
+                                      "f:interfaceName": {},
+                                      "f:ips": {}
+                                   },
+                                   "f:pool": {}
+                                }
+                             }
+                          }
+                       },
+                       "subresource": "status"
+                    }
+                 ]
+              },
+              "spec": {
+                 "devices": {
+                    "requests": [
+                       {
+                          "name": "foo",
+                          "deviceClassName": "foo",
+                          "allocationMode": "ExactCount",
+                          "count": 1
+                       }
+                    ]
+                 }
+              },
+              "status": {
+                 "allocation": {
+                    "devices": {
+                       "results": [
+                          {
+                             "request": "foo",
+                             "driver": "one",
+                             "pool": "global",
+                             "device": "my-device",
+                             "adminAccess": null
+                          },
+                          {
+                             "request": "foo",
+                             "driver": "two",
+                             "pool": "global",
+                             "device": "another-device",
+                             "adminAccess": null
+                          },
+                          {
+                             "request": "foo",
+                             "driver": "three",
+                             "pool": "global",
+                             "device": "my-device",
+                             "adminAccess": null
+                          }
+                       ]
+                    }
+                 },
+                 "devices": [
+                    {
+                       "driver": "one",
+                       "pool": "global",
+                       "device": "my-device",
+                       "conditions": null,
+                       "networkData": {
+                          "interfaceName": "net-1",
+                          "ips": [
+                             "10.9.8.0/24",
+                             "2001:db8::/64"
+                          ],
+                          "hardwareAddress": "ea:9f:cb:40:b1:7b"
+                       }
+                    },
+                    {
+                       "driver": "two",
+                       "pool": "global",
+                       "device": "another-device",
+                       "conditions": null,
+                       "networkData": {
+                          "interfaceName": "net-2"
+                       }
+                    },
+                    {
+                       "driver": "three",
+                       "pool": "global",
+                       "device": "my-device",
+                       "conditions": null,
+                       "networkData": {
+                          "interfaceName": "net-3"
+                       }
+                    }
+                 ]
+              }
+           }
+`
+	data = strings.ReplaceAll(data, "test-namespace", namespace)
+	data = strings.ReplaceAll(data, "\n", "")
+	etcd.put(tCtx, "resourceclaims", namespace, claimName, data)
+
+	deviceStatus := []resourceapi.AllocatedDeviceStatus{
+		{
+			Driver: "one",
+			Pool:   "global",
+			Device: "my-device",
+			NetworkData: &resourceapi.NetworkDeviceData{
+				InterfaceName: "net-1",
+				IPs: []string{
+					"10.9.8.0/24",
+					"2001:db8::/64",
+				},
+				HardwareAddress: "ea:9f:cb:40:b1:7b",
+			},
+		},
+		{
+			Driver: "two",
+			Pool:   "global",
+			Device: "another-device",
+			NetworkData: &resourceapi.NetworkDeviceData{
+				InterfaceName: "net-2",
+			},
+		},
+		{
+			Driver: "three",
+			Pool:   "global",
+			Device: "my-device",
+			NetworkData: &resourceapi.NetworkDeviceData{
+				InterfaceName: "net-3",
+			},
+		},
+	}
+	claim, err := tCtx.Client().ResourceV1beta1().ResourceClaims(namespace).Get(tCtx, claimName, metav1.GetOptions{})
+	tCtx.ExpectNoError(err, "get pre-generated ResourceClaim")
+	require.Equal(tCtx, deviceStatus, claim.Status.Devices)
+
+	// Update one entry, remove the other.
+	deviceStatusAC := resourceapiac.AllocatedDeviceStatus().
+		WithDriver("two").
+		WithPool("global").
+		WithDevice("another-device").
+		WithNetworkData(resourceapiac.NetworkDeviceData().WithInterfaceName("yet-another-net"))
+	deviceStatus[1].NetworkData.InterfaceName = "yet-another-net"
+	claimAC := resourceapiac.ResourceClaim(claim.Name, claim.Namespace).
+		WithStatus(resourceapiac.ResourceClaimStatus().WithDevices(deviceStatusAC))
+	claim, err = tCtx.Client().ResourceV1beta1().ResourceClaims(namespace).ApplyStatus(tCtx, claimAC, metav1.ApplyOptions{
+		Force:        true,
+		FieldManager: "manager-1",
+	})
+	tCtx.ExpectNoError(err, "update device status two")
+	tCtx.Logf("Managed fields after updating device status two:\n%s", format.Object(claim.ManagedFields, 1))
+	require.Equal(tCtx, deviceStatus, claim.Status.Devices, "after updating device status two")
+	claimAC = resourceapiac.ResourceClaim(claim.Name, claim.Namespace)
+	deviceStatus = deviceStatus[0:2]
+	claim, err = tCtx.Client().ResourceV1beta1().ResourceClaims(namespace).ApplyStatus(tCtx, claimAC, metav1.ApplyOptions{
+		Force:        true,
+		FieldManager: "manager-2",
+	})
+	tCtx.ExpectNoError(err, "remove device status three")
+	tCtx.Logf("Managed fields after updating device status three:\n%s", format.Object(claim.ManagedFields, 1))
 	require.Equal(tCtx, deviceStatus, claim.Status.Devices, "after removing device status three")
 }
 
