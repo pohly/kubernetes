@@ -742,7 +742,8 @@ function start_controller_manager {
     fi
 
     CTLRMGR_LOG=${LOG_DIR}/kube-controller-manager.log
-    run kube-controller-manager "${CTLRMGR_LOG}" "${CONTROLPLANE_SUDO}" "${GO_OUT}/kube-controller-manager" \
+    # shellcheck disable=SC2086
+    run kube-controller-manager "${CTLRMGR_LOG}" ${CONTROLPLANE_SUDO} "${GO_OUT}/kube-controller-manager" \
       --v="${LOG_LEVEL}" \
       --vmodule="${LOG_SPEC}" \
       --service-account-private-key-file="${SERVICE_ACCOUNT_KEY}" \
@@ -1113,7 +1114,8 @@ clientConnection:
 leaderElection:
   leaderElect: ${LEADER_ELECT}
 EOF
-    run kube-scheduler "${SCHEDULER_LOG}" "${CONTROLPLANE_SUDO}" "${GO_OUT}/kube-scheduler" \
+    # shellcheck disable=SC2086
+    run kube-scheduler "${SCHEDULER_LOG}" ${CONTROLPLANE_SUDO} "${GO_OUT}/kube-scheduler" \
       --v="${LOG_LEVEL}" \
       --config="${TMP_DIR}"/kube-scheduler.yaml \
       --feature-gates="${FEATURE_GATES}" \
