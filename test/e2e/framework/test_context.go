@@ -417,7 +417,7 @@ func RegisterClusterFlags(flags *flag.FlagSet) {
 	flags.StringVar(&TestContext.KubeletRootDir, "kubelet-root-dir", "/var/lib/kubelet", "The data directory of kubelet. Some tests (for example, CSI storage tests) deploy DaemonSets which need to know this value and cannot query it. Such tests only work in clusters where the data directory is the same on all nodes.")
 	flags.StringVar(&TestContext.KubeletRootDir, "volume-dir", "/var/lib/kubelet", "An alias for --kubelet-root-dir, kept for backwards compatibility.")
 	flags.StringVar(&TestContext.CertDir, "cert-dir", "", "Path to the directory containing the certs. Default is empty, which doesn't use certs.")
-	flags.StringVar(&TestContext.RepoRoot, "repo-root", "../../", "Root directory of kubernetes repository, for finding test files.")
+	flags.StringVar(&TestContext.RepoRoot, "repo-root", repoRootDefault(), "Root directory of kubernetes repository, for finding test files.")
 	// NOTE: Node E2E tests have this flag defined as well, but true by default.
 	// If this becomes true as well, they should be refactored into RegisterCommonFlags.
 	flags.BoolVar(&TestContext.PrepullImages, "prepull-images", false, "If true, prepull images so image pull failures do not cause test failures.")
@@ -465,6 +465,20 @@ func RegisterClusterFlags(flags *flag.FlagSet) {
 	flags.DurationVar(&nodeKiller.Interval, "node-killer-interval", 1*time.Minute, "Time between node failures.")
 	flags.Float64Var(&nodeKiller.JitterFactor, "node-killer-jitter-factor", 60, "Factor used to jitter node failures.")
 	flags.DurationVar(&nodeKiller.SimulatedDowntime, "node-killer-simulated-downtime", 10*time.Minute, "A delay between node death and recreation")
+}
+
+// repoRootDefault figures out whether an E2E suite is invoked in its directory (as in `go test ./test/e2e`),
+// directly in the root (as in `make test-e2e` or `ginkgo ./test/e2e`), or somewhere deep inside
+// the _output directory (`ginkgo _output/bin/e2e.test` where `_output/bin` is actually a symlink).
+func repoRootDefault() string {
+	for i := 0; i < 10; i++ {
+		path := "." + strings.Repeat("/..", i)
+		if _, err := os.Stat(path + "/test/e2e/framework"); err == nil {
+			return path
+		}
+	}
+	// Traditional default.
+	return "../../"
 }
 
 // generateSecureToken returns a string of length tokenLen, consisting
