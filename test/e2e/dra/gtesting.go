@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Kubernetes Authors.
+Copyright 2025 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,13 +26,50 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	ginkgotypes "github.com/onsi/ginkgo/v2/types"
 
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/utils/ktesting"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 var (
 	TimeNow = time.Now    // Can be stubbed out for testing.
 	Pid     = os.Getpid() // Can be stubbed out for testing.
 )
+
+func newTContext(ctx context.Context, f *framework.Framework) ktesting.TContext {
+	// TODO: rewrite the helper code to use only TContext after https://github.com/kubernetes/kubernetes/pull/122481 is merged.
+	tCtx := ktesting.Init(GinkgoContextTB())
+	tCtx = ktesting.WithContext(tCtx, ctx)
+	tCtx = ktesting.WithRESTConfig(tCtx, f.ClientConfig())
+	tCtx = WithNamespace(tCtx, f.Namespace.Name)
+	return tCtx
+}
+
+func newFramework(tCtx ktesting.TContext) *framework.Framework {
+	// TODO: use CreateFromManifest from https://github.com/kubernetes/kubernetes/pull/122481,
+	// then we don't need to fake a Framework instance.
+	namespaceName := NamespaceFromContext(tCtx)
+	f := &framework.Framework{
+		BaseName:      "dra",
+		Timeouts:      framework.NewTimeoutContext(),
+		ClientSet:     tCtx.Client(),
+		DynamicClient: tCtx.Dynamic(),
+		UniqueName:    namespaceName,
+		Namespace: &v1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: namespaceName,
+			},
+		},
+
+		// The driver containers have to run with sufficient privileges to
+		// modify /var/lib/kubelet/plugins.
+		NamespacePodSecurityLevel: admissionapi.LevelPrivileged,
+	}
+	f.SetClientConfig(tCtx.RESTConfig())
+	return f
+}
 
 // TODO: replace with helper code from https://github.com/kubernetes/kubernetes/pull/122481 should that get merged - or vice versa.
 type ginkgoTB struct {

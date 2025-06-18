@@ -67,7 +67,8 @@ import (
 	e2ereplicaset "k8s.io/kubernetes/test/e2e/framework/replicaset"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/drivers/proxy"
-	"k8s.io/kubernetes/test/e2e/storage/utils"
+	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/ktesting/kobject"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
 )
@@ -85,36 +86,39 @@ type Nodes struct {
 //go:embed test-driver/deploy/example/plugin-permissions.yaml
 var pluginPermissions string
 
+//go:embed dra-test-driver-proxy.yaml
+var driverProxy string
+
 // NewNodes selects nodes to run the test on.
 //
 // Call this outside of ginkgo.It, then use the instance inside ginkgo.It.
 func NewNodes(f *framework.Framework, minNodes, maxNodes int) *Nodes {
 	nodes := &Nodes{}
 	ginkgo.BeforeEach(func(ctx context.Context) {
-		nodes.init(ctx, f, minNodes, maxNodes)
+		nodes.init(newTContext(ctx, f), minNodes, maxNodes)
 	})
 	return nodes
 }
 
-// NewNodesNow is a variant of NewNodes which can be used inside a ginkgo.It.
-func NewNodesNow(ctx context.Context, f *framework.Framework, minNodes, maxNodes int) *Nodes {
+// NewNodesNow is a variant of NewNodes which can be used inside a ginkgo.It or unit test.
+func NewNodesNow(tCtx ktesting.TContext, minNodes, maxNodes int) *Nodes {
 	nodes := &Nodes{}
-	nodes.init(ctx, f, minNodes, maxNodes)
+	nodes.init(tCtx, minNodes, maxNodes)
 	return nodes
 }
 
-func (nodes *Nodes) init(ctx context.Context, f *framework.Framework, minNodes, maxNodes int) {
-	nodes.tempDir = ginkgo.GinkgoT().TempDir()
+func (nodes *Nodes) init(tCtx ktesting.TContext, minNodes, maxNodes int) {
+	nodes.tempDir = tCtx.TempDir()
 
-	ginkgo.By("selecting nodes")
+	tCtx.Log("selecting nodes")
 	// The kubelet plugin is harder. We deploy the builtin manifest
 	// after patching in the driver name and all nodes on which we
 	// want the plugin to run.
 	//
 	// Only a subset of the nodes are picked to avoid causing
 	// unnecessary load on a big cluster.
-	nodeList, err := e2enode.GetBoundedReadySchedulableNodes(ctx, f.ClientSet, maxNodes)
-	framework.ExpectNoError(err, "get nodes")
+	nodeList, err := e2enode.GetBoundedReadySchedulableNodes(tCtx, tCtx.Client(), maxNodes)
+	tCtx.ExpectNoError(err, "get nodes")
 	numNodes := int32(len(nodeList.Items))
 	if int(numNodes) < minNodes {
 		e2eskipper.Skipf("%d ready nodes required, only have %d", minNodes, numNodes)
@@ -124,14 +128,14 @@ func (nodes *Nodes) init(ctx context.Context, f *framework.Framework, minNodes, 
 		nodes.NodeNames = append(nodes.NodeNames, node.Name)
 	}
 	sort.Strings(nodes.NodeNames)
-	framework.Logf("testing on nodes %v", nodes.NodeNames)
+	tCtx.Logf("testing on nodes %v", nodes.NodeNames)
 
 	// Watch claims in the namespace. This is useful for monitoring a test
 	// and enables additional sanity checks.
-	claimInformer := resourceapiinformer.NewResourceClaimInformer(f.ClientSet, f.Namespace.Name, 100*time.Hour /* resync */, nil)
+	claimInformer := resourceapiinformer.NewResourceClaimInformer(tCtx.Client(), NamespaceFromContext(tCtx), 100*time.Hour /* resync */, nil)
 	cancelCtx, cancel := context.WithCancelCause(context.Background())
 	var wg sync.WaitGroup
-	ginkgo.DeferCleanup(func() {
+	tCtx.Cleanup(func() {
 		cancel(errors.New("test has completed"))
 		wg.Wait()
 	})
@@ -140,14 +144,14 @@ func (nodes *Nodes) init(ctx context.Context, f *framework.Framework, minNodes, 
 			defer ginkgo.GinkgoRecover()
 			claim := obj.(*resourceapi.ResourceClaim)
 			framework.Logf("New claim:\n%s", format.Object(claim, 1))
-			validateClaim(claim)
+			validateClaim(tCtx, claim)
 		},
 		UpdateFunc: func(oldObj, newObj any) {
 			defer ginkgo.GinkgoRecover()
 			oldClaim := oldObj.(*resourceapi.ResourceClaim)
 			newClaim := newObj.(*resourceapi.ResourceClaim)
 			framework.Logf("Updated claim:\n%s\nDiff:\n%s", format.Object(newClaim, 1), cmp.Diff(oldClaim, newClaim))
-			validateClaim(newClaim)
+			validateClaim(tCtx, newClaim)
 		},
 		DeleteFunc: func(obj any) {
 			defer ginkgo.GinkgoRecover()
@@ -155,7 +159,7 @@ func (nodes *Nodes) init(ctx context.Context, f *framework.Framework, minNodes, 
 			framework.Logf("Deleted claim:\n%s", format.Object(claim, 1))
 		},
 	})
-	framework.ExpectNoError(err, "AddEventHandler")
+	tCtx.ExpectNoError(err, "AddEventHandler")
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -163,13 +167,13 @@ func (nodes *Nodes) init(ctx context.Context, f *framework.Framework, minNodes, 
 	}()
 }
 
-func validateClaim(claim *resourceapi.ResourceClaim) {
+func validateClaim(tCtx ktesting.TContext, claim *resourceapi.ResourceClaim) {
 	// The apiserver doesn't enforce that a claim always has a finalizer
 	// while being allocated. This is a convention that whoever allocates a
 	// claim has to follow to prevent using a claim that is at risk of
 	// being deleted.
 	if claim.Status.Allocation != nil && len(claim.Finalizers) == 0 {
-		framework.Failf("Invalid claim: allocated without any finalizer:\n%s", format.Object(claim, 1))
+		tCtx.Errorf("Invalid claim: allocated without any finalizer:\n%s", format.Object(claim, 1))
 	}
 }
 
@@ -194,42 +198,48 @@ type driverResourcesMutatorFunc func(map[string]resourceslice.DriverResources)
 //
 // Call this outside of ginkgo.It, then use the instance inside ginkgo.It.
 func NewDriver(f *framework.Framework, nodes *Nodes, driverResourcesGenerator driverResourcesGenFunc, driverResourcesMutators ...driverResourcesMutatorFunc) *Driver {
-	d := NewDriverInstance(f)
+	d := newDriverInstance("" /* namespace will be set later */)
 
 	ginkgo.BeforeEach(func() {
+		d.NamespaceName = f.Namespace.Name
+		d.initName()
 		driverResources := driverResourcesGenerator(nodes)
 		for _, mutator := range driverResourcesMutators {
 			mutator(driverResources)
 		}
-		d.Run(nodes, driverResources)
+		d.Run(newTContext(context.Background(), f), nodes, driverResources)
 	})
 	return d
 }
 
 // NewDriverInstance is a variant of NewDriver where the driver is inactive and must
 // be started explicitly with Run. May be used inside ginkgo.It.
-func NewDriverInstance(f *framework.Framework) *Driver {
+func NewDriverInstance(tCtx ktesting.TContext) *Driver {
+	return newDriverInstance(NamespaceFromContext(tCtx))
+}
+
+func newDriverInstance(namespace string) *Driver {
 	d := &Driver{
-		f:          f,
 		fail:       map[MethodInstance]bool{},
 		callCounts: map[MethodInstance]int64{},
 		// By default, test only with the latest gRPC API.
-		NodeV1alpha4: false,
-		NodeV1beta1:  true,
+		NodeV1alpha4:  false,
+		NodeV1beta1:   true,
+		NamespaceName: namespace,
 	}
 	d.initName()
 	return d
 }
 
-func (d *Driver) Run(nodes *Nodes, driverResources map[string]resourceslice.DriverResources) {
-	d.SetUp(nodes, driverResources)
-	ginkgo.DeferCleanup(d.TearDown)
+func (d *Driver) Run(tCtx ktesting.TContext, nodes *Nodes, driverResources map[string]resourceslice.DriverResources) {
+	d.SetUp(tCtx, nodes, driverResources)
+	tCtx.CleanupCtx(d.TearDown)
 }
 
 // NewGetSlices generates a function for gomega.Eventually/Consistently which
 // returns the ResourceSliceList.
-func (d *Driver) NewGetSlices() framework.GetFunc[*resourceapi.ResourceSliceList] {
-	return framework.ListObjects(d.f.ClientSet.ResourceV1beta2().ResourceSlices().List, metav1.ListOptions{FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + d.Name})
+func (d *Driver) NewGetSlices(tCtx ktesting.TContext) framework.GetFunc[*resourceapi.ResourceSliceList] {
+	return framework.ListObjects(tCtx.Client().ResourceV1beta2().ResourceSlices().List, metav1.ListOptions{FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + d.Name})
 }
 
 type MethodInstance struct {
@@ -238,11 +248,13 @@ type MethodInstance struct {
 }
 
 type Driver struct {
-	f                  *framework.Framework
-	ctx                context.Context
-	cleanup            []func(context.Context) // executed first-in-first-out
+	cleanup            []func(ktesting.TContext) // executed first-in-first-out
 	wg                 sync.WaitGroup
 	serviceAccountName string
+
+	// NamespaceName is unique in the cluster.
+	// Only set at test runtime.
+	NamespaceName string
 
 	// NameSuffix can be set while registering a test to deploy different
 	// drivers in the same test namespace.
@@ -279,24 +291,26 @@ type KubeletPlugin struct {
 }
 
 func (d *Driver) initName() {
-	d.Name = d.f.UniqueName + d.NameSuffix + ".k8s.io"
+	d.Name = d.NamespaceName + d.NameSuffix + ".k8s.io"
 }
 
-func (d *Driver) SetUp(nodes *Nodes, driverResources map[string]resourceslice.DriverResources) {
-	d.initName()
-	ginkgo.By(fmt.Sprintf("deploying driver %s on nodes %v", d.Name, nodes.NodeNames))
+func (d *Driver) SetUp(tCtx ktesting.TContext, nodes *Nodes, driverResources map[string]resourceslice.DriverResources) {
+	backgroundCtx := tCtx
+
+	tCtx = ktesting.Begin(tCtx, fmt.Sprintf("deploying driver %s on nodes %v", d.Name, nodes.NodeNames))
+	defer ktesting.End(tCtx)
 	d.Nodes = make(map[string]KubeletPlugin)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	logger := klog.FromContext(ctx)
+	tCtx = ktesting.WithCancel(tCtx)
+	cancel := tCtx.Cancel
+	logger := tCtx.Logger()
 	logger = klog.LoggerWithValues(logger, "driverName", d.Name)
 	if d.InstanceSuffix != "" {
 		instance, _ := strings.CutPrefix(d.InstanceSuffix, "-")
 		logger = klog.LoggerWithValues(logger, "instance", instance)
 	}
-	ctx = klog.NewContext(ctx, logger)
-	d.ctx = ctx
-	d.cleanup = append(d.cleanup, func(context.Context) { cancel() })
+	tCtx = ktesting.WithLogger(tCtx, logger)
+	d.cleanup = append(d.cleanup, func(ktesting.TContext) { cancel("cleaning up") })
 
 	driverResource, found := driverResources[multiHostDriverResources]
 	// If found, we create ResourceSlices that are associated with multiple nodes
@@ -320,48 +334,53 @@ func (d *Driver) SetUp(nodes *Nodes, driverResources map[string]resourceslice.Dr
 						Devices:      slice.Devices,
 					},
 				}
-				_, err := d.f.ClientSet.ResourceV1beta2().ResourceSlices().Create(ctx, resourceSlice, metav1.CreateOptions{})
-				framework.ExpectNoError(err)
-				ginkgo.DeferCleanup(func(ctx context.Context) {
-					framework.ExpectNoError(d.f.ClientSet.ResourceV1beta2().ResourceSlices().Delete(ctx, resourceSlice.Name, metav1.DeleteOptions{}))
+				_, err := tCtx.Client().ResourceV1beta2().ResourceSlices().Create(tCtx, resourceSlice, metav1.CreateOptions{})
+				tCtx.ExpectNoError(err)
+				tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
+					tCtx.ExpectNoError(tCtx.Client().ResourceV1beta2().ResourceSlices().Delete(tCtx, resourceSlice.Name, metav1.DeleteOptions{}))
 				})
 			}
 		}
 	}
 
-	manifests := []string{
-		// The code below matches the content of this manifest (ports,
-		// container names, etc.).
-		"test/e2e/testing-manifests/dra/dra-test-driver-proxy.yaml",
-	}
-
 	// Create service account and corresponding RBAC rules.
 	d.serviceAccountName = "dra-kubelet-plugin-" + d.Name + d.InstanceSuffix + "-service-account"
 	content := pluginPermissions
-	content = strings.ReplaceAll(content, "dra-kubelet-plugin-namespace", d.f.Namespace.Name)
+	content = strings.ReplaceAll(content, "dra-kubelet-plugin-namespace", d.NamespaceName)
 	content = strings.ReplaceAll(content, "dra-kubelet-plugin", "dra-kubelet-plugin-"+d.Name+d.InstanceSuffix)
-	d.createFromYAML(ctx, []byte(content), d.f.Namespace.Name)
+	permissionObjects := kobject.LoadFromManifests(tCtx, nil, kobject.NameReader(strings.NewReader(content), "plugin-permissions.yaml"))
+	for _, obj := range permissionObjects {
+		kobject.Create(tCtx, obj, metav1.CreateOptions{})
+	}
 
 	// Using a ReplicaSet instead of a DaemonSet has the advantage that we can control
 	// the lifecycle explicitly, in particular run two pods per node long enough to
 	// run checks.
 	instanceKey := "app.kubernetes.io/instance"
 	rsName := ""
+	rsNamespace := d.NamespaceName
 	numNodes := int32(len(nodes.NodeNames))
-	pluginDataDirectoryPath := path.Join(framework.TestContext.KubeletRootDir, "plugins", d.Name)
-	registrarDirectoryPath := path.Join(framework.TestContext.KubeletRootDir, "plugins_registry")
+	kubeletRootDir := framework.TestContext.KubeletRootDir
+	if kubeletRootDir == "" {
+		kubeletRootDir = "/var/lib/kubelet"
+	}
+	pluginDataDirectoryPath := path.Join(kubeletRootDir, "plugins", d.Name)
+	registrarDirectoryPath := path.Join(kubeletRootDir, "plugins_registry")
 	instanceName := d.Name + d.InstanceSuffix
-	err := utils.CreateFromManifests(ctx, d.f, d.f.Namespace, func(item interface{}) error {
-		switch item := item.(type) {
+
+	proxyObjects := kobject.LoadFromManifests(tCtx, nil, kobject.NameReader(strings.NewReader(driverProxy), "dra-test-driver-proxy.yaml"))
+	for _, obj := range proxyObjects {
+		switch obj := obj.(type) {
 		case *appsv1.ReplicaSet:
-			item.Name += d.NameSuffix + d.InstanceSuffix
-			rsName = item.Name
-			item.Spec.Replicas = &numNodes
-			item.Spec.Selector.MatchLabels[instanceKey] = instanceName
-			item.Spec.Template.Labels[instanceKey] = instanceName
-			item.Spec.Template.Spec.ServiceAccountName = d.serviceAccountName
-			item.Spec.Template.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].LabelSelector.MatchLabels[instanceKey] = instanceName
-			item.Spec.Template.Spec.Affinity.NodeAffinity = &v1.NodeAffinity{
+			obj.Name += d.NameSuffix + d.InstanceSuffix
+			obj.Namespace = rsNamespace
+			rsName = obj.Name
+			obj.Spec.Replicas = &numNodes
+			obj.Spec.Selector.MatchLabels[instanceKey] = instanceName
+			obj.Spec.Template.Labels[instanceKey] = instanceName
+			obj.Spec.Template.Spec.ServiceAccountName = d.serviceAccountName
+			obj.Spec.Template.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].LabelSelector.MatchLabels[instanceKey] = instanceName
+			obj.Spec.Template.Spec.Affinity.NodeAffinity = &v1.NodeAffinity{
 				RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 					NodeSelectorTerms: []v1.NodeSelectorTerm{
 						{
@@ -376,28 +395,27 @@ func (d *Driver) SetUp(nodes *Nodes, driverResources map[string]resourceslice.Dr
 					},
 				},
 			}
-			item.Spec.Template.Spec.Volumes[0].HostPath.Path = pluginDataDirectoryPath
-			item.Spec.Template.Spec.Volumes[1].HostPath.Path = registrarDirectoryPath
-			item.Spec.Template.Spec.Containers[0].VolumeMounts[0].MountPath = pluginDataDirectoryPath
-			item.Spec.Template.Spec.Containers[0].VolumeMounts[1].MountPath = registrarDirectoryPath
+			obj.Spec.Template.Spec.Volumes[0].HostPath.Path = pluginDataDirectoryPath
+			obj.Spec.Template.Spec.Volumes[1].HostPath.Path = registrarDirectoryPath
+			obj.Spec.Template.Spec.Containers[0].VolumeMounts[0].MountPath = pluginDataDirectoryPath
+			obj.Spec.Template.Spec.Containers[0].VolumeMounts[1].MountPath = registrarDirectoryPath
 		}
-		return nil
-	}, manifests...)
-	framework.ExpectNoError(err, "deploy kubelet plugin replicaset")
+		kobject.Create(tCtx, obj, metav1.CreateOptions{})
+	}
 
-	rs, err := d.f.ClientSet.AppsV1().ReplicaSets(d.f.Namespace.Name).Get(ctx, rsName, metav1.GetOptions{})
-	framework.ExpectNoError(err, "get replicaset")
+	rs, err := tCtx.Client().AppsV1().ReplicaSets(d.NamespaceName).Get(tCtx, rsName, metav1.GetOptions{})
+	tCtx.ExpectNoError(err, "get replicaset")
 
 	// Wait for all pods to be running.
-	if err := e2ereplicaset.WaitForReplicaSetTargetAvailableReplicas(ctx, d.f.ClientSet, rs, numNodes); err != nil {
-		framework.ExpectNoError(err, "all kubelet plugin proxies running")
+	if err := e2ereplicaset.WaitForReplicaSetTargetAvailableReplicas(tCtx, tCtx.Client(), rs, numNodes); err != nil {
+		tCtx.ExpectNoError(err, "all kubelet plugin proxies running")
 	}
 	requirement, err := labels.NewRequirement(instanceKey, selection.Equals, []string{instanceName})
-	framework.ExpectNoError(err, "create label selector requirement")
+	tCtx.ExpectNoError(err, "create label selector requirement")
 	selector := labels.NewSelector().Add(*requirement)
-	pods, err := d.f.ClientSet.CoreV1().Pods(d.f.Namespace.Name).List(ctx, metav1.ListOptions{LabelSelector: selector.String()})
-	framework.ExpectNoError(err, "list proxy pods")
-	gomega.Expect(numNodes).To(gomega.Equal(int32(len(pods.Items))), "number of proxy pods")
+	pods, err := tCtx.Client().CoreV1().Pods(d.NamespaceName).List(tCtx, metav1.ListOptions{LabelSelector: selector.String()})
+	tCtx.ExpectNoError(err, "list proxy pods")
+	gomega.NewWithT(tCtx).Expect(numNodes).To(gomega.Equal(int32(len(pods.Items))), "number of proxy pods")
 	sort.Slice(pods.Items, func(i, j int) bool {
 		return pods.Items[i].Spec.NodeName < pods.Items[j].Spec.NodeName
 	})
@@ -419,18 +437,18 @@ func (d *Driver) SetUp(nodes *Nodes, driverResources map[string]resourceslice.Dr
 		// https://github.com/kubernetes/kubernetes/pull/124711).
 		//
 		// Here we merely use impersonation, which is faster.
-		driverClient := d.impersonateKubeletPlugin(&pod)
+		driverClient := d.impersonateKubeletPlugin(tCtx, &pod)
 
 		logger := klog.LoggerWithValues(klog.LoggerWithName(logger, "kubelet-plugin"), "node", pod.Spec.NodeName, "pod", klog.KObj(&pod))
-		loggerCtx := klog.NewContext(ctx, logger)
+		loggerCtx := klog.NewContext(tCtx, logger)
 		fileOps := app.FileOperations{
 			Create: func(name string, content []byte) error {
 				klog.Background().Info("creating CDI file", "node", nodename, "filename", name, "content", string(content))
-				return d.createFile(&pod, name, content)
+				return d.createFile(tCtx, &pod, name, content)
 			},
 			Remove: func(name string) error {
 				klog.Background().Info("deleting CDI file", "node", nodename, "filename", name)
-				return d.removeFile(&pod, name)
+				return d.removeFile(tCtx, &pod, name)
 			},
 			ErrorHandler: func(ctx context.Context, err error, msg string) {
 				// Record a failure, but don't kill the background goroutine.
@@ -444,7 +462,7 @@ func (d *Driver) SetUp(nodes *Nodes, driverResources map[string]resourceslice.Dr
 				// treat errors as failures which definitely shouldn't occur:
 				var droppedFields *resourceslice.DroppedFieldsError
 				if errors.As(err, &droppedFields) {
-					framework.Failf("driver %s: %v", d.Name, err)
+					tCtx.Errorf("driver %s: %v", d.Name, err)
 				}
 			},
 		}
@@ -477,33 +495,35 @@ func (d *Driver) SetUp(nodes *Nodes, driverResources map[string]resourceslice.Dr
 			kubeletplugin.FlockDirectoryPath(nodes.tempDir),
 
 			kubeletplugin.PluginDataDirectoryPath(pluginDataDirectoryPath),
-			kubeletplugin.PluginListener(listen(d.f, &pod, &listenerPort)),
+			kubeletplugin.PluginListener(listen(backgroundCtx, &pod, &listenerPort)),
 
 			kubeletplugin.RegistrarDirectoryPath(registrarDirectoryPath),
-			kubeletplugin.RegistrarListener(listen(d.f, &pod, &listenerPort)),
+			kubeletplugin.RegistrarListener(listen(backgroundCtx, &pod, &listenerPort)),
 		)
-		framework.ExpectNoError(err, "start kubelet plugin for node %s", pod.Spec.NodeName)
-		d.cleanup = append(d.cleanup, func(ctx context.Context) {
+		tCtx.ExpectNoError(err, "start kubelet plugin for node %s", pod.Spec.NodeName)
+		d.cleanup = append(d.cleanup, func(tCtx ktesting.TContext) {
 			// Depends on cancel being called first.
 			plugin.Stop()
 
 			// Also explicitly stop all pods.
-			ginkgo.By("scaling down driver proxy pods for " + d.Name)
-			rs, err := d.f.ClientSet.AppsV1().ReplicaSets(d.f.Namespace.Name).Get(ctx, rsName, metav1.GetOptions{})
-			framework.ExpectNoError(err, "get ReplicaSet for driver "+d.Name)
+			tCtx = ktesting.Begin(tCtx, "scaling down driver proxy pods for "+d.Name)
+			defer ktesting.End(tCtx)
+			rs, err := tCtx.Client().AppsV1().ReplicaSets(d.NamespaceName).Get(tCtx, rsName, metav1.GetOptions{})
+			tCtx.ExpectNoError(err, "get ReplicaSet for driver "+d.Name)
 			rs.Spec.Replicas = ptr.To(int32(0))
-			rs, err = d.f.ClientSet.AppsV1().ReplicaSets(d.f.Namespace.Name).Update(ctx, rs, metav1.UpdateOptions{})
-			framework.ExpectNoError(err, "scale down ReplicaSet for driver "+d.Name)
-			if err := e2ereplicaset.WaitForReplicaSetTargetAvailableReplicas(ctx, d.f.ClientSet, rs, 0); err != nil {
-				framework.ExpectNoError(err, "all kubelet plugin proxies stopped")
+			rs, err = tCtx.Client().AppsV1().ReplicaSets(d.NamespaceName).Update(tCtx, rs, metav1.UpdateOptions{})
+			tCtx.ExpectNoError(err, "scale down ReplicaSet for driver "+d.Name)
+			if err := e2ereplicaset.WaitForReplicaSetTargetAvailableReplicas(tCtx, tCtx.Client(), rs, 0); err != nil {
+				tCtx.ExpectNoError(err, "all kubelet plugin proxies stopped")
 			}
 		})
 		d.Nodes[nodename] = KubeletPlugin{ExamplePlugin: plugin, ClientSet: driverClient}
 	}
 
 	// Wait for registration.
-	ginkgo.By("wait for plugin registration")
-	gomega.Eventually(func() map[string][]app.GRPCCall {
+	tCtx = ktesting.Begin(tCtx, "wait for registration")
+	defer ktesting.End(tCtx)
+	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) map[string][]app.GRPCCall {
 		notRegistered := make(map[string][]app.GRPCCall)
 		for nodename, plugin := range d.Nodes {
 			calls := plugin.GetGRPCCalls()
@@ -515,8 +535,8 @@ func (d *Driver) SetUp(nodes *Nodes, driverResources map[string]resourceslice.Dr
 	}).WithTimeout(time.Minute).Should(gomega.BeEmpty(), "hosts where the plugin has not been registered yet")
 }
 
-func (d *Driver) impersonateKubeletPlugin(pod *v1.Pod) kubernetes.Interface {
-	ginkgo.GinkgoHelper()
+func (d *Driver) impersonateKubeletPlugin(tCtx ktesting.TContext, pod *v1.Pod) kubernetes.Interface {
+	tCtx.Helper()
 	driverUserInfo := (&serviceaccount.ServiceAccountInfo{
 		Name:      d.serviceAccountName,
 		Namespace: pod.Namespace,
@@ -524,36 +544,36 @@ func (d *Driver) impersonateKubeletPlugin(pod *v1.Pod) kubernetes.Interface {
 		PodName:   pod.Name,
 		PodUID:    string(pod.UID),
 	}).UserInfo()
-	driverClientConfig := d.f.ClientConfig()
+	driverClientConfig := tCtx.RESTConfig()
 	driverClientConfig.Impersonate = rest.ImpersonationConfig{
 		UserName: driverUserInfo.GetName(),
 		Groups:   driverUserInfo.GetGroups(),
 		Extra:    driverUserInfo.GetExtra(),
 	}
 	driverClient, err := kubernetes.NewForConfig(driverClientConfig)
-	framework.ExpectNoError(err, "create client for driver")
+	tCtx.ExpectNoError(err, "create client for driver")
 	return driverClient
 }
 
-func (d *Driver) createFile(pod *v1.Pod, name string, content []byte) error {
+func (d *Driver) createFile(tCtx ktesting.TContext, pod *v1.Pod, name string, content []byte) error {
 	buffer := bytes.NewBuffer(content)
 	// Writing the content can be slow. Better create a temporary file and
 	// move it to the final destination once it is complete.
 	tmpName := name + ".tmp"
-	if err := d.podIO(pod).CreateFile(tmpName, buffer); err != nil {
-		_ = d.podIO(pod).RemoveAll(tmpName)
+	if err := d.podIO(tCtx, pod).CreateFile(tmpName, buffer); err != nil {
+		_ = d.podIO(tCtx, pod).RemoveAll(tmpName)
 		return err
 	}
-	return d.podIO(pod).Rename(tmpName, name)
+	return d.podIO(tCtx, pod).Rename(tmpName, name)
 }
 
-func (d *Driver) removeFile(pod *v1.Pod, name string) error {
-	return d.podIO(pod).RemoveAll(name)
+func (d *Driver) removeFile(tCtx ktesting.TContext, pod *v1.Pod, name string) error {
+	return d.podIO(tCtx, pod).RemoveAll(name)
 }
 
-func (d *Driver) createFromYAML(ctx context.Context, content []byte, namespace string) {
+func (d *Driver) createFromYAML(tCtx ktesting.TContext, content []byte, namespace string) {
 	// Not caching the discovery result isn't very efficient, but good enough.
-	discoveryCache := memory.NewMemCacheClient(d.f.ClientSet.Discovery())
+	discoveryCache := memory.NewMemCacheClient(tCtx.Client().Discovery())
 	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(discoveryCache)
 
 	for _, content := range bytes.Split(content, []byte("---\n")) {
@@ -562,16 +582,16 @@ func (d *Driver) createFromYAML(ctx context.Context, content []byte, namespace s
 		}
 
 		var obj *unstructured.Unstructured
-		framework.ExpectNoError(yaml.UnmarshalStrict(content, &obj), fmt.Sprintf("Full YAML:\n%s\n", string(content)))
+		tCtx.ExpectNoError(yaml.UnmarshalStrict(content, &obj), fmt.Sprintf("Full YAML:\n%s\n", string(content)))
 
 		gv, err := schema.ParseGroupVersion(obj.GetAPIVersion())
-		framework.ExpectNoError(err, fmt.Sprintf("extract group+version from object %q", klog.KObj(obj)))
+		tCtx.ExpectNoError(err, fmt.Sprintf("extract group+version from object %q", klog.KObj(obj)))
 		gk := schema.GroupKind{Group: gv.Group, Kind: obj.GetKind()}
 
 		mapping, err := restMapper.RESTMapping(gk, gv.Version)
-		framework.ExpectNoError(err, fmt.Sprintf("map %q to resource", gk))
+		tCtx.ExpectNoError(err, fmt.Sprintf("map %q to resource", gk))
 
-		resourceClient := d.f.DynamicClient.Resource(mapping.Resource)
+		resourceClient := tCtx.Dynamic().Resource(mapping.Resource)
 		options := metav1.CreateOptions{
 			// If the YAML input is invalid, then we want the
 			// apiserver to tell us via an error. This can
@@ -581,31 +601,31 @@ func (d *Driver) createFromYAML(ctx context.Context, content []byte, namespace s
 		}
 		switch mapping.Scope.Name() {
 		case meta.RESTScopeNameRoot:
-			_, err = resourceClient.Create(ctx, obj, options)
+			_, err = resourceClient.Create(tCtx, obj, options)
 		case meta.RESTScopeNameNamespace:
 			if namespace == "" {
 				framework.Failf("need namespace for object type %s", gk)
 			}
-			_, err = resourceClient.Namespace(namespace).Create(ctx, obj, options)
+			_, err = resourceClient.Namespace(namespace).Create(tCtx, obj, options)
 		}
-		framework.ExpectNoError(err, "create object")
-		ginkgo.DeferCleanup(func(ctx context.Context) {
+		tCtx.ExpectNoError(err, "create object")
+		tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
 			del := resourceClient.Delete
 			if mapping.Scope.Name() == meta.RESTScopeNameNamespace {
 				del = resourceClient.Namespace(namespace).Delete
 			}
-			err := del(ctx, obj.GetName(), metav1.DeleteOptions{})
+			err := del(tCtx, obj.GetName(), metav1.DeleteOptions{})
 			if !apierrors.IsNotFound(err) {
-				framework.ExpectNoError(err, fmt.Sprintf("deleting %s.%s %s", obj.GetKind(), obj.GetAPIVersion(), klog.KObj(obj)))
+				tCtx.ExpectNoError(err, fmt.Sprintf("deleting %s.%s %s", obj.GetKind(), obj.GetAPIVersion(), klog.KObj(obj)))
 			}
 		})
 	}
 }
 
-func (d *Driver) podIO(pod *v1.Pod) proxy.PodDirIO {
-	logger := klog.Background()
+func (d *Driver) podIO(tCtx ktesting.TContext, pod *v1.Pod) proxy.PodDirIO {
+	logger := tCtx.Logger()
 	return proxy.PodDirIO{
-		F:             d.f,
+		F:             newFramework(tCtx),
 		Namespace:     pod.Namespace,
 		PodName:       pod.Name,
 		ContainerName: pod.Spec.Containers[0].Name,
@@ -620,7 +640,9 @@ var errListenerDone = errors.New("listener is shutting down")
 // listen returns the function which the kubeletplugin helper needs to open a listening socket.
 // For that it spins up hostpathplugin in the pod for the desired node
 // and connects to hostpathplugin via port forwarding.
-func listen(f *framework.Framework, pod *v1.Pod, port *int32) func(ctx context.Context, path string) (net.Listener, error) {
+func listen(tCtx ktesting.TContext, pod *v1.Pod, port *int32) func(ctx context.Context, path string) (net.Listener, error) {
+	client := tCtx.Client()
+	restConfig := tCtx.RESTConfig()
 	return func(ctx context.Context, path string) (l net.Listener, e error) {
 		// "Allocate" a new port by by bumping the per-pod counter by one.
 		port := atomic.AddInt32(port, 1)
@@ -631,9 +653,9 @@ func listen(f *framework.Framework, pod *v1.Pod, port *int32) func(ctx context.C
 		ctx = klog.NewContext(ctx, logger)
 
 		// Start hostpathplugin in proxy mode and keep it running until the listener gets closed.
-		req := f.ClientSet.CoreV1().RESTClient().Post().
+		req := client.CoreV1().RESTClient().Post().
 			Resource("pods").
-			Namespace(f.Namespace.Name).
+			Namespace(pod.Namespace).
 			Name(pod.Name).
 			SubResource("exec").
 			VersionedParams(&v1.PodExecOptions{
@@ -656,7 +678,7 @@ func listen(f *framework.Framework, pod *v1.Pod, port *int32) func(ctx context.C
 			cmdCtx := klog.NewContext(cmdCtx, cmdLogger)
 			logger.V(1).Info("Starting...")
 			defer logger.V(1).Info("Stopped")
-			if err := execute(cmdCtx, req.URL(), f.ClientConfig(), 5); err != nil {
+			if err := execute(cmdCtx, req.URL(), restConfig, 5); err != nil {
 				// errors.Is(err, listenerDoneErr) would be nicer, but we don't get
 				// that error from remotecommand. Instead forgo logging when we already shut down.
 				if cmdCtx.Err() == nil {
@@ -665,9 +687,9 @@ func listen(f *framework.Framework, pod *v1.Pod, port *int32) func(ctx context.C
 			}
 
 			// Killing hostpathplugin does not remove the socket. Need to do that manually.
-			req := f.ClientSet.CoreV1().RESTClient().Post().
+			req := client.CoreV1().RESTClient().Post().
 				Resource("pods").
-				Namespace(f.Namespace.Name).
+				Namespace(pod.Namespace).
 				Name(pod.Name).
 				SubResource("exec").
 				VersionedParams(&v1.PodExecOptions{
@@ -682,7 +704,7 @@ func listen(f *framework.Framework, pod *v1.Pod, port *int32) func(ctx context.C
 				}, scheme.ParameterCodec)
 			cleanupLogger := klog.LoggerWithName(logger, "cleanup")
 			cleanupCtx := klog.NewContext(ctx, cleanupLogger)
-			if err := execute(cleanupCtx, req.URL(), f.ClientConfig(), 0); err != nil {
+			if err := execute(cleanupCtx, req.URL(), restConfig, 0); err != nil {
 				cleanupLogger.Error(err, "Socket removal failed")
 			}
 		}()
@@ -698,12 +720,12 @@ func listen(f *framework.Framework, pod *v1.Pod, port *int32) func(ctx context.C
 		}
 
 		addr := proxy.Addr{
-			Namespace:     f.Namespace.Name,
+			Namespace:     pod.Namespace,
 			PodName:       pod.Name,
 			ContainerName: pod.Spec.Containers[0].Name,
 			Port:          int(port),
 		}
-		listener, err := proxy.Listen(ctx, f.ClientSet, f.ClientConfig(), addr)
+		listener, err := proxy.Listen(tCtx, client, restConfig, addr)
 		if err != nil {
 			return nil, fmt.Errorf("listen for connections from %+v: %w", addr, err)
 		}
@@ -765,9 +787,9 @@ func pipe(ctx context.Context, msg string, verbosity int) *io.PipeWriter {
 	return writer
 }
 
-func (d *Driver) TearDown(ctx context.Context) {
+func (d *Driver) TearDown(tCtx ktesting.TContext) {
 	for _, c := range d.cleanup {
-		c(ctx)
+		c(tCtx)
 	}
 	d.cleanup = nil
 	d.wg.Wait()
@@ -778,8 +800,8 @@ func (d *Driver) TearDown(ctx context.Context) {
 // driver's ResourceSlices, which takes at least 5 minutes
 // because of the delay in the kubelet. Only use this in slow
 // tests...
-func (d *Driver) IsGone(ctx context.Context) {
-	gomega.Eventually(ctx, d.NewGetSlices()).WithTimeout(7 * time.Minute).Should(gomega.HaveField("Item", gomega.BeEmpty()))
+func (d *Driver) IsGone(tCtx ktesting.TContext) {
+	gomega.NewWithT(tCtx).Eventually(tCtx, d.NewGetSlices(tCtx)).WithTimeout(7 * time.Minute).Should(gomega.HaveField("Items", gomega.BeEmpty()))
 }
 
 func (d *Driver) interceptor(nodename string, ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
