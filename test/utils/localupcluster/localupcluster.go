@@ -172,7 +172,8 @@ func (c *Cluster) Start(tCtx ktesting.TContext, bindir string, localUpClusterEnv
 		tCtx.ExpectNoError(err, "KUBE_VERBOSE")
 	}
 	if kubeVerboseVal < 2 {
-		cmd.AdditionalEnv["KUBE_VERBOSE"] = "2" // Enables -x for configuration variable assignments.
+		// cmd.AdditionalEnv["KUBE_VERBOSE"] = "2" // Enables -x for configuration variable assignments.
+		cmd.AdditionalEnv["KUBE_VERBOSE"] = "5" // To debug why kube-proxy does not get started.
 	}
 	cmd.Start(tCtx)
 	c.running[LocalUpCluster] = cmd
