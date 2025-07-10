@@ -204,7 +204,7 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 		// test the defaults.
 		driver := drautils.NewDriverInstance(f)
 		driver.IsLocal = true
-		driver.Run(nodes, drautils.DriverResourcesNow(nodes, 1))
+		driver.Run(nodes, drautils.DriverResourcesNow(nodes, 8))
 		b := drautils.NewBuilderNow(ctx, f, driver)
 
 		claim := b.ExternalClaim()
@@ -233,8 +233,13 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 		framework.ExpectNoError(f.ClientSet.CoreV1().Pods(namespace.Name).Delete(ctx, pod.Name, metav1.DeleteOptions{}))
 		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, namespace.Name, f.Timeouts.PodDelete))
 
-		// Create another claim and pod, this time using the latest Kubernetes.
+		// Create another claim and pod, this time using the latest Kubernetes and more devices to allocate.
 		claim = b.ExternalClaim()
+		for i := 1; i <= 2; i++ {
+			req := claim.Spec.Devices.Requests[0].DeepCopy()
+			req.Name += fmt.Sprintf("-%d", i)
+			claim.Spec.Devices.Requests = append(claim.Spec.Devices.Requests, *req)
+		}
 		pod = b.PodExternal()
 		pod.Spec.ResourceClaims[0].ResourceClaimName = &claim.Name
 		b.Create(ctx, claim, pod)
@@ -249,23 +254,62 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 			WithPool(allocatedDevice.Pool).
 			WithDevice(allocatedDevice.Device).
 			WithNetworkData(resourceac.NetworkDeviceData().WithInterfaceName("eth1"))
+		allocatedDevice2 := claim.Status.Allocation.Devices.Results[1]
+		allocatedDeviceAC2 := resourceac.AllocatedDeviceStatus().
+			WithDriver(allocatedDevice2.Driver).
+			WithPool(allocatedDevice2.Pool).
+			WithDevice(allocatedDevice2.Device).
+			WithNetworkData(resourceac.NetworkDeviceData().WithInterfaceName("eth2"))
 		claimAC := resourceac.ResourceClaim(claim.Name, namespace.Name).
 			WithStatus(resourceac.ResourceClaimStatus().
-				WithDevices(allocatedDeviceAC),
+				WithDevices(allocatedDeviceAC, allocatedDeviceAC2),
 			)
 		manager := "manager1"
-		claim, err = f.ClientSet.ResourceV1beta2().ResourceClaims(namespace.Name).ApplyStatus(ctx, claimAC, metav1.ApplyOptions{FieldManager: manager})
-		tCtx.ExpectNoError(err, "apply device status")
+		_, err = f.ClientSet.ResourceV1beta2().ResourceClaims(namespace.Name).ApplyStatus(ctx, claimAC, metav1.ApplyOptions{FieldManager: manager})
+		tCtx.ExpectNoError(err, "apply device status manager #1")
+		allocatedDevice3 := claim.Status.Allocation.Devices.Results[2]
+		allocatedDeviceAC3 := resourceac.AllocatedDeviceStatus().
+			WithDriver(allocatedDevice3.Driver).
+			WithPool(allocatedDevice3.Pool).
+			WithDevice(allocatedDevice3.Device).
+			WithNetworkData(resourceac.NetworkDeviceData().WithInterfaceName("eth3"))
+		claimAC = resourceac.ResourceClaim(claim.Name, namespace.Name).
+			WithStatus(resourceac.ResourceClaimStatus().
+				WithDevices(allocatedDeviceAC3),
+			)
+		manager2 := "manager2"
+		claim, err = f.ClientSet.ResourceV1beta2().ResourceClaims(namespace.Name).ApplyStatus(ctx, claimAC, metav1.ApplyOptions{FieldManager: manager2})
+		tCtx.ExpectNoError(err, "apply device status manager #2")
 		tCtx.Logf("allocated claim with device status from master:\n%s", format.Object(claim, 1))
-		gomega.Expect(claim.Status.Devices).To(gomega.HaveExactElements(gomega.Equal(resourceapi.AllocatedDeviceStatus{
-			Driver:  allocatedDevice.Driver,
-			Pool:    allocatedDevice.Pool,
-			Device:  allocatedDevice.Device,
-			ShareID: ptr.To(""), /* set on the read path?! */
-			NetworkData: &resourceapi.NetworkDeviceData{
-				InterfaceName: "eth1",
-			},
-		})))
+		gomega.Expect(claim.Status.Devices).To(gomega.ConsistOf(
+			gomega.Equal(resourceapi.AllocatedDeviceStatus{
+				Driver:  allocatedDevice.Driver,
+				Pool:    allocatedDevice.Pool,
+				Device:  allocatedDevice.Device,
+				ShareID: ptr.To(""), /* set on the read path?! */
+				NetworkData: &resourceapi.NetworkDeviceData{
+					InterfaceName: "eth1",
+				},
+			}),
+			gomega.Equal(resourceapi.AllocatedDeviceStatus{
+				Driver:  allocatedDevice2.Driver,
+				Pool:    allocatedDevice2.Pool,
+				Device:  allocatedDevice2.Device,
+				ShareID: ptr.To(""), /* set on the read path?! */
+				NetworkData: &resourceapi.NetworkDeviceData{
+					InterfaceName: "eth2",
+				},
+			}),
+			gomega.Equal(resourceapi.AllocatedDeviceStatus{
+				Driver:  allocatedDevice3.Driver,
+				Pool:    allocatedDevice3.Pool,
+				Device:  allocatedDevice3.Device,
+				ShareID: ptr.To(""), /* set on the read path?! */
+				NetworkData: &resourceapi.NetworkDeviceData{
+					InterfaceName: "eth3",
+				},
+			}),
+		))
 
 		// Roll back.
 		tCtx = ktesting.Begin(tCtx, "downgrade")
@@ -282,36 +326,75 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 		}).Should(gomega.ContainSubstring(`"Caches are synced" controller="resource_claim"`))
 		tCtx = ktesting.End(tCtx)
 
-		// We cannot test both with the claim because it only has one allocated device.
-		if false {
-			// Update device status in the allocated device.
-			allocatedDeviceAC := resourceac.AllocatedDeviceStatus().
-				WithDriver(allocatedDevice.Driver).
-				WithPool(allocatedDevice.Pool).
-				WithDevice(allocatedDevice.Device).
-				WithNetworkData(resourceac.NetworkDeviceData().WithInterfaceName("eth2"))
-			claimAC := resourceac.ResourceClaim(claim.Name, namespace.Name).
-				WithStatus(resourceac.ResourceClaimStatus().
-					WithDevices(allocatedDeviceAC),
-				)
-			claim, err := f.ClientSet.ResourceV1beta2().ResourceClaims(namespace.Name).ApplyStatus(ctx, claimAC, metav1.ApplyOptions{FieldManager: manager})
-			tCtx.ExpectNoError(err, "apply device status again")
-			gomega.Expect(claim.Status.Devices).To(gomega.HaveExactElements(gomega.Equal(resourceapi.AllocatedDeviceStatus{
+		// Update device status in one allocated device.
+		allocatedDeviceAC3 = resourceac.AllocatedDeviceStatus().
+			WithDriver(allocatedDevice3.Driver).
+			WithPool(allocatedDevice3.Pool).
+			WithDevice(allocatedDevice3.Device).
+			WithNetworkData(resourceac.NetworkDeviceData().WithInterfaceName("eth3x"))
+		claimAC = resourceac.ResourceClaim(claim.Name, namespace.Name).
+			WithStatus(resourceac.ResourceClaimStatus().
+				WithDevices(allocatedDeviceAC3),
+			)
+		claim, err = f.ClientSet.ResourceV1beta2().ResourceClaims(namespace.Name).ApplyStatus(ctx, claimAC, metav1.ApplyOptions{FieldManager: manager2})
+		tCtx.ExpectNoError(err, "update device status")
+		gomega.Expect(claim.Status.Devices).To(gomega.ConsistOf(
+			gomega.Equal(resourceapi.AllocatedDeviceStatus{
 				Driver: allocatedDevice.Driver,
 				Pool:   allocatedDevice.Pool,
 				Device: allocatedDevice.Device,
 				NetworkData: &resourceapi.NetworkDeviceData{
+					InterfaceName: "eth1",
+				},
+			}),
+			gomega.Equal(resourceapi.AllocatedDeviceStatus{
+				Driver: allocatedDevice2.Driver,
+				Pool:   allocatedDevice2.Pool,
+				Device: allocatedDevice2.Device,
+				NetworkData: &resourceapi.NetworkDeviceData{
 					InterfaceName: "eth2",
 				},
-			})))
-		} else {
-			// Remove device status from the allocated device.
-			claimAC := resourceac.ResourceClaim(claim.Name, namespace.Name)
-			claim, err := f.ClientSet.ResourceV1beta2().ResourceClaims(namespace.Name).ApplyStatus(ctx, claimAC, metav1.ApplyOptions{FieldManager: manager})
-			tCtx.ExpectNoError(err, "remove device status")
-			tCtx.Logf("allocated claim without device status from previous release:\n%s", format.Object(claim, 1))
-			gomega.Expect(claim.Status.Devices).To(gomega.BeEmpty())
-		}
+			}),
+			gomega.Equal(resourceapi.AllocatedDeviceStatus{
+				Driver: allocatedDevice3.Driver,
+				Pool:   allocatedDevice3.Pool,
+				Device: allocatedDevice3.Device,
+				NetworkData: &resourceapi.NetworkDeviceData{
+					InterfaceName: "eth3x",
+				},
+			}),
+		))
+
+		// Remove one device status from the allocated device.
+		allocatedDeviceAC = resourceac.AllocatedDeviceStatus().
+			WithDriver(allocatedDevice.Driver).
+			WithPool(allocatedDevice.Pool).
+			WithDevice(allocatedDevice.Device).
+			WithNetworkData(resourceac.NetworkDeviceData().WithInterfaceName("eth1"))
+		claimAC = resourceac.ResourceClaim(claim.Name, namespace.Name).
+			WithStatus(resourceac.ResourceClaimStatus().
+				WithDevices(allocatedDeviceAC),
+			)
+		claim, err = f.ClientSet.ResourceV1beta2().ResourceClaims(namespace.Name).ApplyStatus(ctx, claimAC, metav1.ApplyOptions{FieldManager: manager})
+		tCtx.ExpectNoError(err, "remove device status")
+		gomega.Expect(claim.Status.Devices).To(gomega.ConsistOf(
+			gomega.Equal(resourceapi.AllocatedDeviceStatus{
+				Driver: allocatedDevice.Driver,
+				Pool:   allocatedDevice.Pool,
+				Device: allocatedDevice.Device,
+				NetworkData: &resourceapi.NetworkDeviceData{
+					InterfaceName: "eth1",
+				},
+			}),
+			gomega.Equal(resourceapi.AllocatedDeviceStatus{
+				Driver: allocatedDevice3.Driver,
+				Pool:   allocatedDevice3.Pool,
+				Device: allocatedDevice3.Device,
+				NetworkData: &resourceapi.NetworkDeviceData{
+					InterfaceName: "eth3x",
+				},
+			}),
+		))
 
 		// We need to clean up explicitly because the normal
 		// cleanup doesn't work (driver shuts down first).
