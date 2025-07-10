@@ -1146,6 +1146,7 @@ type ResourceClaimStatus struct {
 	// +listMapKey=driver
 	// +listMapKey=device
 	// +listMapKey=pool
+	// +listMapKey=shareID
 	// +featureGate=DRAResourceClaimDeviceStatus
 	Devices []AllocatedDeviceStatus `json:"devices,omitempty" protobuf:"bytes,4,opt,name=devices"`
 }
@@ -1495,6 +1496,10 @@ type AllocatedDeviceStatus struct {
 	//
 	// +required
 	Device string `json:"device" protobuf:"bytes,3,rep,name=device"`
+
+	// +default=""
+	// +optional
+	ShareID *string `json:"shareID,omitempty" protobuf:"bytes,7,opt,name=shareID"`
 
 	// Conditions contains the latest observation of the device's state.
 	// If the device has been configured according to the class and claim
