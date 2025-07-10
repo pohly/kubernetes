@@ -38,9 +38,11 @@ import (
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1beta2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/version"
+	resourceac "k8s.io/client-go/applyconfigurations/resource/v1beta2"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	drautils "k8s.io/kubernetes/test/e2e/dra/utils"
@@ -48,9 +50,11 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
+	"k8s.io/kubernetes/test/utils/format"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/kubernetes/test/utils/localupcluster"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/ptr"
 )
 
 func init() {
@@ -236,6 +240,33 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 		b.Create(ctx, claim, pod)
 		b.TestPod(ctx, f, pod)
 
+		// Apply some device status for the allocated device.
+		claim, err = f.ClientSet.ResourceV1beta2().ResourceClaims(namespace.Name).Get(ctx, claim.Name, metav1.GetOptions{})
+		tCtx.ExpectNoError(err, "get claim with allocated device")
+		allocatedDevice := claim.Status.Allocation.Devices.Results[0]
+		allocatedDeviceAC := resourceac.AllocatedDeviceStatus().
+			WithDriver(allocatedDevice.Driver).
+			WithPool(allocatedDevice.Pool).
+			WithDevice(allocatedDevice.Device).
+			WithNetworkData(resourceac.NetworkDeviceData().WithInterfaceName("eth1"))
+		claimAC := resourceac.ResourceClaim(claim.Name, namespace.Name).
+			WithStatus(resourceac.ResourceClaimStatus().
+				WithDevices(allocatedDeviceAC),
+			)
+		manager := "manager1"
+		claim, err = f.ClientSet.ResourceV1beta2().ResourceClaims(namespace.Name).ApplyStatus(ctx, claimAC, metav1.ApplyOptions{FieldManager: manager})
+		tCtx.ExpectNoError(err, "apply device status")
+		tCtx.Logf("allocated claim with device status from master:\n%s", format.Object(claim, 1))
+		gomega.Expect(claim.Status.Devices).To(gomega.HaveExactElements(gomega.Equal(resourceapi.AllocatedDeviceStatus{
+			Driver:  allocatedDevice.Driver,
+			Pool:    allocatedDevice.Pool,
+			Device:  allocatedDevice.Device,
+			ShareID: ptr.To(""), /* set on the read path?! */
+			NetworkData: &resourceapi.NetworkDeviceData{
+				InterfaceName: "eth1",
+			},
+		})))
+
 		// Roll back.
 		tCtx = ktesting.Begin(tCtx, "downgrade")
 		cluster.Modify(tCtx, restoreOptions)
@@ -250,6 +281,37 @@ var _ = ginkgo.Describe("DRA upgrade/downgrade", func() {
 			return output
 		}).Should(gomega.ContainSubstring(`"Caches are synced" controller="resource_claim"`))
 		tCtx = ktesting.End(tCtx)
+
+		// We cannot test both with the claim because it only has one allocated device.
+		if false {
+			// Update device status in the allocated device.
+			allocatedDeviceAC := resourceac.AllocatedDeviceStatus().
+				WithDriver(allocatedDevice.Driver).
+				WithPool(allocatedDevice.Pool).
+				WithDevice(allocatedDevice.Device).
+				WithNetworkData(resourceac.NetworkDeviceData().WithInterfaceName("eth2"))
+			claimAC := resourceac.ResourceClaim(claim.Name, namespace.Name).
+				WithStatus(resourceac.ResourceClaimStatus().
+					WithDevices(allocatedDeviceAC),
+				)
+			claim, err := f.ClientSet.ResourceV1beta2().ResourceClaims(namespace.Name).ApplyStatus(ctx, claimAC, metav1.ApplyOptions{FieldManager: manager})
+			tCtx.ExpectNoError(err, "apply device status again")
+			gomega.Expect(claim.Status.Devices).To(gomega.HaveExactElements(gomega.Equal(resourceapi.AllocatedDeviceStatus{
+				Driver: allocatedDevice.Driver,
+				Pool:   allocatedDevice.Pool,
+				Device: allocatedDevice.Device,
+				NetworkData: &resourceapi.NetworkDeviceData{
+					InterfaceName: "eth2",
+				},
+			})))
+		} else {
+			// Remove device status from the allocated device.
+			claimAC := resourceac.ResourceClaim(claim.Name, namespace.Name)
+			claim, err := f.ClientSet.ResourceV1beta2().ResourceClaims(namespace.Name).ApplyStatus(ctx, claimAC, metav1.ApplyOptions{FieldManager: manager})
+			tCtx.ExpectNoError(err, "remove device status")
+			tCtx.Logf("allocated claim without device status from previous release:\n%s", format.Object(claim, 1))
+			gomega.Expect(claim.Status.Devices).To(gomega.BeEmpty())
+		}
 
 		// We need to clean up explicitly because the normal
 		// cleanup doesn't work (driver shuts down first).
