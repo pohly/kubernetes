@@ -42,6 +42,7 @@ type Features struct {
 	// Sorted alphabetically. When adding a new entry, also extend FeaturesAnd and FeaturesAll.
 
 	AdminAccess          bool
+	ConsumableCapacity   bool
 	DeviceTaints         bool
 	PartitionableDevices bool
 	PrioritizedList      bool
@@ -50,6 +51,7 @@ type Features struct {
 func FeaturesAnd(a, b Features) Features {
 	return Features{
 		AdminAccess:          a.AdminAccess && b.AdminAccess,
+		ConsumableCapacity:   a.ConsumableCapacity && b.ConsumableCapacity,
 		DeviceTaints:         a.DeviceTaints && b.DeviceTaints,
 		PartitionableDevices: a.PartitionableDevices && b.PartitionableDevices,
 		PrioritizedList:      a.PrioritizedList && b.PrioritizedList,
@@ -58,6 +60,7 @@ func FeaturesAnd(a, b Features) Features {
 
 var FeaturesAll = Features{
 	AdminAccess:          true,
+	ConsumableCapacity:   true,
 	DeviceTaints:         true,
 	PartitionableDevices: true,
 	PrioritizedList:      true,
