@@ -57,6 +57,7 @@ import (
 	"k8s.io/klog/v2"
 	kubeschedulerconfigv1 "k8s.io/kube-scheduler/config/v1"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	"k8s.io/kubernetes/pkg/controller/resourceclaim"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	kubeschedulerscheme "k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
@@ -206,7 +207,7 @@ func TestDRA(t *testing.T) {
 	// multiple tests can run in parallel as long as they are careful
 	// about what they create.
 	//
-	// Each configuration starts with two Nodes (ready, sufficient RAM and CPU for multiple pods)
+	// Each configuration starts with two Nodes (ready, sufficient RAM and CPU for 500 multiple pods)
 	// and no ResourceSlices. To test scheduling, a sub-test must create ResourceSlices.
 	// createTestNamespace can be used to create a unique per-test namespace. The name of that
 	// namespace then can be used to create cluster-scoped objects without conflicts between tests.
@@ -244,6 +245,7 @@ func TestDRA(t *testing.T) {
 					testPublishResourceSlices(tCtx, true, features.DRADeviceTaints, features.DRAPartitionableDevices)
 				})
 				tCtx.Run("ResourceClaimDeviceStatus", func(tCtx ktesting.TContext) { testResourceClaimDeviceStatus(tCtx, false) })
+				tCtx.Run("SharingResourceClaimSequentially", testSharingResourceClaimSequentially)
 			},
 		},
 		"v1beta1": {
@@ -350,7 +352,7 @@ func createNodes(tCtx ktesting.TContext) {
 			Capacity: v1.ResourceList{
 				v1.ResourceCPU:    resource.MustParse("100"),
 				v1.ResourceMemory: resource.MustParse("1000"),
-				v1.ResourcePods:   resource.MustParse("100"),
+				v1.ResourcePods:   resource.MustParse("500"),
 			},
 			Phase: v1.NodeRunning,
 			Conditions: []v1.NodeCondition{
@@ -420,6 +422,7 @@ func startSchedulerWithConfig(tCtx ktesting.TContext, config string) {
 type schedulerSingleton struct {
 	rootCtx ktesting.TContext
 
+	wg              sync.WaitGroup
 	mutex           sync.Mutex
 	usageCount      int
 	informerFactory informers.SharedInformerFactory
@@ -442,13 +445,36 @@ func (scheduler *schedulerSingleton) start(tCtx ktesting.TContext, config string
 	// the per-test tCtx passed to start will get canceled once the test which triggered
 	// starting the scheduler is done.
 	tCtx = scheduler.rootCtx
+	cancelCtx := ktesting.WithCancel(tCtx)
+	scheduler.cancel = cancelCtx.Cancel
+
 	tCtx.Logf("Starting the scheduler for test %s...", tCtx.Name())
-	tCtx = ktesting.WithLogger(tCtx, klog.LoggerWithName(tCtx.Logger(), "scheduler"))
-	schedulerCtx := ktesting.WithCancel(tCtx)
-	scheduler.cancel = schedulerCtx.Cancel
+	schedulerCtx := ktesting.WithLogger(tCtx, klog.LoggerWithName(tCtx.Logger(), "scheduler"))
 	cfg := newSchedulerComponentConfig(schedulerCtx, config)
 	_, scheduler.informerFactory = util.StartScheduler(schedulerCtx, cfg, nil)
 	tCtx.Logf("Started the scheduler for test %s.", tCtx.Name())
+
+	// Now also the resource claim controller, to support ResourceClaimTemplates
+	// and deallocation/unreserving of ResourceClaims.
+	resourceClaimController, err := resourceclaim.NewController(
+		klog.LoggerWithName(tCtx.Logger(), "resourceClaimController"),
+		resourceclaim.Features{
+			AdminAccess:     utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess),
+			PrioritizedList: utilfeature.DefaultFeatureGate.Enabled(features.DRAPrioritizedList),
+		},
+		tCtx.Client(),
+		scheduler.informerFactory.Core().V1().Pods(),
+		scheduler.informerFactory.Resource().V1().ResourceClaims(),
+		scheduler.informerFactory.Resource().V1().ResourceClaimTemplates(),
+	)
+	tCtx.ExpectNoError(err, "create ResourceClaim controller")
+	scheduler.informerFactory.WaitForCacheSync(tCtx.Done())
+	scheduler.wg.Add(1)
+	go func() {
+		defer scheduler.wg.Done()
+		resourceClaimController.Run(cancelCtx, 10)
+	}()
+	tCtx.Logf("Started the ResourceClaim controller for test %s.", tCtx.Name())
 }
 
 func (scheduler *schedulerSingleton) stop(tCtx ktesting.TContext) {
@@ -468,6 +494,7 @@ func (scheduler *schedulerSingleton) stop(tCtx ktesting.TContext) {
 	if scheduler.informerFactory != nil {
 		scheduler.informerFactory.Shutdown()
 	}
+	scheduler.wg.Wait()
 }
 
 type schedulerKeyType int
@@ -1167,6 +1194,81 @@ func testMaxResourceSlice(tCtx ktesting.TContext) {
 	if diff := cmp.Diff(slice.Spec, createdSlice.Spec); diff != "" {
 		tCtx.Errorf("ResourceSliceSpec got modified during Create (- want, + got):\n%s", diff)
 	}
+}
+
+// testSharingResourceClaimSequentially verifies that the scheduler keeps pods pending when
+// they cannot be added to ReservedFor because the maximum number of entries has been reached
+// and then schedules them when pods terminate.
+func testSharingResourceClaimSequentially(tCtx ktesting.TContext) {
+	tCtx.Parallel()
+
+	namespace := createTestNamespace(tCtx, nil)
+	class, driverName := createTestClass(tCtx, namespace)
+	slice := st.MakeResourceSlice("worker-0", driverName).Devices("dev-0")
+	createSlice(tCtx, slice.Obj())
+	claim := createClaim(tCtx, namespace, "", class, claim)
+
+	// Not all of these pods can run at the same time.
+	numPods := resourceapi.ResourceClaimReservedForMaxSize * 2
+	pod := podWithClaimName.DeepCopy()
+	pod.Name = ""
+	pod.GenerateName = "pod-"
+	for i := 0; i < numPods; i++ {
+		createPod(tCtx, namespace, "", claim, pod)
+	}
+
+	startScheduler(tCtx)
+
+	numDeletedScheduledPods := 0
+	lastNumScheduled := 0
+	// Normally polling functions should not log. We make an exception...
+	logf := tCtx.Logf
+	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) error {
+		pods, err := tCtx.Client().CoreV1().Pods(namespace).List(tCtx, metav1.ListOptions{})
+		if err != nil {
+			return fmt.Errorf("list pods: %w", err)
+		}
+
+		numConsumingPods := 0
+		for _, pod := range pods.Items {
+			if pod.Spec.NodeName != "" {
+				numConsumingPods++
+			}
+		}
+
+		// Force-delete some scheduled pod, we don't have kubelet running.
+		// A scheduled pod gets deleted if necessary to allow more pods
+		// to get scheduled or when the remaining pods could all use the
+		// claim at the same time.
+		haveDeleted := false
+		for _, pod := range pods.Items {
+			if pod.Spec.NodeName != "" &&
+				(numConsumingPods == resourceapi.ResourceClaimReservedForMaxSize || numPods-numDeletedScheduledPods < resourceapi.ResourceClaimReservedForMaxSize) {
+
+				if err := tCtx.Client().CoreV1().Pods(namespace).Delete(tCtx, pod.Name, metav1.DeleteOptions{GracePeriodSeconds: ptr.To(int64(0))}); err != nil {
+					return fmt.Errorf("delete pod: %w", err)
+				}
+				numDeletedScheduledPods++
+				numConsumingPods--
+				haveDeleted = true
+			}
+		}
+
+		// Only log some information when something changed.
+		numScheduled := numConsumingPods + numDeletedScheduledPods
+		if true || numScheduled != lastNumScheduled || haveDeleted {
+			logf("%d out of %d pods scheduled (%d%%) and %d deleted so far (%d%%)", numScheduled, numPods, 100*numScheduled/numPods, numDeletedScheduledPods, 100*numDeletedScheduledPods/numPods)
+			lastNumScheduled = numScheduled
+		}
+
+		// Continue until all are done.
+		if numDeletedScheduledPods < numPods {
+			return fmt.Errorf("only %d out of %d pods scheduled and deleted so far (%d%%)", numDeletedScheduledPods, numPods, 100*numDeletedScheduledPods/numPods)
+		}
+
+		// Success!
+		return nil
+	}).WithPolling(time.Second).Should(gomega.Succeed())
 }
 
 func matchPointer[T any](p *T) gtypes.GomegaMatcher {

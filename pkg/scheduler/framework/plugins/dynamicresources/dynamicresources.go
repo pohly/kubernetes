@@ -871,10 +871,18 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 	logger.V(5).Info("preparing claim status update", "claim", klog.KObj(state.claims[index]), "allocation", klog.Format(allocation))
 
 	// We may run into a ResourceVersion conflict because there may be some
-	// benign concurrent changes. In that case we get the latest claim and
-	// try again.
+	// benign concurrent changes, including binding some other pod sharing the same claim.
+	// In that case we get the latest claim and try again.
+	//
+	// The default retry gives up after 5 attempts. This is too low when scheduling hundreds of
+	// pods sharing the same claim at the same time (extreme example, but it could happen).
 	refreshClaim := false
-	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+	reserveRetry := retry.DefaultRetry
+	reserveRetry.Steps = 30
+	numAttempts := 0
+	// TODO: randomize backoff?
+	retryErr := retry.RetryOnConflict(reserveRetry, func() error {
+		numAttempts++
 		if refreshClaim {
 			updatedClaim, err := pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).Get(ctx, claim.Name, metav1.GetOptions{})
 			if err != nil {
@@ -926,7 +934,7 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 	})
 
 	if retryErr != nil {
-		return nil, retryErr
+		return nil, fmt.Errorf("giving up after %d attempts: %w", numAttempts, retryErr)
 	}
 
 	logger.V(5).Info("reserved", "pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName}, "resourceclaim", klog.Format(claim))

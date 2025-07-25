@@ -34,12 +34,14 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	cgotesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/util/retry"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	kubeschedulerconfigv1 "k8s.io/kube-scheduler/config/v1"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -1766,4 +1768,17 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRetries(t *testing.T) {
+	numCalls := 0
+	retries := retry.DefaultRetry
+	retries.Steps = 11
+	err := retry.RetryOnConflict(retries, func() error {
+		numCalls++
+		return apierrors.NewConflict(resourceapi.Resource("resourceclaims"), "test", errors.New("fake"))
+	})
+
+	assert.Error(t, err)
+	assert.Equal(t, numCalls, 11)
 }
