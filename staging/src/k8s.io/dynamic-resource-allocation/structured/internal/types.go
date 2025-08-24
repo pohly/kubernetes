@@ -71,6 +71,15 @@ type Features struct {
 	PrioritizedList        bool
 }
 
+// AllocatorChannel identifies one of the current allocator implementations.
+type AllocatorChannel string
+
+const (
+	Experimental AllocatorChannel = "experimental"
+	Stable       AllocatorChannel = "stable"
+	Incubating   AllocatorChannel = "incubating"
+)
+
 // Set returns all features which are set to true.
 // The names of the features happen to match the Kubernetes
 // feature gates where applicable. Plain strings are used
