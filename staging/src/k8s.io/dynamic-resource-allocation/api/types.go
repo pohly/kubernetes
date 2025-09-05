@@ -30,6 +30,8 @@ import (
 // - Fields from this package use upper case whereas types from the
 //   real API use lower case.
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 type ResourceSlice struct {
 	metav1.TypeMeta `json:"-"` // Not needed, not set consistently.
 	metav1.ObjectMeta
@@ -77,4 +79,13 @@ type Device struct {
 type DeviceCounterConsumption struct {
 	CounterSet UniqueString
 	Counters   map[string]resourceapi.Counter `json:",omitempty"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+type ResourceSliceList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metata,omitempty"`
+
+	Items []ResourceSlice `json:"items,omitempty"`
 }
