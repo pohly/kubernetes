@@ -101,7 +101,8 @@ type ResourceSliceSpec struct {
 	// objects with a certain driver name.
 	//
 	// Must be a DNS subdomain and should end with a DNS domain owned by the
-	// vendor of the driver. This field is immutable.
+	// vendor of the driver. It should use only lower case characters.
+	// This field is immutable.
 	//
 	// +required
 	Driver string `json:"driver" protobuf:"bytes,1,name=driver"`
@@ -682,6 +683,7 @@ type ResourceSliceList struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.32
+// +k8s:supportsSubresource=/status
 
 // ResourceClaim describes a request for access to resources in the cluster,
 // for use by workloads. For example, if a workload needs an accelerator device
@@ -726,6 +728,7 @@ type DeviceClaim struct {
 	//
 	// +optional
 	// +listType=atomic
+	// +k8s:maxItems=32
 	Requests []DeviceRequest `json:"requests" protobuf:"bytes,1,name=requests"`
 
 	// These constraints must be satisfied by the set of devices that get
@@ -733,6 +736,7 @@ type DeviceClaim struct {
 	//
 	// +optional
 	// +listType=atomic
+	// +k8s:maxItems=32
 	Constraints []DeviceConstraint `json:"constraints,omitempty" protobuf:"bytes,2,opt,name=constraints"`
 
 	// This field holds configuration for multiple potential drivers which
@@ -741,6 +745,7 @@ type DeviceClaim struct {
 	//
 	// +optional
 	// +listType=atomic
+	// +k8s:maxItems=32
 	Config []DeviceClaimConfiguration `json:"config,omitempty" protobuf:"bytes,3,opt,name=config"`
 
 	// Potential future extension, ignored by older schedulers. This is
@@ -1074,6 +1079,7 @@ const (
 	DeviceTolerationsMaxLength         = 16
 )
 
+// +enum
 type DeviceAllocationMode string
 
 // Valid [DeviceRequest.CountMode] values.
@@ -1275,7 +1281,7 @@ type OpaqueDeviceConfiguration struct {
 	// to decide whether it needs to validate them.
 	//
 	// Must be a DNS subdomain and should end with a DNS domain owned by the
-	// vendor of the driver.
+	// vendor of the driver. It should use only lower case characters.
 	//
 	// +required
 	Driver string `json:"driver" protobuf:"bytes,1,name=driver"`
@@ -1354,6 +1360,7 @@ type ResourceClaimStatus struct {
 	// Allocation is set once the claim has been allocated successfully.
 	//
 	// +optional
+	// +k8s:optional
 	Allocation *AllocationResult `json:"allocation,omitempty" protobuf:"bytes,1,opt,name=allocation"`
 
 	// ReservedFor indicates which entities are currently allowed to use
@@ -1377,6 +1384,7 @@ type ResourceClaimStatus struct {
 	// the future, but not reduced.
 	//
 	// +optional
+	// +k8s:optional
 	// +listType=map
 	// +listMapKey=uid
 	// +patchStrategy=merge
@@ -1393,6 +1401,7 @@ type ResourceClaimStatus struct {
 	// information. Entries are owned by their respective drivers.
 	//
 	// +optional
+	// +k8s:optional
 	// +listType=map
 	// +listMapKey=driver
 	// +listMapKey=device
@@ -1498,7 +1507,7 @@ type DeviceRequestAllocationResult struct {
 	// needed on a node.
 	//
 	// Must be a DNS subdomain and should end with a DNS domain owned by the
-	// vendor of the driver.
+	// vendor of the driver. It should use only lower case characters.
 	//
 	// +required
 	Driver string `json:"driver" protobuf:"bytes,2,name=driver"`
@@ -1510,6 +1519,8 @@ type DeviceRequestAllocationResult struct {
 	// DNS sub-domains separated by slashes.
 	//
 	// +required
+	// +k8s:required
+	// +k8s:format=k8s-resource-pool-name
 	Pool string `json:"pool" protobuf:"bytes,3,name=pool"`
 
 	// Device references one device instance via its name in the driver's
@@ -1799,7 +1810,7 @@ type AllocatedDeviceStatus struct {
 	// needed on a node.
 	//
 	// Must be a DNS subdomain and should end with a DNS domain owned by the
-	// vendor of the driver.
+	// vendor of the driver. It should use only lower case characters.
 	//
 	// +required
 	Driver string `json:"driver" protobuf:"bytes,1,rep,name=driver"`

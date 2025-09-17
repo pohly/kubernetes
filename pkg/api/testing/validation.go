@@ -27,10 +27,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	runtimetest "k8s.io/apimachinery/pkg/runtime/testing"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // ValidateFunc is a function that runs validation.
@@ -222,7 +222,7 @@ func verifyValidationEquivalence(t *testing.T, expectedErrs field.ErrorList, run
 		}
 	})
 
-	t.Run("without declarative validation", func(t *testing.T) {
+	t.Run("hand written validation", func(t *testing.T) {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidationTakeover, false)
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidation, false)
 		imperativeErrs = runValidations()
@@ -233,6 +233,11 @@ func verifyValidationEquivalence(t *testing.T, expectedErrs field.ErrorList, run
 			t.Errorf("expected no errors, but got: %v", imperativeErrs)
 		}
 	})
+
+	if t.Failed() {
+		// There is no point in moving forward, if any of above tests failed for any reason. Running follow up tests will return noise.
+		t.SkipNow()
+	}
 
 	// The equivalenceMatcher is used to verify the output errors from hand-written imperative validation
 	// are equivalent to the output errors when DeclarativeValidationTakeover is enabled.

@@ -28,6 +28,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	resourcealphaapi "k8s.io/api/resource/v1alpha3"
@@ -35,6 +36,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	_ "k8s.io/klog/v2/ktesting/init"
@@ -51,8 +53,8 @@ const (
 
 type handlerEvent struct {
 	event  handlerEventType
-	oldObj *resourceapi.ResourceSlice
-	newObj *resourceapi.ResourceSlice
+	oldObj *draapi.ResourceSlice
+	newObj *draapi.ResourceSlice
 }
 
 func add[T any](obj *T) [2]*T {
@@ -67,22 +69,40 @@ func update[T any](oldObj, newObj *T) [2]*T {
 	return [2]*T{oldObj, newObj}
 }
 
-func runInputEvents(tCtx *testContext, events []any) {
-	for _, event := range events {
-		switch event := event.(type) {
-		case []any:
-			for _, event := range event {
-				applyEventPair(tCtx, event)
+func runInputEvents(tCtx *testContext, events []any, permutation []int) {
+	for _, i := range permutation {
+		event, name := lookupEvent(events, i)
+		stepCtx := tCtx.withLoggerName(fmt.Sprintf("event #%s", name))
+		applyEventPair(stepCtx, event)
+	}
+}
+
+// lookupEvent is the opposite of flatten: it takes an index
+// after flattening and maps it back to the event in the original
+// event hierarchy. To do so, it descends into the second level where necessary.
+func lookupEvent(events []any, index int) (any, string) {
+	numEvents := 0
+	for i := range events {
+		if e, ok := events[i].([]any); ok {
+			for j := range e {
+				if numEvents == index {
+					return e[j], fmt.Sprintf("%d/%d", i, j)
+				}
+				numEvents++
 			}
-		default:
-			applyEventPair(tCtx, event)
+		} else {
+			if numEvents == index {
+				return events[i], fmt.Sprintf("%d", i)
+			}
+			numEvents++
 		}
 	}
+	panic(fmt.Sprintf("invalid event index #%d", index))
 }
 
 func applyEventPair(tCtx *testContext, event any) {
 	switch pair := event.(type) {
-	case [2]*resourceapi.ResourceSlice:
+	case [2]*draapi.ResourceSlice:
 		store := tCtx.resourceSlices.GetStore()
 		switch {
 		case pair[0] != nil && pair[1] != nil:
@@ -140,7 +160,22 @@ type testContext struct {
 	*fake.Clientset
 }
 
+func (t *testContext) withLoggerName(name string) *testContext {
+	logger := klog.FromContext(t.Context)
+	logger = klog.LoggerWithName(logger, name)
+	t = &testContext{
+		T:         t.T,
+		Context:   klog.NewContext(t.Context, logger),
+		Tracker:   t.Tracker,
+		Clientset: t.Clientset,
+	}
+	return t
+}
+
 var (
+	// Alias to save typing.
+	u = draapi.MakeUniqueString
+
 	now, _      = time.Parse(time.RFC3339, "2006-01-02T15:04:05Z")
 	driver1     = "driver1.example.com"
 	driver2     = "driver2.example.com"
@@ -163,44 +198,49 @@ var (
 		},
 	}
 
-	sliceWithDevices = func(slice *resourceapi.ResourceSlice, devices []resourceapi.Device) *resourceapi.ResourceSlice {
+	sliceWithDevices = func(slice *draapi.ResourceSlice, devices []draapi.Device) *draapi.ResourceSlice {
 		slice = slice.DeepCopy()
 		slice.Spec.Devices = devices
 		return slice
 	}
-	slice1NoDevices = &resourceapi.ResourceSlice{
+	sliceWithLabels = func(slice *draapi.ResourceSlice, labels map[string]string) *draapi.ResourceSlice {
+		slice = slice.DeepCopy()
+		slice.Labels = labels
+		return slice
+	}
+	slice1NoDevices = &draapi.ResourceSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "s1",
 		},
-		Spec: resourceapi.ResourceSliceSpec{
-			Driver: driver1,
-			Pool: resourceapi.ResourcePool{
-				Name: pool1,
+		Spec: draapi.ResourceSliceSpec{
+			Driver: u(driver1),
+			Pool: draapi.ResourcePool{
+				Name: u(pool1),
 			},
 		},
 	}
-	slice2NoDevices = &resourceapi.ResourceSlice{
+	slice2NoDevices = &draapi.ResourceSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "s2",
 		},
-		Spec: resourceapi.ResourceSliceSpec{
-			Driver: driver2,
-			Pool: resourceapi.ResourcePool{
-				Name: pool2,
+		Spec: draapi.ResourceSliceSpec{
+			Driver: u(driver2),
+			Pool: draapi.ResourcePool{
+				Name: u(pool2),
 			},
 		},
 	}
-	unchangedSlice = &resourceapi.ResourceSlice{ObjectMeta: metav1.ObjectMeta{Name: "no-change"}}
+	unchangedSlice = &draapi.ResourceSlice{ObjectMeta: metav1.ObjectMeta{Name: "no-change"}}
 
-	deviceWithName = func(device resourceapi.Device, name string) resourceapi.Device {
-		device.Name = name
+	deviceWithName = func(device draapi.Device, name string) draapi.Device {
+		device.Name = u(name)
 		return device
 	}
-	deviceWithTaints = func(device resourceapi.Device, taints []resourceapi.DeviceTaint) resourceapi.Device {
+	deviceWithTaints = func(device draapi.Device, taints []resourceapi.DeviceTaint) draapi.Device {
 		device.Taints = taints
 		return device
 	}
-	emptyDevice = resourceapi.Device{}
+	emptyDevice = draapi.Device{}
 	device0     = deviceWithName(emptyDevice, device0Name)
 	device1     = deviceWithName(emptyDevice, device1Name)
 	device2     = deviceWithName(emptyDevice, device2Name)
@@ -220,32 +260,33 @@ var (
 	deviceTaints   = []resourceapi.DeviceTaint{deviceTaint1}
 	device1Tainted = deviceWithTaints(device1, deviceTaints)
 	device2Tainted = deviceWithTaints(device2, deviceTaints)
-	devices        = []resourceapi.Device{device1}
-	threeDevices   = []resourceapi.Device{
+	devices        = []draapi.Device{device1}
+	threeDevices   = []draapi.Device{
 		device0,
 		device1,
 		device2,
 	}
-	threeDevicesOneTainted = []resourceapi.Device{
+	threeDevicesOneTainted = []draapi.Device{
 		device0,
 		device1Tainted,
 		device2,
 	}
-	devices2        = []resourceapi.Device{device2}
-	taintedDevices  = []resourceapi.Device{device1Tainted}
-	taintedDevices2 = []resourceapi.Device{device2Tainted}
+	devices2        = []draapi.Device{device2}
+	taintedDevices  = []draapi.Device{device1Tainted}
+	taintedDevices2 = []draapi.Device{device2Tainted}
 
 	existingDeviceTaints   = []resourceapi.DeviceTaint{deviceTaint2}
 	existingDevice1Tainted = deviceWithTaints(device1, existingDeviceTaints)
-	existingTaintedDevices = []resourceapi.Device{existingDevice1Tainted}
+	existingTaintedDevices = []draapi.Device{existingDevice1Tainted}
 	mergedDeviceTaints     = []resourceapi.DeviceTaint{deviceTaint2, deviceTaint1}
 	mergedDevice1Tainted   = deviceWithTaints(device1, mergedDeviceTaints)
-	mergedTaintedDevices   = []resourceapi.Device{mergedDevice1Tainted}
+	mergedTaintedDevices   = []draapi.Device{mergedDevice1Tainted}
 
 	slice1               = sliceWithDevices(slice1NoDevices, devices)
 	slice1Tainted        = sliceWithDevices(slice1, taintedDevices)
 	slice1AlreadyTainted = sliceWithDevices(slice1, existingTaintedDevices)
 	slice1MergedTaints   = sliceWithDevices(slice1, mergedTaintedDevices)
+	slice1Labels         = sliceWithLabels(slice1, map[string]string{"foo": "bar"})
 	slice2               = sliceWithDevices(slice2NoDevices, devices2)
 	slice2Tainted        = sliceWithDevices(slice2, taintedDevices2)
 
@@ -334,7 +375,12 @@ func TestListPatchedResourceSlices(t *testing.T) {
 		// order. Other events may be placed in between as long as
 		// the order in those nested lists is preserved.
 		events                []any
-		expectedPatchedSlices []*resourceapi.ResourceSlice
+		expectedPatchedSlices []*draapi.ResourceSlice
+		// The exact events that are emitted for a sequence of events is
+		// highly dependent on the order in which those events are received.
+		// We punt on determining a set of validation criteria for every
+		// possible sequence and only check them against the first
+		// permutation: the order in which the events are defined.
 		expectedHandlerEvents []handlerEvent
 		expectEvents          func(t *assert.CollectT, events *v1.EventList)
 		expectUnhandledErrors func(t *testing.T, errs []error)
@@ -345,7 +391,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				add(slice1),
 				add(slice2),
 			},
-			expectedPatchedSlices: []*resourceapi.ResourceSlice{
+			expectedPatchedSlices: []*draapi.ResourceSlice{
 				slice1,
 				slice2,
 			},
@@ -366,7 +412,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				},
 				add(unchangedSlice),
 			},
-			expectedPatchedSlices: []*resourceapi.ResourceSlice{
+			expectedPatchedSlices: []*draapi.ResourceSlice{
 				slice1,
 				slice2,
 				unchangedSlice,
@@ -379,13 +425,28 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				{event: handlerEventAdd, newObj: unchangedSlice},
 			},
 		},
+		"update-slice-labels": {
+			events: []any{
+				[]any{
+					add(slice1),
+					update(slice1, slice1Labels),
+				},
+			},
+			expectedPatchedSlices: []*draapi.ResourceSlice{
+				slice1Labels,
+			},
+			expectedHandlerEvents: []handlerEvent{
+				{event: handlerEventAdd, newObj: slice1},
+				{event: handlerEventUpdate, oldObj: slice1, newObj: slice1Labels},
+			},
+		},
 		"delete-slices": {
 			events: []any{
 				[]any{add(slice1), remove(slice1)},
 				[]any{add(slice2), remove(slice2)},
 				add(unchangedSlice),
 			},
-			expectedPatchedSlices: []*resourceapi.ResourceSlice{
+			expectedPatchedSlices: []*draapi.ResourceSlice{
 				unchangedSlice,
 			},
 			expectedHandlerEvents: []handlerEvent{
@@ -401,7 +462,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				add(slice1),
 				add(taintAllDevicesRule),
 			},
-			expectedPatchedSlices: []*resourceapi.ResourceSlice{
+			expectedPatchedSlices: []*draapi.ResourceSlice{
 				slice1Tainted,
 			},
 			expectedHandlerEvents: []handlerEvent{
@@ -418,7 +479,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				add(slice1),
 				add(slice2),
 			},
-			expectedPatchedSlices: []*resourceapi.ResourceSlice{
+			expectedPatchedSlices: []*draapi.ResourceSlice{
 				slice1,
 				slice2Tainted,
 			},
@@ -432,7 +493,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				add(taintAllDevicesRule),
 				add(slice1AlreadyTainted),
 			},
-			expectedPatchedSlices: []*resourceapi.ResourceSlice{
+			expectedPatchedSlices: []*draapi.ResourceSlice{
 				slice1MergedTaints,
 			},
 			expectedHandlerEvents: []handlerEvent{
@@ -445,7 +506,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				add(slice1),
 				add(slice2),
 			},
-			expectedPatchedSlices: []*resourceapi.ResourceSlice{
+			expectedPatchedSlices: []*draapi.ResourceSlice{
 				slice1Tainted,
 				slice2,
 			},
@@ -460,7 +521,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				add(slice1),
 				add(slice2),
 			},
-			expectedPatchedSlices: []*resourceapi.ResourceSlice{
+			expectedPatchedSlices: []*draapi.ResourceSlice{
 				slice1Tainted,
 				slice2,
 			},
@@ -475,7 +536,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				add(slice1),
 				add(slice2),
 			},
-			expectedPatchedSlices: []*resourceapi.ResourceSlice{
+			expectedPatchedSlices: []*draapi.ResourceSlice{
 				slice1Tainted,
 				slice2,
 			},
@@ -490,7 +551,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				add(slice1),
 				add(slice2),
 			},
-			expectedPatchedSlices: []*resourceapi.ResourceSlice{
+			expectedPatchedSlices: []*draapi.ResourceSlice{
 				slice1Tainted,
 				slice2,
 			},
@@ -504,7 +565,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				add(taintNoDevicesCELRule),
 				add(slice1),
 			},
-			expectedPatchedSlices: []*resourceapi.ResourceSlice{
+			expectedPatchedSlices: []*draapi.ResourceSlice{
 				slice1,
 			},
 			expectedHandlerEvents: []handlerEvent{
@@ -516,7 +577,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				add(taintNoDevicesCELRuntimeErrorRule),
 				add(slice1),
 			},
-			expectedPatchedSlices: []*resourceapi.ResourceSlice{
+			expectedPatchedSlices: []*draapi.ResourceSlice{
 				slice1,
 			},
 			expectEvents: func(t *assert.CollectT, events *v1.EventList) {
@@ -537,7 +598,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					add(slice1),
 				},
 			},
-			expectedPatchedSlices: []*resourceapi.ResourceSlice{},
+			expectedPatchedSlices: []*draapi.ResourceSlice{},
 			expectUnhandledErrors: func(t *testing.T, errs []error) {
 				if !assert.Len(t, errs, 1) {
 					return
@@ -552,7 +613,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				add(slice1),
 				add(slice2),
 			},
-			expectedPatchedSlices: []*resourceapi.ResourceSlice{
+			expectedPatchedSlices: []*draapi.ResourceSlice{
 				slice1Tainted,
 				slice2,
 			},
@@ -585,7 +646,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				add(slice1),
 				add(slice2),
 			},
-			expectedPatchedSlices: []*resourceapi.ResourceSlice{
+			expectedPatchedSlices: []*draapi.ResourceSlice{
 				slice1Tainted,
 				slice2,
 			},
@@ -606,7 +667,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					update(sliceWithDevices(slice2, threeDevices), sliceWithDevices(slice2, devices)),
 				},
 			},
-			expectedPatchedSlices: []*resourceapi.ResourceSlice{
+			expectedPatchedSlices: []*draapi.ResourceSlice{
 				sliceWithDevices(slice1, threeDevicesOneTainted),
 				sliceWithDevices(slice2, taintedDevices),
 			},
@@ -627,7 +688,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 
 		opts := Options{
 			EnableDeviceTaints: true,
-			SliceInformer:      informerFactory.Resource().V1().ResourceSlices(),
+			SliceInformer:      draapi.NewResourceSliceInformer(informerFactory),
 			TaintInformer:      informerFactory.Resource().V1alpha3().DeviceTaintRules(),
 			ClassInformer:      informerFactory.Resource().V1().DeviceClasses(),
 			KubeClient:         kubeClient,
@@ -643,17 +704,25 @@ func TestListPatchedResourceSlices(t *testing.T) {
 		}
 	}
 
-	testHandlers := func(tCtx *testContext, test test, testExpectedEmittedEvents bool) {
+	testHandlers := func(tCtx *testContext, test test, permutation []int) {
+		isPermutated := false
+		for i, j := range permutation {
+			if i != j {
+				isPermutated = true
+				break
+			}
+		}
+
 		var handlerEvents []handlerEvent
 		handler := cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
-				handlerEvents = append(handlerEvents, handlerEvent{event: handlerEventAdd, newObj: obj.(*resourceapi.ResourceSlice)})
+				handlerEvents = append(handlerEvents, handlerEvent{event: handlerEventAdd, newObj: obj.(*draapi.ResourceSlice)})
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
-				handlerEvents = append(handlerEvents, handlerEvent{event: handlerEventUpdate, oldObj: oldObj.(*resourceapi.ResourceSlice), newObj: newObj.(*resourceapi.ResourceSlice)})
+				handlerEvents = append(handlerEvents, handlerEvent{event: handlerEventUpdate, oldObj: oldObj.(*draapi.ResourceSlice), newObj: newObj.(*draapi.ResourceSlice)})
 			},
 			DeleteFunc: func(obj interface{}) {
-				handlerEvents = append(handlerEvents, handlerEvent{event: handlerEventDelete, oldObj: obj.(*resourceapi.ResourceSlice)})
+				handlerEvents = append(handlerEvents, handlerEvent{event: handlerEventDelete, oldObj: obj.(*draapi.ResourceSlice)})
 			},
 		}
 		_, _ = tCtx.AddEventHandler(handler)
@@ -663,9 +732,9 @@ func TestListPatchedResourceSlices(t *testing.T) {
 			unhandledErrors = append(unhandledErrors, err)
 		}
 
-		runInputEvents(tCtx, test.events)
+		runInputEvents(tCtx, test.events, permutation)
 
-		if testExpectedEmittedEvents {
+		if !isPermutated {
 			assert.Equal(tCtx, test.expectedHandlerEvents, handlerEvents)
 		}
 
@@ -680,7 +749,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 		// Check ResourceSlices
 		patchedResourceSlices, err := tCtx.ListPatchedResourceSlices()
 		require.NoError(tCtx, err, "list patched resource slices")
-		sortResourceSlicesFunc := func(s1, s2 *resourceapi.ResourceSlice) int {
+		sortResourceSlicesFunc := func(s1, s2 *draapi.ResourceSlice) int {
 			return stdcmp.Compare(s1.Name, s2.Name)
 		}
 		slices.SortFunc(test.expectedPatchedSlices, sortResourceSlicesFunc)
@@ -709,60 +778,47 @@ func TestListPatchedResourceSlices(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			// The exact events that are emitted for a sequence of events is
-			// highly dependent on the order in which those events are received.
-			// We punt on determining a set of validation criteria for every
-			// possible sequence and only check them against the first
-			// permutation: the order in which the events are defined.
-			testExpectedEmittedEvents := true
-
-			numEvents := len(tc.events)
-			if numEvents <= 1 {
-				// No permutations.
-				tContext := setup(t)
-				testHandlers(tContext, tc, testExpectedEmittedEvents)
-				return
-			}
-
-			// flatten does one level of flattening of events. It also returns
-			// another slice of pairs of indices representing ranges which were
-			// flattened.
-			flatten := func(events []any) ([]any, [][2]int) {
-				var ret []any
+			// flatten does one level of flattening of events, counting all events.
+			// It also returns a slice of pairs of indices representing ranges which were
+			// flattened (= came from the second level) and which therefore must
+			// remain in that order.
+			flatten := func(events []any) (int, [][2]int) {
+				numEvents := 0
 				var ranges [][2]int
 				for _, e := range events {
 					switch e := e.(type) {
 					case []any:
-						ranges = append(ranges, [2]int{len(ret), len(ret) + len(e)})
-						ret = append(ret, e...)
+						ranges = append(ranges, [2]int{numEvents, numEvents + len(e)})
+						numEvents += len(e)
 					default:
-						ret = append(ret, e)
+						numEvents++
 					}
 				}
-				return ret, ranges
+				return numEvents, ranges
 			}
+			numEvents, constraints := flatten(tc.events)
 
-			var constraints [][2]int
-			tc.events, constraints = flatten(tc.events)
-			numEvents = len(tc.events)
+			if len(tc.events) <= 1 {
+				// No permutations possible.
+				var permutation []int
+				for i := 0; i < numEvents; i++ {
+					permutation = append(permutation, i)
+				}
+				tContext := setup(t)
+				testHandlers(tContext, tc, permutation)
+				return
+			}
 
 			permutation := make([]int, numEvents)
 			var permutate func(depth int)
 			permutate = func(depth int) {
 				if depth >= numEvents {
 					// Define a sub-test which runs the current permutation of events.
-					events := make([]any, numEvents)
-					for i := range numEvents {
-						events[i] = tc.events[permutation[i]]
-					}
-					tc := tc
-					tc.events = events
 					name := strings.Trim(fmt.Sprintf("%v", permutation), "[]")
 					t.Run(name, func(t *testing.T) {
 						tContext := setup(t)
-						testHandlers(tContext, tc, testExpectedEmittedEvents)
-
-						testExpectedEmittedEvents = false
+						// No need to clone the slice, we don't run in parallel.
+						testHandlers(tContext, tc, permutation)
 					})
 					return
 				}
@@ -778,10 +834,13 @@ func TestListPatchedResourceSlices(t *testing.T) {
 						}
 						for j := i + 1; j < constraint[1]; j++ {
 							if slices.Contains(permutation[0:depth], j) {
+								// Invalid permutation, would change order
+								// of sub-events.
 								continue nexti
 							}
 						}
 					}
+
 					// Pick it for the current position in permutation,
 					// continue with next position.
 					permutation[depth] = i
@@ -796,39 +855,39 @@ func TestListPatchedResourceSlices(t *testing.T) {
 func BenchmarkEventHandlers(b *testing.B) {
 	now := time.Now()
 	benchmarks := map[string]struct {
-		resourceSlices []*resourceapi.ResourceSlice
+		resourceSlices []*draapi.ResourceSlice
 		taintRules     []*resourcealphaapi.DeviceTaintRule
-		loop           func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*resourceapi.ResourceSlice, taintRules []*resourcealphaapi.DeviceTaintRule, i int)
+		loop           func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*draapi.ResourceSlice, taintRules []*resourcealphaapi.DeviceTaintRule, i int)
 	}{
 		"resource-slice-add-no-taint-rules": {
-			resourceSlices: func() []*resourceapi.ResourceSlice {
-				resourceSlices := make([]*resourceapi.ResourceSlice, 1000)
+			resourceSlices: func() []*draapi.ResourceSlice {
+				resourceSlices := make([]*draapi.ResourceSlice, 1000)
 				for i := range resourceSlices {
-					resourceSlices[i] = &resourceapi.ResourceSlice{
+					resourceSlices[i] = &draapi.ResourceSlice{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "slice-" + strconv.Itoa(i),
 						},
-						Spec: resourceapi.ResourceSliceSpec{
-							Devices: slices.Repeat([]resourceapi.Device{}, 64),
+						Spec: draapi.ResourceSliceSpec{
+							Devices: slices.Repeat([]draapi.Device{}, 64),
 						},
 					}
 				}
 				return resourceSlices
 			}(),
-			loop: func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*resourceapi.ResourceSlice, _ []*resourcealphaapi.DeviceTaintRule, i int) {
+			loop: func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*draapi.ResourceSlice, _ []*resourcealphaapi.DeviceTaintRule, i int) {
 				tracker.resourceSliceAdd(ctx)(resourceSlices[i%len(resourceSlices)])
 			},
 		},
 		"one-patch-to-many-slices-add-taint-rule": {
-			resourceSlices: func() []*resourceapi.ResourceSlice {
-				resourceSlices := make([]*resourceapi.ResourceSlice, 500)
+			resourceSlices: func() []*draapi.ResourceSlice {
+				resourceSlices := make([]*draapi.ResourceSlice, 500)
 				for i := range resourceSlices {
-					resourceSlices[i] = &resourceapi.ResourceSlice{
+					resourceSlices[i] = &draapi.ResourceSlice{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "slice-" + strconv.Itoa(i),
 						},
-						Spec: resourceapi.ResourceSliceSpec{
-							Devices: slices.Repeat([]resourceapi.Device{{}}, 64),
+						Spec: draapi.ResourceSliceSpec{
+							Devices: slices.Repeat([]draapi.Device{{}}, 64),
 						},
 					}
 				}
@@ -850,20 +909,20 @@ func BenchmarkEventHandlers(b *testing.B) {
 					},
 				},
 			},
-			loop: func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*resourceapi.ResourceSlice, taintRules []*resourcealphaapi.DeviceTaintRule, i int) {
+			loop: func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*draapi.ResourceSlice, taintRules []*resourcealphaapi.DeviceTaintRule, i int) {
 				tracker.deviceTaintAdd(ctx)(taintRules[i%len(taintRules)])
 			},
 		},
 		"one-patch-to-many-slices-add-slice": {
-			resourceSlices: func() []*resourceapi.ResourceSlice {
-				resourceSlices := make([]*resourceapi.ResourceSlice, 500)
+			resourceSlices: func() []*draapi.ResourceSlice {
+				resourceSlices := make([]*draapi.ResourceSlice, 500)
 				for i := range resourceSlices {
-					resourceSlices[i] = &resourceapi.ResourceSlice{
+					resourceSlices[i] = &draapi.ResourceSlice{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "slice-" + strconv.Itoa(i),
 						},
-						Spec: resourceapi.ResourceSliceSpec{
-							Devices: slices.Repeat([]resourceapi.Device{{}}, 64),
+						Spec: draapi.ResourceSliceSpec{
+							Devices: slices.Repeat([]draapi.Device{{}}, 64),
 						},
 					}
 				}
@@ -885,29 +944,29 @@ func BenchmarkEventHandlers(b *testing.B) {
 					},
 				},
 			},
-			loop: func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*resourceapi.ResourceSlice, _ []*resourcealphaapi.DeviceTaintRule, i int) {
+			loop: func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*draapi.ResourceSlice, _ []*resourcealphaapi.DeviceTaintRule, i int) {
 				tracker.resourceSliceAdd(ctx)(resourceSlices[i%len(resourceSlices)])
 			},
 		},
 		"one-patched-device-among-many-slices-add-taint-rule": {
-			resourceSlices: func() []*resourceapi.ResourceSlice {
+			resourceSlices: func() []*draapi.ResourceSlice {
 				nSlices := 500
 				nDevices := 64
-				resourceSlices := make([]*resourceapi.ResourceSlice, nSlices)
+				resourceSlices := make([]*draapi.ResourceSlice, nSlices)
 				for i := range resourceSlices {
-					resourceSlices[i] = &resourceapi.ResourceSlice{
+					resourceSlices[i] = &draapi.ResourceSlice{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "slice-" + strconv.Itoa(i),
 						},
-						Spec: resourceapi.ResourceSliceSpec{
-							Pool: resourceapi.ResourcePool{
-								Name: "pool-" + strconv.Itoa(i),
+						Spec: draapi.ResourceSliceSpec{
+							Pool: draapi.ResourcePool{
+								Name: u("pool-" + strconv.Itoa(i)),
 							},
-							Devices: func() []resourceapi.Device {
-								devices := make([]resourceapi.Device, nDevices)
+							Devices: func() []draapi.Device {
+								devices := make([]draapi.Device, nDevices)
 								for j := range devices {
-									devices[j] = resourceapi.Device{
-										Name: "device-" + strconv.Itoa(j),
+									devices[j] = draapi.Device{
+										Name: u("device-" + strconv.Itoa(j)),
 									}
 								}
 								return devices
@@ -915,7 +974,7 @@ func BenchmarkEventHandlers(b *testing.B) {
 						},
 					}
 				}
-				resourceSlices[nSlices/2].Spec.Devices[nDevices/2].Name = "patchme"
+				resourceSlices[nSlices/2].Spec.Devices[nDevices/2].Name = u("patchme")
 				return resourceSlices
 			}(),
 			taintRules: []*resourcealphaapi.DeviceTaintRule{
@@ -936,26 +995,26 @@ func BenchmarkEventHandlers(b *testing.B) {
 					},
 				},
 			},
-			loop: func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*resourceapi.ResourceSlice, taintRules []*resourcealphaapi.DeviceTaintRule, i int) {
+			loop: func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*draapi.ResourceSlice, taintRules []*resourcealphaapi.DeviceTaintRule, i int) {
 				tracker.deviceTaintAdd(ctx)(taintRules[i%len(taintRules)])
 			},
 		},
 		"one-patched-device-among-many-slices-add-slice": {
-			resourceSlices: func() []*resourceapi.ResourceSlice {
-				resourceSlices := make([]*resourceapi.ResourceSlice, 500)
+			resourceSlices: func() []*draapi.ResourceSlice {
+				resourceSlices := make([]*draapi.ResourceSlice, 500)
 				for i := range resourceSlices {
-					resourceSlices[i] = &resourceapi.ResourceSlice{
+					resourceSlices[i] = &draapi.ResourceSlice{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "slice-" + strconv.Itoa(i),
 						},
-						Spec: resourceapi.ResourceSliceSpec{
-							Pool: resourceapi.ResourcePool{
-								Name: "pool-" + strconv.Itoa(i),
+						Spec: draapi.ResourceSliceSpec{
+							Pool: draapi.ResourcePool{
+								Name: u("pool-" + strconv.Itoa(i)),
 							},
-							Devices: func() []resourceapi.Device {
+							Devices: func() []draapi.Device {
 								nDevices := 64
-								devices := slices.Repeat([]resourceapi.Device{{}}, nDevices)
-								devices[nDevices/2].Name = "patchme"
+								devices := slices.Repeat([]draapi.Device{{}}, nDevices)
+								devices[nDevices/2].Name = u("patchme")
 								return devices
 							}(),
 						},
@@ -982,23 +1041,23 @@ func BenchmarkEventHandlers(b *testing.B) {
 					},
 				},
 			},
-			loop: func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*resourceapi.ResourceSlice, patches []*resourcealphaapi.DeviceTaintRule, i int) {
+			loop: func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*draapi.ResourceSlice, patches []*resourcealphaapi.DeviceTaintRule, i int) {
 				tracker.resourceSliceAdd(ctx)(resourceSlices[250]) // the slice affected by the patch
 			},
 		},
 		"one-patch-for-each-of-many-slices-add-taint-rule": {
-			resourceSlices: func() []*resourceapi.ResourceSlice {
-				resourceSlices := make([]*resourceapi.ResourceSlice, 500)
+			resourceSlices: func() []*draapi.ResourceSlice {
+				resourceSlices := make([]*draapi.ResourceSlice, 500)
 				for i := range resourceSlices {
-					resourceSlices[i] = &resourceapi.ResourceSlice{
+					resourceSlices[i] = &draapi.ResourceSlice{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "slice-" + strconv.Itoa(i),
 						},
-						Spec: resourceapi.ResourceSliceSpec{
-							Pool: resourceapi.ResourcePool{
-								Name: "pool-" + strconv.Itoa(i),
+						Spec: draapi.ResourceSliceSpec{
+							Pool: draapi.ResourcePool{
+								Name: u("pool-" + strconv.Itoa(i)),
 							},
-							Devices: slices.Repeat([]resourceapi.Device{{}}, 64),
+							Devices: slices.Repeat([]draapi.Device{{}}, 64),
 						},
 					}
 				}
@@ -1026,7 +1085,7 @@ func BenchmarkEventHandlers(b *testing.B) {
 				}
 				return patches
 			}(),
-			loop: func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*resourceapi.ResourceSlice, taintRules []*resourcealphaapi.DeviceTaintRule, i int) {
+			loop: func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*draapi.ResourceSlice, taintRules []*resourcealphaapi.DeviceTaintRule, i int) {
 				tracker.deviceTaintAdd(ctx)(taintRules[i%len(taintRules)])
 			},
 		},
@@ -1037,7 +1096,7 @@ func BenchmarkEventHandlers(b *testing.B) {
 		informerFactory := informers.NewSharedInformerFactoryWithOptions(kubeClient, 10*time.Minute)
 		opts := Options{
 			EnableDeviceTaints: true,
-			SliceInformer:      informerFactory.Resource().V1().ResourceSlices(),
+			SliceInformer:      draapi.NewResourceSliceInformer(informerFactory),
 			TaintInformer:      informerFactory.Resource().V1alpha3().DeviceTaintRules(),
 			ClassInformer:      informerFactory.Resource().V1().DeviceClasses(),
 			KubeClient:         kubeClient,

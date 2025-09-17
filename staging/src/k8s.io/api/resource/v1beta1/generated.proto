@@ -41,7 +41,7 @@ message AllocatedDeviceStatus {
   // needed on a node.
   //
   // Must be a DNS subdomain and should end with a DNS domain owned by the
-  // vendor of the driver.
+  // vendor of the driver. It should use only lower case characters.
   //
   // +required
   optional string driver = 1;
@@ -568,6 +568,7 @@ message DeviceClaim {
   //
   // +optional
   // +listType=atomic
+  // +k8s:maxItems=32
   repeated DeviceRequest requests = 1;
 
   // These constraints must be satisfied by the set of devices that get
@@ -575,6 +576,7 @@ message DeviceClaim {
   //
   // +optional
   // +listType=atomic
+  // +k8s:maxItems=32
   repeated DeviceConstraint constraints = 2;
 
   // This field holds configuration for multiple potential drivers which
@@ -583,6 +585,7 @@ message DeviceClaim {
   //
   // +optional
   // +listType=atomic
+  // +k8s:maxItems=32
   repeated DeviceClaimConfiguration config = 3;
 }
 
@@ -935,7 +938,7 @@ message DeviceRequestAllocationResult {
   // needed on a node.
   //
   // Must be a DNS subdomain and should end with a DNS domain owned by the
-  // vendor of the driver.
+  // vendor of the driver. It should use only lower case characters.
   //
   // +required
   optional string driver = 2;
@@ -947,6 +950,8 @@ message DeviceRequestAllocationResult {
   // DNS sub-domains separated by slashes.
   //
   // +required
+  // +k8s:required
+  // +k8s:format=k8s-resource-pool-name
   optional string pool = 3;
 
   // Device references one device instance via its name in the driver's
@@ -1265,7 +1270,7 @@ message OpaqueDeviceConfiguration {
   // to decide whether it needs to validate them.
   //
   // Must be a DNS subdomain and should end with a DNS domain owned by the
-  // vendor of the driver.
+  // vendor of the driver. It should use only lower case characters.
   //
   // +required
   optional string driver = 1;
@@ -1350,6 +1355,7 @@ message ResourceClaimStatus {
   // Allocation is set once the claim has been allocated successfully.
   //
   // +optional
+  // +k8s:optional
   optional AllocationResult allocation = 1;
 
   // ReservedFor indicates which entities are currently allowed to use
@@ -1373,6 +1379,7 @@ message ResourceClaimStatus {
   // the future, but not reduced.
   //
   // +optional
+  // +k8s:optional
   // +listType=map
   // +listMapKey=uid
   // +patchStrategy=merge
@@ -1384,6 +1391,7 @@ message ResourceClaimStatus {
   // information. Entries are owned by their respective drivers.
   //
   // +optional
+  // +k8s:optional
   // +listType=map
   // +listMapKey=driver
   // +listMapKey=device
@@ -1523,7 +1531,8 @@ message ResourceSliceSpec {
   // objects with a certain driver name.
   //
   // Must be a DNS subdomain and should end with a DNS domain owned by the
-  // vendor of the driver. This field is immutable.
+  // vendor of the driver. It should use only lower case characters.
+  // This field is immutable.
   //
   // +required
   optional string driver = 1;
