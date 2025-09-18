@@ -13523,6 +13523,10 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.resource.v1alpha3.DeviceTaintRuleSpec
       default: {}
+    - name: status
+      type:
+        namedType: io.k8s.api.resource.v1alpha3.DeviceTaintRuleStatus
+      default: {}
 - name: io.k8s.api.resource.v1alpha3.DeviceTaintRuleSpec
   map:
     fields:
@@ -13533,6 +13537,17 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.resource.v1alpha3.DeviceTaint
       default: {}
+- name: io.k8s.api.resource.v1alpha3.DeviceTaintRuleStatus
+  map:
+    fields:
+    - name: conditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
+          elementRelationship: associative
+          keys:
+          - type
 - name: io.k8s.api.resource.v1alpha3.DeviceTaintSelector
   map:
     fields:

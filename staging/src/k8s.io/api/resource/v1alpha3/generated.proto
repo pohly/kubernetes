@@ -114,8 +114,10 @@ message DeviceTaint {
 
   // The effect of the taint on claims that do not tolerate the taint
   // and through such claims on the pods using them.
-  // Valid effects are NoSchedule and NoExecute. PreferNoSchedule as used for
-  // nodes is not valid here.
+  //
+  // Valid effects are None, NoSchedule and NoExecute. PreferNoSchedule as used for
+  // nodes is not valid here. More effects may get added in the future.
+  // Consumers must treat unknown effects like None.
   //
   // +required
   optional string effect = 3;
@@ -139,6 +141,11 @@ message DeviceTaintRule {
   //
   // Changing the spec automatically increments the metadata.generation number.
   optional DeviceTaintRuleSpec spec = 2;
+
+  // Status provides information about what was requested in the spec.
+  //
+  // +optional
+  optional DeviceTaintRuleStatus status = 3;
 }
 
 // DeviceTaintRuleList is a collection of DeviceTaintRules.
@@ -154,7 +161,7 @@ message DeviceTaintRuleList {
 // DeviceTaintRuleSpec specifies the selector and one taint.
 message DeviceTaintRuleSpec {
   // DeviceSelector defines which device(s) the taint is applied to.
-  // All selector criteria must be satified for a device to
+  // All selector criteria must be satisfied for a device to
   // match. The empty selector matches all devices. Without
   // a selector, no devices are matches.
   //
@@ -165,6 +172,36 @@ message DeviceTaintRuleSpec {
   //
   // +required
   optional DeviceTaint taint = 2;
+}
+
+// DeviceTaintRuleStatus provides information about an on-going pod eviction.
+message DeviceTaintRuleStatus {
+  // Conditions provide information about the current state of the DeviceTaintRule
+  // in a machine-readable and human-readable format.
+  //
+  // The following condition is currently defined as part of this API, more may
+  // get added:
+  // - Type: EvictionInProgress
+  // - Status: True if there are currently pods which need to be evicted, False otherwise
+  //   (includes the effects which don't cause eviction).
+  // - Reason: not specified, may change
+  // - Message: includes information about number of pending pods and already evicted pods
+  //   in a human-readable format, updated periodically, may change
+  //
+  // For `effect: None`, the condition above gets set once for each change to
+  // the spec, with the message containing information about what would happen
+  // if the effect was `NoExecute`. This feedback can be used to decide whether
+  // changing the effect to `NoExecute` will work as intended. It only gets
+  // set once to avoid having to constantly update the status.
+  //
+  // Must have 8 or less entries.
+  //
+  // +optional
+  // +listType=map
+  // +listMapKey=type
+  // +patchStrategy=merge
+  // +patchMergeKey=type
+  repeated .k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 1;
 }
 
 // DeviceTaintSelector defines which device(s) a DeviceTaintRule applies to.

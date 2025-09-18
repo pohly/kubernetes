@@ -1312,35 +1312,6 @@
             }
           ],
           "version": "v1beta1"
-        },
-        {
-          "freshness": "Current",
-          "resources": [
-            {
-              "resource": "volumeattributesclasses",
-              "responseKind": {
-                "group": "",
-                "kind": "VolumeAttributesClass",
-                "version": ""
-              },
-              "scope": "Cluster",
-              "shortNames": [
-                "vac"
-              ],
-              "singularResource": "volumeattributesclass",
-              "verbs": [
-                "create",
-                "delete",
-                "deletecollection",
-                "get",
-                "list",
-                "patch",
-                "update",
-                "watch"
-              ]
-            }
-          ],
-          "version": "v1alpha1"
         }
       ]
     },
@@ -2130,6 +2101,21 @@
               },
               "scope": "Cluster",
               "singularResource": "devicetaintrule",
+              "subresources": [
+                {
+                  "responseKind": {
+                    "group": "",
+                    "kind": "DeviceTaintRule",
+                    "version": ""
+                  },
+                  "subresource": "status",
+                  "verbs": [
+                    "get",
+                    "patch",
+                    "update"
+                  ]
+                }
+              ],
               "verbs": [
                 "create",
                 "delete",
