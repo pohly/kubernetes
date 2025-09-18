@@ -595,8 +595,8 @@ var (
 
 func taintDevices(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
 	slice = slice.DeepCopy()
-	for i := range slice.Spec.Devices {
-		slice.Spec.Devices[i].Taints = append(slice.Spec.Devices[i].Taints, deviceTaint)
+	for _, device := range slice.Spec.Devices {
+		slice.Spec.Taints = append(slice.Spec.Taints, resourceapi.SliceDeviceTaint{Device: device.Name, Taint: deviceTaint})
 	}
 	return slice
 }

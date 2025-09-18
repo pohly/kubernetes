@@ -25,15 +25,18 @@ import (
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/utils/ptr"
 )
 
-// NewMaxResourceSlice creates a slice that is as large as possible given the current validation constraints.
-func NewMaxResourceSlice() *resourceapi.ResourceSlice {
-	slice := &resourceapi.ResourceSlice{
+// NewMaxResourceSlice creates different slices that are as large as possible given the current validation constraints.
+// They different in which of the one-ofs at the top level they populate. Each name starts with a descriptive prefix
+// before the hyphen.
+func NewMaxResourceSlices() []*resourceapi.ResourceSlice {
+	devices := &resourceapi.ResourceSlice{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: maxSubDomain(0),
+			Name: "devices-" + maxSubDomain(0)[len("devices-"):],
 			// Number of labels is not restricted.
 			Labels: maxKeyValueMap(10),
 			// Total size of annotations is limited to TotalAnnotationSizeLimitB = 256 KB.
@@ -98,25 +101,55 @@ func NewMaxResourceSlice() *resourceapi.ResourceSlice {
 							return consumesCounters
 						}(),
 						NodeName: ptr.To(maxSubDomain(0)),
-						Taints: func() []resourceapi.DeviceTaint {
-							var taints []resourceapi.DeviceTaint
-							for i := 0; i < resourceapi.DeviceTaintsMaxLength; i++ {
-								taints = append(taints, resourceapi.DeviceTaint{
-									Key:       maxLabelName(i),
-									Value:     maxLabelValue(i),
-									Effect:    resourceapi.DeviceTaintEffectNoSchedule,
-									TimeAdded: &metav1.Time{Time: time.Now().Truncate(time.Second)},
-								})
-							}
-							return taints
-						}(),
 					})
 				}
 				return devices
 			}(),
 		},
 	}
-	return slice
+
+	taints := &resourceapi.ResourceSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "taints-" + maxSubDomain(0)[len("taints-"):],
+			// Number of labels is not restricted.
+			Labels: maxKeyValueMap(10),
+			// Total size of annotations is limited to TotalAnnotationSizeLimitB = 256 KB.
+			// Let's be a bit more realistic.
+			Annotations: maxKeyValueMap(10),
+		},
+
+		Spec: resourceapi.ResourceSliceSpec{
+			Driver: strings.Repeat("x", resourceapi.DriverNameMaxLength),
+			Pool: resourceapi.ResourcePool{
+				Name:               strings.Repeat("x", resourceapi.PoolNameMaxLength),
+				Generation:         math.MaxInt64,
+				ResourceSliceCount: math.MaxInt64,
+			},
+			NodeName: ptr.To(maxSubDomain(0)),
+
+			Taints: func() []resourceapi.SliceDeviceTaint {
+				var taints []resourceapi.SliceDeviceTaint
+				for i := range resourceapi.DeviceTaintsMaxLength {
+					taints = append(taints,
+						resourceapi.SliceDeviceTaint{
+							Device: maxDNSLabel(i),
+							Taint: resourceapi.DeviceTaint{
+								Key:                maxLabelName(i),
+								Value:              maxLabelValue(i),
+								Effect:             resourceapi.DeviceTaintEffectNoSchedule,
+								TimeAdded:          &metav1.Time{Time: time.Now().Truncate(time.Second)},
+								Data:               maxRawExtension(resourceapi.TaintDataMaxLength),
+								EvictionsPerSecond: ptr.To(int64(100)),
+							},
+						},
+					)
+				}
+				return taints
+			}(),
+		},
+	}
+
+	return []*resourceapi.ResourceSlice{devices, taints}
 }
 
 // maxKeyValueMap produces a map for labels or annotations.
@@ -155,4 +188,13 @@ func maxDNSLabel(i int) string {
 
 func maxString(i, l int) string {
 	return strings.Repeat("x", l-4) + fmt.Sprintf("%04d", i)
+}
+
+func maxRawExtension(maxLen int) *runtime.RawExtension {
+	// Must be an object.
+	head := `{"x":"`
+	tail := `"}`
+	return &runtime.RawExtension{
+		Raw: []byte(head + strings.Repeat("x", maxLen-len(head)-len(tail)) + tail),
+	}
 }

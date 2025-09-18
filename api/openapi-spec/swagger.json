@@ -15436,14 +15436,6 @@
         "nodeSelector": {
           "$ref": "#/definitions/io.k8s.api.core.v1.NodeSelector",
           "description": "NodeSelector defines the nodes where the device is available.\n\nMust use exactly one term.\n\nMust only be set if Spec.PerDeviceNodeSelection is set to true. At most one of NodeName, NodeSelector and AllNodes can be set."
-        },
-        "taints": {
-          "description": "If specified, these are the driver-defined taints.\n\nThe maximum number of taints is 4.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
-          "items": {
-            "$ref": "#/definitions/io.k8s.api.resource.v1.DeviceTaint"
-          },
-          "type": "array",
-          "x-kubernetes-list-type": "atomic"
         }
       },
       "required": [
@@ -15884,9 +15876,18 @@
     "io.k8s.api.resource.v1.DeviceTaint": {
       "description": "The device this taint is attached to has the \"effect\" on any claim which does not tolerate the taint and, through the claim, to pods using the claim.",
       "properties": {
+        "data": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.runtime.RawExtension",
+          "description": "Data contains arbitrary data specific to the taint key.\n\nThe length of the raw data must be smaller or equal to 10 Ki."
+        },
         "effect": {
-          "description": "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them. Valid effects are NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here.",
+          "description": "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them. Valid effects are None, NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here.",
           "type": "string"
+        },
+        "evictionsPerSecond": {
+          "description": "EvictionsPerSecond controls how quickly Pods get evicted if that is the effect of the taint.\n\nEvictions are tracked separately for each taint. Each eviction has a rate limiter which uses the EvictionsPerSecond configured for the taint. Deleting a pod that is evicted by the taint is delayed by that rate limiter.\n\nA pod may be affected by more than one taint. In that case, the rate limit of each taint is applied. The effect is that pods affected by multiple taints get evicted at the smallest rate defined by any of those taints.\n\nThe default is 10 Pods/s.",
+          "format": "int64",
+          "type": "integer"
         },
         "key": {
           "description": "The taint key to be applied to a device. Must be a label name.",
@@ -16383,11 +16384,36 @@
           },
           "type": "array",
           "x-kubernetes-list-type": "atomic"
+        },
+        "taints": {
+          "description": "If specified, these are driver-defined taints.\n\nThe maximum number of taints is 32. Either Devices or Taints may be set, but not both.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
+          "items": {
+            "$ref": "#/definitions/io.k8s.api.resource.v1.SliceDeviceTaint"
+          },
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
         }
       },
       "required": [
         "driver",
         "pool"
+      ],
+      "type": "object"
+    },
+    "io.k8s.api.resource.v1.SliceDeviceTaint": {
+      "description": "SliceDeviceTaint defines one taint within a ResourceSlice.",
+      "properties": {
+        "device": {
+          "description": "Device is the name of the device in the pool that the ResourceSlice belongs to which is affected by the taint. Multiple taints may affect the same device.",
+          "type": "string"
+        },
+        "taint": {
+          "$ref": "#/definitions/io.k8s.api.resource.v1.DeviceTaint"
+        }
+      },
+      "required": [
+        "device",
+        "taint"
       ],
       "type": "object"
     },
@@ -16417,9 +16443,18 @@
     "io.k8s.api.resource.v1alpha3.DeviceTaint": {
       "description": "The device this taint is attached to has the \"effect\" on any claim which does not tolerate the taint and, through the claim, to pods using the claim.",
       "properties": {
+        "data": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.runtime.RawExtension",
+          "description": "Data contains arbitrary data specific to the taint key.\n\nThe length of the raw data must be smaller or equal to 10 Ki."
+        },
         "effect": {
-          "description": "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them. Valid effects are NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here.",
+          "description": "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them. Valid effects are None, NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here.",
           "type": "string"
+        },
+        "evictionsPerSecond": {
+          "description": "EvictionsPerSecond controls how quickly Pods get evicted if that is the effect of the taint. If multiple taints cause eviction of the same set of Pods, then the lowest rate defined in any of those taints applies.\n\nThe default is 100 Pods/s.",
+          "format": "int64",
+          "type": "integer"
         },
         "key": {
           "description": "The taint key to be applied to a device. Must be a label name.",
@@ -16458,6 +16493,10 @@
         "spec": {
           "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.DeviceTaintRuleSpec",
           "description": "Spec specifies the selector and one taint.\n\nChanging the spec automatically increments the metadata.generation number."
+        },
+        "status": {
+          "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.DeviceTaintRuleStatus",
+          "description": "Status provides information about what was requested in the spec."
         }
       },
       "required": [
@@ -16512,7 +16551,7 @@
       "properties": {
         "deviceSelector": {
           "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.DeviceTaintSelector",
-          "description": "DeviceSelector defines which device(s) the taint is applied to. All selector criteria must be satified for a device to match. The empty selector matches all devices. Without a selector, no devices are matches."
+          "description": "DeviceSelector defines which device(s) the taint is applied to. All selector criteria must be satisfied for a device to match. The empty selector matches all devices. Without a selector, no devices are matches."
         },
         "taint": {
           "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.DeviceTaint",
@@ -16522,6 +16561,25 @@
       "required": [
         "taint"
       ],
+      "type": "object"
+    },
+    "io.k8s.api.resource.v1alpha3.DeviceTaintRuleStatus": {
+      "description": "DeviceTaintRuleStatus provides information about an on-going pod eviction.",
+      "properties": {
+        "conditions": {
+          "description": "Conditions provide information about the current state of the DeviceTaintRule in a machine-readable and human-readable format.\n\nThe following condition is currently defined as part of this API, more may get added: - Type: EvictionInProgress - Status: True if there are currently pods which need to be evicted, False otherwise\n  (includes the effects which don't cause eviction).\n- Reason: not specified, may change - Message: includes information about number of pending pods and already evicted pods\n  in a human-readable format, updated periodically, may change\n\nFor `effect: None`, the condition above gets set once for each change to the spec, with the message containing information about what would happen if the effect was `NoExecute`. This feedback can be used to decide whether changing the effect to `NoExecute` will work as intended. It only gets set once to avoid having to constantly update the status.\n\nMust have 8 or less entries.",
+          "items": {
+            "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Condition"
+          },
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "type"
+          ],
+          "x-kubernetes-list-type": "map",
+          "x-kubernetes-patch-merge-key": "type",
+          "x-kubernetes-patch-strategy": "merge"
+        }
+      },
       "type": "object"
     },
     "io.k8s.api.resource.v1alpha3.DeviceTaintSelector": {
@@ -16678,14 +16736,6 @@
         "nodeSelector": {
           "$ref": "#/definitions/io.k8s.api.core.v1.NodeSelector",
           "description": "NodeSelector defines the nodes where the device is available.\n\nMust use exactly one term.\n\nMust only be set if Spec.PerDeviceNodeSelection is set to true. At most one of NodeName, NodeSelector and AllNodes can be set."
-        },
-        "taints": {
-          "description": "If specified, these are the driver-defined taints.\n\nThe maximum number of taints is 4.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
-          "items": {
-            "$ref": "#/definitions/io.k8s.api.resource.v1beta1.DeviceTaint"
-          },
-          "type": "array",
-          "x-kubernetes-list-type": "atomic"
         }
       },
       "type": "object"
@@ -17276,9 +17326,18 @@
     "io.k8s.api.resource.v1beta1.DeviceTaint": {
       "description": "The device this taint is attached to has the \"effect\" on any claim which does not tolerate the taint and, through the claim, to pods using the claim.",
       "properties": {
+        "data": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.runtime.RawExtension",
+          "description": "Data contains arbitrary data specific to the taint key.\n\nThe length of the raw data must be smaller or equal to 10 Ki."
+        },
         "effect": {
-          "description": "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them. Valid effects are NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here.",
+          "description": "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them. Valid effects are None, NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here.",
           "type": "string"
+        },
+        "evictionsPerSecond": {
+          "description": "EvictionsPerSecond controls how quickly Pods get evicted if that is the effect of the taint.\n\nEvictions are tracked separately for each taint. Each eviction has a rate limiter which uses the EvictionsPerSecond configured for the taint. Deleting a pod that is evicted by the taint is delayed by that rate limiter.\n\nA pod may be affected by more than one taint. In that case, the rate limit of each taint is applied. The effect is that pods affected by multiple taints get evicted at the smallest rate defined by any of those taints.\n\nThe default is 10 Pods/s.",
+          "format": "int64",
+          "type": "integer"
         },
         "key": {
           "description": "The taint key to be applied to a device. Must be a label name.",
@@ -17729,11 +17788,36 @@
           },
           "type": "array",
           "x-kubernetes-list-type": "atomic"
+        },
+        "taints": {
+          "description": "If specified, these are driver-defined taints.\n\nThe maximum number of taints is 32. Either Devices or Taints may be set, but not both.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
+          "items": {
+            "$ref": "#/definitions/io.k8s.api.resource.v1beta1.SliceDeviceTaint"
+          },
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
         }
       },
       "required": [
         "driver",
         "pool"
+      ],
+      "type": "object"
+    },
+    "io.k8s.api.resource.v1beta1.SliceDeviceTaint": {
+      "description": "SliceDeviceTaint defines one taint within a ResourceSlice.",
+      "properties": {
+        "device": {
+          "description": "Device is the name of the device in the pool that the ResourceSlice belongs to which is affected by the taint. Multiple taints may affect the same device.",
+          "type": "string"
+        },
+        "taint": {
+          "$ref": "#/definitions/io.k8s.api.resource.v1beta1.DeviceTaint"
+        }
+      },
+      "required": [
+        "device",
+        "taint"
       ],
       "type": "object"
     },
@@ -17968,14 +18052,6 @@
         "nodeSelector": {
           "$ref": "#/definitions/io.k8s.api.core.v1.NodeSelector",
           "description": "NodeSelector defines the nodes where the device is available.\n\nMust use exactly one term.\n\nMust only be set if Spec.PerDeviceNodeSelection is set to true. At most one of NodeName, NodeSelector and AllNodes can be set."
-        },
-        "taints": {
-          "description": "If specified, these are the driver-defined taints.\n\nThe maximum number of taints is 4.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
-          "items": {
-            "$ref": "#/definitions/io.k8s.api.resource.v1beta2.DeviceTaint"
-          },
-          "type": "array",
-          "x-kubernetes-list-type": "atomic"
         }
       },
       "required": [
@@ -18416,9 +18492,18 @@
     "io.k8s.api.resource.v1beta2.DeviceTaint": {
       "description": "The device this taint is attached to has the \"effect\" on any claim which does not tolerate the taint and, through the claim, to pods using the claim.",
       "properties": {
+        "data": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.runtime.RawExtension",
+          "description": "Data contains arbitrary data specific to the taint key.\n\nThe length of the raw data must be smaller or equal to 10 Ki."
+        },
         "effect": {
-          "description": "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them. Valid effects are NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here.",
+          "description": "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them. Valid effects are None, NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here.",
           "type": "string"
+        },
+        "evictionsPerSecond": {
+          "description": "EvictionsPerSecond controls how quickly Pods get evicted if that is the effect of the taint.\n\nEvictions are tracked separately for each taint. Each eviction has a rate limiter which uses the EvictionsPerSecond configured for the taint. Deleting a pod that is evicted by the taint is delayed by that rate limiter.\n\nA pod may be affected by more than one taint. In that case, the rate limit of each taint is applied. The effect is that pods affected by multiple taints get evicted at the smallest rate defined by any of those taints.\n\nThe default is 10 Pods/s.",
+          "format": "int64",
+          "type": "integer"
         },
         "key": {
           "description": "The taint key to be applied to a device. Must be a label name.",
@@ -18915,11 +19000,36 @@
           },
           "type": "array",
           "x-kubernetes-list-type": "atomic"
+        },
+        "taints": {
+          "description": "If specified, these are driver-defined taints.\n\nThe maximum number of taints is 32. Either Devices or Taints may be set, but not both.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
+          "items": {
+            "$ref": "#/definitions/io.k8s.api.resource.v1beta2.SliceDeviceTaint"
+          },
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
         }
       },
       "required": [
         "driver",
         "pool"
+      ],
+      "type": "object"
+    },
+    "io.k8s.api.resource.v1beta2.SliceDeviceTaint": {
+      "description": "SliceDeviceTaint defines one taint within a ResourceSlice.",
+      "properties": {
+        "device": {
+          "description": "Device is the name of the device in the pool that the ResourceSlice belongs to which is affected by the taint. Multiple taints may affect the same device.",
+          "type": "string"
+        },
+        "taint": {
+          "$ref": "#/definitions/io.k8s.api.resource.v1beta2.DeviceTaint"
+        }
+      },
+      "required": [
+        "device",
+        "taint"
       ],
       "type": "object"
     },

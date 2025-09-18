@@ -148,8 +148,22 @@ type ResourceSliceSpec struct {
 	// Must not have more than 128 entries.
 	//
 	// +optional
+	// +oneOf=ResourceSliceContent
 	// +listType=atomic
 	Devices []Device
+
+	// If specified, these are driver-defined taints.
+	//
+	// The maximum number of taints is 32. Either Devices or Taints may be set, but not both.
+	//
+	// This is an alpha field and requires enabling the DRADeviceTaints
+	// feature gate.
+	//
+	// +optional
+	// +listType=atomic
+	// +featureGate=DRADeviceTaints
+	// +oneOf=ResourceSliceContent
+	Taints []SliceDeviceTaint
 
 	// PerDeviceNodeSelection defines whether the access from nodes to
 	// resources in the pool is set on the ResourceSlice level or on each
@@ -323,18 +337,6 @@ type Device struct {
 	// +oneOf=DeviceNodeSelection
 	// +featureGate=DRAPartitionableDevices
 	AllNodes *bool
-
-	// If specified, these are the driver-defined taints.
-	//
-	// The maximum number of taints is 4.
-	//
-	// This is an alpha field and requires enabling the DRADeviceTaints
-	// feature gate.
-	//
-	// +optional
-	// +listType=atomic
-	// +featureGate=DRADeviceTaints
-	Taints []DeviceTaint
 
 	// BindsToNode indicates if the usage of an allocation involving this device
 	// has to be limited to exactly the node that was chosen when allocating the claim.
@@ -601,8 +603,17 @@ type DeviceAttribute struct {
 // DeviceAttributeMaxValueLength is the maximum length of a string or version attribute value.
 const DeviceAttributeMaxValueLength = 64
 
-// DeviceTaintsMaxLength is the maximum number of taints per device.
-const DeviceTaintsMaxLength = 4
+// DeviceTaintsMaxLength is the maximum number of taints per ResourceSlice.
+const DeviceTaintsMaxLength = 32
+
+// SliceDeviceTaint defines one taint within a ResourceSlice.
+type SliceDeviceTaint struct {
+	// Device is the name of the device in the pool that the ResourceSlice belongs to
+	// which is affected by the taint. Multiple taints may affect the same device.
+	Device string
+
+	Taint DeviceTaint
+}
 
 // The device this taint is attached to has the "effect" on
 // any claim which does not tolerate the taint and, through the claim,
@@ -622,7 +633,7 @@ type DeviceTaint struct {
 
 	// The effect of the taint on claims that do not tolerate the taint
 	// and through such claims on the pods using them.
-	// Valid effects are NoSchedule and NoExecute. PreferNoSchedule as used for
+	// Valid effects are None, NoSchedule and NoExecute. PreferNoSchedule as used for
 	// nodes is not valid here.
 	//
 	// +required
@@ -644,12 +655,49 @@ type DeviceTaint struct {
 	// This field was defined as "It is only written for NoExecute taints." for node taints.
 	// But in practice, Kubernetes never did anything with it (no validation, no defaulting,
 	// ignored during pod eviction in pkg/controller/tainteviction).
+
+	// Data contains arbitrary data specific to the taint key.
+	//
+	// The length of the raw data must be smaller or equal to 10 Ki.
+	//
+	// +optional
+	Data *runtime.RawExtension
+
+	// EvictionsPerSecond controls how quickly Pods get evicted if that is
+	// the effect of the taint.
+	//
+	// Evictions are tracked separately for each taint. Each eviction has
+	// a rate limiter which uses the EvictionsPerSecond configured for the
+	// taint. Deleting a pod that is evicted by the taint is delayed by that
+	// rate limiter.
+	//
+	// A pod may be affected by more than one taint. In that case, the rate
+	// limit of each taint is applied. The effect is that pods affected
+	// by multiple taints get evicted at the smallest rate defined by any
+	// of those taints.
+	//
+	// The default is 10 Pods/s.
+	//
+	// +optional
+	EvictionsPerSecond *int64
 }
+
+const (
+	// DefaultEvictionsPerSecond is the default for [DeviceTaint.EvictionsPerSecond]
+	// if none is specified explicitly.
+	DefaultEvictionsPerSecond = 10
+
+	// TaintDataMaxLength is the maximum size of [DeviceTaint.Data].
+	TaintDataMaxLength = 10 * 1024
+)
 
 // +enum
 type DeviceTaintEffect string
 
 const (
+	// No effect, the taint is purely informational.
+	DeviceTaintEffectNone DeviceTaintEffect = "None"
+
 	// Do not allow new pods to schedule which use a tainted device unless they tolerate the taint,
 	// but allow all pods submitted to Kubelet without going through the scheduler
 	// to start, and allow all already-running pods to continue running.
@@ -1876,18 +1924,16 @@ type DeviceTaintRule struct {
 	// Changing the spec automatically increments the metadata.generation number.
 	Spec DeviceTaintRuleSpec
 
-	// ^^^
-	// A spec gets added because adding a status seems likely.
-	// Such a status could provide feedback on applying the
-	// eviction and/or statistics (number of matching devices,
-	// affected allocated claims, pods remaining to be evicted,
-	// etc.).
+	// Status provides information about what was requested in the spec.
+	//
+	// +optional
+	Status DeviceTaintRuleStatus
 }
 
 // DeviceTaintRuleSpec specifies the selector and one taint.
 type DeviceTaintRuleSpec struct {
 	// DeviceSelector defines which device(s) the taint is applied to.
-	// All selector criteria must be satified for a device to
+	// All selector criteria must be satisfied for a device to
 	// match. The empty selector matches all devices. Without
 	// a selector, no devices are matches.
 	//
@@ -1946,6 +1992,36 @@ type DeviceTaintSelector struct {
 	// +listType=atomic
 	Selectors []DeviceSelector
 }
+
+// DeviceTaintRuleStatus provides information about an on-going pod eviction.
+type DeviceTaintRuleStatus struct {
+	// Conditions provide information about the current state of the DeviceTaintRule
+	// in a machine-readable and human-readable format.
+	//
+	// The following condition is currently defined as part of this API, more may
+	// get added:
+	// - Type: EvictionInProgress
+	// - Status: True if there are currently pods which need to be evicted, False otherwise
+	//   (includes the effects which don't cause eviction).
+	// - Reason: not specified, may change
+	// - Message: includes information about number of pending pods and already evicted pods
+	//   in a human-readable format, updated periodically, may change
+	//
+	// For `effect: None`, the condition above gets set once for each change to
+	// the spec, with the message containing information about what would happen
+	// if the effect was `NoExecute`. This feedback can be used to decide whether
+	// changing the effect to `NoExecute` will work as intended. It only gets
+	// set once to avoid having to constantly update the status.
+	//
+	// Must have 8 or less entries.
+	//
+	// +optional
+	// +listType=map
+	// +listMapKey=type
+	Conditions []metav1.Condition
+}
+
+const DeviceTaintRuleStatusMaxConditions = 8
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 

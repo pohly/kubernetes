@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -321,7 +322,7 @@ func TestDRA(t *testing.T) {
 				// note testExtendedResource depends on testPublishResourceSlices to provide the devices
 				tCtx.Run("ExtendedResource", func(tCtx ktesting.TContext) { testExtendedResource(tCtx, true) })
 				tCtx.Run("ResourceClaimDeviceStatus", func(tCtx ktesting.TContext) { testResourceClaimDeviceStatus(tCtx, true) })
-				tCtx.Run("MaxResourceSlice", testMaxResourceSlice)
+				tCtx.Run("MaxResourceSlices", testMaxResourceSlices)
 			},
 		},
 	} {
@@ -770,21 +771,9 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 						Devices: []resourceapi.Device{
 							{
 								Name: "device-tainted-default",
-								Taints: []resourceapi.DeviceTaint{{
-									Key:    "dra.example.com/taint",
-									Value:  "taint-value",
-									Effect: resourceapi.DeviceTaintEffectNoExecute,
-									// TimeAdded is added by apiserver.
-								}},
 							},
 							{
 								Name: "device-tainted-time-added",
-								Taints: []resourceapi.DeviceTaint{{
-									Key:       "dra.example.com/taint",
-									Value:     "taint-value",
-									Effect:    resourceapi.DeviceTaintEffectNoExecute,
-									TimeAdded: ptr.To(metav1.Time{Time: time.Now().Truncate(time.Second)}),
-								}},
 							},
 							{
 								Name: "gpu",
@@ -809,6 +798,28 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 							},
 						},
 					},
+					{
+						Taints: []resourceapi.SliceDeviceTaint{
+							{
+								Device: "device-tainted-default",
+								Taint: resourceapi.DeviceTaint{
+									Key:    "dra.example.com/taint",
+									Value:  "taint-value",
+									Effect: resourceapi.DeviceTaintEffectNoExecute,
+									// TimeAdded is added by apiserver.
+								},
+							},
+							{
+								Device: "device-tainted-time-added",
+								Taint: resourceapi.DeviceTaint{
+									Key:       "dra.example.com/taint",
+									Value:     "taint-value",
+									Effect:    resourceapi.DeviceTaintEffectNoExecute,
+									TimeAdded: ptr.To(metav1.Time{Time: time.Now().Truncate(time.Second)}),
+								},
+							},
+						},
+					},
 				},
 			},
 		},
@@ -827,15 +838,15 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 			AllNodes:       ptr.To(true),
 			SharedCounters: sl.SharedCounters,
 			Devices:        sl.Devices,
+			Taints:         sl.Taints,
 		})
 	}
 	for _, disabled := range disabledFeatures {
 		switch disabled {
 		case features.DRADeviceTaints:
+			// May lead to an empty slices, which is okay for historic reasons.
 			for i := range expectedSliceSpecs {
-				for e := range expectedSliceSpecs[i].Devices {
-					expectedSliceSpecs[i].Devices[e].Taints = nil
-				}
+				expectedSliceSpecs[i].Taints = nil
 			}
 		case features.DRAPartitionableDevices:
 			for i := range expectedSliceSpecs {
@@ -882,27 +893,33 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 						"NodeName":                 matchPointer(device.NodeName),
 						"NodeSelector":             matchPointer(device.NodeSelector),
 						"AllNodes":                 matchPointer(device.AllNodes),
-						"Taints": gomega.HaveExactElements(func() []any {
-							var expected []any
-							for _, taint := range device.Taints {
-								if taint.TimeAdded != nil {
-									// Can do exact match.
-									expected = append(expected, gomega.Equal(taint))
-								} else {
-									// Ignore TimeAdded value.
-									expected = append(expected, gstruct.MatchAllFields(gstruct.Fields{
-										"Key":       gomega.Equal(taint.Key),
-										"Value":     gomega.Equal(taint.Value),
-										"Effect":    gomega.Equal(taint.Effect),
-										"TimeAdded": gomega.Not(gomega.BeNil()),
-									}))
-								}
-							}
-							return expected
-						}()...),
 						"BindingConditions":        gomega.Equal(device.BindingConditions),
 						"BindingFailureConditions": gomega.Equal(device.BindingFailureConditions),
 						"BindsToNode":              gomega.Equal(device.BindsToNode),
+					}))
+				}
+				return expected
+			}()...),
+			"Taints": gomega.HaveExactElements(func() []any {
+				var expected []any
+				for _, taint := range spec.Taints {
+					expected = append(expected, gstruct.MatchAllFields(gstruct.Fields{
+						"Device": gomega.Equal(taint.Device),
+						"DeviceTaint": func() gtypes.GomegaMatcher {
+							if taint.Taint.TimeAdded != nil {
+								// Can do exact match.
+								return gomega.Equal(taint.Taint)
+							}
+							// Ignore TimeAdded value.
+							return gstruct.MatchAllFields(gstruct.Fields{
+								"Key":                gomega.Equal(taint.Taint.Key),
+								"Value":              gomega.Equal(taint.Taint.Value),
+								"Effect":             gomega.Equal(taint.Taint.Effect),
+								"TimeAdded":          gomega.Not(gomega.BeNil()),
+								"Data":               gomega.Equal(taint.Taint.Data),
+								"EvictionsPerSecond": gomega.Equal(taint.Taint.EvictionsPerSecond),
+							})
+						}(),
 					}))
 				}
 				return expected
@@ -968,12 +985,22 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 
 				var droppedFields *resourceslice.DroppedFieldsError
 				if errors.As(err, &droppedFields) {
+					gotDroppedFieldError.Store(true)
+					if slices.Contains(disabledFeatures, features.DRADeviceTaints) && strings.Contains(err.Error(), ", slice #2: ") {
+						// If this is a complaint about the slice with taints, then only that feature should be listed.
+						assert.ErrorContains(tCtx, err, fmt.Sprintf("pool %q, slice #2: some fields were dropped by the apiserver, probably because these features are disabled: %s", poolName, features.DRADeviceTaints))
+						return
+					}
+
+					// Otherwise we expect a complaint about slice #1, without anything related to taints.
 					var disabled []string
 					for _, feature := range disabledFeatures {
+						if feature == features.DRADeviceTaints {
+							continue
+						}
 						disabled = append(disabled, string(feature))
 					}
 					assert.ErrorContains(tCtx, err, fmt.Sprintf("pool %q, slice #1: some fields were dropped by the apiserver, probably because these features are disabled: %s", poolName, strings.Join(disabled, " ")))
-					gotDroppedFieldError.Store(true)
 				} else if validationErrorsOkay.Load() && apierrors.IsInvalid(err) {
 					gotValidationError.Store(true)
 				} else {
@@ -1052,6 +1079,9 @@ func testPublishResourceSlices(tCtx ktesting.TContext, haveLatestAPI bool, disab
 			slices, err := tCtx.Client().ResourceV1().ResourceSlices().List(tCtx, listDriverSlices)
 			tCtx.ExpectNoError(err, "list slices")
 			for _, slice := range slices.Items {
+				if len(slice.Spec.Devices) == 0 {
+					continue
+				}
 				if slice.Spec.Devices[0].Attributes == nil {
 					slice.Spec.Devices[0].Attributes = make(map[resourceapi.QualifiedName]resourceapi.DeviceAttribute)
 				}
@@ -1240,26 +1270,30 @@ func testResourceClaimDeviceStatus(tCtx ktesting.TContext, enabled bool) {
 	require.Equal(tCtx, deviceStatus, claim.Status.Devices, "after removing device status three")
 }
 
-// testMaxResourceSlice creates a ResourceSlice that is as large as possible
-// and prints some information about it.
-func testMaxResourceSlice(tCtx ktesting.TContext) {
-	slice := NewMaxResourceSlice()
-	createdSlice, err := tCtx.Client().ResourceV1().ResourceSlices().Create(tCtx, slice, metav1.CreateOptions{})
-	tCtx.ExpectNoError(err)
-	totalSize := createdSlice.Size()
-	var managedFieldsSize int
-	for _, f := range createdSlice.ManagedFields {
-		managedFieldsSize += f.Size()
-	}
-	specSize := createdSlice.Spec.Size()
-	tCtx.Logf("\n\nTotal size: %s\nManagedFields size: %s (%.0f%%)\nSpec size: %s (%.0f)%%\n\nManagedFields:\n%s",
-		resource.NewQuantity(int64(totalSize), resource.BinarySI),
-		resource.NewQuantity(int64(managedFieldsSize), resource.BinarySI), float64(managedFieldsSize)*100/float64(totalSize),
-		resource.NewQuantity(int64(specSize), resource.BinarySI), float64(specSize)*100/float64(totalSize),
-		klog.Format(createdSlice.ManagedFields),
-	)
-	if diff := cmp.Diff(slice.Spec, createdSlice.Spec); diff != "" {
-		tCtx.Errorf("ResourceSliceSpec got modified during Create (- want, + got):\n%s", diff)
+// testMaxResourceSlices creates ResourceSlices that are as large as possible
+// and prints some information about them.
+func testMaxResourceSlices(tCtx ktesting.TContext) {
+	for _, slice := range NewMaxResourceSlices() {
+		prefix := strings.Split(slice.Name, "-")[0]
+		tCtx.Run(prefix, func(tCtx ktesting.TContext) {
+			createdSlice, err := tCtx.Client().ResourceV1().ResourceSlices().Create(tCtx, slice, metav1.CreateOptions{})
+			tCtx.ExpectNoError(err)
+			totalSize := createdSlice.Size()
+			var managedFieldsSize int
+			for _, f := range createdSlice.ManagedFields {
+				managedFieldsSize += f.Size()
+			}
+			specSize := createdSlice.Spec.Size()
+			tCtx.Logf("\n\nTotal size: %s\nManagedFields size: %s (%.0f%%)\nSpec size: %s (%.0f)%%\n\nManagedFields:\n%s",
+				resource.NewQuantity(int64(totalSize), resource.BinarySI),
+				resource.NewQuantity(int64(managedFieldsSize), resource.BinarySI), float64(managedFieldsSize)*100/float64(totalSize),
+				resource.NewQuantity(int64(specSize), resource.BinarySI), float64(specSize)*100/float64(totalSize),
+				klog.Format(createdSlice.ManagedFields),
+			)
+			if diff := cmp.Diff(slice.Spec, createdSlice.Spec); diff != "" {
+				tCtx.Errorf("ResourceSliceSpec got modified during Create (- want, + got):\n%s", diff)
+			}
+		})
 	}
 }
 

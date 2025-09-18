@@ -46,11 +46,13 @@ func (DeviceSelector) SwaggerDoc() map[string]string {
 }
 
 var map_DeviceTaint = map[string]string{
-	"":          "The device this taint is attached to has the \"effect\" on any claim which does not tolerate the taint and, through the claim, to pods using the claim.",
-	"key":       "The taint key to be applied to a device. Must be a label name.",
-	"value":     "The taint value corresponding to the taint key. Must be a label value.",
-	"effect":    "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them. Valid effects are NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here.",
-	"timeAdded": "TimeAdded represents the time at which the taint was added. Added automatically during create or update if not set.",
+	"":                   "The device this taint is attached to has the \"effect\" on any claim which does not tolerate the taint and, through the claim, to pods using the claim.",
+	"key":                "The taint key to be applied to a device. Must be a label name.",
+	"value":              "The taint value corresponding to the taint key. Must be a label value.",
+	"effect":             "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them. Valid effects are None, NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here.",
+	"timeAdded":          "TimeAdded represents the time at which the taint was added. Added automatically during create or update if not set.",
+	"data":               "Data contains arbitrary data specific to the taint key.\n\nThe length of the raw data must be smaller or equal to 10 Ki.",
+	"evictionsPerSecond": "EvictionsPerSecond controls how quickly Pods get evicted if that is the effect of the taint. If multiple taints cause eviction of the same set of Pods, then the lowest rate defined in any of those taints applies.\n\nThe default is 100 Pods/s.",
 }
 
 func (DeviceTaint) SwaggerDoc() map[string]string {
@@ -61,6 +63,7 @@ var map_DeviceTaintRule = map[string]string{
 	"":         "DeviceTaintRule adds one taint to all devices which match the selector. This has the same effect as if the taint was specified directly in the ResourceSlice by the DRA driver.",
 	"metadata": "Standard object metadata",
 	"spec":     "Spec specifies the selector and one taint.\n\nChanging the spec automatically increments the metadata.generation number.",
+	"status":   "Status provides information about what was requested in the spec.",
 }
 
 func (DeviceTaintRule) SwaggerDoc() map[string]string {
@@ -79,12 +82,21 @@ func (DeviceTaintRuleList) SwaggerDoc() map[string]string {
 
 var map_DeviceTaintRuleSpec = map[string]string{
 	"":               "DeviceTaintRuleSpec specifies the selector and one taint.",
-	"deviceSelector": "DeviceSelector defines which device(s) the taint is applied to. All selector criteria must be satified for a device to match. The empty selector matches all devices. Without a selector, no devices are matches.",
+	"deviceSelector": "DeviceSelector defines which device(s) the taint is applied to. All selector criteria must be satisfied for a device to match. The empty selector matches all devices. Without a selector, no devices are matches.",
 	"taint":          "The taint that gets applied to matching devices.",
 }
 
 func (DeviceTaintRuleSpec) SwaggerDoc() map[string]string {
 	return map_DeviceTaintRuleSpec
+}
+
+var map_DeviceTaintRuleStatus = map[string]string{
+	"":           "DeviceTaintRuleStatus provides information about an on-going pod eviction.",
+	"conditions": "Conditions provide information about the current state of the DeviceTaintRule in a machine-readable and human-readable format.\n\nThe following condition is currently defined as part of this API, more may get added: - Type: EvictionInProgress - Status: True if there are currently pods which need to be evicted, False otherwise\n  (includes the effects which don't cause eviction).\n- Reason: not specified, may change - Message: includes information about number of pending pods and already evicted pods\n  in a human-readable format, updated periodically, may change\n\nFor `effect: None`, the condition above gets set once for each change to the spec, with the message containing information about what would happen if the effect was `NoExecute`. This feedback can be used to decide whether changing the effect to `NoExecute` will work as intended. It only gets set once to avoid having to constantly update the status.\n\nMust have 8 or less entries.",
+}
+
+func (DeviceTaintRuleStatus) SwaggerDoc() map[string]string {
+	return map_DeviceTaintRuleStatus
 }
 
 var map_DeviceTaintSelector = map[string]string{
