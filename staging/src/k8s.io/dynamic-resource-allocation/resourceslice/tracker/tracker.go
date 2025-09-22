@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"slices"
 	"sync"
+	"sync/atomic"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
@@ -74,7 +75,9 @@ type Tracker struct {
 	// may be overridden in tests.
 	handleError func(context.Context, error, string, ...any)
 
-	slices sliceTaintTracker
+	// Both of these fields do their own locking.
+	slices         sliceTaintTracker
+	taintIDCounter atomic.Int64
 
 	// Synchronizes updates to these fields related to event handlers.
 	rwMutex sync.RWMutex
@@ -618,8 +621,8 @@ func (t *Tracker) syncSlice(ctx context.Context, name string, isSliceChange bool
 		return
 	}
 
-	patches := typedSlice[*resourcealphaapi.DeviceTaintRule](t.deviceTaints.GetIndexer().List())
-	patchedSlice, err := t.applyPatches(ctx, slice, patches)
+	taints := typedSlice[*resourcealphaapi.DeviceTaintRule](t.deviceTaints.GetIndexer().List())
+	patchedSlice, err := t.applyTaints(ctx, oldPatchedSlice, slice, taints)
 	if err != nil {
 		t.handleError(ctx, err, "failed to apply patches to ResourceSlice", "resourceslice", klog.KObj(slice))
 		return
@@ -634,7 +637,9 @@ func (t *Tracker) syncSlice(ctx context.Context, name string, isSliceChange bool
 		for i := range patchedSlice.Spec.Devices {
 			oldDevice := oldPatchedSlice.Spec.Devices[i]
 			newDevice := patchedSlice.Spec.Devices[i]
-			if !slices.EqualFunc(oldDevice.Taints, newDevice.Taints, taintsEqual) {
+			if !slices.EqualFunc(oldDevice.Taints, newDevice.Taints, func(a, b draapi.TrackedDeviceTaint) bool {
+				return taintsEqual(a.DeviceTaint, b.DeviceTaint)
+			}) {
 				changed = true
 				break
 			}
@@ -661,7 +666,13 @@ func (t *Tracker) syncSlice(ctx context.Context, name string, isSliceChange bool
 	}
 }
 
-func (t *Tracker) applyPatches(ctx context.Context, slice *draapi.ResourceSlice, taintRules []*resourcealphaapi.DeviceTaintRule) (*draapi.ResourceSlice, error) {
+// applyTaints returns a deep copy of the slice with taints added to it, if any apply, otherwise the same slice.
+// Taint IDs are preserved if the old slice had the exact same taint, otherwise a new one is assigned.
+//
+// There are no duplicate taints on a device (duplicate == exact same content) because they would just have
+// the same effect. This can happen when different slices contain the same spec.Taint for the same device.
+// Different DeviceTaintRules are always treated as different, even if they have identical attributes.
+func (t *Tracker) applyTaints(ctx context.Context, oldPatchedSlice, slice *draapi.ResourceSlice, taintRules []*resourcealphaapi.DeviceTaintRule) (*draapi.ResourceSlice, error) {
 	logger := klog.FromContext(ctx)
 
 	// slice will be DeepCopied just-in-time, only when necessary.
@@ -671,11 +682,20 @@ func (t *Tracker) applyPatches(ctx context.Context, slice *draapi.ResourceSlice,
 		for _, taint := range sliceWithTaints.Spec.Taints {
 			for i, device := range slice.Spec.Devices {
 				if device.Name == taint.Device {
-					// Apply the taint from the pool.
+					// Apply the taint from the pool, unless some identical one already exists.
 					if patchedSlice == slice {
 						patchedSlice = slice.DeepCopy()
+					} else {
+						if deviceHasTaint(device, taint.Taint) {
+							// A duplicate taint - no need to add it again.
+							continue
+						}
 					}
-					patchedSlice.Spec.Devices[i].Taints = append(patchedSlice.Spec.Devices[i].Taints, taint.Taint)
+					taint := draapi.TrackedDeviceTaint{
+						DeviceTaint: taint.Taint,
+					}
+					t.setTaintID(logger, oldPatchedSlice, &taint)
+					patchedSlice.Spec.Devices[i].Taints = append(patchedSlice.Spec.Devices[i].Taints, taint)
 
 					// There can be no further device with the same name.
 					break
@@ -792,23 +812,76 @@ func (t *Tracker) applyPatches(ctx context.Context, slice *draapi.ResourceSlice,
 
 			logger.V(6).Info("applying matching DeviceTaintRule")
 
-			// TODO: remove conversion once taint is already in the right API package.
-			ta := resourceapi.DeviceTaint{
-				Key:       taintRule.Spec.Taint.Key,
-				Value:     taintRule.Spec.Taint.Value,
-				Effect:    resourceapi.DeviceTaintEffect(taintRule.Spec.Taint.Effect),
-				TimeAdded: taintRule.Spec.Taint.TimeAdded,
+			taint := draapi.TrackedDeviceTaint{
+				Rule: taintRule,
+				// TODO: remove conversion once taint is already in the right API package.
+				DeviceTaint: resourceapi.DeviceTaint{
+					Key:       taintRule.Spec.Taint.Key,
+					Value:     taintRule.Spec.Taint.Value,
+					Effect:    resourceapi.DeviceTaintEffect(taintRule.Spec.Taint.Effect),
+					TimeAdded: taintRule.Spec.Taint.TimeAdded,
+				},
 			}
+			t.setTaintID(logger, oldPatchedSlice, &taint)
 
 			if patchedSlice == slice {
 				patchedSlice = slice.DeepCopy()
 			}
 
-			patchedSlice.Spec.Devices[dIndex].Taints = append(patchedSlice.Spec.Devices[dIndex].Taints, ta)
+			patchedSlice.Spec.Devices[dIndex].Taints = append(patchedSlice.Spec.Devices[dIndex].Taints, taint)
 		}
 	}
 
 	return patchedSlice, nil
+}
+
+// setTaintID is a helper function for applyTaints, see comments there.
+func (t *Tracker) setTaintID(logger klog.Logger, oldPatchedSlice *draapi.ResourceSlice, taint *draapi.TrackedDeviceTaint) {
+	if oldPatchedSlice == nil {
+		// Simply assign a new ID.
+		taint.ID = draapi.DeviceTaintID(t.taintIDCounter.Add(1))
+		logger.V(6).Info("Assigned new taint ID, no old slice", "taintID", taint.ID, "taint", taint)
+		return
+	}
+
+	// If there's a rule, then we only need to look for that rule.
+	if taint.Rule != nil {
+		for _, oldDevice := range oldPatchedSlice.Spec.Devices {
+			for _, oldTaint := range oldDevice.Taints {
+				if oldTaint.Rule != nil && oldTaint.Rule.UID == taint.Rule.UID {
+					taint.ID = oldTaint.ID
+					logger.V(6).Info("Reused taint ID, same rule", "taintID", taint.ID, "taint", taint, "taintRule", klog.KObj(taint.Rule) /* TODO (https://github.com/kubernetes/klog/issues/422): include UID */)
+					return
+				}
+			}
+		}
+	}
+
+	// We need to compare the taint content to find a match. Because taints are de-duplicated,
+	// we don't need to worry about reusing the same ID twice: there won't be a second
+	// new taint which matches the same old taint as some other new taint.
+	for _, oldDevice := range oldPatchedSlice.Spec.Devices {
+		for _, oldTaint := range oldDevice.Taints {
+			if taintsEqual(oldTaint.DeviceTaint, taint.DeviceTaint) {
+				logger.V(6).Info("Reused taint ID, same attributes", "taintID", taint.ID, "taint", taint)
+				taint.ID = oldTaint.ID
+				return
+			}
+		}
+	}
+
+	// New taint.
+	logger.V(6).Info("Assigned new taint ID, no matching taint", "taintID", taint.ID, "taint", taint)
+	taint.ID = draapi.DeviceTaintID(t.taintIDCounter.Add(1))
+}
+
+func deviceHasTaint(device draapi.SliceDevice, taint resourceapi.DeviceTaint) bool {
+	for _, existingTaint := range device.Taints {
+		if taintsEqual(existingTaint.DeviceTaint, taint) {
+			return true
+		}
+	}
+	return false
 }
 
 func sliceTaintsEqual(a, b draapi.SliceDeviceTaint) bool {

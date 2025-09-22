@@ -187,6 +187,15 @@ func (t *testContext) withLoggerName(name string) *testContext {
 	return t
 }
 
+// m contains parameters for taintMeta.
+type m map[struct {
+	deviceName string
+	taintIndex int
+}]struct {
+	id   int
+	rule *resourcealphaapi.DeviceTaintRule
+}
+
 var (
 	// Alias to save typing.
 	u = draapi.MakeUniqueString
@@ -252,7 +261,10 @@ var (
 		return device
 	}
 	deviceWithTaints = func(device draapi.SliceDevice, taints []resourceapi.DeviceTaint) draapi.SliceDevice {
-		device.Taints = taints
+		device = *device.DeepCopy()
+		for _, taint := range taints {
+			device.Taints = append(device.Taints, draapi.TrackedDeviceTaint{DeviceTaint: taint})
+		}
 		return device
 	}
 	emptyDevice = draapi.SliceDevice{}
@@ -297,13 +309,34 @@ var (
 	mergedDevice1Tainted   = deviceWithTaints(device1, mergedDeviceTaints)
 	mergedTaintedDevices   = []draapi.SliceDevice{mergedDevice1Tainted}
 
+	// Tainted slices contain devices with taints, but without ID and rule.
+	// Test cases have to specify those separately through taintMeta.
 	slice1               = sliceWithDevices(slice1NoDevices, devices)
-	slice1Tainted        = sliceWithDevices(slice1, taintedDevices)
-	slice1AlreadyTainted = sliceWithDevices(slice1, existingTaintedDevices)
-	slice1MergedTaints   = sliceWithDevices(slice1, mergedTaintedDevices)
+	slice1Tainted        = sliceWithDevices(slice1NoDevices, taintedDevices)
+	slice1AlreadyTainted = sliceWithDevices(slice1NoDevices, existingTaintedDevices)
+	slice1MergedTaints   = sliceWithDevices(slice1NoDevices, mergedTaintedDevices)
 	slice1Labels         = sliceWithLabels(slice1, map[string]string{"foo": "bar"})
 	slice2               = sliceWithDevices(slice2NoDevices, devices2)
-	slice2Tainted        = sliceWithDevices(slice2, taintedDevices2)
+	slice2Tainted        = sliceWithDevices(slice2NoDevices, taintedDevices2)
+
+	taintMeta = func(slice *draapi.ResourceSlice, meta m) *draapi.ResourceSlice {
+		slice = slice.DeepCopy()
+	nextMeta:
+		for k, v := range meta {
+			for i, device := range slice.Spec.Devices {
+				if device.Name.String() == k.deviceName {
+					if k.taintIndex >= len(device.Taints) {
+						panic(fmt.Sprintf("device taint %#v does not exist in slice", k))
+					}
+					slice.Spec.Devices[i].Taints[k.taintIndex].ID = draapi.DeviceTaintID(v.id)
+					slice.Spec.Devices[i].Taints[k.taintIndex].Rule = v.rule
+					continue nextMeta
+				}
+			}
+			panic(fmt.Sprintf("device %s does not exist in slice", k.deviceName))
+		}
+		return slice
+	}
 
 	extractTaints = func(slice *draapi.ResourceSlice) *draapi.ResourceSlice {
 		slice = slice.DeepCopy()
@@ -312,7 +345,7 @@ var (
 			for _, taint := range device.Taints {
 				slice.Spec.Taints = append(slice.Spec.Taints, draapi.SliceDeviceTaint{
 					Device: device.Name,
-					Taint:  taint,
+					Taint:  taint.DeviceTaint,
 				})
 			}
 		}
@@ -396,6 +429,22 @@ var (
 	taintNoDevicesCELRuntimeErrorRule = taintCELSelectedDevicesRule(taintAllDevicesRule, `device.attributes["test.example.com"].deviceAttr`)
 	taintNoDevicesInvalidCELRule      = taintCELSelectedDevicesRule(taintAllDevicesRule, `invalid`)
 	taintDeviceClass1Rule             = taintDeviceClassRule(taintAllDevicesRule, deviceClass1.Name)
+	taintDeviceAllCriteria            = taintDeviceClassRule(
+		taintDriverDevicesRule(
+			taintPoolDevicesRule(
+				taintNamedDevicesRule(
+					taintCELSelectedDevicesRule(
+						taintAllDevicesRule,
+						`true`,
+					),
+					device1Name,
+				),
+				pool1,
+			),
+			driver1,
+		),
+		deviceClass1.Name,
+	)
 )
 
 func TestListPatchedResourceSlices(t *testing.T) {
@@ -419,6 +468,13 @@ func TestListPatchedResourceSlices(t *testing.T) {
 		// We punt on determining a set of validation criteria for every
 		// possible sequence and only check them against the first
 		// permutation: the order in which the events are defined.
+		//
+		// The same applies to taint IDs: for example, if a taint rule
+		// first applies to one slice, then to another after an update
+		// ("update-patch" test case), then depending on the order
+		// a taint gets added only once ot twice, leading to different IDs.
+		// Therefore taint meta data as specified below is ignored except
+		// for the original order of events.
 		expectedHandlerEvents []handlerEvent
 		expectEvents          func(t *assert.CollectT, events *v1.EventList)
 		expectUnhandledErrors func(t *testing.T, errs []error)
@@ -501,11 +557,11 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				add(taintAllDevicesRule),
 			},
 			expectedPatchedSlices: []*draapi.ResourceSlice{
-				slice1Tainted,
+				taintMeta(slice1Tainted, m{{device1Name, 0}: {1, taintAllDevicesRule}}),
 			},
 			expectedHandlerEvents: []handlerEvent{
 				{event: handlerEventAdd, newObj: slice1},
-				{event: handlerEventUpdate, oldObj: slice1, newObj: slice1Tainted},
+				{event: handlerEventUpdate, oldObj: slice1, newObj: taintMeta(slice1Tainted, m{{device1Name, 0}: {1, taintAllDevicesRule}})},
 			},
 		},
 		"update-patch": {
@@ -519,11 +575,11 @@ func TestListPatchedResourceSlices(t *testing.T) {
 			},
 			expectedPatchedSlices: []*draapi.ResourceSlice{
 				slice1,
-				slice2Tainted,
+				taintMeta(slice2Tainted, m{{device2Name, 0}: {1, taintPool2DevicesRule}}),
 			},
 			expectedHandlerEvents: []handlerEvent{
 				{event: handlerEventAdd, newObj: slice1},
-				{event: handlerEventAdd, newObj: slice2Tainted},
+				{event: handlerEventAdd, newObj: taintMeta(slice2Tainted, m{{device2Name, 0}: {1, taintPool2DevicesRule}})},
 			},
 		},
 		"merge-taints": {
@@ -534,29 +590,12 @@ func TestListPatchedResourceSlices(t *testing.T) {
 			},
 			expectedPatchedSlices: []*draapi.ResourceSlice{
 				extractTaints(slice1AlreadyTainted),
-				slice1MergedTaints,
+				taintMeta(slice1MergedTaints, m{{device1Name, 0}: {1, nil} /* from pool */, {device1Name, 1}: {2, taintAllDevicesRule}}),
 			},
 			expectedHandlerEvents: []handlerEvent{
 				{event: handlerEventAdd, newObj: extractTaints(slice1AlreadyTainted)},
-				{event: handlerEventAdd, newObj: slice1AlreadyTainted},
-				{event: handlerEventUpdate, oldObj: slice1AlreadyTainted, newObj: slice1MergedTaints},
-			},
-		},
-		"merge-taints-reversed": {
-			events: []any{
-				add(trimTaints(slice1AlreadyTainted)),
-				add(extractTaints(slice1AlreadyTainted)),
-				add(taintAllDevicesRule),
-			},
-			expectedPatchedSlices: []*draapi.ResourceSlice{
-				extractTaints(slice1AlreadyTainted),
-				slice1MergedTaints,
-			},
-			expectedHandlerEvents: []handlerEvent{
-				{event: handlerEventAdd, newObj: trimTaints(slice1AlreadyTainted)},
-				{event: handlerEventUpdate, oldObj: trimTaints(slice1AlreadyTainted), newObj: slice1AlreadyTainted},
-				{event: handlerEventAdd, newObj: extractTaints(slice1AlreadyTainted)},
-				{event: handlerEventUpdate, oldObj: slice1AlreadyTainted, newObj: slice1MergedTaints},
+				{event: handlerEventAdd, newObj: taintMeta(slice1AlreadyTainted, m{{device1Name, 0}: {1, nil}})},
+				{event: handlerEventUpdate, oldObj: taintMeta(slice1AlreadyTainted, m{{device1Name, 0}: {1, nil}}), newObj: taintMeta(slice1MergedTaints, m{{device1Name, 0}: {1, nil} /* from pool */, {device1Name, 1}: {2, taintAllDevicesRule}})},
 			},
 		},
 		// TODO:
@@ -572,11 +611,11 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				add(slice2),
 			},
 			expectedPatchedSlices: []*draapi.ResourceSlice{
-				slice1Tainted,
+				taintMeta(slice1Tainted, m{{device1Name, 0}: {1, taintDriver1DevicesRule}}),
 				slice2,
 			},
 			expectedHandlerEvents: []handlerEvent{
-				{event: handlerEventAdd, newObj: slice1Tainted},
+				{event: handlerEventAdd, newObj: taintMeta(slice1Tainted, m{{device1Name, 0}: {1, taintDriver1DevicesRule}})},
 				{event: handlerEventAdd, newObj: slice2},
 			},
 		},
@@ -587,11 +626,11 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				add(slice2),
 			},
 			expectedPatchedSlices: []*draapi.ResourceSlice{
-				slice1Tainted,
+				taintMeta(slice1Tainted, m{{device1Name, 0}: {1, taintPool1DevicesRule}}),
 				slice2,
 			},
 			expectedHandlerEvents: []handlerEvent{
-				{event: handlerEventAdd, newObj: slice1Tainted},
+				{event: handlerEventAdd, newObj: taintMeta(slice1Tainted, m{{device1Name, 0}: {1, taintPool1DevicesRule}})},
 				{event: handlerEventAdd, newObj: slice2},
 			},
 		},
@@ -602,11 +641,11 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				add(slice2),
 			},
 			expectedPatchedSlices: []*draapi.ResourceSlice{
-				slice1Tainted,
+				taintMeta(slice1Tainted, m{{device1Name, 0}: {1, taintDevice1Rule}}),
 				slice2,
 			},
 			expectedHandlerEvents: []handlerEvent{
-				{event: handlerEventAdd, newObj: slice1Tainted},
+				{event: handlerEventAdd, newObj: taintMeta(slice1Tainted, m{{device1Name, 0}: {1, taintDevice1Rule}})},
 				{event: handlerEventAdd, newObj: slice2},
 			},
 		},
@@ -617,11 +656,11 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				add(slice2),
 			},
 			expectedPatchedSlices: []*draapi.ResourceSlice{
-				slice1Tainted,
+				taintMeta(slice1Tainted, m{{device1Name, 0}: {1, taintDriver1DevicesCELRule}}),
 				slice2,
 			},
 			expectedHandlerEvents: []handlerEvent{
-				{event: handlerEventAdd, newObj: slice1Tainted},
+				{event: handlerEventAdd, newObj: taintMeta(slice1Tainted, m{{device1Name, 0}: {1, taintDriver1DevicesCELRule}})},
 				{event: handlerEventAdd, newObj: slice2},
 			},
 		},
@@ -679,44 +718,27 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				add(slice2),
 			},
 			expectedPatchedSlices: []*draapi.ResourceSlice{
-				slice1Tainted,
+				taintMeta(slice1Tainted, m{{device1Name, 0}: {1, taintDeviceClass1Rule}}),
 				slice2,
 			},
 			expectedHandlerEvents: []handlerEvent{
-				{event: handlerEventAdd, newObj: slice1Tainted},
+				{event: handlerEventAdd, newObj: taintMeta(slice1Tainted, m{{device1Name, 0}: {1, taintDeviceClass1Rule}})},
 				{event: handlerEventAdd, newObj: slice2},
 			},
 		},
 		"filter-all-criteria": {
 			events: []any{
 				add(deviceClass1),
-				add(
-					taintDeviceClassRule(
-						taintDriverDevicesRule(
-							taintPoolDevicesRule(
-								taintNamedDevicesRule(
-									taintCELSelectedDevicesRule(
-										taintAllDevicesRule,
-										`true`,
-									),
-									device1Name,
-								),
-								pool1,
-							),
-							driver1,
-						),
-						deviceClass1.Name,
-					),
-				),
+				add(taintDeviceAllCriteria),
 				add(slice1),
 				add(slice2),
 			},
 			expectedPatchedSlices: []*draapi.ResourceSlice{
-				slice1Tainted,
+				taintMeta(slice1Tainted, m{{device1Name, 0}: {1, taintDeviceAllCriteria}}),
 				slice2,
 			},
 			expectedHandlerEvents: []handlerEvent{
-				{event: handlerEventAdd, newObj: slice1Tainted},
+				{event: handlerEventAdd, newObj: taintMeta(slice1Tainted, m{{device1Name, 0}: {1, taintDeviceAllCriteria}})},
 				{event: handlerEventAdd, newObj: slice2},
 			},
 		},
@@ -733,14 +755,14 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				},
 			},
 			expectedPatchedSlices: []*draapi.ResourceSlice{
-				sliceWithDevices(slice1, threeDevicesOneTainted),
-				sliceWithDevices(slice2, taintedDevices),
+				taintMeta(sliceWithDevices(slice1, threeDevicesOneTainted), m{{device1Name, 0}: {1, taintDevice1Rule}}),
+				taintMeta(sliceWithDevices(slice2, taintedDevices), m{{device1Name, 0}: {2, taintDevice1Rule}}),
 			},
 			expectedHandlerEvents: []handlerEvent{
-				{event: handlerEventAdd, newObj: slice1Tainted},
-				{event: handlerEventUpdate, oldObj: slice1Tainted, newObj: sliceWithDevices(slice1, threeDevicesOneTainted)},
-				{event: handlerEventAdd, newObj: sliceWithDevices(slice2, threeDevicesOneTainted)},
-				{event: handlerEventUpdate, oldObj: sliceWithDevices(slice2, threeDevicesOneTainted), newObj: sliceWithDevices(slice2, taintedDevices)},
+				{event: handlerEventAdd, newObj: taintMeta(slice1Tainted, m{{device1Name, 0}: {1, taintDevice1Rule}})},
+				{event: handlerEventUpdate, oldObj: taintMeta(slice1Tainted, m{{device1Name, 0}: {1, taintDevice1Rule}}), newObj: taintMeta(sliceWithDevices(slice1, threeDevicesOneTainted), m{{device1Name, 0}: {1, taintDevice1Rule}})},
+				{event: handlerEventAdd, newObj: taintMeta(sliceWithDevices(slice2, threeDevicesOneTainted), m{{device1Name, 0}: {2, taintDevice1Rule}})},
+				{event: handlerEventUpdate, oldObj: taintMeta(sliceWithDevices(slice2, threeDevicesOneTainted), m{{device1Name, 0}: {2, taintDevice1Rule}}), newObj: taintMeta(sliceWithDevices(slice2, taintedDevices), m{{device1Name, 0}: {2, taintDevice1Rule}})},
 			},
 		},
 	}
@@ -817,9 +839,14 @@ func TestListPatchedResourceSlices(t *testing.T) {
 		sortResourceSlicesFunc := func(s1, s2 *draapi.ResourceSlice) int {
 			return stdcmp.Compare(s1.Name, s2.Name)
 		}
-		slices.SortFunc(test.expectedPatchedSlices, sortResourceSlicesFunc)
+		expectedPatchedSlices := slices.Clone(test.expectedPatchedSlices)
+		slices.SortFunc(expectedPatchedSlices, sortResourceSlicesFunc)
 		slices.SortFunc(patchedResourceSlices, sortResourceSlicesFunc)
-		assert.Equal(tCtx, test.expectedPatchedSlices, patchedResourceSlices)
+		if isPermutated {
+			expectedPatchedSlices = trimDeviceTaintMeta(expectedPatchedSlices)
+			patchedResourceSlices = trimDeviceTaintMeta(patchedResourceSlices)
+		}
+		assert.Equal(tCtx, expectedPatchedSlices, patchedResourceSlices)
 		expectEvents := test.expectEvents
 		if expectEvents == nil {
 			expectEvents = func(t *assert.CollectT, events *v1.EventList) {
@@ -828,6 +855,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 		}
 		// Events are generated asynchronously. While shutting down the event recorder will flush all
 		// pending events, it is not possible to determine when exactly that flush is complete.
+		// TODO (pohly): use synctest.Wait instead, ideally with ktesting
 		assert.EventuallyWithT(
 			tCtx,
 			func(t *assert.CollectT) {
@@ -915,6 +943,20 @@ func TestListPatchedResourceSlices(t *testing.T) {
 			permutate(0)
 		})
 	}
+}
+
+func trimDeviceTaintMeta(slices []*draapi.ResourceSlice) []*draapi.ResourceSlice {
+	var trimmedSlices []*draapi.ResourceSlice
+	for _, slice := range slices {
+		slice = slice.DeepCopy()
+		for i, device := range slice.Spec.Devices {
+			for j := range device.Taints {
+				slice.Spec.Devices[i].Taints[j].ID = 0
+			}
+		}
+		trimmedSlices = append(trimmedSlices, slice)
+	}
+	return trimmedSlices
 }
 
 func BenchmarkEventHandlers(b *testing.B) {

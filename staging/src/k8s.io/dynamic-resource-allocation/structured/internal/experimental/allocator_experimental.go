@@ -1365,7 +1365,7 @@ func taintPreventsAllocation(device *draapi.SliceDevice, request requestAccessor
 		if taint.Effect == resourceapi.DeviceTaintEffectNone {
 			continue
 		}
-		if !taintTolerated(taint, request) {
+		if !taintTolerated(taint.DeviceTaint, request) {
 			return true
 		}
 	}
