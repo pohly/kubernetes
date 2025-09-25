@@ -64,6 +64,10 @@ const (
 	// retries is the number of times that the controller tries to delete a pod
 	// that needs to be evicted.
 	retries = 5
+
+	// evictionBurst is the number of pods which get evicted immediately
+	// before the rate limit kicks in. This number is fairly arbitrary.
+	evictionBurst = 10
 )
 
 // Controller listens to Taint changes of DRA devices and Toleration changes of ResourceClaims,
@@ -139,6 +143,9 @@ type deviceTaint struct {
 
 	// pendingPods contains all known pods which need to be evicted because of this taint.
 	pendingPods sets.Set[types.UID]
+
+	// numEvictedPods counts the number of pods evicted because of this taint.
+	numEvictedPods int64
 }
 
 // addSlice adds one slice to the pool.
@@ -236,31 +243,125 @@ type allocatedClaim struct {
 	// <toleration seconds, 0 if not set>`.
 	evictionTime *metav1.Time
 
-	// taints contains pointers to the taints into the pool which cause eviction.
+	// taints contains pointers to the taints in the pool which cause eviction.
+	// Non-empty if and only if evictionTime is set.
 	taints []*draapi.TrackedDeviceTaint
 }
 
-func (tc *Controller) deletePodHandler(c clientset.Interface, emitEventFunc func(tainteviction.NamespacedObject)) func(ctx context.Context, fireAt time.Time, args *tainteviction.WorkArgs) error {
+func (tc *Controller) createDeletePodHandler(c clientset.Interface, emitEventFunc func(tainteviction.NamespacedObject)) func(ctx context.Context, fireAt time.Time, args *tainteviction.WorkArgs) error {
 	return func(ctx context.Context, fireAt time.Time, args *tainteviction.WorkArgs) error {
-		klog.FromContext(ctx).Info("Deleting pod", "pod", args.Object)
-		var err error
-		for i := 0; i < retries; i++ {
-			err = addConditionAndDeletePod(ctx, c, args.Object, &emitEventFunc)
-			if apierrors.IsNotFound(err) {
-				// Not a problem, the work is done.
-				// But we didn't do it, so don't
-				// bump the metric.
-				return nil
-			}
-			if err == nil {
-				tc.metrics.PodDeletionsTotal.Inc()
-				tc.metrics.PodDeletionsLatency.Observe(float64(time.Since(fireAt).Seconds()))
-				return nil
-			}
-			time.Sleep(10 * time.Millisecond)
-		}
-		return err
+		return tc.deletePod(ctx, c, emitEventFunc, fireAt, args)
 	}
+}
+
+// deletePod gets called by the worker queue when it is time to evict a pod.
+// It checks for rate limiting and depending on that either puts back the pod
+// for future processing or proceeds with the eviction.
+func (tc *Controller) deletePod(ctx context.Context, c clientset.Interface, emitEventFunc func(tainteviction.NamespacedObject), fireAt time.Time, args *tainteviction.WorkArgs) (finalErr error) {
+	logger := klog.FromContext(ctx)
+	if loggerV := logger.V(5); loggerV.Enabled() {
+		loggerV.Info("Starting attempt to evict pod", "pod", args.Object)
+		defer func() {
+			loggerV.Info("Done with eviction attempt", "pod", args.Object, "err", finalErr)
+		}()
+	}
+
+	// Figure out all on-going evictions which affect the pod and reserve a token
+	// from their rate limiter (creating one if needed). At the end, update
+	// those evictions.
+	//
+	// Both must be protected by the mutex, but let's not hold that mutex
+	// while doing API calls.
+	preallocate := 10
+	evictionsForPod := make([]*deviceTaint, 0, preallocate)
+	evicted := false
+	defer func() {
+		if evicted {
+			tc.mutex.Lock()
+			defer tc.mutex.Unlock()
+
+			for _, eviction := range evictionsForPod {
+				eviction.numEvictedPods++
+				if eviction.taint.Rule != nil {
+					// TODO: schedule status update
+				}
+			}
+		}
+	}()
+
+	reservations := make([]*rate.Reservation, 0, preallocate)
+	func() {
+		tc.mutex.Lock()
+		defer tc.mutex.Unlock()
+
+		for _, eviction := range tc.evictions {
+			if !eviction.pendingPods.Has(args.Object.UID) {
+				continue
+			}
+			evictionsForPod = append(evictionsForPod, eviction)
+
+			if eviction.limiter == nil {
+				// Eviction starts in a burst, then continues with a configurable rate.
+				limit := ptr.Deref(eviction.taint.EvictionsPerSecond, resourceapi.DefaultEvictionsPerSecond)
+				eviction.limiter = rate.NewLimiter(rate.Limit(limit), evictionBurst)
+				logger.V(5).Info("Created new rate limiter", "rate", limit, "burst", evictionBurst, "taint", eviction.taint.ID)
+			}
+			reservation := eviction.limiter.Reserve()
+			reservations = append(reservations, reservation)
+		}
+	}()
+
+	var maxDelay time.Duration
+	now := time.Now()
+	for _, reservation := range reservations {
+		delay := reservation.DelayFrom(now)
+		if delay == rate.InfDuration {
+			// This rate limiter can never grant any token?!
+			// Shouldn't happen, log it and try again anyway
+			// after one minute (chosen so that if this happens
+			// we aren't busy looping).
+			logger.Error(nil, "Internal error: rate limiter refuses to grant tokens")
+			delay = time.Minute
+		}
+		if delay > maxDelay {
+			maxDelay = delay
+		}
+	}
+
+	if maxDelay > 0 {
+		// Each eviction attempt runs in its own goroutine. Therefore it is okay to delay here.
+		// Theoretically, releasing the reserved tokens could unblock some other pod eviction
+		// if pods are tainted through some shared taints without sharing all of them.
+		// In practice this seems unusual and isn't worth making the code more complex for.
+		logger.V(5).Info("Pod eviction delayed by rate limit delay", "pod", args.Object, "delay", maxDelay)
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("timed out waiting for rate limit delay: %w", context.Cause(ctx))
+		case <-time.After(maxDelay):
+		}
+
+	}
+
+	logger.Info("Deleting pod", "pod", args.Object)
+	var err error
+	for i := 0; i < retries; i++ {
+		err = addConditionAndDeletePod(ctx, c, args.Object, &emitEventFunc)
+		if apierrors.IsNotFound(err) {
+			// Not a problem, the work is done.
+			// But we didn't do it, so don't
+			// bump the metric.
+			return nil
+		}
+		if err == nil {
+			evicted = true
+			tc.metrics.PodDeletionsTotal.Inc()
+			tc.metrics.PodDeletionsLatency.Observe(float64(time.Since(fireAt).Seconds()))
+			return nil
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	// TODO: we could ask for a retry now that ErrAgain is implemented. Should we?
+	return err
 }
 
 func addConditionAndDeletePod(ctx context.Context, c clientset.Interface, podRef tainteviction.NamespacedObject, emitEventFunc *func(tainteviction.NamespacedObject)) (err error) {
@@ -359,9 +460,10 @@ func (tc *Controller) Run(ctx context.Context) error {
 	tc.recorder = eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: tc.name}).WithLogger(logger)
 	defer eventBroadcaster.Shutdown()
 
-	taintEvictionQueue := tainteviction.CreateWorkerQueue(tc.deletePodHandler(tc.client, tc.emitPodDeletionEvent))
+	taintEvictionQueue := tainteviction.CreateWorkerQueue(tc.createDeletePodHandler(tc.client, tc.emitPodDeletionEvent))
 	evictPod := tc.evictPod
 	tc.evictPod = func(podRef tainteviction.NamespacedObject, fireAt time.Time) {
+		logger.V(3).Info("Scheduling pod for eviction", "pod", podRef, "at", fireAt)
 		// Only relevant for testing.
 		if evictPod != nil {
 			evictPod(podRef, fireAt)
@@ -370,6 +472,7 @@ func (tc *Controller) Run(ctx context.Context) error {
 	}
 	cancelEvict := tc.cancelEvict
 	tc.cancelEvict = func(podRef tainteviction.NamespacedObject) bool {
+		logger.V(3).Info("Canceling pod eviction", "pod", podRef)
 		if cancelEvict != nil {
 			cancelEvict(podRef)
 		}
@@ -866,6 +969,9 @@ func (tc *Controller) handlePodChange(oldPod, newPod *v1.Pod) {
 			eviction.pendingPods.Delete(oldPod.UID)
 			if len(eviction.pendingPods) == 0 {
 				delete(tc.evictions, taintID)
+				tc.logger.V(3).Info("Completed eviction", "taint", taintID, "deviceTaintRule", klog.KObj(eviction.taint.Rule), "pod", klog.KObj(oldPod))
+			} else {
+				tc.logger.V(5).Info("Removed deleted pod from eviction", "taint", taintID, "deviceTaintRule", klog.KObj(eviction.taint.Rule), "pod", klog.KObj(oldPod), "pendingPods", eviction.pendingPods.Len())
 			}
 		}
 		tc.cancelEvict(newObject(oldPod))
@@ -972,9 +1078,11 @@ func (tc *Controller) handlePod(pod *v1.Pod) {
 				if eviction.taint.Rule != nil {
 					// TODO: start updating the rule status.
 				}
+				tc.logger.V(3).Info("Started new eviction", "taint", taint.ID, "deviceTaintRule", klog.KObj(taint.Rule), "pod", klog.KObj(pod))
 			} else {
 				// Just add the pod, if not there yet.
 				eviction.pendingPods.Insert(pod.UID)
+				tc.logger.V(3).Info("Extended existing eviction", "taint", taint.ID, "deviceTaintRule", klog.KObj(taint.Rule), "pod", klog.KObj(pod), "pendingPods", eviction.pendingPods.Len())
 			}
 		}
 		tc.evictPod(podRef, evictionTime.Time)
