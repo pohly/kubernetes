@@ -1839,7 +1839,7 @@ func TestEvictionRate(t *testing.T) {
 					name = "default"
 					actualEvictionsPerSecond = resourceapi.DefaultEvictionsPerSecond
 				}
-				if numTaints > 1 && additionalEvictionsPerSecond < actualEvictionsPerSecond {
+				if numTaints > 1 && additionalEvictionsPerSecond > actualEvictionsPerSecond {
 					actualEvictionsPerSecond = additionalEvictionsPerSecond
 				}
 				tCtx.Run(name, func(tCtx ktesting.TContext) {

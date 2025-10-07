@@ -311,7 +311,9 @@ func (tc *Controller) deletePod(ctx context.Context, c clientset.Interface, emit
 		}
 	}()
 
-	var maxDelay time.Duration
+	// Evict at the highest rate defined for any of the taints by
+	// delaying as little as possible.
+	minDelay := rate.InfDuration
 	now := time.Now()
 	for _, reservation := range reservations {
 		delay := reservation.DelayFrom(now)
@@ -323,21 +325,20 @@ func (tc *Controller) deletePod(ctx context.Context, c clientset.Interface, emit
 			logger.Error(nil, "Internal error: rate limiter refuses to grant tokens")
 			delay = time.Minute
 		}
-		if delay > maxDelay {
-			maxDelay = delay
+		if delay < minDelay {
+			minDelay = delay
 		}
 	}
-
-	if maxDelay > 0 {
+	if minDelay > 0 && minDelay != rate.InfDuration {
 		// Each eviction attempt runs in its own goroutine. Therefore it is okay to delay here.
 		// Theoretically, releasing the reserved tokens could unblock some other pod eviction
 		// if pods are tainted through some shared taints without sharing all of them.
 		// In practice this seems unusual and isn't worth making the code more complex for.
-		logger.V(5).Info("Pod eviction delayed by rate limit delay", "pod", args.Object, "delay", maxDelay)
+		logger.V(5).Info("Pod eviction delayed by rate limit delay", "pod", args.Object, "delay", minDelay)
 		select {
 		case <-ctx.Done():
 			return fmt.Errorf("timed out waiting for rate limit delay: %w", context.Cause(ctx))
-		case <-time.After(maxDelay):
+		case <-time.After(minDelay):
 		}
 
 	}
