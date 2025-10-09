@@ -346,6 +346,10 @@ func (tc *Controller) deletePod(ctx context.Context, c clientset.Interface, emit
 	logger.Info("Deleting pod", "pod", args.Object)
 	var err error
 	for i := 0; i < retries; i++ {
+		if i > 0 {
+			// Avoid busy-looping.
+			time.Sleep(10 * time.Millisecond)
+		}
 		err = addConditionAndDeletePod(ctx, c, args.Object, &emitEventFunc)
 		if apierrors.IsNotFound(err) {
 			// Not a problem, the work is done.
@@ -356,10 +360,11 @@ func (tc *Controller) deletePod(ctx context.Context, c clientset.Interface, emit
 		if err == nil {
 			evicted = true
 			tc.metrics.PodDeletionsTotal.Inc()
-			tc.metrics.PodDeletionsLatency.Observe(float64(time.Since(fireAt).Seconds()))
+			latency := time.Since(fireAt)
+			logger.V(5).Info("Metric updated", "latency", latency, "fireAt", fireAt)
+			tc.metrics.PodDeletionsLatency.Observe(float64(latency.Seconds()))
 			return nil
 		}
-		time.Sleep(10 * time.Millisecond)
 	}
 	// TODO: we could ask for a retry now that ErrAgain is implemented. Should we?
 	return err
