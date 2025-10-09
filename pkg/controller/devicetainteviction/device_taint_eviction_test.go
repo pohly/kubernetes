@@ -35,7 +35,6 @@ import (
 	gomegatypes "github.com/onsi/gomega/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/time/rate"
 	"k8s.io/apimachinery/pkg/watch"
 
 	v1 "k8s.io/api/core/v1"
