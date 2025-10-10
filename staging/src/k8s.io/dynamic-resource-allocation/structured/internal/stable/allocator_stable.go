@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/cel"
-	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/dynamic-resource-allocation/structured/internal"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
@@ -1012,12 +1011,6 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 		subRequestName = requestData.request.name()
 	}
 
-	// Might be tainted, in which case the taint has to be tolerated.
-	// The check is skipped if the feature is disabled.
-	if alloc.features.DeviceTaints && !allTaintsTolerated(device.Device, request) {
-		return false, nil, nil
-	}
-
 	// It's available. Now check constraints.
 	for i, constraint := range alloc.constraints[r.claimIndex] {
 		added := constraint.add(baseRequestName, subRequestName, device.Device, device.id)
@@ -1070,24 +1063,6 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 		alloc.result[r.claimIndex].devices = alloc.result[r.claimIndex].devices[:previousNumResults]
 		alloc.logger.V(7).Info("Device deallocated", "device", device.id)
 	}, nil
-}
-
-func allTaintsTolerated(device *draapi.Device, request requestAccessor) bool {
-	for _, taint := range device.Taints {
-		if !taintTolerated(taint, request) {
-			return false
-		}
-	}
-	return true
-}
-
-func taintTolerated(taint resourceapi.DeviceTaint, request requestAccessor) bool {
-	for _, toleration := range request.tolerations() {
-		if resourceclaim.ToleratesTaint(toleration, taint) {
-			return true
-		}
-	}
-	return false
 }
 
 // checkAvailableCounters checks if there are enough counters available to allocate

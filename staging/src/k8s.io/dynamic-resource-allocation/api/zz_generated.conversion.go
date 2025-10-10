@@ -159,6 +159,11 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddConversionFunc((*TrackedDeviceTaint)(nil), (*v1.DeviceTaint)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_api_TrackedDeviceTaint_To_v1_DeviceTaint(a.(*TrackedDeviceTaint), b.(*v1.DeviceTaint), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddConversionFunc((*UniqueString)(nil), (*string)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_api_UniqueString_To_string(a.(*UniqueString), b.(*string), scope)
 	}); err != nil {
@@ -166,6 +171,11 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddConversionFunc((*string)(nil), (*UniqueString)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_string_To_api_UniqueString(a.(*string), b.(*UniqueString), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1.DeviceTaint)(nil), (*TrackedDeviceTaint)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DeviceTaint_To_api_TrackedDeviceTaint(a.(*v1.DeviceTaint), b.(*TrackedDeviceTaint), scope)
 	}); err != nil {
 		return err
 	}
@@ -286,7 +296,17 @@ func autoConvert_api_Device_To_v1_Device(in *Device, out *v1.Device, s conversio
 	out.NodeName = (*string)(unsafe.Pointer(in.NodeName))
 	out.NodeSelector = (*corev1.NodeSelector)(unsafe.Pointer(in.NodeSelector))
 	out.AllNodes = (*bool)(unsafe.Pointer(in.AllNodes))
-	out.Taints = *(*[]v1.DeviceTaint)(unsafe.Pointer(&in.Taints))
+	if in.Taints != nil {
+		in, out := &in.Taints, &out.Taints
+		*out = make([]v1.DeviceTaint, len(*in))
+		for i := range *in {
+			if err := Convert_api_TrackedDeviceTaint_To_v1_DeviceTaint(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Taints = nil
+	}
 	if err := metav1.Convert_bool_To_Pointer_bool(&in.BindsToNode, &out.BindsToNode, s); err != nil {
 		return err
 	}
@@ -321,7 +341,17 @@ func autoConvert_v1_Device_To_api_Device(in *v1.Device, out *Device, s conversio
 	out.NodeName = (*string)(unsafe.Pointer(in.NodeName))
 	out.NodeSelector = (*corev1.NodeSelector)(unsafe.Pointer(in.NodeSelector))
 	out.AllNodes = (*bool)(unsafe.Pointer(in.AllNodes))
-	out.Taints = *(*[]v1.DeviceTaint)(unsafe.Pointer(&in.Taints))
+	if in.Taints != nil {
+		in, out := &in.Taints, &out.Taints
+		*out = make([]TrackedDeviceTaint, len(*in))
+		for i := range *in {
+			if err := Convert_v1_DeviceTaint_To_api_TrackedDeviceTaint(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Taints = nil
+	}
 	if err := metav1.Convert_Pointer_bool_To_bool(&in.BindsToNode, &out.BindsToNode, s); err != nil {
 		return err
 	}

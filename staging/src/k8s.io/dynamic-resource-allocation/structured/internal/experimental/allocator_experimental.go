@@ -1365,7 +1365,7 @@ func taintPreventsAllocation(device *draapi.Device, request requestAccessor) boo
 		switch taint.Effect {
 		// Only known effects prevent allocation, others (including None) are ignored.
 		case resourceapi.DeviceTaintEffectNoExecute, resourceapi.DeviceTaintEffectNoSchedule:
-			if !taintTolerated(taint, request) {
+			if !taintTolerated(taint.DeviceTaint, request) {
 				return true
 			}
 		}

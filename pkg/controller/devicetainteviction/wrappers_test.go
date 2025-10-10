@@ -54,8 +54,14 @@ func (wrapper *ResourceSliceWrapper) device(name string, otherFields ...any) *Re
 		case map[draapi.QualifiedName]draapi.DeviceCapacity:
 			device.Capacity = typedField
 		case []resourceapi.DeviceTaint:
-			device.Taints = append(device.Taints, typedField...)
+			for _, taint := range typedField {
+				device.Taints = append(device.Taints, draapi.TrackedDeviceTaint{DeviceTaint: taint})
+			}
 		case resourceapi.DeviceTaint:
+			device.Taints = append(device.Taints, draapi.TrackedDeviceTaint{DeviceTaint: typedField})
+		case []draapi.TrackedDeviceTaint:
+			device.Taints = append(device.Taints, typedField...)
+		case draapi.TrackedDeviceTaint:
 			device.Taints = append(device.Taints, typedField)
 		default:
 			panic(fmt.Sprintf("expected a type which matches a field in BasicDevice, got %T", field))

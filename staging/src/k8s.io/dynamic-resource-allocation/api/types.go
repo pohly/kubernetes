@@ -19,6 +19,7 @@ package api
 import (
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	resourcealpha "k8s.io/api/resource/v1alpha3"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -62,7 +63,7 @@ type Device struct {
 	NodeName                 *string                           `json:"nodeName,omitempty"`
 	NodeSelector             *v1.NodeSelector                  `json:"nodeSelector,omitempty"`
 	AllNodes                 *bool                             `json:"allNodes,omitempty"`
-	Taints                   []resourceapi.DeviceTaint         `json:"taints,omitempty"`
+	Taints                   []TrackedDeviceTaint              `json:"taints,omitempty"`
 	BindsToNode              bool                              `json:"bindsToNode,omitempty"`
 	BindingConditions        []string                          `json:"bindingConditions,omitempty"`
 	BindingFailureConditions []string                          `json:"bindingFailureConditions,omitempty"`
@@ -105,6 +106,30 @@ type CapacityRequestPolicyRange struct {
 type Counter struct {
 	Value resource.Quantity `json:"value"`
 }
+
+// TrackedDeviceTaint is DeviceTaint with additional information provided
+// by the ResourceSlice tracker.
+type TrackedDeviceTaint struct {
+	// Rule points towards the DeviceTaintRule which provided the taint.
+	// Nil if the taint is from a ResourceSlice.
+	Rule *resourcealpha.DeviceTaintRule `json:"rule,omitempty"`
+
+	// ID is generated on-the-fly by the ResourceSlice tracker.
+	// Each new taint that has not been seen before is assigned
+	// a new number. During updates, taints from the same rule
+	// (when available) or the same attributes (otherwise)
+	// retain their ID. It does not persist across process restarts.
+	//
+	// Consumers can use this ID to manage their own additional state
+	// for each taint during a program run.
+	ID DeviceTaintID `json:"id,omitempty"`
+
+	resourceapi.DeviceTaint `json:",inline"`
+}
+
+// TODO: remove DeviceTaintID?
+
+type DeviceTaintID int64
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
