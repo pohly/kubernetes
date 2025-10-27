@@ -168,6 +168,8 @@ type KubeControllerManagerConfiguration struct {
 	// ValidatingAdmissionPolicyStatusControllerConfiguration holds configuration for
 	// ValidatingAdmissionPolicyStatusController related features.
 	ValidatingAdmissionPolicyStatusController ValidatingAdmissionPolicyStatusControllerConfiguration
+	// ResourceClaimControllerConfiguration contains elements configuring the device taint eviction controller.
+	ResourceClaimController ResourceClaimControllerConfiguration
 }
 
 // AttachDetachControllerConfiguration contains elements describing AttachDetachController.
@@ -487,4 +489,13 @@ type ValidatingAdmissionPolicyStatusControllerConfiguration struct {
 	// but more CPU (and network) load.
 	// The default value is 5.
 	ConcurrentPolicySyncs int32
+}
+
+// ResourceClaimControllerConfiguration contains elements configuring the device taint eviction controller.
+type ResourceClaimControllerConfiguration struct {
+	// ConcurrentSyncs is the number of operations (deleting a pod, updating a ResourcClaim status, etc.)
+	// that will be done concurrently. Larger number = processing, but more CPU (and network) load.
+	//
+	// The default is 10.
+	ConcurrentSyncs int32
 }
