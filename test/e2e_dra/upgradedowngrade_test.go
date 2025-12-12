@@ -113,10 +113,7 @@ func testUpgradeDowngrade(tCtx ktesting.TContext) {
 	// Ideally we shouldn't have any code which directly calls gomega.Expect,
 	// but we are not there yet (e.g. e2epod.MakePod). So for now we install
 	// one fail handler which records failures in the main test context.
-	gomega.RegisterFailHandler(func(message string, callerSkip ...int) {
-		tCtx.Helper()
-		tCtx.Fatal(message)
-	})
+	gomega.RegisterTestingT(tCtx)
 
 	envName, dir := currentBinDir()
 	if dir == "" {

@@ -28,6 +28,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/onsi/gomega/format"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -72,6 +73,7 @@ type Builder struct {
 	namespace               string
 	Driver                  *Driver
 	UseExtendedResourceName bool
+	WithClaimController     bool
 
 	podCounter      int
 	claimCounter    int
@@ -476,7 +478,7 @@ func TestContainerEnv(tCtx ktesting.TContext, pod *v1.Pod, containerName string,
 }
 
 func NewBuilder(f *framework.Framework, driver *Driver) *Builder {
-	b := &Builder{Driver: driver}
+	b := &Builder{Driver: driver, WithClaimController: true}
 	ginkgo.BeforeEach(func() {
 		b.setUp(f.TContext(context.Background()))
 	})
@@ -484,7 +486,7 @@ func NewBuilder(f *framework.Framework, driver *Driver) *Builder {
 }
 
 func NewBuilderNow(tCtx ktesting.TContext, driver *Driver) *Builder {
-	b := &Builder{Driver: driver}
+	b := &Builder{Driver: driver, WithClaimController: true}
 	b.setUp(tCtx)
 	return b
 }
@@ -517,9 +519,25 @@ func (b *Builder) tearDown(tCtx ktesting.TContext) {
 			continue
 		}
 		tCtx.Logf("Deleting %T %s", &pod, klog.KObj(&pod))
-		err := tCtx.Client().CoreV1().Pods(b.namespace).Delete(tCtx, pod.Name, metav1.DeleteOptions{})
+		options := metav1.DeleteOptions{}
+		if !b.Driver.WithRealNodes {
+			// We must force-delete, scheduled pods won't go away without actual nodes.
+			options.GracePeriodSeconds = ptr.To(int64(0))
+		}
+		err := tCtx.Client().CoreV1().Pods(b.namespace).Delete(tCtx, pod.Name, options)
 		if !apierrors.IsNotFound(err) {
 			tCtx.ExpectNoError(err, "delete pod")
+		}
+		if !b.Driver.WithRealNodes {
+			pod, err := tCtx.Client().CoreV1().Pods(b.namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
+			switch {
+			case err == nil:
+				tCtx.Errorf("pod should have been deleted immediately but wasn't:\n%s", format.Object(pod, 1))
+			case apierrors.IsNotFound(err):
+				// Okay.
+			default:
+				tCtx.Errorf("get pod %s: %v", pod.Name, err)
+			}
 		}
 	}
 	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) []v1.Pod {
@@ -536,8 +554,20 @@ func (b *Builder) tearDown(tCtx ktesting.TContext) {
 		}
 		tCtx.Logf("Deleting %T %s", &claim, klog.KObj(&claim))
 		err := client.ResourceClaims(b.namespace).Delete(tCtx, claim.Name, metav1.DeleteOptions{})
-		if !apierrors.IsNotFound(err) {
-			tCtx.ExpectNoError(err, "delete claim")
+		if apierrors.IsNotFound(err) {
+			continue
+		}
+		tCtx.ExpectNoError(err, "delete claim")
+		if !b.WithClaimController {
+			// We must remove the finalizer ourselves.
+			claim, err := client.ResourceClaims(b.namespace).Get(tCtx, claim.Name, metav1.GetOptions{})
+			if apierrors.IsNotFound(err) {
+				continue
+			}
+			tCtx.ExpectNoError(err, "get claim")
+			claim.Finalizers = nil
+			_, err = client.ResourceClaims(b.namespace).Update(tCtx, claim, metav1.UpdateOptions{})
+			tCtx.ExpectNoError(err, "update claim")
 		}
 	}
 

@@ -140,7 +140,7 @@ func Init(tb TB, opts ...InitOption) TContext {
 	var header func() string
 	if c.PerTestOutput {
 		logger := newLogger(tb, c.BufferLogs)
-		ctx = klog.NewContext(interruptCtx, logger)
+		ctx = klog.NewContext(ctx, logger)
 		header = klogHeader
 	}
 
@@ -241,7 +241,7 @@ func (tc *TC) withTB(tb TB) TContext {
 	tc.testingTB.TB = tb
 	if tc.perTestHeader != nil {
 		logger := newLogger(tb, false /* don't buffer logs in sub-test */)
-		tc.Context = klog.NewContext(interruptCtx, logger)
+		tc.Context = klog.NewContext(tc.Context, logger)
 	}
 	tc = WithCancel(tc)
 	return tc

@@ -307,6 +307,8 @@ func NewDriverInstance(tCtx ktesting.TContext) *Driver {
 		// TODO: should setting this be optional to test the actual helper defaults?
 		NodeV1:      true,
 		NodeV1beta1: true,
+		// By default, deploy real pods on the nodes.
+		WithRealNodes: true,
 		// By default, assume that the kubelet supports DRA and that
 		// the driver's removal causes ResourceSlice cleanup.
 		WithKubelet:                true,
@@ -381,6 +383,9 @@ type Driver struct {
 	NodeV1      bool
 	NodeV1beta1 bool
 
+	// Run the DRA test driver (the default). If false, nothing gets deployed and ResourceSlices get created manually.
+	WithRealNodes bool
+
 	// Register the DRA test driver with the kubelet and expect DRA to work (= feature.DynamicResourceAllocation).
 	WithKubelet bool
 
@@ -418,8 +423,8 @@ func (d *Driver) SetUp(tCtx ktesting.TContext, kubeletRootDir string, nodes *Nod
 		tCtx.CleanupCtx(d.IsGone)
 	}
 
-	driverResource, useMultiHostDriverResources := driverResources[multiHostDriverResources]
-	if useMultiHostDriverResources || !d.WithKubelet {
+	multiHostResources, useMultiHostDriverResources := driverResources[multiHostDriverResources]
+	if useMultiHostDriverResources || !d.WithKubelet || !d.WithRealNodes {
 		// We have to remove ResourceSlices ourselves.
 		// Otherwise the kubelet does it after unregistering the driver.
 		tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
@@ -428,33 +433,22 @@ func (d *Driver) SetUp(tCtx ktesting.TContext, kubeletRootDir string, nodes *Nod
 		})
 	}
 
+	// Create *all* slices directly and deploy nothing.
+	if !d.WithRealNodes {
+		for nodeName, resources := range driverResources {
+			createSlices(tCtx, d.Name, nodeName, resources)
+		}
+		return
+	}
+
 	// If found, we create ResourceSlices that are associated with multiple nodes
 	// through the node selector. Thus, the ResourceSlices are published here
 	// rather than through the driver on a specific node.
 	if useMultiHostDriverResources {
-		for poolName, pool := range driverResource.Pools {
-			for i, slice := range pool.Slices {
-				resourceSlice := &resourceapi.ResourceSlice{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: fmt.Sprintf("%s-%d", d.Name, i), // globally unique
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Driver: d.Name,
-						Pool: resourceapi.ResourcePool{
-							Name:               poolName,
-							Generation:         pool.Generation,
-							ResourceSliceCount: int64(len(pool.Slices)),
-						},
-						NodeSelector: pool.NodeSelector,
-						Devices:      slice.Devices,
-					},
-				}
-				_, err := tCtx.Client().ResourceV1().ResourceSlices().Create(tCtx, resourceSlice, metav1.CreateOptions{})
-				tCtx.ExpectNoError(err)
-			}
-		}
+		createSlices(tCtx, d.Name, "", multiHostResources)
 	}
 
+	// Proceed with deploying the driver.
 	manifests := []string{
 		// The code below matches the content of this manifest (ports,
 		// container names, etc.).
@@ -674,6 +668,33 @@ func (d *Driver) SetUp(tCtx ktesting.TContext, kubeletRootDir string, nodes *Nod
 		}
 		return notRegistered
 	}).WithTimeout(time.Minute).Should(gomega.BeEmpty(), "hosts where the plugin has not been registered yet")
+}
+
+func createSlices(tCtx ktesting.TContext, driverName string, nodeName string, resources resourceslice.DriverResources) {
+	for poolName, pool := range resources.Pools {
+		for i, slice := range pool.Slices {
+			resourceSlice := &resourceapi.ResourceSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: fmt.Sprintf("%s-%s-%d", driverName, poolName, i), // globally unique
+				},
+				Spec: resourceapi.ResourceSliceSpec{
+					Driver: driverName,
+					Pool: resourceapi.ResourcePool{
+						Name:               poolName,
+						Generation:         pool.Generation,
+						ResourceSliceCount: int64(len(pool.Slices)),
+					},
+					NodeSelector: pool.NodeSelector,
+					Devices:      slice.Devices,
+				},
+			}
+			if pool.NodeSelector == nil {
+				resourceSlice.Spec.NodeName = &nodeName
+			}
+			_, err := tCtx.Client().ResourceV1().ResourceSlices().Create(tCtx, resourceSlice, metav1.CreateOptions{})
+			tCtx.ExpectNoError(err)
+		}
+	}
 }
 
 func (d *Driver) ImpersonateKubeletPlugin(tCtx ktesting.TContext, pod *v1.Pod) kubernetes.Interface {
@@ -994,8 +1015,10 @@ func (d *Driver) TearDown(tCtx ktesting.TContext) {
 //
 // Only use this in tests where kubelet support for DRA is guaranteed.
 func (d *Driver) IsGone(tCtx ktesting.TContext) {
-	tCtx.Logf("Waiting for ResourceSlices of driver %s to be removed...", d.Name)
-	ktesting.Eventually(tCtx, d.NewGetSlices()).WithTimeout(2 * time.Minute).Should(gomega.HaveField("Items", gomega.BeEmpty()))
+	if d.WithRealNodes {
+		tCtx.Logf("Waiting for ResourceSlices of driver %s to be removed...", d.Name)
+		ktesting.Eventually(tCtx, d.NewGetSlices()).WithTimeout(2 * time.Minute).Should(gomega.HaveField("Items", gomega.BeEmpty()))
+	}
 }
 
 func (d *Driver) interceptor(nodename string, ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {

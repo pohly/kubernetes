@@ -66,6 +66,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	kubeschedulerscheme "k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	drautils "k8s.io/kubernetes/test/e2e/dra/utils"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/integration/util"
@@ -129,7 +130,7 @@ func TestDRA(t *testing.T) {
 	// multiple tests can run in parallel as long as they are careful
 	// about what they create.
 	//
-	// Each configuration starts with two Nodes (ready, sufficient RAM and CPU for multiple pods)
+	// Each configuration starts with eight Nodes (ready, sufficient RAM and CPU for multiple pods)
 	// and no ResourceSlices. To test scheduling, a sub-test must create ResourceSlices.
 	// createTestNamespace can be used to create a unique per-test namespace. The name of that
 	// namespace then can be used to create cluster-scoped objects without conflicts between tests.
@@ -174,6 +175,7 @@ func TestDRA(t *testing.T) {
 					tCtx = tCtx.WithNamespace(namespace)
 					TestCreateResourceSlices(tCtx, 100)
 				})
+				tCtx.Run("UsesAllNodes", testUsesAllNodes)
 			},
 		},
 		"v1beta1": {
@@ -243,6 +245,7 @@ func TestDRA(t *testing.T) {
 				tCtx.Run("EvictClusterWithRule", func(tCtx ktesting.TContext) { testEvictCluster(tCtx, true) })
 				tCtx.Run("EvictClusterWithSlices", func(tCtx ktesting.TContext) { testEvictCluster(tCtx, false) })
 				tCtx.Run("InvalidResourceSlices", testInvalidResourceSlices)
+				tCtx.Run("UsesAllNodes", testUsesAllNodes)
 			},
 		},
 	} {
@@ -1736,5 +1739,56 @@ func testInvalidResourceSlices(tCtx ktesting.TContext) {
 				}))))
 			}
 		})
+	}
+}
+
+func testUsesAllNodes(tCtx ktesting.TContext) {
+	// Some test helper in e2epod still uses gomega directly -> cannot run in parallel.
+	gomega.RegisterTestingT(tCtx)
+	defer gomega.RegisterFailHandler(nil)
+
+	namespace := createTestNamespace(tCtx, nil)
+	tCtx = tCtx.WithNamespace(namespace)
+	nodes := drautils.NewNodesNow(tCtx, numNodes, numNodes)
+	driver := drautils.NewDriverInstance(tCtx)
+	driver.WithRealNodes = false
+	driver.Run(tCtx, "", nodes, drautils.DriverResourcesNow(nodes, 1))
+	b := drautils.NewBuilderNow(tCtx, driver)
+	b.WithClaimController = false
+
+	var objs []klog.KMetadata
+	var pods []*v1.Pod
+	for i := 0; i < numNodes; i++ {
+		claim := b.ExternalClaim()
+		pod := b.PodExternal()
+		pod.Spec.ResourceClaims[0].ResourceClaimName = &claim.Name
+		pods = append(pods, pod)
+		objs = append(objs, pod, claim)
+	}
+
+	b.Create(tCtx, objs...)
+
+	// Now start scheduling, as rapidly as possible.
+	startScheduler(tCtx)
+
+	for _, pod := range pods {
+		tCtx.ExpectNoError(e2epod.WaitForPodScheduled(tCtx, tCtx.Client(), pod.Namespace, pod.Name), "pod scheduled")
+	}
+
+	// The pods all should run on different nodes because the maximum
+	// number of claims per node was limited to 1 for this test.
+	//starts
+	// We cannot know for sure why the pods ran on two different nodes
+	// (could also be a coincidence) but if they don't cover all nodes,
+	// then we have a problem.
+	used := make(map[string]*v1.Pod)
+	for _, pod := range pods {
+		pod, err := tCtx.Client().CoreV1().Pods(pod.Namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
+		tCtx.ExpectNoError(err, "get pod")
+		nodeName := pod.Spec.NodeName
+		if other, ok := used[nodeName]; ok {
+			tCtx.Errorf("Pod %s got started on the same node %s as pod %s although claim allocation should have been limited to one claim per node.", pod.Name, nodeName, other.Name)
+		}
+		used[nodeName] = pod
 	}
 }
