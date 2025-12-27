@@ -313,6 +313,9 @@ func fakeKubeClientSetWithCTBList(t *testing.T, signerName string, ctbs ...runti
 			}
 		}
 
+		// High enough that the following Watch won't send any of the existing objects.
+		retList.ResourceVersion = "10000"
+
 		return true, retList, nil
 	})
 
