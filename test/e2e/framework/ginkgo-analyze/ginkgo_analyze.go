@@ -21,7 +21,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	gtypes "github.com/onsi/ginkgo/v2/types"
@@ -55,16 +54,18 @@ func main() {
 	}
 	report := reports[0]
 
-	fmt.Printf(`
+	fmt.Printf(`---
+displayMode: compact
+---
 gantt
-  title %s: %s
-  %% Unix milliseconds
-  dateFormat x
-  axisFormat %%H:%%M:%%S
+ title %s: %s
+ %% Unix milliseconds
+ dateFormat x
+ axisFormat %%H:%%M:%%S
 
 `, report.StartTime.Format(time.RFC1123Z), input)
 
-	for _, test := range report.SpecReports {
+	for i, test := range report.SpecReports {
 		if test.NumAttempts == 0 {
 			// Never started.
 			continue
@@ -81,8 +82,8 @@ gantt
 			tag = "crit"
 		}
 
-		fmt.Printf("   %s :%s, %d, %.3fs\n",
-			strings.ReplaceAll(test.FullText(), ":", "_"),
+		fmt.Printf(" %d :%s, %d, %.3fs\n",
+			i,
 			tag,
 			test.StartTime.UnixMilli(),
 			test.EndTime.Sub(test.StartTime).Seconds(),
