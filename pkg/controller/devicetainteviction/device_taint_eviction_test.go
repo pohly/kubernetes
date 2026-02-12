@@ -2377,14 +2377,15 @@ func testEviction(tCtx ktesting.TContext) {
 // activity to settle down and then check the state.
 func testDeviceTaintRule(tCtx ktesting.TContext) {
 	tCtx.Parallel()
-	tCtx.SyncTest("immediate", func(tCtx ktesting.TContext) { synctestDeviceTaintRule(tCtx, false) })
-	tCtx.SyncTest("delayed", func(tCtx ktesting.TContext) { synctestDeviceTaintRule(tCtx, true) })
+	tCtx.SyncTest("immediate", func(tCtx ktesting.TContext) { synctestDeviceTaintRule(tCtx, false, false) })
+	tCtx.SyncTest("delayed", func(tCtx ktesting.TContext) { synctestDeviceTaintRule(tCtx, true, false) })
+	tCtx.SyncTest("slow", func(tCtx ktesting.TContext) { synctestDeviceTaintRule(tCtx, true, true) })
 }
-func synctestDeviceTaintRule(tCtx ktesting.TContext, delayed bool) {
+func synctestDeviceTaintRule(tCtx ktesting.TContext, toleration, slowDelete bool) {
 	rule := ruleNone.DeepCopy()
 	claim := inUseClaim.DeepCopy()
 	tolerationSeconds := int64(0)
-	if delayed {
+	if toleration {
 		tolerationSeconds = 30
 		claim.Status.Allocation.Devices.Results[0].Tolerations = []resourceapi.DeviceToleration{{
 			Effect:            resourceapi.DeviceTaintEffectNoExecute,
@@ -2393,6 +2394,18 @@ func synctestDeviceTaintRule(tCtx ktesting.TContext, delayed bool) {
 		}}
 	}
 	fakeClientset := fake.NewClientset(podWithClaimName, claim, rule)
+	blockDelete := make(chan struct{})
+	deleteWaiting := make(chan struct{})
+	if slowDelete {
+		fakeClientset.PrependReactor("delete", "pods", func(action core.Action) (bool, runtime.Object, error) {
+			// The main test needs to sleep, too, or time won't move forward.
+			tCtx.Logf("Delaying pod deletion")
+			close(deleteWaiting)
+			<-blockDelete
+			tCtx.Logf("Proceeding with pod deletion")
+			return false, nil, nil
+		})
+	}
 	tCtx = tCtx.WithClients(nil, nil, fakeClientset, nil, nil)
 	controller := newTestController(tCtx)
 
@@ -2441,8 +2454,13 @@ func synctestDeviceTaintRule(tCtx ktesting.TContext, delayed bool) {
 	check(tCtx, "evict: ", l(inProgress(rule, true, "PodsPendingEviction", "1 pod needs to be evicted in 1 namespace.", &updated)), expectedPods)
 
 	if tolerationSeconds > 0 {
-		// Need to move forward in time past the delay.
+		// Need to move forward in time past the delay(s)
 		time.Sleep(time.Duration(tolerationSeconds) * time.Second)
+		if slowDelete {
+			<-deleteWaiting
+			time.Sleep(3 * time.Second)
+			close(blockDelete)
+		}
 		tCtx.Wait()
 		// Now the pod is deleted. Status gets updated later.
 		check(tCtx, "evict: ", l(inProgress(rule, true, "PodsPendingEviction", "1 pod needs to be evicted in 1 namespace.", &updated)), nil)
