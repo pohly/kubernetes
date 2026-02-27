@@ -1,3 +1,6 @@
+# PR: <placeholder>
+# MIGRATION: downstream consumers shouldn't need to implement Controller. If they do for some reason, then they can replace Controller with their own custom interface.
+pkg k8s.io/client-go/tools/cache, type Controller interface{HasSynced() bool; HasSyncedChecker() DoneChecker; LastSyncResourceVersion() string; Run(stopCh <-chan struct{}); RunWithContext(ctx context.Context)}
 
 # AUTO-GENERATED EXCEPTIONS FROM BOOTSTRAP
 # PR: Historical API Cleanups

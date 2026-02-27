@@ -296,7 +296,7 @@ pkg k8s.io/client-go/tools/cache, method (RealFIFO) Name() string
 pkg k8s.io/client-go/tools/cache, method (RealFIFO) PopBatch(processBatch ProcessBatchFunc, processSingle PopProcessFunc) error
 pkg k8s.io/client-go/tools/cache, method (SyncResult) AsError() error
 pkg k8s.io/client-go/tools/cache, type BookmarkInfo struct{ResourceVersion string}
-pkg k8s.io/client-go/tools/cache, type Controller interface{HasSynced() bool; HasSyncedChecker() DoneChecker; LastSyncResourceVersion() string; Run(stopCh <-chan struct{}); RunWithContext(ctx context.Context)}
+pkg k8s.io/client-go/tools/cache, type Controller interface{HasSynced() bool; HasSyncedChecker() DoneChecker; LastSyncResourceVersion() string; Run(stopCh <-chan struct{}); RunWithContext(ctx context.Context); private()}
 pkg k8s.io/client-go/tools/cache, type DeltaFIFO struct{logger k8s.io/klog/v2.Logger; name string; lock sync.RWMutex; cond sync.Cond; items map[string]Deltas; queue []string; synced chan struct{}; syncedClosed bool; populated bool; initialPopulationCount int; keyFunc KeyFunc; knownObjects KeyListerGetter; closed bool; emitDeltaTypeReplaced bool; transformer TransformFunc}
 pkg k8s.io/client-go/tools/cache, type DeltaFIFOOptions struct{Logger *k8s.io/klog/v2.Logger; Name string; KeyFunction KeyFunc; KnownObjects KeyListerGetter; EmitDeltaTypeReplaced bool; Transformer TransformFunc}
 pkg k8s.io/client-go/tools/cache, type DoneChecker interface{Done() <-chan struct{}; Name() string}
