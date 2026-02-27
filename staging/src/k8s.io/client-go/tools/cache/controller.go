@@ -155,6 +155,8 @@ type Controller interface {
 	// is one, otherwise returns the empty string
 	LastSyncResourceVersion() string
 
+	SomeNewMethod()
+
 	// A private method to prevent users implementing the
 	// interface and so future additions to it will not
 	// cause apidiff warnings.
@@ -170,7 +172,8 @@ func New(c *Config) Controller {
 	return ctlr
 }
 
-func (c *controller) private() {}
+func (c *controller) private()       {}
+func (c *controller) SomeNewMethod() {}
 
 // Run implements [Controller.Run].
 func (c *controller) Run(stopCh <-chan struct{}) {

@@ -670,6 +670,9 @@ func (v *dummyController) LastSyncResourceVersion() string {
 func (v *dummyController) private() {
 }
 
+func (v *dummyController) SomeNewMethod() {
+}
+
 type updateNotification struct {
 	oldObj interface{}
 	newObj interface{}
