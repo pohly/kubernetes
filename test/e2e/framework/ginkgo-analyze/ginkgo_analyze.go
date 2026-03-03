@@ -21,6 +21,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"slices"
 	"time"
 
 	gtypes "github.com/onsi/ginkgo/v2/types"
@@ -54,6 +55,27 @@ func main() {
 	}
 	report := reports[0]
 
+	// Find all failed tests and when they ran.
+	// Below we then mark all tests which ran in parallel.
+	var failureRanges [][2]time.Time
+	for _, test := range report.SpecReports {
+		switch test.State {
+		case gtypes.SpecStateSkipped, gtypes.SpecStatePassed:
+		default:
+			failureRanges = append(failureRanges, [2]time.Time{test.StartTime, test.EndTime})
+		}
+	}
+
+	overlapsFailureRange := func(start, end time.Time) bool {
+		for _, failureRange := range failureRanges {
+			if end.Compare(failureRange[0]) >= 0 &&
+				start.Compare(failureRange[1]) <= 0 {
+				return true
+			}
+		}
+		return false
+	}
+
 	fmt.Printf(`---
 displayMode: compact
 ---
@@ -65,7 +87,23 @@ gantt
 
 `, report.StartTime.Format(time.RFC1123Z), input)
 
-	for i, test := range report.SpecReports {
+	slices.SortFunc(report.SpecReports, func(t1, t2 gtypes.SpecReport) int {
+		switch t1.StartTime.Compare(t2.StartTime) {
+		case -1:
+			return -1
+		case 1:
+			return 1
+		}
+
+		switch t1.EndTime.Compare(t2.EndTime) {
+		case -1:
+			return -1
+		case 1:
+			return 1
+		}
+		return 0
+	})
+	for _, test := range report.SpecReports {
 		if test.NumAttempts == 0 {
 			// Never started.
 			continue
@@ -74,16 +112,18 @@ gantt
 		// https://mermaid.js.org/syntax/gantt.html#syntax
 		var tag string
 		switch test.State {
-		case gtypes.SpecStateSkipped:
-			tag = "active"
-		case gtypes.SpecStatePassed:
-			tag = "done"
+		case gtypes.SpecStateSkipped, gtypes.SpecStatePassed:
+			if overlapsFailureRange(test.StartTime, test.EndTime) {
+				tag = "active"
+			} else {
+				tag = "done"
+			}
 		default:
 			tag = "crit"
 		}
 
-		fmt.Printf(" %d :%s, %d, %.3fs\n",
-			i,
+		fmt.Printf(" %s :%s, %d, %.3fs\n",
+			test.FullText(),
 			tag,
 			test.StartTime.UnixMilli(),
 			test.EndTime.Sub(test.StartTime).Seconds(),
