@@ -18,11 +18,12 @@ package apidefinitions
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"strings"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -63,10 +64,10 @@ func TestAllowCreateOnUpdate(t *testing.T) {
 		obj.SetResourceVersion("")
 		obj.SetUID("")
 		_, err := client.Update(context.TODO(), obj, metav1.UpdateOptions{})
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			t.Fatalf("Unexpected error from Update: %v", err)
 		}
-		assertDefault(t, api.Mapping.Resource, "AllowCreateOnUpdate must be false", errors.IsNotFound(err), exempt)
+		assertDefault(t, api.Mapping.Resource, "AllowCreateOnUpdate must be false", apierrors.IsNotFound(err), exempt)
 	})
 }
 
@@ -95,7 +96,7 @@ func TestGenerateName(t *testing.T) {
 		obj.SetResourceVersion("")
 		obj.SetUID("")
 		created, err := client.Create(context.TODO(), obj, metav1.CreateOptions{})
-		if err != nil && !errors.IsInvalid(err) {
+		if err != nil && !apierrors.IsInvalid(err) {
 			t.Fatalf("Unexpected error from Create: %v", err)
 		}
 		generated := err == nil && strings.HasPrefix(created.GetName(), "default-behaviors-")
@@ -187,7 +188,7 @@ func TestAllowUnconditionalUpdate(t *testing.T) {
 
 		created.SetResourceVersion("")
 		_, err = client.Update(context.TODO(), created, metav1.UpdateOptions{})
-		rejected := errors.IsConflict(err) || isInvalidResourceVersion(err)
+		rejected := apierrors.IsConflict(err) || isInvalidResourceVersion(err)
 		if err != nil && !rejected {
 			t.Fatalf("Unexpected error from Update: %v", err)
 		}
@@ -321,7 +322,7 @@ func TestCheckGracefulDelete(t *testing.T) {
 			t.Fatalf("Failed to delete with grace period: %v", err)
 		}
 		after, err := rsc.Get(context.TODO(), name, metav1.GetOptions{})
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			t.Fatalf("Unexpected error from Get after delete: %v", err)
 		}
 
@@ -351,11 +352,11 @@ func addBlockingFinalizer(client dynamic.ResourceInterface, name string) error {
 
 // isInvalidResourceVersion reports whether err is an Invalid status error caused by metadata.resourceVersion.
 func isInvalidResourceVersion(err error) bool {
-	if !errors.IsInvalid(err) {
+	if !apierrors.IsInvalid(err) {
 		return false
 	}
-	statusErr, ok := err.(*errors.StatusError)
-	if !ok || statusErr.ErrStatus.Details == nil {
+	var statusErr *apierrors.StatusError
+	if !errors.As(err, &statusErr) || statusErr.ErrStatus.Details == nil {
 		return false
 	}
 	for _, cause := range statusErr.ErrStatus.Details.Causes {

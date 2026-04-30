@@ -653,7 +653,7 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 		// k8s.io/kubernetes/pkg/apis/resource/v1alpha3
 		gvr("resource.k8s.io", "v1alpha3", "devicetaintrules"): {
 			Stub:              `{"metadata": {"name": "taint1name"}, "spec": {"taint": {"key": "example.com/taintkey", "value": "taintvalue", "effect": "NoSchedule"}}}`,
-			MutatedStub:       `{"spec": {"taint": {"key": "example.com/taintkey", "value": "newtaintvalue", "effect": "NoSchedule"}}}`,
+			MutatedStub:       `{"spec": {"taint": {"effect": "NoExecute"}}}`,
 			ExpectedEtcdPath:  "/registry/devicetaintrules/taint1name",
 			IntroducedVersion: "1.33",
 			RemovedVersion:    "1.39",
@@ -718,7 +718,7 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 		},
 		gvr("resource.k8s.io", "v1beta2", "devicetaintrules"): {
 			Stub:              `{"metadata": {"name": "taint2name"}, "spec": {"taint": {"key": "example.com/taintkey", "value": "taintvalue", "effect": "NoSchedule"}}}`,
-			MutatedStub:       `{"spec": {"taint": {"key": "example.com/taintkey", "value": "newtaintvalue", "effect": "NoSchedule"}}}`,
+			MutatedStub:       `{"spec": {"taint": {"effect": "NoExecute"}}}`,
 			ExpectedEtcdPath:  "/registry/devicetaintrules/taint2name",
 			ExpectedGVK:       gvkP("resource.k8s.io", "v1alpha3", "DeviceTaintRule"), // v1beta2 has higher priority, but to support downgrades v1alpha3 is picked automatically.
 			IntroducedVersion: "1.36",
@@ -915,10 +915,11 @@ func storageVersionAtEmulationVersion(key schema.GroupVersionResource, expectedG
 type StorageData struct {
 	// Stub is a valid JSON object used to create the resource.
 	Stub string
-	// MutatedStub valid JSON spec with at least one spec field changed to a different value.
-	// For resources with a status subresource, MutatedStub MUST mutate a spec field.
+	// MutatedStub is partial update of Sub as a JSON object, with at least one field
+	// changed to a different value. For resources with a status subresource, MutatedStub
+	// MUST mutate a spec field. If a resource is immutable, do not set MutatedStub.
 	// For resources without a status subresource, MutatedStub may mutate any field
-	// or be left empty.
+	// or be left empty ("", do not set this field to "{}" as a noop apply will confuse tests).
 	// The mutation is applied as a patch.
 	// Example: if Stub has `"replicas": 1`, MutatedStub might have `"replicas": 2`.
 	MutatedStub string
