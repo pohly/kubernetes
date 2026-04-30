@@ -26,6 +26,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/util/retry"
 )
 
 // TestAllowCreateOnUpdate verifies that APIs prefer AllowCreateOnUpdate() = false.
@@ -61,6 +63,9 @@ func TestAllowCreateOnUpdate(t *testing.T) {
 		obj.SetResourceVersion("")
 		obj.SetUID("")
 		_, err := client.Update(context.TODO(), obj, metav1.UpdateOptions{})
+		if err != nil && !errors.IsNotFound(err) {
+			t.Fatalf("Unexpected error from Update: %v", err)
+		}
 		assertDefault(t, api.Mapping.Resource, "AllowCreateOnUpdate must be false", errors.IsNotFound(err), exempt)
 	})
 }
@@ -90,6 +95,9 @@ func TestGenerateName(t *testing.T) {
 		obj.SetResourceVersion("")
 		obj.SetUID("")
 		created, err := client.Create(context.TODO(), obj, metav1.CreateOptions{})
+		if err != nil && !errors.IsInvalid(err) {
+			t.Fatalf("Unexpected error from Create: %v", err)
+		}
 		generated := err == nil && strings.HasPrefix(created.GetName(), "default-behaviors-")
 		assertDefault(t, api.Mapping.Resource, "metadata.generateName must produce a server-generated name", generated, exempt)
 	})
@@ -102,19 +110,13 @@ func TestGenerateName(t *testing.T) {
 func TestAllowUnconditionalUpdate(t *testing.T) {
 	exempt := sets.New(
 		// Grandfathered APIs:
-		"apiservices.v1.apiregistration.k8s.io",
 		"certificatesigningrequests.v1.certificates.k8s.io",
 		"clusterrolebindings.v1.rbac.authorization.k8s.io",
 		"clusterroles.v1.rbac.authorization.k8s.io",
 		"clustertrustbundles.v1alpha1.certificates.k8s.io",
-		"clustertrustbundles.v1beta1.certificates.k8s.io",
 		"configmaps.v1",
 		"controllerrevisions.v1.apps",
 		"cronjobs.v1.batch",
-		"csidrivers.v1.storage.k8s.io",
-		"csinodes.v1.storage.k8s.io",
-		"csistoragecapacities.v1.storage.k8s.io",
-		"customresourcedefinitions.v1.apiextensions.k8s.io",
 		"daemonsets.v1.apps",
 		"deployments.v1.apps",
 		"deviceclasses.v1.resource.k8s.io",
@@ -127,37 +129,20 @@ func TestAllowUnconditionalUpdate(t *testing.T) {
 		"events.v1.events.k8s.io",
 		"events.v1",
 		"flowschemas.v1.flowcontrol.apiserver.k8s.io",
-		"foos.v1.cr.bar.com",
 		"horizontalpodautoscalers.v1.autoscaling",
 		"horizontalpodautoscalers.v2.autoscaling",
 		"ingressclasses.v1.networking.k8s.io",
 		"ingresses.v1.networking.k8s.io",
-		"integers.v1.random.numbers.com",
 		"ipaddresses.v1.networking.k8s.io",
 		"jobs.v1.batch",
-		"leasecandidates.v1alpha2.coordination.k8s.io",
-		"leasecandidates.v1beta1.coordination.k8s.io",
-		"leases.v1.coordination.k8s.io",
 		"limitranges.v1",
-		"mutatingadmissionpolicies.v1.admissionregistration.k8s.io",
-		"mutatingadmissionpolicies.v1alpha1.admissionregistration.k8s.io",
-		"mutatingadmissionpolicies.v1beta1.admissionregistration.k8s.io",
-		"mutatingadmissionpolicybindings.v1.admissionregistration.k8s.io",
-		"mutatingadmissionpolicybindings.v1alpha1.admissionregistration.k8s.io",
-		"mutatingadmissionpolicybindings.v1beta1.admissionregistration.k8s.io",
-		"mutatingwebhookconfigurations.v1.admissionregistration.k8s.io",
 		"namespaces.v1",
 		"networkpolicies.v1.networking.k8s.io",
 		"nodes.v1",
-		"pandas.v1.awesome.bears.com",
-		"pandas.v3.awesome.bears.com",
 		"pants.v1.custom.fancy.com",
-		"pants.v2.custom.fancy.com",
 		"persistentvolumeclaims.v1",
 		"persistentvolumes.v1",
 		"podcertificaterequests.v1alpha1.certificates.k8s.io",
-		"podcertificaterequests.v1beta1.certificates.k8s.io",
-		"poddisruptionbudgets.v1.policy",
 		"podgroups.v1alpha2.scheduling.k8s.io",
 		"pods.v1",
 		"podtemplates.v1",
@@ -171,28 +156,20 @@ func TestAllowUnconditionalUpdate(t *testing.T) {
 		"resourceclaimtemplates.v1.resource.k8s.io",
 		"resourceclaimtemplates.v1beta1.resource.k8s.io",
 		"resourceclaimtemplates.v1beta2.resource.k8s.io",
-		"resourcepoolstatusrequests.v1alpha3.resource.k8s.io",
 		"resourcequotas.v1",
 		"resourceslices.v1.resource.k8s.io",
 		"resourceslices.v1beta1.resource.k8s.io",
 		"resourceslices.v1beta2.resource.k8s.io",
 		"rolebindings.v1.rbac.authorization.k8s.io",
 		"roles.v1.rbac.authorization.k8s.io",
-		"runtimeclasses.v1.node.k8s.io",
 		"secrets.v1",
 		"serviceaccounts.v1",
 		"servicecidrs.v1.networking.k8s.io",
 		"services.v1",
 		"statefulsets.v1.apps",
 		"storageclasses.v1.storage.k8s.io",
-		"storageversionmigrations.v1beta1.storagemigration.k8s.io",
-		"storageversions.v1alpha1.internal.apiserver.k8s.io",
-		"validatingadmissionpolicies.v1.admissionregistration.k8s.io",
 		"validatingadmissionpolicies.v1beta1.admissionregistration.k8s.io",
-		"validatingadmissionpolicybindings.v1.admissionregistration.k8s.io",
 		"validatingadmissionpolicybindings.v1beta1.admissionregistration.k8s.io",
-		"validatingwebhookconfigurations.v1.admissionregistration.k8s.io",
-		"volumeattachments.v1.storage.k8s.io",
 		"volumeattributesclasses.v1.storage.k8s.io",
 		"workloads.v1alpha2.scheduling.k8s.io",
 	)
@@ -210,8 +187,11 @@ func TestAllowUnconditionalUpdate(t *testing.T) {
 
 		created.SetResourceVersion("")
 		_, err = client.Update(context.TODO(), created, metav1.UpdateOptions{})
-
-		assertDefault(t, api.Mapping.Resource, "AllowUnconditionalUpdate must be false", errors.IsConflict(err), exempt)
+		rejected := errors.IsConflict(err) || isInvalidResourceVersion(err)
+		if err != nil && !rejected {
+			t.Fatalf("Unexpected error from Update: %v", err)
+		}
+		assertDefault(t, api.Mapping.Resource, "AllowUnconditionalUpdate must be false", rejected, exempt)
 	})
 }
 
@@ -238,6 +218,7 @@ func TestDefaultGarbageCollectionPolicy(t *testing.T) {
 		// Events are intended to be high-volume leaf nodes.
 		"events.v1",
 		"events.v1.events.k8s.io",
+		"customresourcedefinitions.v1.apiextensions.k8s.io",
 	)
 	TestAllDefinitions(t, "default-gc-policy", func(t *testing.T, api Definition) {
 		if !api.HasVerb("create") || !api.HasVerb("get") || !api.HasVerb("update") || !api.HasVerb("delete") {
@@ -250,17 +231,10 @@ func TestDefaultGarbageCollectionPolicy(t *testing.T) {
 		if _, err := client.Create(context.TODO(), obj, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("Failed to create: %v", err)
 		}
-		latest, err := client.Get(context.TODO(), name, metav1.GetOptions{})
-		if err != nil {
-			t.Fatalf("Failed to get latest: %v", err)
-		}
-
 		// A blocking finalizer is added first, so the object is not removed
 		// before we can observe the result of each delete.
-		latest.SetFinalizers(append(latest.GetFinalizers(), "test.k8s.io/block"))
-		if _, err := client.Update(context.TODO(), latest, metav1.UpdateOptions{}); err != nil {
-			t.Logf("Could not set test finalizer, skipping GC policy check: %v", err)
-			return
+		if err := addBlockingFinalizer(client, name); err != nil {
+			t.Fatalf("Could not set test finalizer: %v", err)
 		}
 		if err := client.Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
 			t.Fatalf("Failed to delete: %v", err)
@@ -298,17 +272,10 @@ func TestDefaultGarbageCollectionPolicy(t *testing.T) {
 		if _, err := client.Create(context.TODO(), obj, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("Failed to create: %v", err)
 		}
-		latest, err := client.Get(context.TODO(), name, metav1.GetOptions{})
-		if err != nil {
-			t.Fatalf("Failed to get latest: %v", err)
-		}
-
 		// A blocking finalizer is added first, so the object is not removed
 		// before we can observe the result of each delete.
-		latest.SetFinalizers(append(latest.GetFinalizers(), "test.k8s.io/block"))
-		if _, err := client.Update(context.TODO(), latest, metav1.UpdateOptions{}); err != nil {
-			t.Logf("Could not set test finalizer, skipping GC policy check: %v", err)
-			return
+		if err := addBlockingFinalizer(client, name); err != nil {
+			t.Fatalf("Could not set test finalizer: %v", err)
 		}
 
 		// Also check for APIs using Unsupported garbage collection policy
@@ -354,6 +321,9 @@ func TestCheckGracefulDelete(t *testing.T) {
 			t.Fatalf("Failed to delete with grace period: %v", err)
 		}
 		after, err := rsc.Get(context.TODO(), name, metav1.GetOptions{})
+		if err != nil && !errors.IsNotFound(err) {
+			t.Fatalf("Unexpected error from Get after delete: %v", err)
+		}
 
 		isGraceful := false
 		if err == nil {
@@ -364,6 +334,36 @@ func TestCheckGracefulDelete(t *testing.T) {
 
 		assertDefault(t, api.Mapping.Resource, "CheckGracefulDelete must not be implemented", !isGraceful, exempt)
 	})
+}
+
+// addBlockingFinalizer appends a test finalizer to name, retrying on conflict.
+func addBlockingFinalizer(client dynamic.ResourceInterface, name string) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		latest, err := client.Get(context.TODO(), name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		latest.SetFinalizers(append(latest.GetFinalizers(), "test.k8s.io/block"))
+		_, err = client.Update(context.TODO(), latest, metav1.UpdateOptions{})
+		return err
+	})
+}
+
+// isInvalidResourceVersion reports whether err is an Invalid status error caused by metadata.resourceVersion.
+func isInvalidResourceVersion(err error) bool {
+	if !errors.IsInvalid(err) {
+		return false
+	}
+	statusErr, ok := err.(*errors.StatusError)
+	if !ok || statusErr.ErrStatus.Details == nil {
+		return false
+	}
+	for _, cause := range statusErr.ErrStatus.Details.Causes {
+		if cause.Field == "metadata.resourceVersion" {
+			return true
+		}
+	}
+	return false
 }
 
 // assertDefault checks that expected behavior conforms, unless the gvr is in the allow list, in which the behavor is

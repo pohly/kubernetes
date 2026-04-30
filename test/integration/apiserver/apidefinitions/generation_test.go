@@ -20,6 +20,7 @@ import (
 	"context"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -111,8 +112,12 @@ func TestGenerationManagement(t *testing.T) {
 		// Verify that updating spec does bump generation.
 		result, err := rsc.Patch(context.TODO(), name, types.MergePatchType, []byte(differentSpec), metav1.PatchOptions{})
 		if err != nil {
-			t.Logf("Patch to main endpoint failed: %v", err)
-		} else if result.GetGeneration() <= afterStatus.GetGeneration() {
+			if !errors.IsInvalid(err) {
+				t.Fatalf("Patch to main endpoint failed with unexpected error: %v", err)
+			}
+			return
+		}
+		if result.GetGeneration() <= afterStatus.GetGeneration() {
 			if matchesException(api.Mapping.Resource, generationExempt) {
 				if result.GetGeneration() != 0 {
 					t.Errorf("Expected generation exempt resource always have generation 0, but got %v", result.GetGeneration())

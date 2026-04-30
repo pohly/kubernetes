@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -145,8 +146,10 @@ func TestFieldsWipingConsistency(t *testing.T) {
 		if baselineSpec != nil && differentSpec != "" {
 			result, err := rsc.Patch(context.TODO(), name, types.MergePatchType, []byte(differentSpec), metav1.PatchOptions{}, "status")
 			if err != nil {
+				if !errors.IsInvalid(err) {
+					t.Fatalf("Unexpected error from Patch to status endpoint with different spec: %v", err)
+				}
 				statusWipesSpec = true
-				t.Logf("Patch to status endpoint with different spec returned an error (OK if validation rejects it): %v", err)
 			} else {
 				statusWipesSpec = !checkPatch(t, differentSpec, "spec", result.Object)
 			}
