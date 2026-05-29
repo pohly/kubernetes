@@ -4408,10 +4408,11 @@ func TestAllocatorSelection(t *testing.T) {
 			expectImplementation: "incubating",
 		},
 
-		// Alpha features need the experimental implementation.
+		// Alpha features may need the experimental implementation, if there are any
+		// and if those influence allocation.
 		"alpha": {
 			features:             "AllAlpha=true,AllBeta=true",
-			expectImplementation: "incubating",
+			expectImplementation: "experimental",
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
