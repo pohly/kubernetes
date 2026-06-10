@@ -18,7 +18,6 @@ package cel
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math"
 	"reflect"
@@ -292,38 +291,38 @@ func (c *compiler) getDeclType(t *cel.Type) *apiservercel.DeclType {
 // getAttributeValue returns the native representation of the one value that
 // should be stored in the attribute, otherwise an error. An error is
 // also returned when there is no supported value.
-func (c CompilationResult) getAttributeValue(attr resourceapi.DeviceAttribute) (any, error) {
+func (c CompilationResult) getAttributeValue(name resourceapi.QualifiedName, attr resourceapi.DeviceAttribute) any {
 	switch {
 	case attr.IntValues != nil:
-		return attr.IntValues, nil
+		return attr.IntValues
 	case attr.BoolValues != nil:
-		return attr.BoolValues, nil
+		return attr.BoolValues
 	case attr.StringValues != nil:
-		return attr.StringValues, nil
+		return attr.StringValues
 	case attr.VersionValues != nil:
 		semVers := make([]apiservercel.Semver, len(attr.VersionValues))
 		for i, versionStr := range attr.VersionValues {
 			v, err := semver.Parse(versionStr)
 			if err != nil {
-				return nil, fmt.Errorf("parse semantic version: %w", err)
+				return types.NewErr("attribute %s: parse semantic version: %w", name, err)
 			}
 			semVers[i] = apiservercel.Semver{Version: v}
 		}
-		return semVers, nil
+		return semVers
 	case attr.IntValue != nil:
-		return *attr.IntValue, nil
+		return *attr.IntValue
 	case attr.BoolValue != nil:
-		return *attr.BoolValue, nil
+		return *attr.BoolValue
 	case attr.StringValue != nil:
-		return *attr.StringValue, nil
+		return *attr.StringValue
 	case attr.VersionValue != nil:
 		v, err := semver.Parse(*attr.VersionValue)
 		if err != nil {
-			return nil, fmt.Errorf("parse semantic version: %w", err)
+			return types.NewErr("attribute %s: parse semantic version: %w", name, err)
 		}
-		return apiservercel.Semver{Version: v}, nil
+		return apiservercel.Semver{Version: v}
 	default:
-		return nil, errors.New("unsupported attribute value")
+		return types.NewErr("attribute %s: unsupported attribute value", name)
 	}
 }
 
@@ -332,26 +331,33 @@ var boolType = reflect.TypeOf(true)
 func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (bool, *cel.EvalDetails, error) {
 	// TODO (future): avoid building these maps and instead use a proxy
 	// which wraps the underlying maps and directly looks up values.
-	attributes := make(map[string]any)
-	for name, attr := range input.Attributes {
-		value, err := c.getAttributeValue(attr)
-		if err != nil {
-			return false, nil, fmt.Errorf("attribute %s: %w", name, err)
+	//
+	// This is a bit hard to do because e.g. the top-level Size already depends
+	// on parsing all attributes. For now we only delay building these maps
+	// until they really are needed.
+	attributes := func() map[string]any {
+		attributes := make(map[string]any)
+		for name, attr := range input.Attributes {
+			value := c.getAttributeValue(name, attr)
+			domain, id := parseQualifiedName(name, input.Driver)
+			if attributes[domain] == nil {
+				attributes[domain] = make(map[string]any)
+			}
+			attributes[domain].(map[string]any)[id] = value
 		}
-		domain, id := parseQualifiedName(name, input.Driver)
-		if attributes[domain] == nil {
-			attributes[domain] = make(map[string]any)
-		}
-		attributes[domain].(map[string]any)[id] = value
+		return attributes
 	}
 
-	capacity := make(map[string]any)
-	for name, cap := range input.Capacity {
-		domain, id := parseQualifiedName(name, input.Driver)
-		if capacity[domain] == nil {
-			capacity[domain] = make(map[string]apiservercel.Quantity)
+	capacity := func() map[string]any {
+		capacity := make(map[string]any)
+		for name, cap := range input.Capacity {
+			domain, id := parseQualifiedName(name, input.Driver)
+			if capacity[domain] == nil {
+				capacity[domain] = make(map[string]apiservercel.Quantity)
+			}
+			capacity[domain].(map[string]apiservercel.Quantity)[id] = apiservercel.Quantity{Quantity: &cap.Value}
 		}
-		capacity[domain].(map[string]apiservercel.Quantity)[id] = apiservercel.Quantity{Quantity: &cap.Value}
+		return capacity
 	}
 
 	variables := map[string]any{
@@ -602,28 +608,54 @@ func parseQualifiedName(name resourceapi.QualifiedName, defaultDomain string) (s
 // newStringInterfaceMapWithDefault is like
 // https://pkg.go.dev/github.com/google/cel-go@v0.20.1/common/types#NewStringInterfaceMap,
 // except that looking up an unknown key returns a default value.
-func newStringInterfaceMapWithDefault(adapter types.Adapter, value map[string]any, defaultValue ref.Val) traits.Mapper {
-	return mapper{
-		Mapper:       types.NewStringInterfaceMap(adapter, value),
+func newStringInterfaceMapWithDefault(adapter types.Adapter, genValue func() map[string]any, defaultValue ref.Val) traits.Mapper {
+	return &mapper{
+		adapter:      adapter,
+		genValue:     genValue,
 		defaultValue: defaultValue,
 	}
 }
 
 type mapper struct {
-	traits.Mapper
+	adapter      types.Adapter
+	genValue     func() map[string]any
 	defaultValue ref.Val
+	delegate     traits.Mapper
+}
+
+func (m *mapper) getDelegate() traits.Mapper {
+	if m.delegate != nil {
+		return m.delegate
+	}
+	value := m.genValue()
+	m.delegate = types.NewStringInterfaceMap(m.adapter, value)
+	return m.delegate
 }
 
 // Find wraps the mapper's Find so that a default empty map is returned when
 // the lookup did not find the entry.
-func (m mapper) Find(key ref.Val) (ref.Val, bool) {
-	value, found := m.Mapper.Find(key)
+func (m *mapper) Find(key ref.Val) (ref.Val, bool) {
+	value, found := m.getDelegate().Find(key)
 	if found {
 		return value, true
 	}
 
 	return m.defaultValue, true
 }
+
+func (m *mapper) ConvertToNative(typeDesc reflect.Type) (any, error) {
+	return m.getDelegate().ConvertToNative(typeDesc)
+}
+func (m *mapper) ConvertToType(typeValue ref.Type) ref.Val {
+	return m.getDelegate().ConvertToType(typeValue)
+}
+func (m *mapper) Equal(other ref.Val) ref.Val    { return m.getDelegate().Equal(other) }
+func (m *mapper) Type() ref.Type                 { return m.getDelegate().Type() }
+func (m *mapper) Value() any                     { return m.getDelegate().Value() }
+func (m *mapper) Contains(value ref.Val) ref.Val { return m.getDelegate().Contains(value) }
+func (m *mapper) Get(index ref.Val) ref.Val      { return m.getDelegate().Get(index) }
+func (m *mapper) Iterator() traits.Iterator      { return m.getDelegate().Iterator() }
+func (m *mapper) Size() ref.Val                  { return m.getDelegate().Size() }
 
 // draCostEstimator is a wrapper around the base CEL CostEstimator to provide custom cost estimates for DRA-specific functions and types.
 type draCostEstimator struct {
