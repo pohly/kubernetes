@@ -19,8 +19,8 @@ package incubating
 import (
 	"fmt"
 
-	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	apiservercel "k8s.io/apiserver/pkg/cel"
 	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/klog/v2"
 )
@@ -33,12 +33,11 @@ import (
 // We don't need to track *which* devices are part of the set, only
 // how many.
 type distinctAttributeConstraint struct {
-	logger        klog.Logger // Includes name and attribute name, so no need to repeat in log messages.
-	requestNames  sets.Set[string]
-	attributeName resourceapi.FullyQualifiedName
+	logger                         klog.Logger // Includes name and attribute name, so no need to repeat in log messages.
+	requestNames                   sets.Set[string]
+	attributeDomain, attributeName draapi.UniqueString
 
-	attributes map[string]resourceapi.DeviceAttribute
-	numDevices int
+	attributes []any
 }
 
 func (m *distinctAttributeConstraint) add(requestName, subRequestName string, device *draapi.Device, deviceID DeviceID) bool {
@@ -47,28 +46,26 @@ func (m *distinctAttributeConstraint) add(requestName, subRequestName string, de
 		return true
 	}
 
-	attribute := lookupAttribute(device, deviceID, m.attributeName)
+	attribute := device.Attributes.Lookup(m.attributeDomain, m.attributeName)
 	if attribute == nil {
 		// Doesn't have the attribute.
 		m.logger.V(7).Info("Constraint not satisfied, attribute not set")
 		return false
 	}
 
-	if m.numDevices == 0 {
+	if len(m.attributes) == 0 {
 		// The first device can always get picked.
-		m.attributes[requestName] = *attribute
-		m.numDevices = 1
+		m.attributes = append(m.attributes, attribute)
 		m.logger.V(7).Info("First attribute added")
 		return true
 	}
 
-	if !m.matchesAttribute(*attribute) {
+	if !m.matchesAttribute(attribute) {
 		m.logger.V(7).Info("Constraint not satisfied, has some duplicated attributes")
 		return false
 	}
-	m.attributes[requestName] = *attribute
-	m.numDevices++
-	m.logger.V(7).Info("Constraint satisfied by device", "device", deviceID, "numDevices", m.numDevices)
+	m.attributes = append(m.attributes, attribute)
+	m.logger.V(7).Info("Constraint satisfied by device", "device", deviceID, "numDevices", len(m.attributes))
 	return true
 
 }
@@ -78,9 +75,9 @@ func (m *distinctAttributeConstraint) remove(requestName, subRequestName string,
 		// Device not affected by constraint.
 		return
 	}
-	delete(m.attributes, requestName)
-	m.numDevices--
-	m.logger.V(7).Info("Device removed from constraint set", "device", deviceID, "numDevices", m.numDevices)
+	// This keeps the same backing store, so we don't need to reallocate.
+	m.attributes = m.attributes[:len(m.attributes)-1]
+	m.logger.V(7).Info("Device removed from constraint set", "device", deviceID, "numDevices", len(m.attributes))
 }
 
 func (m *distinctAttributeConstraint) matches(requestName, subRequestName string) bool {
@@ -92,39 +89,45 @@ func (m *distinctAttributeConstraint) matches(requestName, subRequestName string
 	}
 }
 
-func (m *distinctAttributeConstraint) matchesAttribute(attribute resourceapi.DeviceAttribute) bool {
-	for _, attr := range m.attributes {
-		switch {
-		case attribute.StringValue != nil:
-			if attr.StringValue != nil && *attribute.StringValue == *attr.StringValue {
-				m.logger.V(7).Info("String values duplicated")
+func (m *distinctAttributeConstraint) matchesAttribute(attribute any) bool {
+	// Different types are distinct. We only need to compare equal types.
+	switch candidate := attribute.(type) {
+	case string:
+		for _, existing := range m.attributes {
+			existing, ok := existing.(string)
+			if ok && existing == candidate {
+				m.logger.V(7).Info("Value not distinct", "existing", existing)
 				return false
 			}
-		case attribute.IntValue != nil:
-			if attr.IntValue != nil && *attribute.IntValue == *attr.IntValue {
-				m.logger.V(7).Info("Int values duplicated")
-				return false
-			}
-		case attribute.BoolValue != nil:
-			if attr.BoolValue != nil && *attribute.BoolValue == *attr.BoolValue {
-				m.logger.V(7).Info("Bool values duplicated")
-				return false
-			}
-		case attribute.VersionValue != nil:
-			// semver 2.0.0 requires that version strings are in their
-			// minimal form (in particular, no leading zeros). Therefore a
-			// strict "exact equal" check can do a string comparison.
-			if attr.VersionValue != nil && *attribute.VersionValue == *attr.VersionValue {
-				m.logger.V(7).Info("Version values duplicated")
-				return false
-			}
-		default:
-			// Unknown value type, cannot match.
-			// This condition should not be reached
-			// as the unknown value type should be failed on CEL compile (getAttributeValue).
-			m.logger.V(7).Info("Distinct attribute type unknown")
-			return false
 		}
+	case int64:
+		for _, existing := range m.attributes {
+			existing, ok := existing.(int64)
+			if ok && existing == candidate {
+				m.logger.V(7).Info("Value not distinct", "existing", existing)
+				return false
+			}
+		}
+	case bool:
+		for _, existing := range m.attributes {
+			existing, ok := existing.(bool)
+			if ok && existing == candidate {
+				m.logger.V(7).Info("Value not distinct", "existing", existing)
+				return false
+			}
+		}
+	case apiservercel.Semver:
+		for _, existing := range m.attributes {
+			existing, ok := existing.(apiservercel.Semver)
+			if ok && existing.Version.Equals(candidate.Version) {
+				m.logger.V(7).Info("Value not distinct", "existing", existing)
+				return false
+			}
+		}
+	default:
+		// Unknown value type, cannot match.
+		m.logger.V(7).Info("Distinct attribute type unknown", "candidate", candidate)
+		return false
 	}
 	// All distinct
 	return true

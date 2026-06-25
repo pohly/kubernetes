@@ -22,6 +22,8 @@ import (
 	. "github.com/onsi/gomega"
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	apiservercel "k8s.io/apiserver/pkg/cel"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/utils/ptr"
 )
 
@@ -75,36 +77,43 @@ func TestConsumableCapacity(t *testing.T) {
 	})
 
 	t.Run("get-consumed-capacity-from-request", func(t *testing.T) {
+		const domain = "dra.example.com"
+		qualCap0 := resourceapi.QualifiedName(domain + "/" + capacity0)
+		qualCap1 := resourceapi.QualifiedName(domain + "/" + capacity1)
+		qualDummy := resourceapi.QualifiedName(domain + "/dummy")
 		requestedCapacity := &resourceapi.CapacityRequirements{
 			Requests: map[resourceapi.QualifiedName]resource.Quantity{
-				capacity0: one,
-				"dummy":   one,
+				qualCap0:  one,
+				qualDummy: one,
 			},
 		}
-		consumableCapacity := map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
-			capacity0: { // with request and with default, expect requested value
-				Value: two,
-				RequestPolicy: &resourceapi.CapacityRequestPolicy{
-					Default:    ptr.To(two),
-					ValidRange: &resourceapi.CapacityRequestPolicyRange{Min: ptr.To(one)},
+		d := draapi.MakeUniqueString(domain)
+		consumableCapacity := draapi.DeviceCapacities{
+			d: {
+				draapi.MakeUniqueString(capacity0): { // with request and with default, expect requested value
+					Value: apiservercel.Quantity{Quantity: ptr.To(two)},
+					RequestPolicy: &resourceapi.CapacityRequestPolicy{
+						Default:    ptr.To(two),
+						ValidRange: &resourceapi.CapacityRequestPolicyRange{Min: ptr.To(one)},
+					},
 				},
-			},
-			capacity1: { // no request but with default, expect default
-				Value: two,
-				RequestPolicy: &resourceapi.CapacityRequestPolicy{
-					Default:    ptr.To(one),
-					ValidRange: &resourceapi.CapacityRequestPolicyRange{Min: ptr.To(one)},
+				draapi.MakeUniqueString(capacity1): { // no request but with default, expect default
+					Value: apiservercel.Quantity{Quantity: ptr.To(two)},
+					RequestPolicy: &resourceapi.CapacityRequestPolicy{
+						Default:    ptr.To(one),
+						ValidRange: &resourceapi.CapacityRequestPolicyRange{Min: ptr.To(one)},
+					},
 				},
-			},
-			"dummy": {
-				Value: one, // no request and no policy (no default), expect capacity value
+				draapi.MakeUniqueString("dummy"): {
+					Value: apiservercel.Quantity{Quantity: ptr.To(one)}, // no request and no policy (no default), expect capacity value
+				},
 			},
 		}
 		consumedCapacity := GetConsumedCapacityFromRequest(requestedCapacity, consumableCapacity)
 		g := NewWithT(t)
 		g.Expect(consumedCapacity).To(HaveLen(3))
 		for name, val := range consumedCapacity {
-			g.Expect(string(name)).Should(BeElementOf([]string{capacity0, capacity1, "dummy"}))
+			g.Expect(name).Should(BeElementOf([]resourceapi.QualifiedName{qualCap0, qualCap1, qualDummy}))
 			g.Expect(val.Cmp(one)).To(BeZero())
 		}
 	})
@@ -232,8 +241,8 @@ func testCalculateConsumedCapacity(t *testing.T) {
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
 			g := NewWithT(t)
-			capacity := resourceapi.DeviceCapacity{
-				Value:         tc.capacityValue,
+			capacity := draapi.DeviceCapacity{
+				Value:         apiservercel.Quantity{Quantity: ptr.To(tc.capacityValue)},
 				RequestPolicy: tc.requestPolicy,
 			}
 			consumedCapacity := calculateConsumedCapacity(tc.requestedVal, capacity)

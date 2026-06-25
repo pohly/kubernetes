@@ -48,30 +48,7 @@ func (m *distinctAttributeConstraint) add(requestName, subRequestName string, de
 		return true
 	}
 
-	attribute := lookupAttribute(device, deviceID, m.attributeName)
-	if attribute == nil {
-		// Doesn't have the attribute.
-		m.logger.V(7).Info("Constraint not satisfied, attribute not set")
-		return false
-	}
-
-	if m.numDevices == 0 {
-		// The first device can always get picked.
-		m.attributes[requestName] = *attribute
-		m.numDevices = 1
-		m.logger.V(7).Info("First attribute added")
-		return true
-	}
-
-	if !m.matchesAttribute(*attribute) {
-		m.logger.V(7).Info("Constraint not satisfied, has some duplicated attributes")
-		return false
-	}
-	m.attributes[requestName] = *attribute
-	m.numDevices++
-	m.logger.V(7).Info("Constraint satisfied by device", "device", deviceID, "numDevices", m.numDevices)
-	return true
-
+	return false
 }
 
 func (m *distinctAttributeConstraint) remove(requestName, subRequestName string, device *draapi.Device, deviceID DeviceID) {

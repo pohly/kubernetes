@@ -18,44 +18,49 @@ package incubating
 
 import (
 	"errors"
+	"strings"
 
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/utils/ptr"
 )
 
 // CmpRequestOverCapacity checks whether the new capacity request can be added within the given capacity,
 // and checks whether the requested value is against the capacity requestPolicy.
 func CmpRequestOverCapacity(currentConsumedCapacity ConsumedCapacity, deviceRequestCapacity *resourceapi.CapacityRequirements,
-	allowMultipleAllocations *bool, capacity map[resourceapi.QualifiedName]resourceapi.DeviceCapacity, allocatingCapacity ConsumedCapacity) (bool, error) {
+	allowMultipleAllocations *bool, capacity draapi.DeviceCapacities, allocatingCapacity ConsumedCapacity) (bool, error) {
 	if requestsContainNonExistCapacity(deviceRequestCapacity, capacity) {
 		return false, errors.New("some requested capacity has not been defined")
 	}
 	clone := currentConsumedCapacity.Clone()
-	for name, cap := range capacity {
-		var requestedValPtr *resource.Quantity
-		if deviceRequestCapacity != nil && deviceRequestCapacity.Requests != nil {
-			if requestedVal, requestedFound := deviceRequestCapacity.Requests[name]; requestedFound {
-				requestedValPtr = &requestedVal
+	for domain, inner := range capacity {
+		for name, cap := range inner {
+			qualName := resourceapi.QualifiedName(domain.String() + "/" + name.String())
+			var requestedValPtr *resource.Quantity
+			if deviceRequestCapacity != nil && deviceRequestCapacity.Requests != nil {
+				if requestedVal, requestedFound := deviceRequestCapacity.Requests[qualName]; requestedFound {
+					requestedValPtr = &requestedVal
+				}
 			}
-		}
-		consumedCapacity := calculateConsumedCapacity(requestedValPtr, cap)
-		if violatesPolicy(consumedCapacity, cap.RequestPolicy) {
-			return false, nil
-		}
-		// If the current clone already contains an entry for this capacity, add the consumedCapacity to it.
-		// Otherwise, initialize it with calculated consumedCapacity.
-		if _, allocatedFound := clone[name]; allocatedFound {
-			clone[name].Add(consumedCapacity)
-		} else {
-			clone[name] = ptr.To(consumedCapacity)
-		}
-		// If allocatingCapacity contains an entry for this capacity, add its value to clone as well.
-		if allocatingVal, allocatingFound := allocatingCapacity[name]; allocatingFound {
-			clone[name].Add(*allocatingVal)
-		}
-		if clone[name].Cmp(cap.Value) > 0 {
-			return false, nil
+			consumedCapacity := calculateConsumedCapacity(requestedValPtr, cap)
+			if violatesPolicy(consumedCapacity, cap.RequestPolicy) {
+				return false, nil
+			}
+			// If the current clone already contains an entry for this capacity, add the consumedCapacity to it.
+			// Otherwise, initialize it with calculated consumedCapacity.
+			if _, allocatedFound := clone[qualName]; allocatedFound {
+				clone[qualName].Add(consumedCapacity)
+			} else {
+				clone[qualName] = ptr.To(consumedCapacity)
+			}
+			// If allocatingCapacity contains an entry for this capacity, add its value to clone as well.
+			if allocatingVal, allocatingFound := allocatingCapacity[qualName]; allocatingFound {
+				clone[qualName].Add(*allocatingVal)
+			}
+			if clone[qualName].Cmp(*cap.Value.Quantity) > 0 {
+				return false, nil
+			}
 		}
 	}
 	return true, nil
@@ -63,13 +68,32 @@ func CmpRequestOverCapacity(currentConsumedCapacity ConsumedCapacity, deviceRequ
 
 // requestsNonExistCapacity returns true if requests contain non-exist capacity.
 func requestsContainNonExistCapacity(deviceRequestCapacity *resourceapi.CapacityRequirements,
-	capacity map[resourceapi.QualifiedName]resourceapi.DeviceCapacity) bool {
+	capacity draapi.DeviceCapacities) bool {
 	if deviceRequestCapacity == nil || deviceRequestCapacity.Requests == nil {
 		return false
 	}
 	for name := range deviceRequestCapacity.Requests {
-		if _, found := capacity[name]; !found {
+		if !capacityHasQualifiedName(capacity, name) {
 			return true
+		}
+	}
+	return false
+}
+
+// capacityHasQualifiedName returns true if DeviceCapacities contains an entry matching name.
+func capacityHasQualifiedName(capacity draapi.DeviceCapacities, name resourceapi.QualifiedName) bool {
+	sep := strings.Index(string(name), "/")
+	if sep < 0 {
+		return false
+	}
+	domain, id := string(name[:sep]), string(name[sep+1:])
+	for d, inner := range capacity {
+		if d.String() == domain {
+			for n := range inner {
+				if n.String() == id {
+					return true
+				}
+			}
 		}
 	}
 	return false
@@ -80,7 +104,7 @@ func requestsContainNonExistCapacity(deviceRequestCapacity *resourceapi.Capacity
 // If no requestPolicy, return capacity.Value.
 // If no requestVal, fill the quantity by fillEmptyRequest function
 // Otherwise, use requestPolicy to calculate the consumed capacity from request if applicable.
-func calculateConsumedCapacity(requestedVal *resource.Quantity, capacity resourceapi.DeviceCapacity) resource.Quantity {
+func calculateConsumedCapacity(requestedVal *resource.Quantity, capacity draapi.DeviceCapacity) resource.Quantity {
 	if requestedVal == nil {
 		return fillEmptyRequest(capacity)
 	}
@@ -99,7 +123,7 @@ func calculateConsumedCapacity(requestedVal *resource.Quantity, capacity resourc
 // fillEmptyRequest
 // return requestPolicy.default if defined.
 // Otherwise, return capacity value.
-func fillEmptyRequest(capacity resourceapi.DeviceCapacity) resource.Quantity {
+func fillEmptyRequest(capacity draapi.DeviceCapacity) resource.Quantity {
 	if capacity.RequestPolicy != nil && capacity.RequestPolicy.Default != nil {
 		return capacity.RequestPolicy.Default.DeepCopy()
 	}
@@ -148,17 +172,19 @@ func roundUpValidValues(requestedVal *resource.Quantity, validValues []resource.
 // GetConsumedCapacityFromRequest returns valid consumed capacity,
 // according to claim request and defined capacity.
 func GetConsumedCapacityFromRequest(requestedCapacity *resourceapi.CapacityRequirements,
-	consumableCapacity map[resourceapi.QualifiedName]resourceapi.DeviceCapacity) map[resourceapi.QualifiedName]resource.Quantity {
+	consumableCapacity draapi.DeviceCapacities) map[resourceapi.QualifiedName]resource.Quantity {
 	consumedCapacity := make(map[resourceapi.QualifiedName]resource.Quantity)
-	for name, cap := range consumableCapacity {
-		var requestedValPtr *resource.Quantity
-		if requestedCapacity != nil && requestedCapacity.Requests != nil {
-			if requestedVal, requestedFound := requestedCapacity.Requests[name]; requestedFound {
-				requestedValPtr = &requestedVal
+	for domain, inner := range consumableCapacity {
+		for name, cap := range inner {
+			qualName := resourceapi.QualifiedName(domain.String() + "/" + name.String())
+			var requestedValPtr *resource.Quantity
+			if requestedCapacity != nil && requestedCapacity.Requests != nil {
+				if requestedVal, requestedFound := requestedCapacity.Requests[qualName]; requestedFound {
+					requestedValPtr = &requestedVal
+				}
 			}
+			consumedCapacity[qualName] = calculateConsumedCapacity(requestedValPtr, cap)
 		}
-		capacity := calculateConsumedCapacity(requestedValPtr, cap)
-		consumedCapacity[name] = capacity
 	}
 	return consumedCapacity
 }

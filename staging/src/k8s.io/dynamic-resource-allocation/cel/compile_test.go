@@ -27,6 +27,7 @@ import (
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apiserver/pkg/cel/environment"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
 )
@@ -661,13 +662,28 @@ func TestCEL(t *testing.T) {
 				t.Errorf("ERROR: expected CEL cost %d, got %d instead (%.0f%% of limit %d)", expect, actual, float64(actual)*100.0/float64(resourceapi.CELSelectorExpressionMaxCost), resourceapi.CELSelectorExpressionMaxCost)
 			}
 
-			// in := resourceapi.BasicDevice{Attributes: scenario.attributes, Capacity: scenario.capacity}
-			// var out draapi.BasicDevice
-			// require.NoError(t, draapi.Convert_v1alpha3_BasicDevice_To_api_BasicDevice(&in, &out, nil), "convert test data")
+			in := resourceapi.ResourceSlice{
+				Spec: resourceapi.ResourceSliceSpec{
+					Driver: scenario.driver,
+					Devices: []resourceapi.Device{{
+						Attributes: scenario.attributes,
+						Capacity:   scenario.capacity,
+					}},
+				},
+			}
+			var out draapi.ResourceSlice
+			if err := draapi.Convert_v1_ResourceSlice_To_api_ResourceSlice(&in, &out, nil); err != nil {
+				t.Fatalf("conversion of scenario failed: %v", err)
+			}
+			device := Device{
+				AllowMultipleAllocations: scenario.allowMultipleAllocations,
+				Attributes:               out.Spec.Devices[0].Attributes,
+				Capacity:                 out.Spec.Devices[0].Capacity,
+				Driver:                   scenario.driver,
+				LookupUniqueString:       out.MakeUniqueString,
+			}
 
-			match, details, err := result.DeviceMatches(ctx, Device{
-				AllowMultipleAllocations: scenario.allowMultipleAllocations, Attributes: scenario.attributes, Capacity: scenario.capacity, Driver: scenario.driver,
-			})
+			match, details, err := result.DeviceMatches(ctx, device)
 			// details.ActualCost can be called for nil details, no need to check.
 			actualCost := ptr.Deref(details.ActualCost(), 0)
 			if scenario.expectCost > 0 {
@@ -750,14 +766,27 @@ func TestInterrupt(t *testing.T) {
 				cancel()
 				ctx = c
 			}
-			device := Device{
-				Attributes: make(map[resourceapi.QualifiedName]resourceapi.DeviceAttribute),
+			in := resourceapi.ResourceSlice{
+				Spec: resourceapi.ResourceSliceSpec{
+					Driver: "dra.example.com",
+					Devices: []resourceapi.Device{{
+						Attributes: make(map[resourceapi.QualifiedName]resourceapi.DeviceAttribute),
+					}},
+				},
 			}
 			for i := int64(0); i < 1000; i++ {
-				device.Attributes[resourceapi.QualifiedName(fmt.Sprintf("dra.example.com/attr%d", i))] = resourceapi.DeviceAttribute{
-					IntValue: ptr.To(i),
-				}
+				in.Spec.Devices[0].Attributes[resourceapi.QualifiedName(fmt.Sprintf("attr%d", i))] = resourceapi.DeviceAttribute{IntValue: new(i)}
 			}
+			var out draapi.ResourceSlice
+			if err := draapi.Convert_v1_ResourceSlice_To_api_ResourceSlice(&in, &out, nil); err != nil {
+				t.Fatalf("conversion of scenario failed: %v", err)
+			}
+			device := Device{
+				Attributes:         out.Spec.Devices[0].Attributes,
+				Driver:             out.Spec.Driver.String(),
+				LookupUniqueString: out.MakeUniqueString,
+			}
+
 			_, _, err := result.DeviceMatches(ctx, device)
 			if ctx.Err() != nil {
 				if !errors.Is(err, ctx.Err()) {
@@ -784,16 +813,34 @@ func BenchmarkDeviceMatches(b *testing.B) {
 			if result.Error != nil {
 				b.Fatalf("unexpected compile error: %s", result.Error.Error())
 			}
+			in := resourceapi.ResourceSlice{
+				Spec: resourceapi.ResourceSliceSpec{
+					Driver: scenario.driver,
+					Devices: []resourceapi.Device{{
+						Attributes: scenario.attributes,
+						Capacity:   scenario.capacity,
+					}},
+				},
+			}
+			var out draapi.ResourceSlice
+			if err := draapi.Convert_v1_ResourceSlice_To_api_ResourceSlice(&in, &out, nil); err != nil {
+				b.Fatalf("conversion of attributes failed: %v", err)
+			}
+			device := Device{
+				AllowMultipleAllocations: scenario.allowMultipleAllocations,
+				Attributes:               out.Spec.Devices[0].Attributes,
+				Capacity:                 out.Spec.Devices[0].Capacity,
+				Driver:                   scenario.driver,
+				LookupUniqueString:       out.MakeUniqueString,
+			}
 
-			for i := 0; i < b.N; i++ {
+			for b.Loop() {
 				// It would be nice to measure
 				// time/actual_cost, but the time as observed
 				// here also includes additional preparations
 				// in result.DeviceMatches and thus cannot be
 				// used.
-				match, _, err := result.DeviceMatches(ctx, Device{
-					AllowMultipleAllocations: scenario.allowMultipleAllocations, Attributes: scenario.attributes, Capacity: scenario.capacity, Driver: scenario.driver,
-				})
+				match, _, err := result.DeviceMatches(ctx, device)
 				if err != nil {
 					if scenario.expectMatchError == "" {
 						b.Fatalf("unexpected evaluation error: %v", err)
