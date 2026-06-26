@@ -292,22 +292,13 @@ func (c *compiler) getDeclType(t *cel.Type) *apiservercel.DeclType {
 
 var boolType = reflect.TypeOf(true)
 
-// deviceActivation is a poolable CEL activation for device selector expressions.
-// Reusing it avoids allocating the outer map (replaced by ResolveName dispatch) and
-// the inner device map (reused from the pool; only its values are updated per call).
-//
-// CEL's stringQualifier has a fast path for map[string]any that bypasses NativeToValue,
-// so keeping the inner device fields in a map[string]any is faster than a custom ref.Val.
+// deviceActivation is a CEL activation for device selector expressions.
+// It replaces the outermost map[string]any so that only one heap object is
+// allocated instead of two nested maps. The inner device map retains its
+// map[string]any type because CEL's stringQualifier has a fast direct-index
+// path for that type, bypassing NativeToValue.
 type deviceActivation struct {
 	device map[string]any
-}
-
-var deviceActivationPool = sync.Pool{
-	New: func() any {
-		return &deviceActivation{
-			device: make(map[string]any, 4),
-		}
-	},
 }
 
 func (a *deviceActivation) ResolveName(name string) (any, bool) {
@@ -340,21 +331,14 @@ func (c *CompilationResult) DeviceMatches(ctx context.Context, input Device) (bo
 		caps:                input.Capacity,
 	}
 
-	// Get a pooled activation and fill in the per-call values. The outer
-	// activation itself replaces the outermost map[string]any, and the inner
-	// device map is reused from the pool so its backing array is not reallocated.
-	a := deviceActivationPool.Get().(*deviceActivation)
-	defer func() {
-		// Clear pointer-valued entries before returning to the pool so the GC
-		// can collect the objects they reference.
-		a.device[attributesVar] = nil
-		a.device[capacityVar] = nil
-		deviceActivationPool.Put(a)
-	}()
-	a.device[driverVar] = input.Driver
-	a.device[multiAllocVar] = ptr.Deref(input.AllowMultipleAllocations, false)
-	a.device[attributesVar] = attributes
-	a.device[capacityVar] = capacity
+	a := &deviceActivation{
+		device: map[string]any{
+			driverVar:     input.Driver,
+			multiAllocVar: ptr.Deref(input.AllowMultipleAllocations, false),
+			attributesVar: attributes,
+			capacityVar:   capacity,
+		},
+	}
 
 	result, details, err := c.Program.ContextEval(ctx, a)
 	if err != nil {
