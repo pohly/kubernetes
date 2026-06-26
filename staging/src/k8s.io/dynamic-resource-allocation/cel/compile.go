@@ -292,8 +292,35 @@ func (c *compiler) getDeclType(t *cel.Type) *apiservercel.DeclType {
 
 var boolType = reflect.TypeOf(true)
 
+// deviceActivation is a poolable CEL activation for device selector expressions.
+// Reusing it avoids allocating the outer map (replaced by ResolveName dispatch) and
+// the inner device map (reused from the pool; only its values are updated per call).
+//
+// CEL's stringQualifier has a fast path for map[string]any that bypasses NativeToValue,
+// so keeping the inner device fields in a map[string]any is faster than a custom ref.Val.
+type deviceActivation struct {
+	device map[string]any
+}
+
+var deviceActivationPool = sync.Pool{
+	New: func() any {
+		return &deviceActivation{
+			device: make(map[string]any, 4),
+		}
+	},
+}
+
+func (a *deviceActivation) ResolveName(name string) (any, bool) {
+	if name == deviceVar {
+		return a.device, true
+	}
+	return nil, false
+}
+
+func (a *deviceActivation) Parent() cel.Activation { return nil }
+
 func (c *CompilationResult) DeviceMatches(ctx context.Context, input Device) (bool, *cel.EvalDetails, error) {
-	// TODO (future): avoid building these maps and instead use a proxy
+	// TODO (future): avoid building these proxy objects and instead use a proxy
 	// which wraps the underlying maps and directly looks up values.
 	//
 	// This is a bit hard to do because e.g. the top-level Size already depends
@@ -313,16 +340,23 @@ func (c *CompilationResult) DeviceMatches(ctx context.Context, input Device) (bo
 		caps:                input.Capacity,
 	}
 
-	variables := map[string]any{
-		deviceVar: map[string]any{
-			driverVar:     input.Driver,
-			multiAllocVar: ptr.Deref(input.AllowMultipleAllocations, false),
-			attributesVar: attributes,
-			capacityVar:   capacity,
-		},
-	}
+	// Get a pooled activation and fill in the per-call values. The outer
+	// activation itself replaces the outermost map[string]any, and the inner
+	// device map is reused from the pool so its backing array is not reallocated.
+	a := deviceActivationPool.Get().(*deviceActivation)
+	defer func() {
+		// Clear pointer-valued entries before returning to the pool so the GC
+		// can collect the objects they reference.
+		a.device[attributesVar] = nil
+		a.device[capacityVar] = nil
+		deviceActivationPool.Put(a)
+	}()
+	a.device[driverVar] = input.Driver
+	a.device[multiAllocVar] = ptr.Deref(input.AllowMultipleAllocations, false)
+	a.device[attributesVar] = attributes
+	a.device[capacityVar] = capacity
 
-	result, details, err := c.Program.ContextEval(ctx, variables)
+	result, details, err := c.Program.ContextEval(ctx, a)
 	if err != nil {
 		// CEL does not wrap the context error. We have to deduce why it failed.
 		// See https://github.com/google/cel-go/issues/1195.
