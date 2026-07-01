@@ -1154,13 +1154,12 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		schedulingv1alpha3.PodGroupSpec{}.OpenAPIModelName():                                                            schema_k8sio_api_scheduling_v1alpha3_PodGroupSpec(ref),
 		schedulingv1alpha3.PodGroupStatus{}.OpenAPIModelName():                                                          schema_k8sio_api_scheduling_v1alpha3_PodGroupStatus(ref),
 		schedulingv1alpha3.PodGroupTemplate{}.OpenAPIModelName():                                                        schema_k8sio_api_scheduling_v1alpha3_PodGroupTemplate(ref),
-		schedulingv1alpha3.PodGroupTemplateReference{}.OpenAPIModelName():                                               schema_k8sio_api_scheduling_v1alpha3_PodGroupTemplateReference(ref),
 		schedulingv1alpha3.SingleDisruptionMode{}.OpenAPIModelName():                                                    schema_k8sio_api_scheduling_v1alpha3_SingleDisruptionMode(ref),
 		schedulingv1alpha3.TopologyConstraint{}.OpenAPIModelName():                                                      schema_k8sio_api_scheduling_v1alpha3_TopologyConstraint(ref),
 		schedulingv1alpha3.TypedLocalObjectReference{}.OpenAPIModelName():                                               schema_k8sio_api_scheduling_v1alpha3_TypedLocalObjectReference(ref),
 		schedulingv1alpha3.Workload{}.OpenAPIModelName():                                                                schema_k8sio_api_scheduling_v1alpha3_Workload(ref),
 		schedulingv1alpha3.WorkloadList{}.OpenAPIModelName():                                                            schema_k8sio_api_scheduling_v1alpha3_WorkloadList(ref),
-		schedulingv1alpha3.WorkloadPodGroupTemplateReference{}.OpenAPIModelName():                                       schema_k8sio_api_scheduling_v1alpha3_WorkloadPodGroupTemplateReference(ref),
+		schedulingv1alpha3.WorkloadReference{}.OpenAPIModelName():                                                       schema_k8sio_api_scheduling_v1alpha3_WorkloadReference(ref),
 		schedulingv1alpha3.WorkloadSpec{}.OpenAPIModelName():                                                            schema_k8sio_api_scheduling_v1alpha3_WorkloadSpec(ref),
 		schedulingv1beta1.PriorityClass{}.OpenAPIModelName():                                                            schema_k8sio_api_scheduling_v1beta1_PriorityClass(ref),
 		schedulingv1beta1.PriorityClassList{}.OpenAPIModelName():                                                        schema_k8sio_api_scheduling_v1beta1_PriorityClassList(ref),
@@ -6799,7 +6798,6 @@ func schema_k8sio_api_apidiscovery_v2_APIGroupDiscoveryList(ref common.Reference
 						},
 					},
 				},
-				Required: []string{"items"},
 			},
 		},
 		Dependencies: []string{
@@ -6923,7 +6921,6 @@ func schema_k8sio_api_apidiscovery_v2_APIResourceDiscovery(ref common.ReferenceC
 						},
 					},
 				},
-				Required: []string{"resource", "scope", "singularResource", "verbs"},
 			},
 		},
 		Dependencies: []string{
@@ -6995,7 +6992,6 @@ func schema_k8sio_api_apidiscovery_v2_APISubresourceDiscovery(ref common.Referen
 						},
 					},
 				},
-				Required: []string{"subresource", "verbs"},
 			},
 		},
 		Dependencies: []string{
@@ -7047,7 +7043,6 @@ func schema_k8sio_api_apidiscovery_v2_APIVersionDiscovery(ref common.ReferenceCa
 						},
 					},
 				},
-				Required: []string{"version"},
 			},
 		},
 		Dependencies: []string{
@@ -7154,7 +7149,6 @@ func schema_k8sio_api_apidiscovery_v2beta1_APIGroupDiscoveryList(ref common.Refe
 						},
 					},
 				},
-				Required: []string{"items"},
 			},
 		},
 		Dependencies: []string{
@@ -7278,7 +7272,6 @@ func schema_k8sio_api_apidiscovery_v2beta1_APIResourceDiscovery(ref common.Refer
 						},
 					},
 				},
-				Required: []string{"resource", "scope", "singularResource", "verbs"},
 			},
 		},
 		Dependencies: []string{
@@ -7350,7 +7343,6 @@ func schema_k8sio_api_apidiscovery_v2beta1_APISubresourceDiscovery(ref common.Re
 						},
 					},
 				},
-				Required: []string{"subresource", "verbs"},
 			},
 		},
 		Dependencies: []string{
@@ -7402,7 +7394,6 @@ func schema_k8sio_api_apidiscovery_v2beta1_APIVersionDiscovery(ref common.Refere
 						},
 					},
 				},
-				Required: []string{"version"},
 			},
 		},
 		Dependencies: []string{
@@ -17804,7 +17795,7 @@ func schema_k8sio_api_certificates_v1alpha1_ClusterTrustBundle(ref common.Refere
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "ClusterTrustBundle is a cluster-scoped container for X.509 trust anchors (root certificates).\n\nClusterTrustBundle objects are considered to be readable by any authenticated user in the cluster, because they can be mounted by pods using the `clusterTrustBundle` projection.  All service accounts have read access to ClusterTrustBundles by default.  Users who only have namespace-level access to a cluster can read ClusterTrustBundles by impersonating a serviceaccount that they have access to.\n\nIt can be optionally associated with a particular assigner, in which case it contains one valid set of trust anchors for that signer. Signers may have multiple associated ClusterTrustBundles; each is an independent set of trust anchors for that signer. Admission control is used to enforce that only users with permissions on the signer can create or modify the corresponding bundle.",
+				Description: "ClusterTrustBundle is a cluster-scoped container for X.509 trust anchors (root certificates).\n\nClusterTrustBundle objects are considered to be readable by any authenticated user in the cluster, because they can be mounted by pods using the `clusterTrustBundle` projection.  All service accounts have read access to ClusterTrustBundles by default.  Users who only have namespace-level access to a cluster can read ClusterTrustBundles by impersonating a serviceaccount that they have access to.\n\nIt can be optionally associated with a particular signer, in which case it contains one valid set of trust anchors for that signer. Signers may have multiple associated ClusterTrustBundles; each is an independent set of trust anchors for that signer. Admission control is used to enforce that only users with permissions on the signer can create or modify the corresponding bundle.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
@@ -18232,7 +18223,7 @@ func schema_k8sio_api_certificates_v1beta1_ClusterTrustBundle(ref common.Referen
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "ClusterTrustBundle is a cluster-scoped container for X.509 trust anchors (root certificates).\n\nClusterTrustBundle objects are considered to be readable by any authenticated user in the cluster, because they can be mounted by pods using the `clusterTrustBundle` projection.  All service accounts have read access to ClusterTrustBundles by default.  Users who only have namespace-level access to a cluster can read ClusterTrustBundles by impersonating a serviceaccount that they have access to.\n\nIt can be optionally associated with a particular assigner, in which case it contains one valid set of trust anchors for that signer. Signers may have multiple associated ClusterTrustBundles; each is an independent set of trust anchors for that signer. Admission control is used to enforce that only users with permissions on the signer can create or modify the corresponding bundle.",
+				Description: "ClusterTrustBundle is a cluster-scoped container for X.509 trust anchors (root certificates).\n\nClusterTrustBundle objects are considered to be readable by any authenticated user in the cluster, because they can be mounted by pods using the `clusterTrustBundle` projection.  All service accounts have read access to ClusterTrustBundles by default.  Users who only have namespace-level access to a cluster can read ClusterTrustBundles by impersonating a serviceaccount that they have access to.\n\nIt can be optionally associated with a particular signer, in which case it contains one valid set of trust anchors for that signer. Signers may have multiple associated ClusterTrustBundles; each is an independent set of trust anchors for that signer. Admission control is used to enforce that only users with permissions on the signer can create or modify the corresponding bundle.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
@@ -54261,10 +54252,10 @@ func schema_k8sio_api_scheduling_v1alpha3_PodGroupSpec(ref common.ReferenceCallb
 				Description: "PodGroupSpec defines the desired state of a PodGroup.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
-					"podGroupTemplateRef": {
+					"workloadRef": {
 						SchemaProps: spec.SchemaProps{
-							Description: "PodGroupTemplateRef references an optional PodGroup template within other object (e.g. Workload) that was used to create the PodGroup. This field is immutable.",
-							Ref:         ref(schedulingv1alpha3.PodGroupTemplateReference{}.OpenAPIModelName()),
+							Description: "WorkloadRef references an optional PodGroup template within the Workload object that was used to create the PodGroup. This field is immutable.",
+							Ref:         ref(schedulingv1alpha3.WorkloadReference{}.OpenAPIModelName()),
 						},
 					},
 					"schedulingPolicy": {
@@ -54337,7 +54328,7 @@ func schema_k8sio_api_scheduling_v1alpha3_PodGroupSpec(ref common.ReferenceCallb
 			},
 		},
 		Dependencies: []string{
-			schedulingv1alpha3.DisruptionMode{}.OpenAPIModelName(), schedulingv1alpha3.PodGroupResourceClaim{}.OpenAPIModelName(), schedulingv1alpha3.PodGroupSchedulingConstraints{}.OpenAPIModelName(), schedulingv1alpha3.PodGroupSchedulingPolicy{}.OpenAPIModelName(), schedulingv1alpha3.PodGroupTemplateReference{}.OpenAPIModelName()},
+			schedulingv1alpha3.DisruptionMode{}.OpenAPIModelName(), schedulingv1alpha3.PodGroupResourceClaim{}.OpenAPIModelName(), schedulingv1alpha3.PodGroupSchedulingConstraints{}.OpenAPIModelName(), schedulingv1alpha3.PodGroupSchedulingPolicy{}.OpenAPIModelName(), schedulingv1alpha3.WorkloadReference{}.OpenAPIModelName()},
 	}
 }
 
@@ -54479,38 +54470,6 @@ func schema_k8sio_api_scheduling_v1alpha3_PodGroupTemplate(ref common.ReferenceC
 		},
 		Dependencies: []string{
 			schedulingv1alpha3.DisruptionMode{}.OpenAPIModelName(), schedulingv1alpha3.PodGroupResourceClaim{}.OpenAPIModelName(), schedulingv1alpha3.PodGroupSchedulingConstraints{}.OpenAPIModelName(), schedulingv1alpha3.PodGroupSchedulingPolicy{}.OpenAPIModelName()},
-	}
-}
-
-func schema_k8sio_api_scheduling_v1alpha3_PodGroupTemplateReference(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "PodGroupTemplateReference references a PodGroup template defined in some object (e.g. Workload). Exactly one reference must be set.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"workload": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Workload references the PodGroupTemplate within the Workload object that was used to create the PodGroup.",
-							Ref:         ref(schedulingv1alpha3.WorkloadPodGroupTemplateReference{}.OpenAPIModelName()),
-						},
-					},
-				},
-			},
-			VendorExtensible: spec.VendorExtensible{
-				Extensions: spec.Extensions{
-					"x-kubernetes-unions": []interface{}{
-						map[string]interface{}{
-							"fields-to-discriminateBy": map[string]interface{}{
-								"workload": "Workload",
-							},
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			schedulingv1alpha3.WorkloadPodGroupTemplateReference{}.OpenAPIModelName()},
 	}
 }
 
@@ -54678,31 +54637,31 @@ func schema_k8sio_api_scheduling_v1alpha3_WorkloadList(ref common.ReferenceCallb
 	}
 }
 
-func schema_k8sio_api_scheduling_v1alpha3_WorkloadPodGroupTemplateReference(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_scheduling_v1alpha3_WorkloadReference(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "WorkloadPodGroupTemplateReference references the PodGroupTemplate within the Workload object.",
+				Description: "WorkloadReference references the Workload object together with the template that was used to create a particular PodGroup.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"workloadName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "WorkloadName defines the name of the Workload object.",
+							Description: "WorkloadName is the name of the Workload object that contains a template that was used when creating a pod group. It must be a DNS name. This field is required.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
-					"podGroupTemplateName": {
+					"templateName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "PodGroupTemplateName defines the PodGroupTemplate name within the Workload object.",
+							Description: "TemplateName is the name of a template within the Workload object that was used to create a pod group. It must be a DNS label. This field is required.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 				},
-				Required: []string{"workloadName", "podGroupTemplateName"},
+				Required: []string{"workloadName", "templateName"},
 			},
 		},
 	}

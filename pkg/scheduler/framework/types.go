@@ -26,17 +26,17 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
-	"k8s.io/klog/v2"
-
-	"k8s.io/apimachinery/pkg/api/resource"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
 	resourcehelper "k8s.io/component-helpers/resource"
+	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
+	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
@@ -897,10 +897,8 @@ func (pgqi *QueuedPodGroupInfo) Gated() bool {
 }
 
 // GetPriority returns the pod group's priority.
-// It returns the priority of the first member pod, because all member pods should have the same priority.
 func (pgqi *QueuedPodGroupInfo) GetPriority() int32 {
-	// TODO(macsko): Update this to return PodGroup object's priority instead.
-	return pgqi.QueuedPodInfos[0].GetPriority()
+	return schedutil.PodGroupPriority(pgqi.PodGroup)
 }
 
 func (pgqi *QueuedPodGroupInfo) Size() int {
@@ -963,6 +961,8 @@ type PodGroupInfo struct {
 	// PodGroupManager.PodGroupState can be used for that.
 	// The order of the pods is deterministic and based on signature, priority and timestamp.
 	UnscheduledPods []*v1.Pod
+	// PodGroup is a PodGroup API object.
+	PodGroup *schedulingv1alpha3.PodGroup
 }
 
 func (pgi *PodGroupInfo) GetName() string {
@@ -975,6 +975,10 @@ func (pgi *PodGroupInfo) GetNamespace() string {
 
 func (pgi *PodGroupInfo) GetUnscheduledPods() []*v1.Pod {
 	return pgi.UnscheduledPods
+}
+
+func (pgi *PodGroupInfo) GetPodGroup() *schedulingv1alpha3.PodGroup {
+	return pgi.PodGroup
 }
 
 // PodInfo is a wrapper to a Pod with additional pre-computed information to

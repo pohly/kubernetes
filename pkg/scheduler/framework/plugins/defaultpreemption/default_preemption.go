@@ -24,11 +24,9 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/listers/scheduling/v1alpha3"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
@@ -71,7 +69,7 @@ type DefaultPreemption struct {
 
 	Executor          *preemption.Executor
 	Evaluator         *preemption.Evaluator
-	pgLister          v1alpha3.PodGroupLister
+	pgLister          fwk.PodGroupLister
 	podGroupEvaluator *preemption.PodGroupEvaluator
 
 	// IsEligiblePod returns whether a victim pod is allowed to be preempted by a preemptor pod.
@@ -114,7 +112,7 @@ func New(_ context.Context, dpArgs runtime.Object, fh fwk.Handle, fts feature.Fe
 	pl.Evaluator = preemption.NewEvaluator(Name, fh, &pl, pl.Executor)
 
 	if pl.fts.EnableGenericWorkload {
-		pl.pgLister = fh.SharedInformerFactory().Scheduling().V1alpha3().PodGroups().Lister()
+		pl.pgLister = fh.PodGroupManager().PodGroups()
 		pl.podGroupEvaluator = preemption.NewPodGroupEvaluator(fh, pl.Executor, pl.fts.EnablePodGroupPreemptionPolicy)
 	}
 
@@ -155,7 +153,7 @@ func (pl *DefaultPreemption) PreEnqueue(ctx context.Context, p *v1.Pod) *fwk.Sta
 		return nil
 	}
 	if p.Spec.SchedulingGroup != nil && pl.fts.EnableGenericWorkload {
-		pg, err := pl.pgLister.PodGroups(p.Namespace).Get(*p.Spec.SchedulingGroup.PodGroupName)
+		pg, err := pl.pgLister.Get(p.Namespace, *p.Spec.SchedulingGroup.PodGroupName)
 		// If the pg is not found do not block the pod. It's not a default preemption responsibility
 		// to block pods from pod group without pg from entering the queue.
 		if err != nil {
@@ -439,8 +437,25 @@ func filterPodsWithPDBViolation(podInfos []fwk.PodInfo, pdbs []*policy.PodDisrup
 }
 
 // PodGroupPostFilter runs a default preemption for the pod group.
-func (pl *DefaultPreemption) PodGroupPostFilter(ctx context.Context, pg *schedulingapi.PodGroup, pods []*v1.Pod, pgSchedulingFunc framework.PodGroupSchedulingFunc) (*framework.PodGroupPostFilterResult, *fwk.Status) {
-	res, status := pl.podGroupEvaluator.Preempt(ctx, pg, pods, pgSchedulingFunc)
+func (pl *DefaultPreemption) PodGroupPostFilter(ctx context.Context, pgInfo fwk.PodGroupInfo, pgSchedulingFunc framework.PodGroupSchedulingFunc) (postFilterResult *framework.PodGroupPostFilterResult, status *fwk.Status) {
+	pg := pgInfo.GetPodGroup()
+
+	if pg.Spec.SchedulingConstraints != nil && len(pg.Spec.SchedulingConstraints.Topology) > 0 {
+		return nil, fwk.NewStatus(fwk.Unschedulable, "pod group preemption: not supported with topology constraints")
+	}
+
+	mutableLister := pl.fh.MutableSnapshotSharedLister()
+	err := mutableLister.StartMutations()
+	if err != nil {
+		return nil, fwk.AsStatus(fmt.Errorf("pod group preemption: failed to start mutations: %w", err))
+	}
+	defer func() {
+		if err := mutableLister.EndMutations(); err != nil {
+			status = fwk.AsStatus(fmt.Errorf("pod group preemption: failed to end mutations: %w", err))
+		}
+	}()
+
+	res, status := pl.podGroupEvaluator.Preempt(ctx, pg, pgInfo.GetUnscheduledPods(), pgSchedulingFunc)
 	msg := status.Message()
 	if len(msg) > 0 {
 		return res, fwk.NewStatus(status.Code(), "pod group preemption: "+msg)

@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -502,7 +503,6 @@ func TestAddAllEventHandlers(t *testing.T) {
 				}
 				if opts.EnableDeviceTaintRules {
 					opts.TaintInformer = informerFactory.Resource().V1beta2().DeviceTaintRules()
-					opts.ClassInformer = informerFactory.Resource().V1().DeviceClasses()
 
 				}
 				resourceSliceTracker, err = resourceslicetracker.StartTracker(ctx, opts)
@@ -531,6 +531,67 @@ func TestAddAllEventHandlers(t *testing.T) {
 				t.Errorf("Unexpected diff (-want, +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestAddAllEventHandlersPodEventResources(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	informerFactory := informers.NewSharedInformerFactory(fake.NewClientset(), 0)
+	schedulingQueue := internalqueue.NewTestQueueWithInformerFactory(ctx, nil, informerFactory)
+	testSched := Scheduler{
+		StopEverything:  ctx.Done(),
+		SchedulingQueue: schedulingQueue,
+		logger:          logger,
+	}
+
+	dynclient := dyfake.NewSimpleDynamicClient(runtime.NewScheme())
+	dynInformerFactory := dynamicinformer.NewDynamicSharedInformerFactory(dynclient, 0)
+	gvkMap := map[fwk.EventResource]fwk.ActionType{
+		fwk.AssignedPod:    fwk.Add | fwk.Update | fwk.Delete,
+		fwk.UnscheduledPod: fwk.Add | fwk.Update | fwk.Delete,
+		fwk.TargetPod:      fwk.Update,
+	}
+
+	handledErrorMessages := []string{}
+	oldErrorHandlers := utilruntime.ErrorHandlers
+	t.Cleanup(func() {
+		utilruntime.ErrorHandlers = oldErrorHandlers
+	})
+	utilruntime.ErrorHandlers = []utilruntime.ErrorHandler{
+		func(_ context.Context, _ error, msg string, _ ...interface{}) {
+			handledErrorMessages = append(handledErrorMessages, msg)
+		},
+	}
+
+	err := addAllEventHandlers(&testSched, informerFactory, dynInformerFactory, nil, nil, nil, gvkMap)
+	utilruntime.ErrorHandlers = oldErrorHandlers
+	if err != nil {
+		t.Fatalf("Add event handlers failed, error = %v", err)
+	}
+	for _, msg := range handledErrorMessages {
+		if msg == "Incorrect event registration" {
+			t.Fatalf("expected no incorrect event registration, got handled errors: %v", handledErrorMessages)
+		}
+	}
+
+	informerFactory.Start(testSched.StopEverything)
+	dynInformerFactory.Start(testSched.StopEverything)
+	staticInformers := informerFactory.WaitForCacheSync(testSched.StopEverything)
+	dynamicInformers := dynInformerFactory.WaitForCacheSync(testSched.StopEverything)
+
+	expectStaticInformers := map[reflect.Type]bool{
+		reflect.TypeFor[*v1.Pod]():       true,
+		reflect.TypeFor[*v1.Node]():      true,
+		reflect.TypeFor[*v1.Namespace](): true,
+	}
+	if diff := cmp.Diff(expectStaticInformers, staticInformers); diff != "" {
+		t.Errorf("Unexpected diff (-want, +got):\n%s", diff)
+	}
+	if len(dynamicInformers) != 0 {
+		t.Errorf("expected no dynamic informers, got %v", dynamicInformers)
 	}
 }
 
@@ -1268,6 +1329,143 @@ func TestDeletePod(t *testing.T) {
 				}
 			} else if err == nil {
 				t.Errorf("Unexpected pod group state in cache after pod removal")
+			}
+		})
+	}
+}
+
+func TestAddPodGroup(t *testing.T) {
+	podGroup := st.MakePodGroup().Namespace("ns1").Name("pg1").Obj()
+
+	tests := []struct {
+		name     string
+		podGroup *schedulingapi.PodGroup
+	}{
+		{
+			name:     "add valid pod group",
+			podGroup: podGroup,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			sched := &Scheduler{
+				Cache:           internalcache.New(ctx, nil, true),
+				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
+				logger:          logger,
+			}
+
+			sched.addPodGroup(tt.podGroup)
+
+			gotPodGroup, err := sched.Cache.PodGroups().Get(podGroup.Namespace, podGroup.Name)
+			if err != nil {
+				t.Errorf("Expected pod group to be in cache, got error: %v", err)
+			}
+			if diff := cmp.Diff(podGroup, gotPodGroup); diff != "" {
+				t.Errorf("Unexpected pod group in cache (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestUpdatePodGroup(t *testing.T) {
+	oldPodGroup := st.MakePodGroup().Namespace("ns1").Name("pg1").MinCount(1).Obj()
+	oldPodGroup.ResourceVersion = "1"
+	newPodGroup := st.MakePodGroup().Namespace("ns1").Name("pg1").MinCount(2).Obj()
+	newPodGroup.ResourceVersion = "2"
+
+	tests := []struct {
+		name           string
+		oldPodGroup    *schedulingapi.PodGroup
+		newPodGroup    *schedulingapi.PodGroup
+		expectPodGroup *schedulingapi.PodGroup
+	}{
+		{
+			name:           "update valid pod group",
+			oldPodGroup:    oldPodGroup,
+			newPodGroup:    newPodGroup,
+			expectPodGroup: newPodGroup,
+		},
+		{
+			name:           "update pod group with same resource version should be no-op",
+			oldPodGroup:    oldPodGroup,
+			newPodGroup:    oldPodGroup,
+			expectPodGroup: oldPodGroup,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			sched := &Scheduler{
+				Cache:           internalcache.New(ctx, nil, true),
+				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
+				logger:          logger,
+			}
+
+			sched.Cache.AddPodGroup(tt.oldPodGroup)
+
+			sched.updatePodGroup(tt.oldPodGroup, tt.newPodGroup)
+
+			gotPodGroup, err := sched.Cache.PodGroups().Get(tt.expectPodGroup.Namespace, tt.expectPodGroup.Name)
+			if err != nil {
+				t.Errorf("Expected pod group to be in cache, got error: %v", err)
+			}
+			if diff := cmp.Diff(tt.expectPodGroup, gotPodGroup); diff != "" {
+				t.Errorf("Unexpected pod group in cache (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestDeletePodGroup(t *testing.T) {
+	podGroup := st.MakePodGroup().Namespace("ns1").Name("pg1").Obj()
+
+	tests := []struct {
+		name             string
+		initPodGroup     *schedulingapi.PodGroup
+		podGroupToDelete any
+	}{
+		{
+			name:             "delete pod group",
+			initPodGroup:     podGroup,
+			podGroupToDelete: podGroup,
+		},
+		{
+			name:             "delete DeletedFinalStateUnknown tombstone with pod group",
+			initPodGroup:     podGroup,
+			podGroupToDelete: cache.DeletedFinalStateUnknown{Obj: podGroup},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			sched := &Scheduler{
+				Cache:           internalcache.New(ctx, nil, true),
+				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
+				logger:          logger,
+			}
+
+			if tt.initPodGroup != nil {
+				sched.Cache.AddPodGroup(tt.initPodGroup)
+			}
+
+			sched.deletePodGroup(tt.podGroupToDelete)
+
+			_, err := sched.Cache.PodGroups().Get(tt.initPodGroup.Namespace, tt.initPodGroup.Name)
+			if err == nil {
+				t.Errorf("Expected pod group to be deleted from cache, but it still exists")
 			}
 		})
 	}

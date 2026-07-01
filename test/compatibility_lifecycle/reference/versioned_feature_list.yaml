@@ -729,6 +729,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.37"
+- name: HPAOptimizedSelectorStore
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.37"
 - name: HPAScaleToZero
   versionedSpecs:
   - default: false
@@ -2057,7 +2063,7 @@
     version: "1.34"
 - name: WatchListCompression
   versionedSpecs:
-  - default: false
+  - default: true
     lockToDefault: false
     preRelease: Beta
     version: "1.37"

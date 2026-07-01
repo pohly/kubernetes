@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	testutils "k8s.io/kubernetes/test/integration/util"
 )
@@ -136,6 +137,8 @@ type Step struct {
 	CreatePodGroup *schedulingapi.PodGroup
 	// UpdatePodGroup is used to update an existing pod group and wait for it to propagate.
 	UpdatePodGroup *schedulingapi.PodGroup
+	// DeletePodGroup is used to delete a pod group by name and wait for it to propagate.
+	DeletePodGroup string
 	// CreatePods is use to create pods in the cluster.
 	CreatePods []*v1.Pod
 	// CreatePodsInOrder is use to create pods in the cluster and have them enqueued by the scheduler in the specified order.
@@ -150,6 +153,8 @@ type Step struct {
 	WaitForPodsInActiveQ []string
 	// WaitForPodsInUnschedulableEntities is use to wait for pods to be in unschedulableEntities.
 	WaitForPodsInUnschedulableEntities []string
+	// WaitForPodsInIncompletePodGroupPods is use to wait for pods to be in incompletePodGroupPods.
+	WaitForPodsInIncompletePodGroupPods []string
 	// WaitForPodsUnschedulable is use to wait for pods to be unschedulable.
 	WaitForPodsUnschedulable []string
 	// WaitForPodsScheduled is use to wait for pods to be scheduled.
@@ -175,6 +180,27 @@ type Step struct {
 func podInUnschedulableEntities(queue queue.SchedulingQueue, podName string) bool {
 	unschedPods := queue.UnschedulablePods()
 	for _, pod := range unschedPods {
+		if pod.Name == podName {
+			return true
+		}
+	}
+	return false
+}
+
+func podSchedulingAttempted(cs kubernetes.Interface, ns, name string) wait.ConditionWithContextFunc {
+	return func(ctx context.Context) (bool, error) {
+		pod, err := cs.CoreV1().Pods(ns).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			return false, nil
+		}
+		_, cond := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
+		return cond != nil, nil
+	}
+}
+
+func podInIncompletePodGroupPods(queue queue.SchedulingQueue, podName string) bool {
+	incompletePods := queue.IncompletePodGroupPodsPods()
+	for _, pod := range incompletePods {
 		if pod.Name == podName {
 			return true
 		}
@@ -230,14 +256,16 @@ func createPods(testCtx *testutils.TestContext, ns string, pods []*v1.Pod, prese
 			return fmt.Errorf("failed to create pod %s: %w", p.Name, err)
 		}
 		if preserveOrder {
-			podScheduledFn := testutils.PodScheduled(cs, ns, p.Name)
+			podSchedulingAttemptedFn := podSchedulingAttempted(cs, ns, p.Name)
 			err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
 				_, ok := testCtx.Scheduler.SchedulingQueue.GetPod(p.Name, p.Namespace, p.Spec.SchedulingGroup)
 				if ok {
 					return true, nil
 				}
-				// pod may have gotten queued and scheduled between the polls
-				return podScheduledFn(ctx)
+				// The pod may have gotten queued and had a scheduling attempt between
+				// polls. A PodScheduled condition, either true or false, proves the
+				// scheduler has observed the pod.
+				return podSchedulingAttemptedFn(ctx)
 			})
 			if err != nil {
 				return fmt.Errorf("failed to ensure queueing order of pod %s: %w", p.Name, err)
@@ -304,6 +332,37 @@ func updatePodGroup(testCtx *testutils.TestContext, ns string, pg *schedulingapi
 	return nil
 }
 
+func deletePodGroup(testCtx *testutils.TestContext, ns string, pgName string) error {
+	cs := testCtx.ClientSet
+
+	pg, err := cs.SchedulingV1alpha3().PodGroups(ns).Get(testCtx.Ctx, pgName, metav1.GetOptions{})
+	if err == nil && len(pg.Finalizers) > 0 {
+		pg.Finalizers = nil
+		if _, err = cs.SchedulingV1alpha3().PodGroups(ns).Update(testCtx.Ctx, pg, metav1.UpdateOptions{}); err != nil {
+			return fmt.Errorf("failed to clear finalizers of pod group %s: %w", pgName, err)
+		}
+	}
+	if err := cs.SchedulingV1alpha3().PodGroups(ns).Delete(testCtx.Ctx, pgName, metav1.DeleteOptions{}); err != nil {
+		return fmt.Errorf("failed to delete pod group %s: %w", pgName, err)
+	}
+	err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+		func(_ context.Context) (bool, error) {
+			_, err := testCtx.InformerFactory.Scheduling().V1alpha3().PodGroups().Lister().PodGroups(ns).Get(pgName)
+			if err != nil {
+				if apierrors.IsNotFound(err) {
+					return true, nil
+				}
+				return false, err
+			}
+			return false, nil
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to wait for pod group %s deletion to propagate: %w", pgName, err)
+	}
+	return nil
+}
+
 func createWorkloads(testCtx *testutils.TestContext, ns string, wls []*schedulingapi.Workload) error {
 	cs := testCtx.ClientSet
 	for _, wl := range wls {
@@ -366,6 +425,20 @@ func waitForPodsInUnschedulableEntities(testCtx *testutils.TestContext, ns strin
 		)
 		if err != nil {
 			return fmt.Errorf("failed to wait for pod %s to be in unschedulable entities: %w", podName, err)
+		}
+	}
+	return nil
+}
+
+func waitForPodsInIncompletePodGroupPods(testCtx *testutils.TestContext, ns string, podNames []string) error {
+	for _, podName := range podNames {
+		err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+			func(_ context.Context) (bool, error) {
+				return podInIncompletePodGroupPods(testCtx.Scheduler.SchedulingQueue, podName), nil
+			},
+		)
+		if err != nil {
+			return fmt.Errorf("failed to wait for pod %s to be in incompletePodGroupPods: %w", podName, err)
 		}
 	}
 	return nil
@@ -534,6 +607,8 @@ func RunSteps(testCtx *testutils.TestContext, t *testing.T, ns string, steps []S
 			err = createPodGroup(testCtx, ns, step.CreatePodGroup)
 		case step.UpdatePodGroup != nil:
 			err = updatePodGroup(testCtx, ns, step.UpdatePodGroup)
+		case step.DeletePodGroup != "":
+			err = deletePodGroup(testCtx, ns, step.DeletePodGroup)
 		case step.CreateWorkloads != nil:
 			err = createWorkloads(testCtx, ns, step.CreateWorkloads)
 		case step.DeletePods != nil:
@@ -544,6 +619,8 @@ func RunSteps(testCtx *testutils.TestContext, t *testing.T, ns string, steps []S
 			err = waitForPodsInActiveQ(testCtx, step.WaitForPodsInActiveQ)
 		case step.WaitForPodsInUnschedulableEntities != nil:
 			err = waitForPodsInUnschedulableEntities(testCtx, ns, step.WaitForPodsInUnschedulableEntities)
+		case step.WaitForPodsInIncompletePodGroupPods != nil:
+			err = waitForPodsInIncompletePodGroupPods(testCtx, ns, step.WaitForPodsInIncompletePodGroupPods)
 		case step.WaitForPodsUnschedulable != nil:
 			err = waitForPodsUnschedulable(testCtx, ns, step.WaitForPodsUnschedulable)
 		case step.WaitForPodsScheduled != nil:

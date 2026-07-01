@@ -1222,6 +1222,69 @@ type testPluginCase struct {
 func TestPlugin(t *testing.T) {
 	testPlugin(ktesting.Init(t))
 }
+
+func TestPreFilterReusesPendingAllocationWithNilNodeSelector(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGatesDuringTest(tCtx, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.DRAWorkloadResourceClaims: true,
+		features.GenericWorkload:           true,
+	})
+
+	feats := feature.Features{
+		EnableDRAAdminAccess:               true,
+		EnableDRADeviceBindingConditions:   true,
+		EnableDRAResourceClaimDeviceStatus: true,
+		EnableDRASchedulerFilterTimeout:    true,
+		EnableDynamicResourceAllocation:    true,
+		EnableDRAWorkloadResourceClaims:    true,
+	}
+	testCtx := setup(tCtx, nil, []*v1.Node{workerNode}, []*resourceapi.ResourceClaim{pendingPodGroupClaim}, []*resourceapi.DeviceClass{deviceClass}, []*schedulingapi.PodGroup{podGroupWithClaimName}, []apiruntime.Object{workerNodeSlice}, feats, false, nil)
+
+	pendingClaim, err := testCtx.draManager.ResourceClaims().Get(namespace, claimName)
+	if err != nil {
+		t.Fatalf("Get claim: %v", err)
+	}
+	allocatedClaim := pendingClaim.DeepCopy()
+	allocatedClaim.Status.Allocation = allocationResult.DeepCopy()
+	allocatedClaim.Status.Allocation.NodeSelector = nil
+	tCtx.ExpectNoError(testCtx.draManager.ResourceClaims().SignalClaimPendingAllocation(allocatedClaim.UID, allocatedClaim))
+
+	podGroupCycleState := framework.NewCycleState()
+	podGroupCycleState.Write(stateKey, &podGroupStateData{
+		pendingAllocations: sets.New(allocatedClaim.UID),
+	})
+	cycleState := framework.NewCycleState()
+	cycleState.SetPodGroupSchedulingCycle(podGroupCycleState)
+	testCtx.state = cycleState
+
+	nodeInfo := framework.NewNodeInfo()
+	nodeInfo.SetNode(workerNode)
+
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Errorf("PreFilter panicked: %v", r)
+			}
+		}()
+		_, status := testCtx.p.PreFilter(tCtx, testCtx.state, groupedPodWithClaimName, []fwk.NodeInfo{nodeInfo})
+		if !status.IsSuccess() {
+			t.Errorf("PreFilter status: %v", status)
+		}
+	}()
+
+	pluginState, err := getStateData(testCtx.state)
+	if err != nil {
+		t.Fatalf("getStateData: %v", err)
+	}
+	if pluginState.informationsForClaim[0].allocation != allocatedClaim.Status.Allocation {
+		t.Errorf("allocation pointer mismatch: got %p, want %p",
+			pluginState.informationsForClaim[0].allocation, allocatedClaim.Status.Allocation)
+	}
+	if pluginState.informationsForClaim[0].availableOnNodes != nil {
+		t.Errorf("availableOnNodes should be nil, got %v", pluginState.informationsForClaim[0].availableOnNodes)
+	}
+}
+
 func testPlugin(tCtx ktesting.TContext) {
 	testcases := map[string]testPluginCase{
 		"empty": {
@@ -3995,7 +4058,6 @@ func setup(tCtx ktesting.TContext, args *config.DynamicResourcesArgs, nodes []*v
 		EnableDeviceTaintRules: true,
 		SliceInformer:          tc.informerFactory.Resource().V1().ResourceSlices(),
 		TaintInformer:          tc.informerFactory.Resource().V1beta2().DeviceTaintRules(),
-		ClassInformer:          tc.informerFactory.Resource().V1().DeviceClasses(),
 		KubeClient:             tc.client,
 	}
 	resourceSliceTracker, err := resourceslicetracker.StartTracker(tCtx, resourceSliceTrackerOpts)
@@ -4029,6 +4091,10 @@ func setup(tCtx ktesting.TContext, args *config.DynamicResourcesArgs, nodes []*v
 			tc.podGroupManager.AddPodGroupMember(pod)
 		}
 	}
+	for _, podGroup := range podGroups {
+		tc.podGroupManager.AddPodGroup(podGroup)
+	}
+	snapshot := internalcache.NewTestSnapshotWithPodGroups(nil, nil, podGroups)
 
 	opts := []runtime.Option{
 		runtime.WithClientSet(tc.client),
@@ -4036,6 +4102,7 @@ func setup(tCtx ktesting.TContext, args *config.DynamicResourcesArgs, nodes []*v
 		runtime.WithEventRecorder(&events.FakeRecorder{}),
 		runtime.WithSharedDRAManager(tc.draManager),
 		runtime.WithPodGroupManager(tc.podGroupManager),
+		runtime.WithSnapshotSharedLister(snapshot),
 	}
 	fh, err := runtime.NewFramework(tCtx, nil, nil, opts...)
 	tCtx.ExpectNoError(err, "create scheduler framework")
