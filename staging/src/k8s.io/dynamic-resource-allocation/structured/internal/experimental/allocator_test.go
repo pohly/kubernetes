@@ -128,7 +128,7 @@ func TestAvailableCountersForPool(t *testing.T) {
 			Pool:   draapi.ResourcePool{Name: id.Pool},
 			Devices: []draapi.Device{{Name: id.Device, ConsumesCounters: []draapi.DeviceCounterConsumption{{
 				CounterSet: set,
-				Counters:   map[string]resourceapi.Counter{"counter": {Value: one}},
+				Counters:   map[string]resourceapi.CounterRequirement{"counter": {Value: &one}},
 			}}}},
 		}}},
 	}
