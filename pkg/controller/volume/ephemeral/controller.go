@@ -109,10 +109,10 @@ func NewController(
 		// PVC.
 		// Deletion of the PVC is handled through the owner reference and garbage collection.
 		// Therefore pod deletions also can be ignored.
-	}, cache.HandlerOptions{})
+	})
 	pvcInformer.TypedInformer().AddTypedEventHandler(coreinformers.PersistentVolumeClaimHandlerFuncs{
 		DeleteFunc: ec.onPVCDelete,
-	}, cache.HandlerOptions{})
+	})
 	if err := common.AddPodPVCIndexerIfNotPresent(podInformer.Informer().GetIndexer()); err != nil {
 		return nil, fmt.Errorf("could not initialize ephemeral volume controller: %w", err)
 	}

@@ -78,7 +78,7 @@ func NewClusterRoleAggregation(clusterRoleInformer rbacinformers.TypedClusterRol
 		DeleteFunc: func(_ rbacinformers.DeletedClusterRole) {
 			c.enqueue()
 		},
-	}, cache.HandlerOptions{})
+	})
 	return c
 }
 

@@ -90,7 +90,7 @@ func NewCertificateController(
 			logger.V(4).Info("Deleting certificate request", "csr", deletedCSR.GetName())
 			cc.enqueueCertificateRequest(deletedCSR.GetKey())
 		},
-	}, cache.HandlerOptions{})
+	})
 	cc.csrLister = csrInformer.Lister()
 	cc.csrsSynced = csrInformer.Informer().HasSynced
 	return cc

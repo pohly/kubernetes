@@ -94,7 +94,7 @@ func NewTTLController(ctx context.Context, nodeInformer informers.TypedNodeInfor
 			ttlc.updateNode(logger, old, newObj)
 		},
 		DeleteFunc: ttlc.deleteNode,
-	}, cache.HandlerOptions{})
+	})
 
 	ttlc.nodeStore = listers.NewNodeLister(nodeInformer.Informer().GetIndexer())
 	ttlc.hasSynced = nodeInformer.Informer().HasSynced

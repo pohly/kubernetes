@@ -94,7 +94,7 @@ func New(ctx context.Context, jobInformer batchinformers.TypedJobInformer, clien
 		UpdateFunc: func(oldObj, newObj *batch.Job) {
 			tc.updateJob(logger, oldObj, newObj)
 		},
-	}, cache.HandlerOptions{})
+	})
 
 	tc.jLister = jobInformer.Lister()
 	tc.jListerSynced = jobInformer.Informer().HasSynced

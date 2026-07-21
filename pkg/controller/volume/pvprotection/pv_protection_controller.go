@@ -68,7 +68,7 @@ func NewPVProtectionController(logger klog.Logger, pvInformer coreinformers.Type
 		UpdateFunc: func(_, newObj *v1.PersistentVolume) {
 			e.pvAddedUpdated(logger, newObj)
 		},
-	}, cache.HandlerOptions{})
+	})
 
 	return e
 }

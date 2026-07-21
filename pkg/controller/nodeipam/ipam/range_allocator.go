@@ -148,7 +148,7 @@ func NewCIDRRangeAllocator(ctx context.Context, client clientset.Interface, node
 				utilruntime.HandleErrorWithContext(ctx, err, "Error while processing CIDR Release")
 			}
 		},
-	}, cache.HandlerOptions{})
+	})
 
 	return ra, nil
 }
