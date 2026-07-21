@@ -109,6 +109,16 @@ func AddToAllocatedState(state *AllocatedState, allocations iter.Seq[*resourceap
 	internal.AddToAllocatedState(state, allocations, features)
 }
 
+// ResolveCounterConsumption is a helper for callers outside the allocator to
+// resolve counter amounts using the allocator's rounding and policy checks.
+// The allocator itself uses the internal implementation directly.
+// The boolean is false when the resolved amount violates the policy;
+// an error indicates that resolution failed.
+// A nil requested value selects the policy default or the counter's full value.
+func ResolveCounterConsumption(requestedValue *resource.Quantity, counter resourceapi.Counter, features Features) (resource.Quantity, bool, error) {
+	return experimental.ResolveCounterConsumption(requestedValue, counter, features.FractionalCapacityRange)
+}
+
 // Allocator calculates how to allocate a set of unallocated claims which use
 // structured parameters.
 //
