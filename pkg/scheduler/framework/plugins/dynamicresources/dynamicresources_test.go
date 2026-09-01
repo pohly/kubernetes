@@ -5020,6 +5020,21 @@ func testIsSchedulableAfterTargetPodUpdate(tCtx ktesting.TContext) {
 			obj:      podWithClaimTemplateInStatus,
 			wantHint: fwk.QueueSkip,
 		},
+		"different-pod": {
+			// The update is for a different pod (different UID) than the one
+			// being evaluated. A pod's own generated-claim status update must
+			// not requeue other pods, otherwise a single pod update triggers a
+			// thundering herd across all DRA-rejected pods.
+			objs: []apiruntime.Object{pendingClaim},
+			pod: func() *v1.Pod {
+				pod := podWithClaimTemplate.DeepCopy()
+				pod.Name = "other-pod"
+				pod.UID = types.UID(podUID + "-other")
+				return pod
+			}(),
+			obj:      podWithClaimTemplateInStatus,
+			wantHint: fwk.QueueSkip,
+		},
 		"incomplete": {
 			objs: []apiruntime.Object{pendingClaim},
 			pod:  podWithTwoClaimTemplates,

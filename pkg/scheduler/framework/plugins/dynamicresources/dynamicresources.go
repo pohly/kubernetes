@@ -481,6 +481,11 @@ func (pl *DynamicResources) isSchedulableAfterTargetPodUpdate(logger klog.Logger
 		return fwk.Queue, fmt.Errorf("unexpected object in isSchedulableAfterTargetPodUpdate: %w", err)
 	}
 
+	// A pod's status update should only unblock the same pod.
+	if pod.UID != modifiedPod.UID {
+		return fwk.QueueSkip, nil
+	}
+
 	if err := pl.foreachPodResourceClaim(modifiedPod, nil); err != nil {
 		// This is not an unexpected error: we know that
 		// foreachPodResourceClaim only returns errors for "not
