@@ -29,6 +29,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/klog/v2"
 )
 
 // Scheme defines methods for serializing and deserializing API objects, a type
@@ -91,10 +92,19 @@ type Scheme struct {
 	// schemeName is the name of this scheme.  If you don't specify a name, the stack of the NewScheme caller will be used.
 	// This is useful for error reporting to indicate the origin of the scheme.
 	schemeName string
+
+	// initFuncs are invoked, in registration order, by Finalize against the
+	// clone it returns.
+	initFuncs []SchemeInitFunc
 }
 
 // FieldLabelConversionFunc converts a field selector to internal representation.
 type FieldLabelConversionFunc func(label, value string) (internalLabel, internalValue string, err error)
+
+// SchemeInitFunc performs scheme setup that must happen after feature gates
+// are parsed, such as feature-gated API registration. Finalize invokes it
+// with the clone being initialized, not the scheme AddInitFunc was called on.
+type SchemeInitFunc func(logger klog.Logger, scheme *Scheme) error
 
 // NewScheme creates a new Scheme. This scheme is pluggable by default.
 func NewScheme() *Scheme {
@@ -120,6 +130,75 @@ func NewScheme() *Scheme {
 // Converter allows access to the converter for the scheme
 func (s *Scheme) Converter() *conversion.Converter {
 	return s.converter
+}
+
+// AddInitFunc registers a callback that Finalize runs later against the
+// clone it is about to return. Use it for scheme setup that depends on
+// feature gates. Callbacks run in registration order.
+func (s *Scheme) AddInitFunc(f SchemeInitFunc) {
+	s.initFuncs = append(s.initFuncs, f)
+}
+
+// Finalize returns a clone of the scheme with all init funcs registered via
+// AddInitFunc applied, evaluated against current runtime state (such as
+// feature gates). The original instance is left unmodified, so Finalize can be
+// called repeatedly with different feature gate states. Callers must use the
+// returned scheme instead of the original one. The returned clone has no
+// init funcs of its own: they have already run and are not meant to run
+// again, including if the returned scheme is cloned or finalized again.
+func (s *Scheme) Finalize(logger klog.Logger) (*Scheme, error) {
+	out := s.Clone()
+	for _, f := range out.initFuncs {
+		if err := f(logger, out); err != nil {
+			return nil, err
+		}
+	}
+	out.initFuncs = nil
+	return out, nil
+}
+
+// Clone returns a copy of s that shares no mutable state with it, including
+// its init funcs.
+func (s *Scheme) Clone() *Scheme {
+	out := &Scheme{
+		gvkToType:                 make(map[schema.GroupVersionKind]reflect.Type, len(s.gvkToType)),
+		typeToGVK:                 make(map[reflect.Type][]schema.GroupVersionKind, len(s.typeToGVK)),
+		unversionedTypes:          make(map[reflect.Type]schema.GroupVersionKind, len(s.unversionedTypes)),
+		unversionedKinds:          make(map[string]reflect.Type, len(s.unversionedKinds)),
+		fieldLabelConversionFuncs: make(map[schema.GroupVersionKind]FieldLabelConversionFunc, len(s.fieldLabelConversionFuncs)),
+		defaulterFuncs:            make(map[reflect.Type]func(interface{}), len(s.defaulterFuncs)),
+		validationFuncs:           make(map[reflect.Type]func(ctx context.Context, op operation.Operation, object, oldObject interface{}) field.ErrorList, len(s.validationFuncs)),
+		versionPriority:           make(map[string][]string, len(s.versionPriority)),
+		observedVersions:          append([]schema.GroupVersion(nil), s.observedVersions...),
+		schemeName:                s.schemeName,
+		initFuncs:                 append([]SchemeInitFunc(nil), s.initFuncs...),
+	}
+	for k, v := range s.gvkToType {
+		out.gvkToType[k] = v
+	}
+	for k, v := range s.typeToGVK {
+		out.typeToGVK[k] = append([]schema.GroupVersionKind(nil), v...)
+	}
+	for k, v := range s.unversionedTypes {
+		out.unversionedTypes[k] = v
+	}
+	for k, v := range s.unversionedKinds {
+		out.unversionedKinds[k] = v
+	}
+	for k, v := range s.fieldLabelConversionFuncs {
+		out.fieldLabelConversionFuncs[k] = v
+	}
+	for k, v := range s.defaulterFuncs {
+		out.defaulterFuncs[k] = v
+	}
+	for k, v := range s.validationFuncs {
+		out.validationFuncs[k] = v
+	}
+	for k, v := range s.versionPriority {
+		out.versionPriority[k] = append([]string(nil), v...)
+	}
+	out.converter = s.converter.Clone()
+	return out
 }
 
 // AddUnversionedTypes registers the provided types as "unversioned", which means that they follow special rules.

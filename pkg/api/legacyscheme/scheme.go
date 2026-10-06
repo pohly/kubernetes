@@ -19,15 +19,22 @@ package legacyscheme
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/klog/v2"
 )
 
+// baseScheme is the scheme instance which gets populated during the init phase.
+var baseScheme = runtime.NewScheme()
+
 var (
-	// Scheme is the default instance of runtime.Scheme to which types in the Kubernetes API are already registered.
+	// Scheme is the default instance of runtime.Scheme to which types in the Kubernetes API are already registered,
+	// with a few exceptions: some entries might depend on feature gates and only get registered when
+	// [Scheme.Finalize] is called.
+	//
 	// NOTE: If you are copying this file to start a new api group, STOP! Copy the
 	// extensions group instead. This Scheme is special and should appear ONLY in
 	// the api group, unless you really know what you're doing.
 	// TODO(lavalamp): make the above error impossible.
-	Scheme = runtime.NewScheme()
+	Scheme = baseScheme
 
 	// Codecs provides access to encoding and decoding for the scheme
 	Codecs = serializer.NewCodecFactory(Scheme)
@@ -35,3 +42,18 @@ var (
 	// ParameterCodec handles versioning of objects that are converted to query parameters.
 	ParameterCodec = runtime.NewParameterCodec(Scheme)
 )
+
+// Finalize applies feature-gated scheme setup and replaces Scheme, Codecs, and
+// ParameterCodec with the result. Call it once feature gates are parsed and
+// before anything depends on their effects. Safe to call again later with a
+// different feature gate state (useful for tests).
+func Finalize(logger klog.Logger) error {
+	finalized, err := baseScheme.Finalize(logger)
+	if err != nil {
+		return err
+	}
+	Scheme = finalized
+	Codecs = serializer.NewCodecFactory(Scheme)
+	ParameterCodec = runtime.NewParameterCodec(Scheme)
+	return nil
+}

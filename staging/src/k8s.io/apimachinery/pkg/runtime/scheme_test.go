@@ -18,13 +18,16 @@ package runtime_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -36,6 +39,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/klog/v2"
+	"sigs.k8s.io/randfill"
 )
 
 type testConversions struct {
@@ -1178,4 +1183,281 @@ func TestToOpenAPIDefinitionName(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestSchemeClone verifies that Scheme.Clone produces a copy that behaves
+// the same as the original but shares no mutable state with it, including
+// for fields added to Scheme after this test was written.
+func TestSchemeClone(t *testing.T) {
+	s := runtime.NewScheme()
+	// Give the embedded converter some real, non-empty content so the
+	// independence check below is meaningful.
+	//
+	// We could fuzz it, but only by duplicating the fuzzer logic from
+	// the Converter's own clone test. Instead we rely on that test
+	// for coverage of the converter field content.
+	if err := s.Converter().RegisterUntypedConversionFunc((*int)(nil), (*string)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Fuzz every field via reflection so that a field added in the future
+	// automatically gets a non-zero value here too, without having to
+	// remember to update this test.
+	f := randfill.NewWithSeed(1).
+		NilChance(0).
+		NumElements(1, 3).
+		AllowUnexportedFields(true).
+		SkipFieldsWithPattern(regexp.MustCompile(`^converter$`)).
+		Funcs(
+			// Scheme contains values of type reflect.Type.
+			// randfill cannot generate values for it, so
+			// here we fill that gap by randomly picking
+			// among a few different types. We need more than one
+			// because several maps are indexed by reflect.Type
+			// instances (defaulterFuncs, validationFuncs,
+			// typeToGVK, unversionedTypes) and we want to
+			// generate non-trivial maps with more than one entry.
+			func(v *reflect.Type, c randfill.Continue) {
+				candidates := []reflect.Type{
+					reflect.TypeOf(0),
+					reflect.TypeOf(""),
+					reflect.TypeOf(false),
+					reflect.TypeOf(int64(0)),
+					reflect.TypeOf(struct{ X int }{}),
+				}
+				*v = candidates[c.Intn(len(candidates))]
+			},
+			// Each function type that appears in Scheme must be
+			// handled here (test panics otherwise).
+			func(v *runtime.FieldLabelConversionFunc, c randfill.Continue) {
+				*v = func(label, value string) (string, string, error) { return label, value, nil }
+			},
+			func(v *func(interface{}), c randfill.Continue) {
+				*v = func(interface{}) {}
+			},
+			func(v *func(ctx context.Context, op operation.Operation, object, oldObject interface{}) field.ErrorList, c randfill.Continue) {
+				*v = func(ctx context.Context, op operation.Operation, object, oldObject interface{}) field.ErrorList {
+					return nil
+				}
+			},
+			func(v *runtime.SchemeInitFunc, c randfill.Continue) {
+				*v = func(logger klog.Logger, scheme *runtime.Scheme) error { return nil }
+			},
+		)
+	f.Fill(s)
+
+	clone := s.Clone()
+
+	// cmp.Diff walks both values field by field (including unexported
+	// ones), so it catches a field Clone forgot to copy (left at its zero
+	// value) without this test having to list the fields itself. The
+	// independenceReporter piggybacks on the same walk to additionally
+	// flag maps/slices/pointers that Clone copied by reference instead of
+	// by value; it still runs on converter even though its contents are
+	// excluded from the equality check above.
+	ir := &independenceReporter{}
+	opts := []cmp.Option{
+		cmp.AllowUnexported(runtime.Scheme{}),
+		cmpopts.IgnoreFields(runtime.Scheme{}, "converter"),
+		cmp.Comparer(func(a, b reflect.Type) bool { return a == b }),
+		cmp.Comparer(func(a, b runtime.FieldLabelConversionFunc) bool { return true }),
+		cmp.Comparer(func(a, b func(interface{})) bool { return true }),
+		cmp.Comparer(func(a, b func(ctx context.Context, op operation.Operation, object, oldObject interface{}) field.ErrorList) bool {
+			return true
+		}),
+		cmp.Comparer(func(a, b runtime.SchemeInitFunc) bool { return true }),
+		cmp.Reporter(ir),
+	}
+	if diff := cmp.Diff(s, clone, opts...); diff != "" {
+		t.Errorf("clone is not semantically equal to the original (-orig +clone):\n%s", diff)
+	}
+	ir.check(t)
+}
+
+// independenceReporter is a cmp.Reporter that, alongside whatever equality
+// check cmp.Diff is already doing, additionally flags pointers, maps, and
+// slices that a clone shares with the original instead of copying. Pass it
+// to cmp.Diff/cmp.Equal via cmp.Reporter, then call check once comparison
+// is done.
+type independenceReporter struct {
+	path   cmp.Path
+	errors []string
+}
+
+func (r *independenceReporter) PushStep(ps cmp.PathStep) {
+	r.path = append(r.path, ps)
+
+	switch ps.Type().Kind() {
+	case reflect.Ptr:
+		vx, vy := ps.Values()
+		if vx.IsValid() && vy.IsValid() && !vx.IsNil() && !vy.IsNil() && vx.Pointer() == vy.Pointer() {
+			r.errors = append(r.errors, r.path.String()+": clone shares the same pointer as the original")
+		}
+	case reflect.Map:
+		vx, vy := ps.Values()
+		if vx.IsValid() && vy.IsValid() && !vx.IsNil() && !vy.IsNil() && vx.Len() > 0 && vx.Pointer() == vy.Pointer() {
+			r.errors = append(r.errors, r.path.String()+": clone shares the same map as the original")
+		}
+	case reflect.Slice:
+		vx, vy := ps.Values()
+		if vx.IsValid() && vy.IsValid() && !vx.IsNil() && !vy.IsNil() && vx.Len() > 0 && vx.Pointer() == vy.Pointer() {
+			r.errors = append(r.errors, r.path.String()+": clone shares the same backing array as the original")
+		}
+	}
+}
+
+func (r *independenceReporter) Report(cmp.Result) {}
+
+func (r *independenceReporter) PopStep() {
+	r.path = r.path[:len(r.path)-1]
+}
+
+// check fails t with every independence violation found during the compare.
+func (r *independenceReporter) check(t *testing.T) {
+	t.Helper()
+	for _, msg := range r.errors {
+		t.Error(msg)
+	}
+}
+
+func TestSchemeFinalize(t *testing.T) {
+	t.Run("no-init-funcs", func(t *testing.T) {
+		s := runtime.NewScheme()
+		out, err := s.Finalize(klog.Background())
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if out == s {
+			t.Error("Finalize must return a clone, not s itself")
+		}
+	})
+
+	t.Run("runs-init-funcs-in-order", func(t *testing.T) {
+		s := runtime.NewScheme()
+		var order []int
+		s.AddInitFunc(func(logger klog.Logger, scheme *runtime.Scheme) error {
+			order = append(order, 1)
+			return nil
+		})
+		s.AddInitFunc(func(logger klog.Logger, scheme *runtime.Scheme) error {
+			order = append(order, 2)
+			return nil
+		})
+		if _, err := s.Finalize(klog.Background()); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if want := []int{1, 2}; !reflect.DeepEqual(order, want) {
+			t.Errorf("init funcs ran in order %v, want %v", order, want)
+		}
+	})
+
+	t.Run("init-func-receives-clone-not-s", func(t *testing.T) {
+		s := runtime.NewScheme()
+		var got *runtime.Scheme
+		s.AddInitFunc(func(logger klog.Logger, scheme *runtime.Scheme) error {
+			got = scheme
+			return nil
+		})
+		out, err := s.Finalize(klog.Background())
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got != out {
+			t.Error("init func must be called with the clone Finalize returns, not s")
+		}
+		if got == s {
+			t.Error("init func must not be called with s itself")
+		}
+	})
+
+	t.Run("error-from-init-func-is-propagated", func(t *testing.T) {
+		s := runtime.NewScheme()
+		wantErr := errors.New("boom")
+		s.AddInitFunc(func(logger klog.Logger, scheme *runtime.Scheme) error {
+			return wantErr
+		})
+		if _, err := s.Finalize(klog.Background()); !errors.Is(err, wantErr) {
+			t.Errorf("got error %v, want %v", err, wantErr)
+		}
+	})
+
+	t.Run("s-is-left-unmodified", func(t *testing.T) {
+		s := runtime.NewScheme()
+		gvk := schema.GroupVersionKind{Version: "v1", Kind: "Pod"}
+		s.AddInitFunc(func(logger klog.Logger, scheme *runtime.Scheme) error {
+			scheme.AddKnownTypeWithName(gvk, &schemeTestObject{})
+			return nil
+		})
+		out, err := s.Finalize(klog.Background())
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if s.Recognizes(gvk) {
+			t.Error("s must not be modified by its own init funcs")
+		}
+		if !out.Recognizes(gvk) {
+			t.Error("the returned clone must reflect what the init funcs registered")
+		}
+	})
+
+	t.Run("repeated-calls-reevaluate-init-funcs", func(t *testing.T) {
+		s := runtime.NewScheme()
+		enabled := false
+		gvk := schema.GroupVersionKind{Version: "v1", Kind: "Pod"}
+		s.AddInitFunc(func(logger klog.Logger, scheme *runtime.Scheme) error {
+			if enabled {
+				scheme.AddKnownTypeWithName(gvk, &schemeTestObject{})
+			}
+			return nil
+		})
+
+		out1, err := s.Finalize(klog.Background())
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if out1.Recognizes(gvk) {
+			t.Error("type must not be registered while the feature is disabled")
+		}
+
+		enabled = true
+		out2, err := s.Finalize(klog.Background())
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !out2.Recognizes(gvk) {
+			t.Error("a later Finalize call must re-run init funcs against the new state")
+		}
+	})
+	t.Run("finalized-scheme-has-no-init-funcs-of-its-own", func(t *testing.T) {
+		s := runtime.NewScheme()
+		var calls int
+		s.AddInitFunc(func(logger klog.Logger, scheme *runtime.Scheme) error {
+			calls++
+			return nil
+		})
+		out, err := s.Finalize(klog.Background())
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if calls != 1 {
+			t.Fatalf("got %d calls after first Finalize, want 1", calls)
+		}
+		if _, err := out.Finalize(klog.Background()); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if calls != 1 {
+			t.Errorf("got %d calls after finalizing the already-finalized clone, want 1 (its init funcs must have been stripped)", calls)
+		}
+	})
+}
+
+type schemeTestObject struct {
+	runtime.TypeMeta
+}
+
+func (o *schemeTestObject) DeepCopyObject() runtime.Object {
+	out := *o
+	return &out
 }

@@ -52,6 +52,7 @@ import (
 	"k8s.io/client-go/util/keyutil"
 	basecompatibility "k8s.io/component-base/compatibility"
 	metricsfeatures "k8s.io/component-base/metrics/features"
+	"k8s.io/klog/v2"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -131,6 +132,30 @@ func BuildGenericConfig(
 	storageFactory *serverstorage.DefaultStorageFactory,
 	lastErr error,
 ) {
+	// Feature gates are parsed by now, so schemes can finish any setup that
+	// depends on them, such as feature-gated API registration.
+	//
+	// TODO: thread a logger (maybe via CompletedOptions?) from the caller
+	// instead of using klog.TODO.
+	logger := klog.TODO()
+	for i, scheme := range schemes {
+		if scheme == legacyscheme.Scheme {
+			// Must go through legacyscheme.Finalize instead of scheme.Finalize:
+			// legacyscheme.Codecs and legacyscheme.ParameterCodec are derived from
+			// legacyscheme.Scheme and have to be refreshed together with it, and
+			// a lot of code elsewhere still references those package variables
+			// directly instead of using the result of this function.
+			if lastErr = legacyscheme.Finalize(logger); lastErr != nil {
+				return
+			}
+			schemes[i] = legacyscheme.Scheme
+			continue
+		}
+		if schemes[i], lastErr = scheme.Finalize(logger); lastErr != nil {
+			return
+		}
+	}
+
 	codecs := legacyscheme.Codecs
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.CBORServingAndStorage) {
 		codecs = serializer.NewCodecFactory(legacyscheme.Scheme, serializer.WithSerializer(cbor.NewSerializerInfo))
