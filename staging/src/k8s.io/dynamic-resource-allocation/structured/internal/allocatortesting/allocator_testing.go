@@ -1080,18 +1080,18 @@ func requestWithDerivedAttributes(name, class string, count int64, derivedAttrs 
 	return req
 }
 
+type newAllocator func(
+	ctx context.Context,
+	features Features,
+	allocateState AllocatedState,
+	classLister DeviceClassLister,
+	slices []*draapi.ResourceSlice,
+	celCache *cel.Cache,
+) (Allocator, error)
+
 // TestAllocator runs as many of the shared tests against a specific allocator implementation as possible.
 // Test cases which depend on features that are not supported by the implementation are expected to fail or to produce different results.
-func TestAllocator(t *testing.T,
-	supportedFeatures Features,
-	newAllocator func(
-		ctx context.Context,
-		features Features,
-		allocateState AllocatedState,
-		classLister DeviceClassLister,
-		slices []*draapi.ResourceSlice,
-		celCache *cel.Cache,
-	) (Allocator, error)) {
+func TestAllocator(t *testing.T, supportedFeatures Features, newAllocator newAllocator) {
 	tCtx := ktesting.Init(t)
 	nonExistentAttribute := resourceapi.FullyQualifiedName(driverA + "/" + "NonExistentAttribute")
 	boolAttribute := resourceapi.FullyQualifiedName(driverA + "/" + "boolAttribute")
@@ -10863,6 +10863,22 @@ func TestAllocator(t *testing.T,
 		},
 	}
 
+	// Newer test cases get defined elsewhere because the table above became too large.
+	// Having them in separate function also provides nicer diffs because the chunk context
+	// includes the function name.
+	//
+	// Accidental duplicates get caught here at runtime.
+	for _, moreCases := range []func() map[string]AllocatorTestCase{
+		sharedConsumableCapacityCases,
+	} {
+		for name, tc := range moreCases() {
+			if _, exists := testcases[name]; exists {
+				t.Fatalf("duplicate test case: %s", name)
+			}
+			testcases[name] = tc
+		}
+	}
+
 	runTestAllocator(tCtx, supportedFeatures, newAllocator, testcases)
 
 	tCtx.Run("interrupt", func(tCtx ktesting.TContext) {
@@ -11230,19 +11246,8 @@ func (l informerLister[T]) Get(name string) (*T, error) {
 	return nil, apierrors.NewNotFound(schema.GroupResource{}, "not found")
 }
 
-// testSharedConsumableCapacity keeps fixtures related to that feature out of the common allocator table.
-// Adding more test cases there became unwieldy and led to an ugly diff.
-func testSharedConsumableCapacity(tCtx ktesting.TContext,
-	supportedFeatures Features,
-	newAllocator func(
-		ctx context.Context,
-		features Features,
-		allocateState AllocatedState,
-		classLister DeviceClassLister,
-		slices []*draapi.ResourceSlice,
-		celCache *cel.Cache,
-	) (Allocator, error)) {
-	testcases := map[string]AllocatorTestCase{
+func sharedConsumableCapacityCases() map[string]AllocatorTestCase {
+	return map[string]AllocatorTestCase{
 		"partitionable-admin-exclusive-does-not-block-ordinary-claim": {
 			features: Features{AdminAccess: true, PartitionableDevices: true},
 			claimsToAllocate: objects(
@@ -13773,14 +13778,17 @@ func testSharedConsumableCapacity(tCtx ktesting.TContext,
 			},
 		},
 	}
+}
+
+func testSharedConsumableCapacity(tCtx ktesting.TContext, supportedFeatures Features, newAllocator newAllocator) {
+	features := Features{PartitionableDevices: true, ConsumableCapacity: true, SharedConsumableCapacity: true}
+	if !supportedFeatures.Set().IsSuperset(features.Set()) {
+		return
+	}
 
 	// A surviving share must keep the device's fixed cost reserved, regardless of
 	// allocation or release order. Only the released share's variable cost is freed.
 	tCtx.Run("shared-consumable-capacity-lifecycle", func(tCtx ktesting.TContext) {
-		features := Features{PartitionableDevices: true, ConsumableCapacity: true, SharedConsumableCapacity: true}
-		if !supportedFeatures.Set().IsSuperset(features.Set()) {
-			tCtx.Skip("shared consumable capacity is not supported")
-		}
 		for _, mixed := range []bool{false, true} {
 			for _, together := range []bool{false, true} {
 				for _, releaseFirst := range []bool{false, true} {
@@ -13869,6 +13877,4 @@ func testSharedConsumableCapacity(tCtx ktesting.TContext,
 			}
 		}
 	})
-
-	runTestAllocator(tCtx, supportedFeatures, newAllocator, testcases)
 }
