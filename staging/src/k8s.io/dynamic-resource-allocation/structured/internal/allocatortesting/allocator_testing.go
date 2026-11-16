@@ -1173,6 +1173,43 @@ func TestAllocator(t *testing.T, supportedFeatures Features, newAllocator newAll
 				return expectResults, expectError, expectErrorIs
 			},
 		},
+		// Like the test above, but the admin request's class and device allow multiple allocations.
+		"compatibility-groups-admin-access-allow-multiple-does-not-restrict-normal-request": {
+			features: Features{PartitionableDevices: true, CompatibilityGroups: true, AdminAccess: true, ConsumableCapacity: true},
+			claimsToAllocate: objects(claim(claim0).withRequests(
+				deviceRequest(req0, classA, 1).withAdminAccess(),
+				deviceRequest(req1, classB, 1),
+			)),
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true), classWithAllowMultipleAllocations(classB, driverA, false)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withAllowMultipleAllocations().withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{counter0: two}, "mig"),
+					),
+					device(device2).withDeviceCounterConsumption(
+						deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{counter0: two}, "vgpu"),
+					),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{counter0: four}),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{matchAllocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, true),
+				deviceAllocationResult(req1, driverA, pool1, device2, false),
+			)},
+			expectWithFeatures: func(expectResults []any, expectError types.GomegaMatcher, expectErrorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.AdminAccess {
+					return nil, g.MatchError(g.ContainSubstring("admin access is requested, but the feature is disabled")), nil
+				}
+				if !features.PartitionableDevices || !features.CompatibilityGroups {
+					return nil, nil, nil
+				}
+				return expectResults, expectError, expectErrorIs
+			},
+		},
 		// Two requests in one claim, both landing on the same counter set with the
 		// same compatibility group: they can be co-allocated.
 		"compatibility-groups-compatible": {
@@ -4848,6 +4885,22 @@ func TestAllocator(t *testing.T, supportedFeatures Features, newAllocator newAll
 				deviceAllocationResult(req0, driverA, pool1, device2, false),
 				deviceAllocationResult(req0, driverA, pool1, device3, false),
 			)},
+		},
+		// A shared counter without a value must not break allocation of a device consuming it.
+		"partitionable-device-counter-without-value": {
+			features:         Features{PartitionableDevices: true},
+			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classA, 1))),
+			classes:          objects(class(classA, driverA)),
+			slices: func() []*resourceapi.ResourceSlice {
+				counterSlice := sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{counter0: one}),
+				).obj()
+				counterSlice.Spec.SharedCounters[0].Counters[counter0] = resourceapi.Counter{}
+				return append(unwrapResourceSlices(sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one})),
+				)), counterSlice)
+			}(),
+			node: node(node1, region1),
 		},
 		"partitionable-devices-no-capacity-available": {
 			features: Features{
@@ -10012,6 +10065,39 @@ func TestAllocator(t *testing.T, supportedFeatures Features, newAllocator newAll
 				return expectResults, expectError, expectErrorIs
 			},
 		},
+		// Unlike the test above, which only has admin requests, an ordinary claim must
+		// still get a device after admin claims used the same device.
+		"partitionable-admin-exclusive-does-not-block-ordinary-claim": {
+			features: Features{AdminAccess: true, PartitionableDevices: true},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withAdminAccess()),
+				claim(claim1).withRequests(deviceRequest(req0, classA, 1).withAdminAccess()),
+				claim("third").withRequests(deviceRequest(req0, classA, 1).withSelectors(resourceapi.DeviceSelector{CEL: &resourceapi.CELDeviceSelector{Expression: `device.attributes["driver-a"].pick == "a"`}})),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1).withAttribute("pick", "a").withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one})),
+					device(device2).withAttribute("pick", "b").withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one})),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, counterSet(counterSet1, map[string]resource.Quantity{counter0: three})),
+			),
+			node: node(node1, region1),
+			expectResults: []any{
+				matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device1, true)),
+				matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device1, true)),
+				matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device1, false)),
+			},
+			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
+				if !features.AdminAccess {
+					return nil, g.MatchError(g.ContainSubstring("admin access is requested, but the feature is disabled")), nil
+				}
+				if !features.PartitionableDevices {
+					return nil, nil, nil
+				}
+				return results, matchError, errorIs
+			},
+		},
 		"consumable-capacity-backtrack-releases-capacity": {
 			features: Features{ConsumableCapacity: true},
 			claimsToAllocate: objects(
@@ -11248,88 +11334,6 @@ func (l informerLister[T]) Get(name string) (*T, error) {
 
 func sharedConsumableCapacityCases() map[string]AllocatorTestCase {
 	return map[string]AllocatorTestCase{
-		"partitionable-admin-exclusive-does-not-block-ordinary-claim": {
-			features: Features{AdminAccess: true, PartitionableDevices: true},
-			claimsToAllocate: objects(
-				claim(claim0).withRequests(deviceRequest(req0, classA, 1).withAdminAccess()),
-				claim(claim1).withRequests(deviceRequest(req0, classA, 1).withAdminAccess()),
-				claim("third").withRequests(deviceRequest(req0, classA, 1).withSelectors(resourceapi.DeviceSelector{CEL: &resourceapi.CELDeviceSelector{Expression: `device.attributes["driver-a"].pick == "a"`}})),
-			),
-			classes: objects(class(classA, driverA)),
-			slices: unwrapResourceSlices(
-				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
-					device(device1).withAttribute("pick", "a").withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one})),
-					device(device2).withAttribute("pick", "b").withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one})),
-				),
-				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA, counterSet(counterSet1, map[string]resource.Quantity{counter0: three})),
-			),
-			node: node(node1, region1),
-			expectResults: []any{
-				matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device1, true)),
-				matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device1, true)),
-				matchAllocationResult(localNodeSelector(node1), deviceAllocationResult(req0, driverA, pool1, device1, false)),
-			},
-			expectWithFeatures: func(results []any, matchError types.GomegaMatcher, errorIs error, features Features) ([]any, types.GomegaMatcher, error) {
-				if !features.AdminAccess {
-					return nil, g.MatchError(g.ContainSubstring("admin access is requested, but the feature is disabled")), nil
-				}
-				if !features.PartitionableDevices {
-					return nil, nil, nil
-				}
-				return results, matchError, errorIs
-			},
-		},
-		"compatibility-groups-admin-access-allow-multiple-does-not-restrict-normal-request": {
-			features: Features{PartitionableDevices: true, CompatibilityGroups: true, AdminAccess: true, ConsumableCapacity: true},
-			claimsToAllocate: objects(claim(claim0).withRequests(
-				deviceRequest(req0, classA, 1).withAdminAccess(),
-				deviceRequest(req1, classB, 1),
-			)),
-			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true), classWithAllowMultipleAllocations(classB, driverA, false)),
-			slices: unwrapResourceSlices(
-				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
-					device(device1).withAllowMultipleAllocations().withDeviceCounterConsumption(
-						deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{counter0: two}, "mig"),
-					),
-					device(device2).withDeviceCounterConsumption(
-						deviceCounterConsumptionWithGroups(counterSet1, map[string]resource.Quantity{counter0: two}, "vgpu"),
-					),
-				),
-				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
-					counterSet(counterSet1, map[string]resource.Quantity{counter0: four}),
-				),
-			),
-			node: node(node1, region1),
-			expectResults: []any{matchAllocationResult(
-				localNodeSelector(node1),
-				deviceAllocationResult(req0, driverA, pool1, device1, true),
-				deviceAllocationResult(req1, driverA, pool1, device2, false),
-			)},
-			expectWithFeatures: func(expectResults []any, expectError types.GomegaMatcher, expectErrorIs error, features Features) ([]any, types.GomegaMatcher, error) {
-				if !features.AdminAccess {
-					return nil, g.MatchError(g.ContainSubstring("admin access is requested, but the feature is disabled")), nil
-				}
-				if !features.PartitionableDevices || !features.CompatibilityGroups {
-					return nil, nil, nil
-				}
-				return expectResults, expectError, expectErrorIs
-			},
-		},
-		"partitionable-device-counter-without-value": {
-			features:         Features{PartitionableDevices: true},
-			claimsToAllocate: objects(claim(claim0).withRequests(deviceRequest(req0, classA, 1))),
-			classes:          objects(class(classA, driverA)),
-			slices: func() []*resourceapi.ResourceSlice {
-				counterSlice := sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
-					counterSet(counterSet1, map[string]resource.Quantity{counter0: one}),
-				).obj()
-				counterSlice.Spec.SharedCounters[0].Counters[counter0] = resourceapi.Counter{}
-				return append(unwrapResourceSlices(sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
-					device(device1).withDeviceCounterConsumption(deviceCounterConsumption(counterSet1, map[string]resource.Quantity{counter0: one})),
-				)), counterSlice)
-			}(),
-			node: node(node1, region1),
-		},
 		"shared-consumable-capacity-admin-request-exceeds-total": {
 			features: Features{AdminAccess: true, PartitionableDevices: true, ConsumableCapacity: true, SharedConsumableCapacity: true},
 			claimsToAllocate: objects(
